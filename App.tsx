@@ -54,7 +54,7 @@ const BASE_NAV_ITEMS_RIGHT: NavItem[] = [
   { id: 'preop',    label: 'Pre-Op Prep',    icon: Syringe,  section: 'Surgical' },
   { id: 'team',     label: 'Team Settings',  icon: Users,    section: 'Admin' },
   { id: 'audit',    label: 'Audit Log',      icon: Shield,   section: 'Admin' },
-  { id: 'settings', label: 'Ward & Lab Config', icon: Settings, section: 'Admin' },
+  { id: 'settings', label: 'Configuration', icon: Settings, section: 'Admin' },
 ];
 
 // ─── Loading Fallback ───
@@ -107,7 +107,7 @@ const App: React.FC = () => {
     discharge:    { title: 'Discharge',               description: 'Discharge summaries for all discharged patients' },
     'round-mode': { title: 'Ward Rounds',             description: 'Bedside round mode — swipe through patients' },
     audit:        { title: 'Audit Log',               description: 'System audit trail — all actions logged by user and time' },
-    settings:     { title: 'Ward & Lab Config',       description: 'Manage ward names, ICU flags, lab test types and alert thresholds' },
+    settings:     { title: 'Configuration',            description: 'Hospital settings, department presets, wards, units and lab types' },
   }), [preOpModuleName, procedureListName]);
 
   // Modal State (kept local since it's UI-only)
