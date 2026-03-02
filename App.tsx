@@ -4,6 +4,7 @@ import { Patient, ViewMode } from './types';
 import { can } from './utils/permissions';
 import LoginPage from './components/LoginPage';
 import HospitalRegisterPage from './components/HospitalRegisterPage';
+import SuperAdminPanel from './components/SuperAdminPanel';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationCenter from './components/NotificationCenter';
 import GlobalSearch from './components/GlobalSearch';
@@ -172,6 +173,11 @@ const App: React.FC = () => {
         }}
       />
     );
+  }
+
+  // ─── Super Admin ───
+  if (user?.role === 'superadmin') {
+    return <SuperAdminPanel />;
   }
 
   // ─── Render View ───

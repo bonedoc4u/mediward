@@ -121,6 +121,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const found = await findUserByEmail(email);
       if (!found) return { success: false, error: 'User role not configured. Contact admin.' };
 
+      // Check hospital approval status (superadmin bypasses this check)
+      if (found.role !== 'superadmin') {
+        const { data: hosp } = await supabase
+          .from('hospitals')
+          .select('status')
+          .eq('id', found.hospitalId)
+          .maybeSingle();
+
+        if (hosp?.status === 'pending') {
+          await supabase.auth.signOut().catch(() => {});
+          return { success: false, error: 'Your hospital registration is pending approval. You will be notified once approved.' };
+        }
+        if (hosp?.status === 'rejected') {
+          await supabase.auth.signOut().catch(() => {});
+          return { success: false, error: 'Your hospital registration was not approved. Contact support.' };
+        }
+        if (hosp?.status === 'suspended') {
+          await supabase.auth.signOut().catch(() => {});
+          return { success: false, error: 'Your hospital account has been suspended. Contact support.' };
+        }
+      }
+
       const session: AuthUser = {
         id:            authData.user.id,
         email:         found.email,

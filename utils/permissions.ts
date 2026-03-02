@@ -14,6 +14,7 @@ export type Permission =
   | 'team:manage';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  superadmin: [], // superadmin uses separate panel, doesn't need patient permissions
   admin: [
     'patient:add', 'patient:edit', 'patient:delete', 'patient:discharge',
     'rounds:write', 'labs:write', 'investigations:write',
@@ -39,6 +40,7 @@ export function can(user: AuthUser | null, permission: Permission): boolean {
 
 // Human-readable descriptions shown in Team Management
 export const ROLE_LABELS: Record<UserRole, string> = {
+  superadmin:    'Super Admin',
   admin:         'Admin',
   resident:      'Resident',
   house_surgeon: 'House Surgeon',
@@ -46,6 +48,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const ROLE_ACCESS_DESC: Record<UserRole, string> = {
+  superadmin:    'Platform owner — manage all hospitals',
   admin:         'Full access + manage users',
   resident:      'Add / edit / discharge patients, all clinical tools',
   house_surgeon: 'Add / edit patients, all clinical tools (no discharge)',
@@ -53,6 +56,7 @@ export const ROLE_ACCESS_DESC: Record<UserRole, string> = {
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
+  superadmin:    'bg-purple-100 text-purple-800',
   admin:         'bg-red-100 text-red-800',
   resident:      'bg-blue-100 text-blue-800',
   house_surgeon: 'bg-indigo-100 text-indigo-700',

@@ -159,7 +159,7 @@ export interface Patient {
 }
 
 // ─── Auth Types ───
-export type UserRole = 'attending' | 'resident' | 'house_surgeon' | 'admin';
+export type UserRole = 'attending' | 'resident' | 'house_surgeon' | 'admin' | 'superadmin';
 
 export interface AuthUser {
   id: string;
