@@ -3,3 +3,9 @@ dist/
 .env.local
 .env.*.local
 *.local
+
+# Capacitor Android - commit the project but not build artifacts
+android/.gradle/
+android/app/build/
+android/build/
+.gradle/
