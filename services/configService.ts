@@ -128,25 +128,29 @@ export async function deleteLabType(id: string): Promise<void> {
 // ─── Hospital Config ───
 
 const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
-  hospitalName: 'GOVT MEDICAL COLLEGE, KOZHIKODE',
-  department: 'DEPARTMENT OF ORTHOPAEDICS',
-  units: ['OR1', 'OR2', 'OR3', 'OR4', 'OR5'],
+  hospitalName: 'MY HOSPITAL',
+  department: 'DEPARTMENT OF MEDICINE',
+  units: ['Unit 1', 'Unit 2', 'Unit 3'],
+  preOpModuleName: 'Pre-op Clearance',
+  procedureListName: 'Procedure List',
 };
 
 export async function fetchHospitalConfig(): Promise<HospitalConfig> {
   const { data, error } = await supabase
     .from('hospital_config')
-    .select('hospital_name, department, units')
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name')
     .limit(1)
     .maybeSingle();
   if (error) throw error;
   if (!data) return DEFAULT_HOSPITAL_CONFIG;
   return {
-    hospitalName: String(data.hospital_name ?? DEFAULT_HOSPITAL_CONFIG.hospitalName),
-    department:   String(data.department   ?? DEFAULT_HOSPITAL_CONFIG.department),
+    hospitalName:      String(data.hospital_name ?? DEFAULT_HOSPITAL_CONFIG.hospitalName),
+    department:        String(data.department    ?? DEFAULT_HOSPITAL_CONFIG.department),
     units: Array.isArray(data.units) && data.units.length > 0
       ? data.units as string[]
       : DEFAULT_HOSPITAL_CONFIG.units,
+    preOpModuleName:   String(data.pre_op_module_name   ?? DEFAULT_HOSPITAL_CONFIG.preOpModuleName),
+    procedureListName: String(data.procedure_list_name  ?? DEFAULT_HOSPITAL_CONFIG.procedureListName),
   };
 }
 
@@ -162,10 +166,12 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
     const { error } = await supabase
       .from('hospital_config')
       .update({
-        hospital_name: config.hospitalName,
-        department:    config.department,
-        units:         config.units,
-        updated_at:    new Date().toISOString(),
+        hospital_name:       config.hospitalName,
+        department:          config.department,
+        units:               config.units,
+        pre_op_module_name:  config.preOpModuleName,
+        procedure_list_name: config.procedureListName,
+        updated_at:          new Date().toISOString(),
       })
       .eq('id', existing.id);
     if (error) throw error;
@@ -173,9 +179,11 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
     const { error } = await supabase
       .from('hospital_config')
       .insert({
-        hospital_name: config.hospitalName,
-        department:    config.department,
-        units:         config.units,
+        hospital_name:       config.hospitalName,
+        department:          config.department,
+        units:               config.units,
+        pre_op_module_name:  config.preOpModuleName,
+        procedure_list_name: config.procedureListName,
       });
     if (error) throw error;
   }

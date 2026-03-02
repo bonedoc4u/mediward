@@ -4,7 +4,6 @@ import { useConfig, useAuth } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { X, Save, UserPlus, Pencil, ScanLine, Loader2 } from 'lucide-react';
 
-const UNIT_OPTIONS = ['OR1', 'OR2', 'OR3', 'OR4', 'OR5'];
 
 interface Props {
   isOpen: boolean;
@@ -30,10 +29,10 @@ const COLORS = [
 ];
 
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
-  const { wards } = useConfig();
+  const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
   const activeWards = wards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
-  const defaultWard = activeWards[0]?.name ?? 'Ward 10';
+  const defaultWard = activeWards[0]?.name ?? 'Ward 1';
 
   // Non-admins are locked to their own unit; admins can assign any unit
   const isAdmin = user?.role === 'admin';
@@ -298,7 +297,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                       onChange={e => setFormData({...formData, unit: e.target.value})}
                     >
                       <option value="">— Unassigned —</option>
-                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                      {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                   ) : (
                     <input

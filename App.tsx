@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
-import { useAuth, usePatients, useUI } from './contexts/AppContext';
+import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode } from './types';
 import { can } from './utils/permissions';
 import LoginPage from './components/LoginPage';
@@ -40,47 +40,22 @@ interface NavItem {
   section: string;
 }
 
-// Primary tabs shown in the mobile bottom bar
-const MOBILE_TABS: Pick<NavItem, 'id' | 'label' | 'icon'>[] = [
-  { id: 'dashboard', label: 'Ward',   icon: LayoutDashboard },
-  { id: 'rounds',    label: 'Rounds', icon: ListChecks      },
-  { id: 'otlist',    label: 'OT',     icon: ClipboardList   },
-  { id: 'pac',       label: 'PAC',    icon: HeartPulse      },
+// Static nav items — PAC/OT labels are dynamically set inside App using config
+const BASE_NAV_ITEMS_LEFT: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard',   icon: LayoutDashboard, section: 'Overview' },
+  { id: 'pending',   label: 'Pending List', icon: ClipboardList,   section: 'Overview' },
+  { id: 'master',    label: 'Master List',  icon: Database,        section: 'Overview' },
+  { id: 'discharge', label: 'Discharge',    icon: LogOut,          section: 'Overview' },
+  { id: 'rounds',    label: 'Daily Rounds', icon: ListChecks,      section: 'Clinical Tools' },
+  { id: 'labs',      label: 'Lab Trends',   icon: Activity,        section: 'Clinical Tools' },
+  { id: 'radiology', label: 'Radiology',    icon: FileImage,       section: 'Clinical Tools' },
 ];
-
-const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
-  { id: 'pending', label: 'Pending List', icon: ClipboardList, section: 'Overview' },
-  { id: 'master', label: 'Master List', icon: Database, section: 'Overview' },
-  { id: 'discharge', label: 'Discharge', icon: LogOut, section: 'Overview' },
-  { id: 'rounds', label: 'Daily Rounds', icon: ListChecks, section: 'Clinical Tools' },
-  { id: 'labs', label: 'Lab Trends', icon: Activity, section: 'Clinical Tools' },
-  { id: 'radiology', label: 'Radiology', icon: FileImage, section: 'Clinical Tools' },
-  { id: 'pac', label: 'PAC Status', icon: HeartPulse, section: 'Surgical' },
-  { id: 'preop', label: 'Pre-Op Prep', icon: Syringe, section: 'Surgical' },
-  { id: 'otlist', label: 'OT List', icon: ClipboardList, section: 'Surgical' },
-  { id: 'team',     label: 'Team Settings',    icon: Users,    section: 'Admin' },
-  { id: 'audit',    label: 'Audit Log',        icon: Shield,   section: 'Admin' },
+const BASE_NAV_ITEMS_RIGHT: NavItem[] = [
+  { id: 'preop',    label: 'Pre-Op Prep',    icon: Syringe,  section: 'Surgical' },
+  { id: 'team',     label: 'Team Settings',  icon: Users,    section: 'Admin' },
+  { id: 'audit',    label: 'Audit Log',      icon: Shield,   section: 'Admin' },
   { id: 'settings', label: 'Ward & Lab Config', icon: Settings, section: 'Admin' },
 ];
-
-const VIEW_META: Record<ViewMode, { title: string; description: string }> = {
-  dashboard: { title: 'Ward Dashboard', description: 'Managing active In-Patients' },
-  pending: { title: 'Pending Surgery List', description: 'Active patients awaiting surgery (Pre-op)' },
-  master: { title: 'Master Patient List', description: 'Complete registry of Active and Discharged patients' },
-  radiology: { title: 'Radiology', description: 'Upload and view X-Rays, CTs and MRI scans' },
-  labs: { title: 'Clinical Lab Trends', description: 'Track Glucose (FBS/PPBS) and Inflammatory Markers (ESR/CRP)' },
-  team: { title: 'Ward Team Settings', description: 'Manage access controls and team permissions' },
-  rounds: { title: 'Daily Rounds', description: 'Daily checklist, status updates and orders' },
-  pac: { title: 'PAC Status Management', description: 'Anesthesia Clearance and Pre-op Fitness Checklist' },
-  preop: { title: 'Pre-Op Preparation', description: 'Pre-Operative Preparation Checklists for Scheduled Cases' },
-  otlist: { title: 'OT List Management', description: 'Manage Minor and Major OT lists and schedules' },
-  patient:      { title: 'Patient Detail', description: 'Comprehensive patient overview' },
-  discharge:    { title: 'Discharge',    description: 'Discharge summaries for all discharged patients' },
-  'round-mode': { title: 'Ward Rounds',  description: 'Bedside round mode — swipe through patients' },
-  audit:        { title: 'Audit Log',       description: 'System audit trail — all actions logged by user and time' },
-  settings:     { title: 'Ward & Lab Config', description: 'Manage ward names, ICU flags, lab test types and alert thresholds' },
-};
 
 // ─── Loading Fallback ───
 const ViewLoader = () => (
@@ -101,6 +76,39 @@ const App: React.FC = () => {
     currentView, navigateTo, navParams,
     isMobileMenuOpen, setIsMobileMenuOpen, isTransitioning,
   } = useUI();
+  const { preOpModuleName, procedureListName } = useConfig();
+
+  const mobileTabs = useMemo(() => [
+    { id: 'dashboard' as ViewMode, label: 'Ward',                icon: LayoutDashboard },
+    { id: 'rounds'    as ViewMode, label: 'Rounds',              icon: ListChecks      },
+    { id: 'otlist'    as ViewMode, label: procedureListName,     icon: ClipboardList   },
+    { id: 'pac'       as ViewMode, label: preOpModuleName,       icon: HeartPulse      },
+  ], [preOpModuleName, procedureListName]);
+
+  const navItems = useMemo((): NavItem[] => [
+    ...BASE_NAV_ITEMS_LEFT,
+    { id: 'pac',    label: preOpModuleName,   icon: HeartPulse,   section: 'Surgical' },
+    { id: 'otlist', label: procedureListName, icon: ClipboardList, section: 'Surgical' },
+    ...BASE_NAV_ITEMS_RIGHT,
+  ], [preOpModuleName, procedureListName]);
+
+  const viewMeta = useMemo(() => ({
+    dashboard:    { title: 'Ward Dashboard',        description: 'Managing active In-Patients' },
+    pending:      { title: 'Pending List',           description: 'Active patients awaiting procedure (Pre-op)' },
+    master:       { title: 'Master Patient List',    description: 'Complete registry of Active and Discharged patients' },
+    radiology:    { title: 'Radiology',              description: 'Upload and view X-Rays, CTs and MRI scans' },
+    labs:         { title: 'Clinical Lab Trends',    description: 'Track lab results and inflammatory markers' },
+    team:         { title: 'Team Settings',          description: 'Manage access controls and team permissions' },
+    rounds:       { title: 'Daily Rounds',           description: 'Daily checklist, status updates and orders' },
+    pac:          { title: preOpModuleName,           description: 'Pre-operative clearance and fitness assessment' },
+    preop:        { title: 'Pre-Op Preparation',     description: 'Pre-Operative Preparation Checklists for Scheduled Cases' },
+    otlist:       { title: procedureListName,         description: 'Manage scheduled procedures and surgery lists' },
+    patient:      { title: 'Patient Detail',          description: 'Comprehensive patient overview' },
+    discharge:    { title: 'Discharge',               description: 'Discharge summaries for all discharged patients' },
+    'round-mode': { title: 'Ward Rounds',             description: 'Bedside round mode — swipe through patients' },
+    audit:        { title: 'Audit Log',               description: 'System audit trail — all actions logged by user and time' },
+    settings:     { title: 'Ward & Lab Config',       description: 'Manage ward names, ICU flags, lab test types and alert thresholds' },
+  }), [preOpModuleName, procedureListName]);
 
   // Modal State (kept local since it's UI-only)
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
@@ -126,19 +134,19 @@ const App: React.FC = () => {
     setIsAddPatientModalOpen(true);
   }, []);
 
-  const meta = VIEW_META[currentView] || VIEW_META.dashboard;
+  const meta = viewMeta[currentView] || viewMeta.dashboard;
 
   // Group nav items by section — filter Team Settings to admin only
   const navSections = useMemo(() => {
     const sections: Record<string, NavItem[]> = {};
-    NAV_ITEMS
+    navItems
       .filter(item => (item.id !== 'team' && item.id !== 'audit' && item.id !== 'settings') || can(user, 'team:manage'))
       .forEach(item => {
         if (!sections[item.section]) sections[item.section] = [];
         sections[item.section].push(item);
       });
     return sections;
-  }, [user]);
+  }, [user, navItems]);
 
   // ─── Auth Guard ───
   if (!isAuthenticated) {
@@ -372,7 +380,7 @@ const App: React.FC = () => {
       {/* ─── Mobile Bottom Tab Bar ─── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
         <div className="grid grid-cols-5">
-          {MOBILE_TABS.map(tab => (
+          {mobileTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => { navigateTo(tab.id); setIsMobileMenuOpen(false); }}

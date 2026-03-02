@@ -31,6 +31,10 @@ export interface HospitalConfig {
   department: string;
   /** Clinical units in this department, e.g. ["OR1", "OR2", "OR3", "OR4", "OR5"]. */
   units: string[];
+  /** Label for the pre-op clearance module, e.g. "PAC Status" or "Pre-admission". */
+  preOpModuleName: string;
+  /** Label for the procedure list module, e.g. "OT List" or "Procedure List". */
+  procedureListName: string;
 }
 
 /** A ward row from the ward_config table. */

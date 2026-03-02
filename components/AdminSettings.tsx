@@ -1,7 +1,25 @@
 import React, { useState } from 'react';
 import { useConfig } from '../contexts/AppContext';
 import { WardConfig, LabTypeConfig } from '../types';
-import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers } from 'lucide-react';
+
+// ─── Department presets ───
+const DEPARTMENT_PRESETS = [
+  { label: 'Orthopaedics',         department: 'DEPARTMENT OF ORTHOPAEDICS',          units: ['OR1','OR2','OR3','OR4','OR5'], preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'General Surgery',      department: 'DEPARTMENT OF GENERAL SURGERY',        units: ['GS1','GS2','GS3','GS4','GS5'], preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'Neurosurgery',         department: 'DEPARTMENT OF NEUROSURGERY',           units: ['NS1','NS2','NS3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'Cardiothoracic Surgery', department: 'DEPARTMENT OF CARDIOTHORACIC SURGERY', units: ['CT1','CT2','CT3'],            preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'Gynaecology & Obs',    department: 'DEPARTMENT OF GYNAECOLOGY & OBSTETRICS', units: ['GY1','GY2','GY3','GY4'],    preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'ENT',                  department: 'DEPARTMENT OF ENT',                   units: ['EN1','EN2','EN3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'Ophthalmology',        department: 'DEPARTMENT OF OPHTHALMOLOGY',          units: ['OP1','OP2','OP3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'Urology',              department: 'DEPARTMENT OF UROLOGY',               units: ['UR1','UR2','UR3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
+  { label: 'Medicine',             department: 'DEPARTMENT OF MEDICINE',              units: ['MD1','MD2','MD3','MD4','MD5'], preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
+  { label: 'Cardiology',           department: 'DEPARTMENT OF CARDIOLOGY',            units: ['CL1','CL2','CL3','CL4'],        preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
+  { label: 'Neurology',            department: 'DEPARTMENT OF NEUROLOGY',             units: ['NL1','NL2','NL3'],              preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
+  { label: 'Paediatrics',          department: 'DEPARTMENT OF PAEDIATRICS',           units: ['PD1','PD2','PD3','PD4'],        preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
+  { label: 'Psychiatry',           department: 'DEPARTMENT OF PSYCHIATRY',            units: ['PS1','PS2','PS3'],              preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
+  { label: 'Dermatology',          department: 'DEPARTMENT OF DERMATOLOGY',           units: ['DM1','DM2'],                   preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
+];
 
 // ─── Inline editable row for a ward ───
 const WardRow: React.FC<{ ward: WardConfig; unitOptions: string[]; onSave: (w: WardConfig) => void; onDelete: (id: string) => void }> = ({ ward, unitOptions, onSave, onDelete }) => {
@@ -207,12 +225,14 @@ const LabRow: React.FC<{ lab: LabTypeConfig; onSave: (l: LabTypeConfig) => void;
 
 // ─── Main AdminSettings view ───
 const AdminSettings: React.FC = () => {
-  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, saveHospitalConfig } = useConfig();
+  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, saveHospitalConfig } = useConfig();
 
   // Hospital settings form
   const [localHospitalName, setLocalHospitalName] = useState(hospitalName);
   const [localDepartment, setLocalDepartment] = useState(department);
   const [localUnits, setLocalUnits] = useState<string[]>(unitOptions);
+  const [localPreOpName, setLocalPreOpName] = useState(preOpModuleName);
+  const [localProcedureName, setLocalProcedureName] = useState(procedureListName);
   const [newUnit, setNewUnit] = useState('');
   const [savingHospital, setSavingHospital] = useState(false);
 
@@ -224,10 +244,17 @@ const AdminSettings: React.FC = () => {
     setNewUnit('');
   };
 
+  const applyPreset = (preset: typeof DEPARTMENT_PRESETS[0]) => {
+    setLocalDepartment(preset.department);
+    setLocalUnits(preset.units);
+    setLocalPreOpName(preset.preOpModuleName);
+    setLocalProcedureName(preset.procedureListName);
+  };
+
   const handleSaveHospital = async () => {
     setSavingHospital(true);
     try {
-      await saveHospitalConfig({ hospitalName: localHospitalName, department: localDepartment, units: localUnits });
+      await saveHospitalConfig({ hospitalName: localHospitalName, department: localDepartment, units: localUnits, preOpModuleName: localPreOpName, procedureListName: localProcedureName });
     } finally { setSavingHospital(false); }
   };
 
@@ -286,6 +313,27 @@ const AdminSettings: React.FC = () => {
           <span className="text-xs text-slate-500 ml-1">Used in PDF/Excel exports</span>
         </div>
         <div className="p-4 space-y-4">
+          {/* Department Presets */}
+          <div>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Layers className="w-3.5 h-3.5 text-slate-500" />
+              <label className="text-xs font-medium text-slate-600">Quick Presets</label>
+              <span className="text-xs text-slate-400">— click to auto-fill department, units & module names</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {DEPARTMENT_PRESETS.map(p => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => applyPreset(p)}
+                  className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 rounded-full border border-slate-200 hover:border-blue-300 transition-colors font-medium"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Hospital Name</label>
@@ -304,6 +352,29 @@ const AdminSettings: React.FC = () => {
                 className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="e.g. DEPARTMENT OF ORTHOPAEDICS"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Pre-op Module Name</label>
+              <input
+                value={localPreOpName}
+                onChange={e => setLocalPreOpName(e.target.value)}
+                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. PAC Status / Pre-admission"
+              />
+              <p className="text-xs text-slate-400 mt-1">Shown in navigation and tabs</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 mb-1 block">Procedure List Name</label>
+              <input
+                value={localProcedureName}
+                onChange={e => setLocalProcedureName(e.target.value)}
+                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. OT List / Procedure List"
+              />
+              <p className="text-xs text-slate-400 mt-1">Shown in navigation and tabs</p>
             </div>
           </div>
           <div>

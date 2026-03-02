@@ -26,16 +26,18 @@ const UNIT_CHIEFS_CACHE_KEY   = 'config_unit_chiefs';
 const HOSPITAL_CONFIG_CACHE_KEY = 'config_hospital';
 
 const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
-  hospitalName: 'GOVT MEDICAL COLLEGE, KOZHIKODE',
-  department: 'DEPARTMENT OF ORTHOPAEDICS',
-  units: ['OR1', 'OR2', 'OR3', 'OR4', 'OR5'],
+  hospitalName: 'MY HOSPITAL',
+  department: 'DEPARTMENT OF MEDICINE',
+  units: ['Unit 1', 'Unit 2', 'Unit 3'],
+  preOpModuleName: 'Pre-op Clearance',
+  procedureListName: 'Procedure List',
 };
 
 // ─── Fallback defaults (used when DB is unreachable and no cache exists) ───
 const DEFAULT_WARDS: WardConfig[] = [
-  { id: 'default-icu',  name: 'Ortho ICU', sortOrder: 0, isIcu: true,  active: true },
-  { id: 'default-w24',  name: 'Ward 24',   sortOrder: 1, isIcu: false, active: true },
-  { id: 'default-w10',  name: 'Ward 10',   sortOrder: 2, isIcu: false, active: true },
+  { id: 'default-icu', name: 'ICU',    sortOrder: 0, isIcu: true,  active: true },
+  { id: 'default-w1',  name: 'Ward 1', sortOrder: 1, isIcu: false, active: true },
+  { id: 'default-w2',  name: 'Ward 2', sortOrder: 2, isIcu: false, active: true },
 ];
 const DEFAULT_LAB_TYPES: LabTypeConfig[] = [
   { id: 'default-fbs',  name: 'FBS',  unit: 'mg/dL', alertHigh: 126, category: 'Diabetes',  sortOrder: 0, active: true },
@@ -62,8 +64,12 @@ interface ConfigContextType {
   hospitalName: string;
   /** Department name (used in PDF/Excel exports). */
   department: string;
-  /** Available clinical units (e.g. ["OR1","OR2","OR3","OR4","OR5"]). */
+  /** Available clinical units. */
   unitOptions: string[];
+  /** Label for the pre-op clearance module (e.g. "PAC Status"). */
+  preOpModuleName: string;
+  /** Label for the procedure/surgery list module (e.g. "OT List"). */
+  procedureListName: string;
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
 
@@ -227,6 +233,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     hospitalName: hospitalConfig.hospitalName,
     department: hospitalConfig.department,
     unitOptions: hospitalConfig.units.length > 0 ? hospitalConfig.units : DEFAULT_HOSPITAL_CONFIG.units,
+    preOpModuleName: hospitalConfig.preOpModuleName || DEFAULT_HOSPITAL_CONFIG.preOpModuleName,
+    procedureListName: hospitalConfig.procedureListName || DEFAULT_HOSPITAL_CONFIG.procedureListName,
     saveHospitalConfig,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,

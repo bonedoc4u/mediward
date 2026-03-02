@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AppContext';
+import { useAuth, useConfig } from '../contexts/AppContext';
 import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
+  const { hospitalName, department } = useConfig();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -48,7 +49,8 @@ const LoginPage: React.FC = () => {
               <h1 className="font-bold text-2xl tracking-tight">MediWard</h1>
             </div>
             <div className="space-y-4">
-              <h2 className="text-3xl font-bold leading-tight">Orthopedic Ward Management System</h2>
+              <h2 className="text-3xl font-bold leading-tight">{hospitalName}</h2>
+              <p className="text-blue-300 text-sm font-medium">{department}</p>
               <p className="text-slate-400 text-sm leading-relaxed">
                 Daily rounds, orders, labs, imaging, and clinical calculations — all in one place.
               </p>
