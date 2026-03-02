@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AppContext';
-import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Info } from 'lucide-react';
+import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -9,7 +9,6 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showCredentials, setShowCredentials] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,36 +135,6 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Demo Credentials (collapsible) */}
-          <div className="mt-6 pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setShowCredentials(!showCredentials)}
-              className="flex items-center gap-2 text-xs text-blue-600 font-medium hover:text-blue-700 w-full justify-center"
-            >
-              <Info className="w-3.5 h-3.5" />
-              {showCredentials ? 'Hide' : 'Show'} Demo Credentials
-            </button>
-            {showCredentials && (
-              <div className="mt-3 bg-slate-50 rounded-lg p-3 space-y-2 text-xs border border-slate-100">
-                {[
-                  { email: 'dr.ortho@hospital.com', pass: 'Ortho@2024', role: 'Attending' },
-                  { email: 'resident@hospital.com', pass: 'Res@2024', role: 'Resident' },
-                  { email: 'nurse@hospital.com', pass: 'Nurse@2024', role: 'Nurse' },
-                ].map(cred => (
-                  <button
-                    key={cred.email}
-                    type="button"
-                    onClick={() => { setEmail(cred.email); setPassword(cred.pass); }}
-                    className="w-full text-left p-2 bg-white rounded border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                  >
-                    <span className="font-bold text-slate-700">{cred.role}</span>
-                    <span className="text-slate-400 ml-2">{cred.email}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
