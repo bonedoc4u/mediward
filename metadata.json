@@ -1,0 +1,7 @@
+{
+  "name": "MediWard - Orthopedic Ward Manager 1",
+  "description": "A secure, mobile-responsive ward management system for doctors to track in-patients, calculate POD automatically, and compare radiological investigations side-by-side.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

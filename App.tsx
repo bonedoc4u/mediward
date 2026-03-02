@@ -1,0 +1,411 @@
+import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useAuth, usePatients, useUI } from './contexts/AppContext';
+import { Patient, ViewMode } from './types';
+import { can } from './utils/permissions';
+import LoginPage from './components/LoginPage';
+import ErrorBoundary from './components/ErrorBoundary';
+import NotificationCenter from './components/NotificationCenter';
+import GlobalSearch from './components/GlobalSearch';
+import WardSkeleton from './components/WardSkeleton';
+import ToastContainer from './components/ToastContainer';
+import {
+  LayoutDashboard, FileImage, Menu, X, Home, ClipboardList, Database,
+  Activity, Users, HeartPulse, LogOut, Stethoscope, ListChecks, Syringe,
+  Loader2, Shield, Settings
+} from 'lucide-react';
+
+// Lazy load heavy components
+const WardDashboard = lazy(() => import('./components/WardDashboard'));
+const RadiologyComparator = lazy(() => import('./components/RadiologyComparator'));
+const LabTrends = lazy(() => import('./components/LabTrends'));
+const TeamManagement = lazy(() => import('./components/TeamManagement'));
+const AddPatientModal = lazy(() => import('./components/AddPatientModal'));
+const DailyRounds = lazy(() => import('./components/DailyRounds'));
+const PacManagement = lazy(() => import('./components/PacManagement'));
+const AiClinicalAssistant = lazy(() => import('./components/AiClinicalAssistant'));
+const OTListManagement = lazy(() => import('./components/OTListManagement'));
+const PreOpPrep = lazy(() => import('./components/PreOpPrep'));
+const PatientDetail = lazy(() => import('./components/PatientDetail'));
+const DischargeSummaryView = lazy(() => import('./components/DischargeSummary'));
+const RoundMode = lazy(() => import('./components/RoundMode'));
+const AuditLogViewer = lazy(() => import('./components/AuditLogViewer'));
+const AdminSettings = lazy(() => import('./components/AdminSettings'));
+import OfflineBanner from './components/OfflineBanner';
+
+// ─── Navigation Config ───
+interface NavItem {
+  id: ViewMode;
+  label: string;
+  icon: React.ComponentType<any>;
+  section: string;
+}
+
+// Primary tabs shown in the mobile bottom bar
+const MOBILE_TABS: Pick<NavItem, 'id' | 'label' | 'icon'>[] = [
+  { id: 'dashboard', label: 'Ward',   icon: LayoutDashboard },
+  { id: 'rounds',    label: 'Rounds', icon: ListChecks      },
+  { id: 'otlist',    label: 'OT',     icon: ClipboardList   },
+  { id: 'pac',       label: 'PAC',    icon: HeartPulse      },
+];
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'Overview' },
+  { id: 'pending', label: 'Pending List', icon: ClipboardList, section: 'Overview' },
+  { id: 'master', label: 'Master List', icon: Database, section: 'Overview' },
+  { id: 'discharge', label: 'Discharge', icon: LogOut, section: 'Overview' },
+  { id: 'rounds', label: 'Daily Rounds', icon: ListChecks, section: 'Clinical Tools' },
+  { id: 'labs', label: 'Lab Trends', icon: Activity, section: 'Clinical Tools' },
+  { id: 'radiology', label: 'Radiology', icon: FileImage, section: 'Clinical Tools' },
+  { id: 'pac', label: 'PAC Status', icon: HeartPulse, section: 'Surgical' },
+  { id: 'preop', label: 'Pre-Op Prep', icon: Syringe, section: 'Surgical' },
+  { id: 'otlist', label: 'OT List', icon: ClipboardList, section: 'Surgical' },
+  { id: 'team',     label: 'Team Settings',    icon: Users,    section: 'Admin' },
+  { id: 'audit',    label: 'Audit Log',        icon: Shield,   section: 'Admin' },
+  { id: 'settings', label: 'Ward & Lab Config', icon: Settings, section: 'Admin' },
+];
+
+const VIEW_META: Record<ViewMode, { title: string; description: string }> = {
+  dashboard: { title: 'Ward Dashboard', description: 'Managing active In-Patients' },
+  pending: { title: 'Pending Surgery List', description: 'Active patients awaiting surgery (Pre-op)' },
+  master: { title: 'Master Patient List', description: 'Complete registry of Active and Discharged patients' },
+  radiology: { title: 'Radiology', description: 'Upload and view X-Rays, CTs and MRI scans' },
+  labs: { title: 'Clinical Lab Trends', description: 'Track Glucose (FBS/PPBS) and Inflammatory Markers (ESR/CRP)' },
+  team: { title: 'Ward Team Settings', description: 'Manage access controls and team permissions' },
+  rounds: { title: 'Daily Rounds', description: 'Daily checklist, status updates and orders' },
+  pac: { title: 'PAC Status Management', description: 'Anesthesia Clearance and Pre-op Fitness Checklist' },
+  preop: { title: 'Pre-Op Preparation', description: 'Pre-Operative Preparation Checklists for Scheduled Cases' },
+  otlist: { title: 'OT List Management', description: 'Manage Minor and Major OT lists and schedules' },
+  patient:      { title: 'Patient Detail', description: 'Comprehensive patient overview' },
+  discharge:    { title: 'Discharge',    description: 'Discharge summaries for all discharged patients' },
+  'round-mode': { title: 'Ward Rounds',  description: 'Bedside round mode — swipe through patients' },
+  audit:        { title: 'Audit Log',       description: 'System audit trail — all actions logged by user and time' },
+  settings:     { title: 'Ward & Lab Config', description: 'Manage ward names, ICU flags, lab test types and alert thresholds' },
+};
+
+// ─── Loading Fallback ───
+const ViewLoader = () => (
+  <div className="flex items-center justify-center py-20">
+    <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+  </div>
+);
+
+// ─── Main App ───
+const App: React.FC = () => {
+  const { isAuthenticated, user, logout } = useAuth();
+  const {
+    patients, isLoadingPatients, updatePatient, addPatient,
+    addLabResult, addInvestigation, deleteInvestigation,
+    hasMore, isLoadingMore, loadMorePatients,
+  } = usePatients();
+  const {
+    currentView, navigateTo, navParams,
+    isMobileMenuOpen, setIsMobileMenuOpen, isTransitioning,
+  } = useUI();
+
+  // Modal State (kept local since it's UI-only)
+  const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+
+  const handleSavePatient = useCallback((patient: Patient) => {
+    if (editingPatient) {
+      updatePatient(patient);
+      setEditingPatient(null);
+    } else {
+      addPatient(patient);
+    }
+    setIsAddPatientModalOpen(false);
+  }, [editingPatient, updatePatient, addPatient]);
+
+  const openAddModal = useCallback(() => {
+    setEditingPatient(null);
+    setIsAddPatientModalOpen(true);
+  }, []);
+
+  const openEditModal = useCallback((patient: Patient) => {
+    setEditingPatient(patient);
+    setIsAddPatientModalOpen(true);
+  }, []);
+
+  const meta = VIEW_META[currentView] || VIEW_META.dashboard;
+
+  // Group nav items by section — filter Team Settings to admin only
+  const navSections = useMemo(() => {
+    const sections: Record<string, NavItem[]> = {};
+    NAV_ITEMS
+      .filter(item => (item.id !== 'team' && item.id !== 'audit' && item.id !== 'settings') || can(user, 'team:manage'))
+      .forEach(item => {
+        if (!sections[item.section]) sections[item.section] = [];
+        sections[item.section].push(item);
+      });
+    return sections;
+  }, [user]);
+
+  // ─── Auth Guard ───
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  // ─── Render View ───
+  const renderView = () => {
+    switch (currentView) {
+      case 'discharge':
+        return <DischargeSummaryView />;
+      case 'round-mode':
+        return <RoundMode />;
+      case 'audit':
+        return <AuditLogViewer />;
+      case 'settings':
+        return <AdminSettings />;
+      case 'patient':
+        return <PatientDetail />;
+      case 'radiology':
+        return (
+          <RadiologyComparator
+            patients={patients}
+            onAddInvestigation={addInvestigation}
+            onDeleteInvestigation={deleteInvestigation}
+            initialPatientId={navParams.id || ''}
+          />
+        );
+      case 'labs':
+        return <LabTrends patients={patients} onAddResult={addLabResult} />;
+      case 'rounds':
+        return <DailyRounds patients={patients} onUpdatePatient={updatePatient} />;
+      case 'team':
+        return <TeamManagement />;
+      case 'pac':
+        return <PacManagement patients={patients} onUpdatePatient={updatePatient} />;
+      case 'preop':
+        return <PreOpPrep patients={patients} onUpdatePatient={updatePatient} />;
+      case 'otlist':
+        return <OTListManagement patients={patients} onUpdatePatient={updatePatient} />;
+      default:
+        if (isLoadingPatients) return <WardSkeleton />;
+        return (
+          <WardDashboard
+            patients={patients}
+            viewMode={currentView === 'dashboard' ? 'home' : currentView as 'pending' | 'master'}
+            onAddPatient={can(user, 'patient:add') ? openAddModal : undefined}
+            onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
+            onViewPatient={(ipNo: string) => navigateTo('patient', { id: ipNo })}
+            onStartRounds={() => navigateTo('round-mode')}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={loadMorePatients}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        * { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+        .glass-effect { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+        .content-fade-in { animation: fadeIn 0.3s ease-out; }
+        .content-slide-in { animation: slideInRight 0.25s ease-out; }
+      `}</style>
+      <OfflineBanner />
+
+      {/* ─── Mobile Header ─── */}
+      <header className="md:hidden bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <Stethoscope className="w-5 h-5 text-blue-400" />
+          <span className="font-bold">MediWard</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <NotificationCenter />
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg">
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+      </header>
+
+      {/* ─── Sidebar ─── */}
+      <aside className={`
+        fixed md:sticky top-0 left-0 h-screen w-72 bg-slate-900 z-[60]
+        transform transition-transform duration-300 ease-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        flex flex-col overflow-hidden
+      `}>
+        {/* Logo */}
+        <div className="p-6 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2.5 rounded-xl shadow-lg shadow-blue-900/40">
+              <Stethoscope className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-white text-xl tracking-tight">MediWard</h1>
+              <p className="text-[10px] text-slate-500 tracking-wider uppercase">Orthopedic Unit</p>
+            </div>
+          </div>
+        </div>
+
+        {/* User Badge */}
+        {user && (
+          <div className="mx-4 mb-4 px-3 py-2 bg-slate-800/60 rounded-lg border border-slate-700/50">
+            <p className="text-xs font-semibold text-white truncate">{user.name}</p>
+            <p className="text-[10px] text-slate-400 capitalize">{user.role}</p>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-4 space-y-1">
+          {Object.entries(navSections).map(([section, items]) => (
+            <React.Fragment key={section}>
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2 px-4 mt-5 flex items-center gap-2">
+                <div className="h-px flex-1 bg-slate-800"></div>
+                <span>{section}</span>
+                <div className="h-px flex-1 bg-slate-800"></div>
+              </div>
+              {items.map(item => (
+                <button
+                  key={item.id}
+                  onClick={() => navigateTo(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
+                    currentView === item.id
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-900/50'
+                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  }`}
+                >
+                  <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
+                  <span className="font-medium text-sm">{item.label}</span>
+                  {currentView === item.id && (
+                    <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full"></div>
+                  )}
+                </button>
+              ))}
+            </React.Fragment>
+          ))}
+
+          {/* Logout */}
+          <div className="pt-3 mt-3 border-t border-slate-800/50">
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-400 hover:bg-red-900/20 hover:text-red-400 transition-all group"
+            >
+              <LogOut className="w-5 h-5 transition-transform group-hover:scale-110" />
+              <span className="font-medium text-sm">Log Out</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* Footer - Supabase sync indicator */}
+        <div className="p-4 shrink-0 border-t border-slate-800/50">
+          <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+            <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="font-medium">Synced to Cloud</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              Supabase · Real-time sync · Session expires in 8 hours.
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      {/* ─── Main Content ─── */}
+      <main className="flex-1 p-4 md:p-8 h-[calc(100vh-64px)] md:h-screen overflow-y-auto">
+        <div className="max-w-7xl mx-auto pb-20 md:pb-0">
+          {/* Header */}
+          <header className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-1">
+                  {meta.title}
+                </h2>
+                <p className="text-slate-600 text-sm">{meta.description}</p>
+              </div>
+              <div className="hidden md:flex items-center gap-2">
+                <GlobalSearch />
+                <NotificationCenter />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <Home className="w-4 h-4" />
+              <span>/</span>
+              <span className="text-blue-600 font-medium">{meta.title}</span>
+            </div>
+          </header>
+
+          {/* View Content */}
+          <div className={`${!isTransitioning
+            ? (currentView === 'patient' || currentView === 'round-mode' ? 'content-slide-in' : 'content-fade-in')
+            : 'opacity-0'} transition-opacity duration-200`}>
+            <ErrorBoundary>
+              <Suspense fallback={<ViewLoader />}>
+                {renderView()}
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+        </div>
+      </main>
+
+      {/* ─── Add/Edit Patient Modal ─── */}
+      <Suspense fallback={null}>
+        <AddPatientModal
+          isOpen={isAddPatientModalOpen}
+          onClose={() => setIsAddPatientModalOpen(false)}
+          onSave={handleSavePatient}
+          initialData={editingPatient}
+        />
+      </Suspense>
+
+      {/* ─── AI Assistant ─── */}
+      <ErrorBoundary fallbackMessage="AI Assistant encountered an error.">
+        <Suspense fallback={null}>
+          <AiClinicalAssistant patients={patients} />
+        </Suspense>
+      </ErrorBoundary>
+
+      {/* ─── Mobile Menu Overlay ─── */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* ─── Mobile Bottom Tab Bar ─── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+        <div className="grid grid-cols-5">
+          {MOBILE_TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { navigateTo(tab.id); setIsMobileMenuOpen(false); }}
+              className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
+                currentView === tab.id ? 'text-blue-600' : 'text-slate-400 active:text-slate-600'
+              }`}
+            >
+              {currentView === tab.id && (
+                <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-blue-600 rounded-full" />
+              )}
+              <tab.icon className="w-5 h-5" />
+              <span className="text-[10px] font-semibold leading-none">{tab.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
+              isMobileMenuOpen ? 'text-blue-600' : 'text-slate-400 active:text-slate-600'
+            }`}
+          >
+            {isMobileMenuOpen && (
+              <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-blue-600 rounded-full" />
+            )}
+            <Menu className="w-5 h-5" />
+            <span className="text-[10px] font-semibold leading-none">More</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ─── Toast Notifications ─── */}
+      <ToastContainer />
+    </div>
+  );
+};
+
+export default App;
