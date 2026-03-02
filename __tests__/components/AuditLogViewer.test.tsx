@@ -23,6 +23,7 @@ const makeUser = (role: AuthUser['role']): AuthUser => ({
   email: 'test@hospital.com',
   name: 'Test User',
   role,
+  hospitalId: '00000000-0000-0000-0000-000000000001',
   sessionExpiry: Date.now() + 3_600_000,
 });
 

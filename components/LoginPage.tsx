@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth, useConfig } from '../contexts/AppContext';
 import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
-const LoginPage: React.FC = () => {
+const LoginPage: React.FC<{ onRegister?: () => void }> = ({ onRegister }) => {
   const { login } = useAuth();
   const { hospitalName, department } = useConfig();
   const [email, setEmail] = useState('');
@@ -136,6 +136,18 @@ const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
+
+          {onRegister && (
+            <div className="mt-6 pt-6 border-t border-slate-100 text-center">
+              <p className="text-slate-500 text-sm">New to MediWard?</p>
+              <button
+                onClick={onRegister}
+                className="mt-1 text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors"
+              >
+                Register your hospital →
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

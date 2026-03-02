@@ -21,6 +21,17 @@ export enum PatientStatus {
 /** Ward name — now a plain string fed from the ward_config database table. */
 export type Ward = string;
 
+/** A customer hospital registered in the hospitals table. */
+export interface Hospital {
+  id: string;
+  name: string;
+  slug?: string;
+  plan: 'trial' | 'basic' | 'pro';
+  status: 'active' | 'suspended';
+  trialEndsAt?: string;
+  createdAt: string;
+}
+
 /** Lab test name — now a plain string fed from the lab_type_config database table. */
 export type LabType = string;
 
@@ -158,6 +169,8 @@ export interface AuthUser {
   ward?: Ward;
   /** Unit assignment (e.g. "OR1"). Null/undefined means admin — sees all patients. */
   unit?: string;
+  /** Hospital this user belongs to. Used to scope all DB queries via RLS. */
+  hospitalId: string;
   sessionExpiry: number;
 }
 
@@ -169,6 +182,8 @@ export interface StoredUser {
   ward?: Ward;
   /** Unit assignment (e.g. "OR1"). Null/undefined means admin — sees all patients. */
   unit?: string;
+  /** Hospital this user belongs to. */
+  hospitalId: string;
   passwordHash: string;
 }
 

@@ -3,6 +3,7 @@ import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode } from './types';
 import { can } from './utils/permissions';
 import LoginPage from './components/LoginPage';
+import HospitalRegisterPage from './components/HospitalRegisterPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationCenter from './components/NotificationCenter';
 import GlobalSearch from './components/GlobalSearch';
@@ -67,6 +68,9 @@ const ViewLoader = () => (
 // ─── Main App ───
 const App: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
+  const [showRegister, setShowRegister] = useState(
+    () => window.location.hash === '#/register',
+  );
   const {
     patients, isLoadingPatients, updatePatient, addPatient,
     addLabResult, addInvestigation, deleteInvestigation,
@@ -150,7 +154,24 @@ const App: React.FC = () => {
 
   // ─── Auth Guard ───
   if (!isAuthenticated) {
-    return <LoginPage />;
+    if (showRegister) {
+      return (
+        <HospitalRegisterPage
+          onBack={() => {
+            setShowRegister(false);
+            window.location.hash = '#/dashboard';
+          }}
+        />
+      );
+    }
+    return (
+      <LoginPage
+        onRegister={() => {
+          setShowRegister(true);
+          window.location.hash = '#/register';
+        }}
+      />
+    );
   }
 
   // ─── Render View ───

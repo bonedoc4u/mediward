@@ -16,6 +16,7 @@ interface UserRow {
   password_hash: string;
   ward: string | null;
   unit: string | null;
+  hospital_id: string;
 }
 
 function rowToUser(row: UserRow): StoredUser {
@@ -27,6 +28,7 @@ function rowToUser(row: UserRow): StoredUser {
     passwordHash: row.password_hash,
     ward:         (row.ward ?? undefined) as StoredUser['ward'],
     unit:         row.unit ?? undefined,
+    hospitalId:   row.hospital_id ?? '00000000-0000-0000-0000-000000000001',
   };
 }
 

@@ -70,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             email:        u.email,
             name:         u.name,
             role:         u.role,
+            hospitalId:   '00000000-0000-0000-0000-000000000001',
             passwordHash: hash,
           });
         }
@@ -127,6 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role:          found.role,
         ward:          found.ward,
         unit:          found.unit,
+        hospitalId:    found.hospitalId,
         sessionExpiry: Date.now() + SESSION_DURATION,
       };
       setUser(session);
@@ -159,6 +161,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role:          found.role,
       ward:          found.ward,
       unit:          found.unit,
+      hospitalId:    found.hospitalId,
       sessionExpiry: Date.now() + SESSION_DURATION,
     };
     setUser(session);
