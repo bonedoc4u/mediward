@@ -135,6 +135,8 @@ export interface Patient {
   /** Unit this patient belongs to (e.g. "OR1", "OR2"). Determines which team can see them. */
   unit?: string;
   ipNo: string;
+  /** Ayushman Bharat Health Account (ABHA) 14-digit ID — used for FHIR/NDHM interoperability. */
+  abhaId?: string;
   name: string;
   mobile: string;
   age: number;

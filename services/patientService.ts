@@ -30,6 +30,7 @@ interface ImagingRowRead {
 // ─── DB row shape (mirrors the Supabase table exactly) ───
 interface PatientRow {
   ip_no: string;
+  abha_id: string | null;
   name: string;
   mobile: string;
   age: number;
@@ -84,6 +85,7 @@ function rowToPatient(row: PatientRow): Patient {
 
   return {
     ipNo:             row.ip_no,
+    abhaId:           row.abha_id ?? undefined,
     name:             row.name,
     mobile:           row.mobile,
     age:              row.age,
@@ -115,6 +117,7 @@ function rowToPatient(row: PatientRow): Patient {
 function patientToRow(patient: Patient): Omit<PatientRow, 'created_at' | 'updated_at' | 'labs' | 'imaging'> {
   return {
     ip_no:             patient.ipNo,
+    abha_id:           patient.abhaId ?? null,
     name:              patient.name,
     mobile:            patient.mobile,
     age:               patient.age,
@@ -142,7 +145,7 @@ function patientToRow(patient: Patient): Omit<PatientRow, 'created_at' | 'update
 
 // ─── Shared SELECT string (patients columns + joined labs/imaging) ───
 const PATIENT_SELECT = [
-  'ip_no', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit', 'diagnosis', 'procedure',
+  'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit', 'diagnosis', 'procedure',
   'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'pac_status', 'patient_status',
   'daily_rounds', 'todos', 'pac_checklist', 'pre_op_checklist', 'discharge_summary',
   'created_at', 'updated_at',

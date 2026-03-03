@@ -4,17 +4,19 @@ import { PatientStatus } from '../types';
 import { can } from '../utils/permissions';
 import { getStatusColor, getLabTrend } from '../utils/calculations';
 import {
-  ArrowLeft, User, Calendar, Phone, Activity, FileImage,
-  Droplet, Flame, ClipboardCheck, CheckSquare, HeartPulse,
-  TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2
+  ArrowLeft, Calendar, Phone, Activity, FileImage,
+  Droplet, ClipboardCheck, CheckSquare, HeartPulse,
+  TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2, FileJson
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import FHIRExportModal from './FHIRExportModal';
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
   const { labTypes } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFhirExport, setShowFhirExport] = useState(false);
   const canDischarge = can(user, 'patient:discharge');
   const canDelete = can(user, 'patient:delete');
   const patient = useMemo(() => patients.find(p => p.ipNo === navParams.id), [patients, navParams.id]);
@@ -148,7 +150,7 @@ const PatientDetail: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 p-3 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
           <ClipboardCheck className="w-4 h-4 text-blue-500" /> Daily Rounds
         </button>
@@ -160,6 +162,12 @@ const PatientDetail: React.FC = () => {
         </button>
         <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 p-3 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
           <HeartPulse className="w-4 h-4 text-blue-500" /> PAC Status
+        </button>
+        <button
+          onClick={() => setShowFhirExport(true)}
+          className="flex items-center gap-2 p-3 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700"
+        >
+          <FileJson className="w-4 h-4 text-teal-600" /> Export FHIR
         </button>
         {isAlreadyDischarged ? (
           <button
@@ -210,6 +218,10 @@ const PatientDetail: React.FC = () => {
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
       />
+
+      {showFhirExport && (
+        <FHIRExportModal patient={patient} onClose={() => setShowFhirExport(false)} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Lab Trends Summary */}
