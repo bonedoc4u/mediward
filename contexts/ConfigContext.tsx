@@ -32,6 +32,10 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   units: ['Unit 1', 'Unit 2', 'Unit 3'],
   preOpModuleName: 'Pre-op Clearance',
   procedureListName: 'Procedure List',
+  preOpChecklistTemplate: [
+    'Consent', 'Pre-OP Order', 'Inj. Cefuroxime', 'Part Preparation (Shave)',
+    'Pre-OP X-Ray', 'C-Sample (Cross Match)', 'CBD (Catheter)', 'Implant Order', 'Things / Materials',
+  ],
 };
 
 // ─── Fallback defaults (used when DB is unreachable and no cache exists) ───
@@ -71,6 +75,8 @@ interface ConfigContextType {
   preOpModuleName: string;
   /** Label for the procedure/surgery list module (e.g. "OT List"). */
   procedureListName: string;
+  /** Configurable pre-op checklist item labels for the Pre-Op Prep screen. */
+  preOpChecklistTemplate: string[];
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
 
@@ -242,6 +248,9 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     unitOptions: hospitalConfig.units.length > 0 ? hospitalConfig.units : DEFAULT_HOSPITAL_CONFIG.units,
     preOpModuleName: hospitalConfig.preOpModuleName || DEFAULT_HOSPITAL_CONFIG.preOpModuleName,
     procedureListName: hospitalConfig.procedureListName || DEFAULT_HOSPITAL_CONFIG.procedureListName,
+    preOpChecklistTemplate: hospitalConfig.preOpChecklistTemplate?.length
+      ? hospitalConfig.preOpChecklistTemplate
+      : DEFAULT_HOSPITAL_CONFIG.preOpChecklistTemplate,
     saveHospitalConfig,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,

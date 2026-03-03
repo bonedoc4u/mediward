@@ -3,7 +3,7 @@ import { Patient, PacStatus, PatientStatus } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, Loader2, ChevronRight, FlaskConical, X } from 'lucide-react';
 import HandoverSummary from './HandoverSummary';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 
@@ -19,13 +19,14 @@ interface Props {
   onEditPatient?: (patient: Patient) => void;
   onViewPatient?: (ipNo: string) => void;
   onStartRounds?: () => void;
+  onAddLab?: (ipNo: string, type: string, value: number, date: string) => Promise<void>;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
 }
 
-const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, hasMore, isLoadingMore, onLoadMore }) => {
-  const { wards: configWards, icuWardNames } = useConfig();
+const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, hasMore, isLoadingMore, onLoadMore }) => {
+  const { wards: configWards, icuWardNames, labTypes } = useConfig();
   const { user } = useAuth();
 
   // For unit-scoped users: show only wards belonging to their unit + shared wards (no unit) + ICU wards.
@@ -139,6 +140,25 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   };
 
   const hasActiveFilters = filterPending || filterSurgeryToday || filterPod01 || filterOverdueTodos || searchTerm;
+
+  // ─── Quick Lab Entry state ───
+  const [quickLabIp, setQuickLabIp] = useState<string | null>(null);
+  const [quickLabType, setQuickLabType] = useState('');
+  const [quickLabValue, setQuickLabValue] = useState('');
+  const [quickLabSaving, setQuickLabSaving] = useState(false);
+
+  const handleQuickLab = async () => {
+    if (!quickLabIp || !quickLabType || !quickLabValue || !onAddLab) return;
+    setQuickLabSaving(true);
+    try {
+      await onAddLab(quickLabIp, quickLabType, parseFloat(quickLabValue), today);
+      setQuickLabIp(null);
+      setQuickLabType('');
+      setQuickLabValue('');
+    } finally {
+      setQuickLabSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -360,6 +380,22 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         );
       })}
 
+      {/* ─── Start Rounds CTA — mobile home view only ─── */}
+      {viewMode === 'home' && onStartRounds && filteredPatients.length > 0 && (
+        <div className="md:hidden">
+          <button
+            onClick={onStartRounds}
+            className="w-full flex items-center justify-between bg-gradient-to-r from-teal-700 to-teal-800 text-white p-4 rounded-xl shadow-md active:scale-[0.98] transition-transform"
+          >
+            <div>
+              <p className="font-bold text-sm">Start Ward Rounds</p>
+              <p className="text-teal-200 text-xs mt-0.5">{filteredPatients.length} patients · tap to begin</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-teal-300" />
+          </button>
+        </div>
+      )}
+
       {/* ─── Mobile: Virtualised flat card list (all wards) ─── */}
       <div className="md:hidden" ref={listRef}>
         <div
@@ -441,6 +477,15 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.patientStatus)}`}>{item.patient.patientStatus}</span>
                       </div>
                       <div className="flex gap-2 shrink-0">
+                        {onAddLab && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setQuickLabIp(item.patient.ipNo); setQuickLabType(''); setQuickLabValue(''); }}
+                            className="p-2 bg-teal-50 hover:bg-teal-100 rounded-lg text-teal-700 transition-colors"
+                            title="Quick Lab Entry"
+                          >
+                            <FlaskConical className="w-4 h-4" />
+                          </button>
+                        )}
                         {onEditPatient && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onEditPatient(item.patient); }}
@@ -484,20 +529,65 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       )}
 
       {wardsToDisplay.length === 0 && (
-        <div className="p-16 flex flex-col items-center justify-center text-slate-400 bg-white rounded-xl border border-slate-200">
-          <BedSingle className="w-12 h-12 mb-3 opacity-20" />
+        <div className="py-16 px-6 flex flex-col items-center justify-center text-slate-400 bg-white rounded-xl border border-slate-200">
           {hasActiveFilters ? (
             <>
-              <p className="font-semibold text-slate-600">No patients match this filter</p>
+              <Search className="w-10 h-10 mb-3 text-slate-300" />
+              <p className="font-semibold text-slate-600">No patients match</p>
+              <p className="text-sm text-slate-400 mt-1">Try clearing your filters</p>
               <button onClick={clearFilters} className="mt-3 text-sm text-blue-600 hover:underline">
-                Clear filters
+                Clear all filters
               </button>
             </>
-          ) : filterPending ? (
-            <p className="font-semibold text-slate-600">✓ All patients PAC cleared</p>
           ) : (
-            <p className="font-semibold text-slate-600">No patients in this view</p>
+            <>
+              <BedSingle className="w-12 h-12 mb-3 opacity-20" />
+              <p className="font-semibold text-slate-600">No patients in this view</p>
+              {onAddPatient && (
+                <button onClick={onAddPatient} className="mt-3 flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+                  <UserPlus className="w-4 h-4" /> Admit first patient
+                </button>
+              )}
+            </>
           )}
+        </div>
+      )}
+
+      {/* ─── Quick Lab Entry bottom panel — mobile only ─── */}
+      {quickLabIp && onAddLab && (
+        <div className="md:hidden fixed bottom-[calc(64px+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center justify-between mb-3">
+            <p className="font-semibold text-sm text-slate-800">Quick Lab Entry</p>
+            <button onClick={() => setQuickLabIp(null)} className="text-slate-400 hover:text-slate-600 p-1">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={quickLabType}
+              onChange={e => setQuickLabType(e.target.value)}
+              className="flex-1 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white"
+            >
+              <option value="">Select lab type…</option>
+              {labTypes.filter(l => l.active).map(lt => (
+                <option key={lt.id} value={lt.name}>{lt.name} ({lt.unit})</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              placeholder="Value"
+              value={quickLabValue}
+              onChange={e => setQuickLabValue(e.target.value)}
+              className="w-24 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+            />
+            <button
+              onClick={handleQuickLab}
+              disabled={!quickLabType || !quickLabValue || quickLabSaving}
+              className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {quickLabSaving ? '…' : 'Save'}
+            </button>
+          </div>
         </div>
       )}
     </div>

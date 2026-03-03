@@ -60,6 +60,28 @@ interface PatientRow {
   imaging?: ImagingRowRead[] | null;
 }
 
+// ─── Backward-compatible migration: old PreOpChecklist object → PacChecklistItem[] ───
+const PREOP_LABEL_MAP: Record<string, string> = {
+  cefuroxime:   'Inj. Cefuroxime',
+  consent:      'Consent',
+  cbd:          'CBD (Catheter)',
+  preOpXray:    'Pre-OP X-Ray',
+  preOpOrder:   'Pre-OP Order',
+  things:       'Things / Materials',
+  implantOrder: 'Implant Order',
+  cSample:      'C-Sample (Cross Match)',
+  shave:        'Part Preparation (Shave)',
+};
+
+function migratePreOpChecklist(raw: unknown): PacChecklistItem[] | undefined {
+  if (!raw) return undefined;
+  if (Array.isArray(raw)) return raw as PacChecklistItem[];
+  // Old format: { cefuroxime: true, consent: false, phoneNo: "..." }
+  return Object.entries(raw as Record<string, unknown>)
+    .filter(([k, v]) => k !== 'phoneNo' && typeof v === 'boolean')
+    .map(([k, v]) => ({ id: k, task: PREOP_LABEL_MAP[k] ?? k, isDone: v as boolean }));
+}
+
 // ─── DB row → TypeScript Patient ───
 function rowToPatient(row: PatientRow): Patient {
   // Map normalized labs rows → LabResult[]
@@ -108,7 +130,7 @@ function rowToPatient(row: PatientRow): Patient {
     labResults,
     todos:            Array.isArray(row.todos)            ? row.todos           : [],
     pacChecklist:     row.pac_checklist    ?? undefined,
-    preOpChecklist:   row.pre_op_checklist ?? undefined,
+    preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
   };
 }

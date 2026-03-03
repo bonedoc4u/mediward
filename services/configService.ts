@@ -124,18 +124,24 @@ export async function deleteLabType(id: string): Promise<void> {
 
 // ─── Hospital Config ───
 
+const DEFAULT_PREOP_TEMPLATE = [
+  'Consent', 'Pre-OP Order', 'Inj. Cefuroxime', 'Part Preparation (Shave)',
+  'Pre-OP X-Ray', 'C-Sample (Cross Match)', 'CBD (Catheter)', 'Implant Order', 'Things / Materials',
+];
+
 const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   hospitalName: 'MY HOSPITAL',
   department: 'DEPARTMENT OF MEDICINE',
   units: ['Unit 1', 'Unit 2', 'Unit 3'],
   preOpModuleName: 'Pre-op Clearance',
   procedureListName: 'Procedure List',
+  preOpChecklistTemplate: DEFAULT_PREOP_TEMPLATE,
 };
 
 export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
   let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name');
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template');
   if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
   const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
@@ -146,8 +152,11 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     units: Array.isArray(data.units) && data.units.length > 0
       ? data.units as string[]
       : DEFAULT_HOSPITAL_CONFIG.units,
-    preOpModuleName:   String(data.pre_op_module_name   ?? DEFAULT_HOSPITAL_CONFIG.preOpModuleName),
-    procedureListName: String(data.procedure_list_name  ?? DEFAULT_HOSPITAL_CONFIG.procedureListName),
+    preOpModuleName:        String(data.pre_op_module_name   ?? DEFAULT_HOSPITAL_CONFIG.preOpModuleName),
+    procedureListName:      String(data.procedure_list_name  ?? DEFAULT_HOSPITAL_CONFIG.procedureListName),
+    preOpChecklistTemplate: Array.isArray(data.pre_op_checklist_template) && data.pre_op_checklist_template.length > 0
+      ? data.pre_op_checklist_template as string[]
+      : DEFAULT_PREOP_TEMPLATE,
   };
 }
 
@@ -166,9 +175,10 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         hospital_name:       config.hospitalName,
         department:          config.department,
         units:               config.units,
-        pre_op_module_name:  config.preOpModuleName,
-        procedure_list_name: config.procedureListName,
-        updated_at:          new Date().toISOString(),
+        pre_op_module_name:         config.preOpModuleName,
+        procedure_list_name:        config.procedureListName,
+        pre_op_checklist_template:  config.preOpChecklistTemplate,
+        updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
     if (error) throw error;
@@ -176,11 +186,12 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
     const { error } = await supabase
       .from('hospital_config')
       .insert({
-        hospital_name:       config.hospitalName,
-        department:          config.department,
-        units:               config.units,
-        pre_op_module_name:  config.preOpModuleName,
-        procedure_list_name: config.procedureListName,
+        hospital_name:              config.hospitalName,
+        department:                 config.department,
+        units:                      config.units,
+        pre_op_module_name:         config.preOpModuleName,
+        procedure_list_name:        config.procedureListName,
+        pre_op_checklist_template:  config.preOpChecklistTemplate,
       });
     if (error) throw error;
   }

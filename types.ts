@@ -46,6 +46,9 @@ export interface HospitalConfig {
   preOpModuleName: string;
   /** Label for the procedure list module, e.g. "OT List" or "Procedure List". */
   procedureListName: string;
+  /** Configurable pre-op checklist items shown in the Pre-Op Prep screen.
+   *  Admin can customise per department. Defaults to orthopaedic items. */
+  preOpChecklistTemplate: string[];
 }
 
 /** A ward row from the ward_config table. */
@@ -104,18 +107,10 @@ export interface DailyRound {
   todos: ToDoItem[];
 }
 
-export interface PreOpChecklist {
-  cefuroxime: boolean;
-  consent: boolean;
-  cbd: boolean;
-  preOpXray: boolean;
-  preOpOrder: boolean;
-  things: boolean;
-  implantOrder: boolean;
-  cSample: boolean;
-  shave: boolean;
-  phoneNo: string;
-}
+/** Pre-op checklist — dynamic list, same structure as PacChecklistItem.
+ *  Replaces the old hardcoded 9-boolean orthopaedic-specific interface.
+ *  Old data (object format) is auto-migrated in patientService.rowToPatient. */
+export type PreOpChecklist = PacChecklistItem[];
 
 export interface DischargeSummary {
   hospitalCourse: string;

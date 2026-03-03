@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { useConfig } from '../contexts/AppContext';
 import { WardConfig, LabTypeConfig } from '../types';
-import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList } from 'lucide-react';
 
 // ─── Department presets ───
 const DEPARTMENT_PRESETS = [
-  { label: 'Orthopaedics',         department: 'DEPARTMENT OF ORTHOPAEDICS',          units: ['OR1','OR2','OR3','OR4','OR5'], preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'General Surgery',      department: 'DEPARTMENT OF GENERAL SURGERY',        units: ['GS1','GS2','GS3','GS4','GS5'], preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'Neurosurgery',         department: 'DEPARTMENT OF NEUROSURGERY',           units: ['NS1','NS2','NS3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'Cardiothoracic Surgery', department: 'DEPARTMENT OF CARDIOTHORACIC SURGERY', units: ['CT1','CT2','CT3'],            preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'Gynaecology & Obs',    department: 'DEPARTMENT OF GYNAECOLOGY & OBSTETRICS', units: ['GY1','GY2','GY3','GY4'],    preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'ENT',                  department: 'DEPARTMENT OF ENT',                   units: ['EN1','EN2','EN3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'Ophthalmology',        department: 'DEPARTMENT OF OPHTHALMOLOGY',          units: ['OP1','OP2','OP3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'Urology',              department: 'DEPARTMENT OF UROLOGY',               units: ['UR1','UR2','UR3'],              preOpModuleName: 'PAC Status',       procedureListName: 'OT List'        },
-  { label: 'Medicine',             department: 'DEPARTMENT OF MEDICINE',              units: ['MD1','MD2','MD3','MD4','MD5'], preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
-  { label: 'Cardiology',           department: 'DEPARTMENT OF CARDIOLOGY',            units: ['CL1','CL2','CL3','CL4'],        preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
-  { label: 'Neurology',            department: 'DEPARTMENT OF NEUROLOGY',             units: ['NL1','NL2','NL3'],              preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
-  { label: 'Paediatrics',          department: 'DEPARTMENT OF PAEDIATRICS',           units: ['PD1','PD2','PD3','PD4'],        preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
-  { label: 'Psychiatry',           department: 'DEPARTMENT OF PSYCHIATRY',            units: ['PS1','PS2','PS3'],              preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
-  { label: 'Dermatology',          department: 'DEPARTMENT OF DERMATOLOGY',           units: ['DM1','DM2'],                   preOpModuleName: 'Pre-admission',     procedureListName: 'Procedure List' },
+  { label: 'Orthopaedics',          department: 'DEPARTMENT OF ORTHOPAEDICS',            units: ['OR1','OR2','OR3','OR4','OR5'], preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Inj. Cefuroxime','Part Preparation (Shave)','Pre-OP X-Ray','C-Sample (Cross Match)','CBD (Catheter)','Implant Order','Things / Materials'] },
+  { label: 'General Surgery',       department: 'DEPARTMENT OF GENERAL SURGERY',          units: ['GS1','GS2','GS3','GS4','GS5'], preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Inj. Antibiotics','Part Preparation','Pre-OP X-Ray','Blood Group & Hold','CBD (Catheter)','Diathermy Setup','Instruments Ready'] },
+  { label: 'Neurosurgery',          department: 'DEPARTMENT OF NEUROSURGERY',             units: ['NS1','NS2','NS3'],              preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Inj. Antibiotics','Part Preparation (Head)','Pre-OP Imaging','Blood Group & Hold','CBD (Catheter)','Neuromonitoring Setup','Instruments Ready'] },
+  { label: 'Cardiothoracic Surgery', department: 'DEPARTMENT OF CARDIOTHORACIC SURGERY',  units: ['CT1','CT2','CT3'],              preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Inj. Antibiotics','ECG','Echocardiogram','Chest X-Ray','Blood Group & Hold','CBD (Catheter)','Bypass Machine Ready'] },
+  { label: 'Gynaecology & Obs',     department: 'DEPARTMENT OF GYNAECOLOGY & OBSTETRICS', units: ['GY1','GY2','GY3','GY4'],       preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Inj. Antibiotics','Part Preparation','Pre-OP Ultrasound','Blood Group & Hold','CBD (Catheter)','Oxytocin Ready'] },
+  { label: 'ENT',                   department: 'DEPARTMENT OF ENT',                     units: ['EN1','EN2','EN3'],              preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Inj. Antibiotics','Part Preparation','Pre-OP Audiometry','Blood Group & Hold','Tracheostomy Tray','ENT Instruments'] },
+  { label: 'Ophthalmology',         department: 'DEPARTMENT OF OPHTHALMOLOGY',            units: ['OP1','OP2','OP3'],              preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Eye Drops Administered','Pupil Dilation','Blood Group & Hold','IV Line','Ophthalmic Instruments'] },
+  { label: 'Urology',               department: 'DEPARTMENT OF UROLOGY',                 units: ['UR1','UR2','UR3'],              preOpModuleName: 'PAC Status',   procedureListName: 'OT List',        preOpChecklistTemplate: ['Consent','Pre-OP Order','Inj. Antibiotics','Part Preparation','Urine Culture Result','Blood Group & Hold','CBD (Catheter)','Urological Instruments'] },
+  { label: 'Medicine',              department: 'DEPARTMENT OF MEDICINE',                units: ['MD1','MD2','MD3','MD4','MD5'], preOpModuleName: 'Pre-admission', procedureListName: 'Procedure List', preOpChecklistTemplate: ['Consent','Medications Reviewed','IV Line','Blood Group & Hold','ECG','NPO Status Confirmed'] },
+  { label: 'Cardiology',            department: 'DEPARTMENT OF CARDIOLOGY',              units: ['CL1','CL2','CL3','CL4'],        preOpModuleName: 'Pre-admission', procedureListName: 'Procedure List', preOpChecklistTemplate: ['Consent','Medications Reviewed','IV Line','Blood Group & Hold','ECG','Echocardiogram','NPO Status Confirmed','Cath Lab Notified'] },
+  { label: 'Neurology',             department: 'DEPARTMENT OF NEUROLOGY',               units: ['NL1','NL2','NL3'],              preOpModuleName: 'Pre-admission', procedureListName: 'Procedure List', preOpChecklistTemplate: ['Consent','Medications Reviewed','IV Line','Blood Group & Hold','ECG','Neuroimaging','NPO Status Confirmed'] },
+  { label: 'Paediatrics',           department: 'DEPARTMENT OF PAEDIATRICS',             units: ['PD1','PD2','PD3','PD4'],        preOpModuleName: 'Pre-admission', procedureListName: 'Procedure List', preOpChecklistTemplate: ['Consent (Guardian)','Medications Reviewed','IV Line','Blood Group & Hold','Weight Checked','NPO Status Confirmed'] },
+  { label: 'Psychiatry',            department: 'DEPARTMENT OF PSYCHIATRY',              units: ['PS1','PS2','PS3'],              preOpModuleName: 'Pre-admission', procedureListName: 'Procedure List', preOpChecklistTemplate: ['Consent','Medications Reviewed','IV Line','Blood Group & Hold','ECG','Risk Assessment'] },
+  { label: 'Dermatology',           department: 'DEPARTMENT OF DERMATOLOGY',             units: ['DM1','DM2'],                   preOpModuleName: 'Pre-admission', procedureListName: 'Procedure List', preOpChecklistTemplate: ['Consent','Medications Reviewed','IV Line','Blood Group & Hold','Allergy Check'] },
 ];
 
 // ─── Inline editable row for a ward ───
@@ -225,7 +225,7 @@ const LabRow: React.FC<{ lab: LabTypeConfig; onSave: (l: LabTypeConfig) => void;
 
 // ─── Main AdminSettings view ───
 const AdminSettings: React.FC = () => {
-  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, saveHospitalConfig } = useConfig();
+  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, saveHospitalConfig } = useConfig();
 
   // Hospital settings form
   const [localHospitalName, setLocalHospitalName] = useState(hospitalName);
@@ -233,7 +233,9 @@ const AdminSettings: React.FC = () => {
   const [localUnits, setLocalUnits] = useState<string[]>(unitOptions);
   const [localPreOpName, setLocalPreOpName] = useState(preOpModuleName);
   const [localProcedureName, setLocalProcedureName] = useState(procedureListName);
+  const [localPreOpItems, setLocalPreOpItems] = useState<string[]>(preOpChecklistTemplate);
   const [newUnit, setNewUnit] = useState('');
+  const [newPreOpItem, setNewPreOpItem] = useState('');
   const [savingHospital, setSavingHospital] = useState(false);
 
   const handleAddUnit = () => {
@@ -244,17 +246,30 @@ const AdminSettings: React.FC = () => {
     setNewUnit('');
   };
 
+  const handleAddPreOpItem = () => {
+    const trimmed = newPreOpItem.trim();
+    if (trimmed && !localPreOpItems.includes(trimmed)) {
+      setLocalPreOpItems(prev => [...prev, trimmed]);
+    }
+    setNewPreOpItem('');
+  };
+
   const applyPreset = (preset: typeof DEPARTMENT_PRESETS[0]) => {
     setLocalDepartment(preset.department);
     setLocalUnits(preset.units);
     setLocalPreOpName(preset.preOpModuleName);
     setLocalProcedureName(preset.procedureListName);
+    setLocalPreOpItems(preset.preOpChecklistTemplate);
   };
 
   const handleSaveHospital = async () => {
     setSavingHospital(true);
     try {
-      await saveHospitalConfig({ hospitalName: localHospitalName, department: localDepartment, units: localUnits, preOpModuleName: localPreOpName, procedureListName: localProcedureName });
+      await saveHospitalConfig({
+        hospitalName: localHospitalName, department: localDepartment,
+        units: localUnits, preOpModuleName: localPreOpName,
+        procedureListName: localProcedureName, preOpChecklistTemplate: localPreOpItems,
+      });
     } finally { setSavingHospital(false); }
   };
 
@@ -417,6 +432,53 @@ const AdminSettings: React.FC = () => {
               <Save className="w-4 h-4" /> {savingHospital ? 'Saving…' : 'Save Settings'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ── Pre-Op Checklist Items ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2 bg-slate-50">
+          <ClipboardList className="w-5 h-5 text-teal-600" />
+          <h2 className="font-bold text-slate-800">Pre-Op Checklist Items</h2>
+          <span className="text-xs text-slate-500 ml-1">Shown in Pre-Op Prep screen for all departments</span>
+        </div>
+        <div className="p-4 space-y-3">
+          <p className="text-xs text-slate-500">
+            These items appear on the pre-operative checklist for every scheduled patient.
+            Apply a department preset above to auto-fill with department-specific items.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {localPreOpItems.map((item, idx) => (
+              <span key={idx} className="flex items-center gap-1.5 bg-teal-50 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-full text-xs font-medium">
+                {item}
+                <button
+                  onClick={() => setLocalPreOpItems(prev => prev.filter((_, i) => i !== idx))}
+                  className="text-teal-400 hover:text-red-600 transition-colors text-sm leading-none"
+                  title="Remove item"
+                >×</button>
+              </span>
+            ))}
+            {localPreOpItems.length === 0 && (
+              <p className="text-xs text-slate-400 italic">No items — add at least one below.</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={newPreOpItem}
+              onChange={e => setNewPreOpItem(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddPreOpItem(); }}
+              placeholder="Add checklist item, e.g. Blood Group & Hold"
+              className="flex-1 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+            />
+            <button
+              onClick={handleAddPreOpItem}
+              disabled={!newPreOpItem.trim()}
+              className="flex items-center gap-1 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add
+            </button>
+          </div>
+          <p className="text-xs text-slate-400">Changes take effect after clicking "Save Settings" above.</p>
         </div>
       </div>
 
