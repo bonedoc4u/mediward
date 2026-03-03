@@ -149,37 +149,37 @@ const PatientDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+      {/* Quick Actions — horizontal scroll on mobile, wrap on larger screens */}
+      <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-x-visible">
+        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
           <ClipboardCheck className="w-4 h-4 text-blue-500 shrink-0" /> Daily Rounds
         </button>
-        <button onClick={() => navigateTo('labs')} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+        <button onClick={() => navigateTo('labs')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
           <Droplet className="w-4 h-4 text-blue-500 shrink-0" /> Lab Trends
         </button>
-        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
           <FileImage className="w-4 h-4 text-blue-500 shrink-0" /> Radiology
         </button>
-        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
           <HeartPulse className="w-4 h-4 text-blue-500 shrink-0" /> PAC Status
         </button>
         <button
           onClick={() => setShowFhirExport(true)}
-          className="flex items-center gap-2 p-3 min-h-[44px] bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700"
+          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700 whitespace-nowrap"
         >
           <FileJson className="w-4 h-4 text-teal-600 shrink-0" /> Export FHIR
         </button>
         {isAlreadyDischarged ? (
           <button
             onClick={() => navigateTo('discharge', { id: patient.ipNo })}
-            className="flex items-center gap-2 p-3 min-h-[44px] bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700"
+            className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700 whitespace-nowrap"
           >
             <FileText className="w-4 h-4 text-teal-600 shrink-0" /> Discharge Summary
           </button>
         ) : canDischarge ? (
           <button
             onClick={() => setShowDischargeConfirm(true)}
-            className="flex items-center gap-2 p-3 min-h-[44px] bg-red-50 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-sm font-medium text-red-700"
+            className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-red-50 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-sm font-medium text-red-700 whitespace-nowrap"
           >
             <LogOut className="w-4 h-4 text-red-500 shrink-0" /> Discharge Patient
           </button>
