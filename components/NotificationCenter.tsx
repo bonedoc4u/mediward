@@ -50,7 +50,7 @@ const NotificationCenter: React.FC = () => {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="fixed right-2 top-[60px] w-[calc(100vw-16px)] max-w-96 max-h-[70vh] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden">
+          <div className="fixed right-2 w-[calc(100vw-16px)] max-w-96 max-h-[70vh] bg-white rounded-xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden" style={{ top: 'calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 60px)' }}>
             {/* Header */}
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>

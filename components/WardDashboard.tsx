@@ -555,7 +555,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       {/* ─── Quick Lab Entry bottom panel — mobile only ─── */}
       {quickLabIp && onAddLab && (
-        <div className="md:hidden fixed bottom-[calc(64px+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200">
+        <div className="md:hidden fixed left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200" style={{ bottom: 'calc(var(--bottom-nav-height, 56px) + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)))' }}>
           <div className="flex items-center justify-between mb-3">
             <p className="font-semibold text-sm text-slate-800">Quick Lab Entry</p>
             <button onClick={() => setQuickLabIp(null)} className="text-slate-400 hover:text-slate-600 p-1">

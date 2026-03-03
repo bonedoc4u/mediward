@@ -186,7 +186,9 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
     <>
       <button
         onClick={() => { setIsOpen(true); if (!alerts) generateInsights(); }}
-        className="fixed bottom-6 right-6 z-40 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg shadow-indigo-900/30 flex items-center justify-center transition-all hover:scale-105 group"
+        className="fixed right-4 z-40 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg shadow-indigo-900/30 flex items-center justify-center transition-all hover:scale-105 group"
+        style={{ bottom: 'var(--fab-bottom, calc(72px + env(safe-area-inset-bottom, 0px)))' }}
+        aria-label="Clinical Assistant"
         title="Clinical Assistant"
       >
         <Zap className="w-6 h-6 group-hover:animate-pulse" />
@@ -196,7 +198,7 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
 
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col">
+          <div className="relative w-full max-w-md bg-white flex flex-col shadow-2xl" style={{ height: '100dvh', paddingTop: 'var(--safe-area-top, env(safe-area-inset-top, 0px))', paddingBottom: 'var(--safe-area-bottom, env(safe-area-inset-bottom, 0px))' }}>
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-indigo-50/50">
               <div className="flex items-center gap-2">
                 <div className="bg-indigo-100 p-2 rounded-lg">

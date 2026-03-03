@@ -246,12 +246,21 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row overflow-x-hidden">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        :root {
+          --bottom-nav-height: 56px;
+          --safe-area-top: env(safe-area-inset-top, 0px);
+          --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+          --content-bottom-pad: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 16px);
+          --fab-bottom: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 16px);
+        }
         * { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
         .glass-effect { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
         .content-fade-in { animation: fadeIn 0.3s ease-out; }
         .content-slide-in { animation: slideInRight 0.25s ease-out; }
+        /* Horizontal scroll fade indicator */
+        .scroll-x-hint { -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%); mask-image: linear-gradient(to right, black 85%, transparent 100%); }
       `}</style>
       <OfflineBanner />
 
@@ -260,10 +269,13 @@ const App: React.FC = () => {
         {/* Safe-area spacer: fills the status-bar height on notched / display-cutout phones.
             On Android with no notch env(safe-area-inset-top) = 0 so this div collapses to zero. */}
         <div style={{ height: 'env(safe-area-inset-top)' }} />
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Stethoscope className="w-5 h-5 text-blue-400" />
-            <span className="font-bold">MediWard</span>
+        <div className="px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Stethoscope className="w-5 h-5 text-blue-400 shrink-0" />
+            <div className="min-w-0">
+              <span className="font-bold block leading-none">MediWard</span>
+              <span className="text-[10px] text-slate-400 truncate block leading-none mt-0.5">{meta.title}</span>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <NotificationCenter />
@@ -367,8 +379,8 @@ const App: React.FC = () => {
       </aside>
 
       {/* ─── Main Content ─── */}
-      <main className="flex-1 p-3 sm:p-4 md:p-8 h-[calc(100svh-56px)] md:h-screen overflow-y-auto overflow-x-hidden">
-        <div className="max-w-7xl mx-auto pb-28 md:pb-0">
+      <main className="flex-1 p-3 sm:p-4 md:p-8 md:h-screen overflow-y-auto min-w-0" style={{ height: 'calc(100svh - 56px - var(--safe-area-top, env(safe-area-inset-top, 0px)))' }}>
+        <div className="max-w-7xl mx-auto" style={{ paddingBottom: 'var(--content-bottom-pad)' }}>
 
           {/* ─── Superadmin: Viewing another hospital banner ─── */}
           {user?.role === 'superadmin' && viewingHospitalId && (
@@ -386,8 +398,8 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Header */}
-          <header className="mb-8">
+          {/* Header — desktop only (mobile uses top app bar) */}
+          <header className="hidden md:block mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 tracking-tight mb-1">
@@ -395,7 +407,7 @@ const App: React.FC = () => {
                 </h2>
                 <p className="text-slate-600 text-sm">{meta.description}</p>
               </div>
-              <div className="hidden md:flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <GlobalSearch />
                 <NotificationCenter />
               </div>
@@ -448,7 +460,7 @@ const App: React.FC = () => {
       {/* ─── Mobile Bottom Tab Bar ─── */}
       <PwaInstallBanner />
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'var(--safe-area-bottom)' }}>
         <div className="grid grid-cols-5">
           {mobileTabs.map(tab => (
             <button

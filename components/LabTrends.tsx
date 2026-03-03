@@ -181,30 +181,32 @@ const CategoryPanel: React.FC<{
         </div>
       </div>
 
-      {/* Table */}
-      <table className="w-full text-sm text-left">
-        <thead className="text-xs text-slate-500 uppercase bg-slate-50">
-          <tr>
-            <th className="px-4 py-2">Date</th>
-            {labTypes.map(lt => <th key={lt.name} className="px-4 py-2">{lt.name}</th>)}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {grouped.map(row => (
-            <tr key={row.date} className="hover:bg-slate-50">
-              <td className="px-4 py-2 text-slate-500">{row.date}</td>
-              {labTypes.map(lt => (
-                <td key={lt.name} className="px-4 py-2">
-                  {renderValueCell(row[lt.name] as number | undefined, lt)}
-                </td>
-              ))}
+      {/* Table — horizontally scrollable when many columns */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left" style={{ minWidth: `${(labTypes.length + 1) * 80}px` }}>
+          <thead className="text-xs text-slate-500 uppercase bg-slate-50">
+            <tr>
+              <th className="px-4 py-2 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Date</th>
+              {labTypes.map(lt => <th key={lt.name} className="px-4 py-2 whitespace-nowrap">{lt.name}</th>)}
             </tr>
-          ))}
-          {grouped.length === 0 && (
-            <tr><td colSpan={labTypes.length + 1} className="p-4 text-center text-slate-400 text-xs">No records found</td></tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {grouped.map(row => (
+              <tr key={row.date} className="hover:bg-slate-50">
+                <td className="px-4 py-2 text-slate-500 whitespace-nowrap sticky left-0 bg-white">{row.date}</td>
+                {labTypes.map(lt => (
+                  <td key={lt.name} className="px-4 py-2">
+                    {renderValueCell(row[lt.name] as number | undefined, lt)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {grouped.length === 0 && (
+              <tr><td colSpan={labTypes.length + 1} className="p-4 text-center text-slate-400 text-xs">No records found</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

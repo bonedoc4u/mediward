@@ -31,7 +31,7 @@ const ToastContainer: React.FC = () => {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div className="fixed right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none" style={{ bottom: 'calc(var(--content-bottom-pad, 88px) + 4px)' }}>
       {toasts.map(t => (
         <div
           key={t.id}
