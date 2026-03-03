@@ -36,7 +36,7 @@ const LoginPage: React.FC<{ onRegister?: () => void }> = ({ onRegister }) => {
       <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
 
         {/* Left Side - Brand */}
-        <div className="md:w-1/2 bg-slate-900 p-8 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="hidden md:flex md:w-1/2 bg-slate-900 p-8 text-white flex-col justify-between relative overflow-hidden">
           <div className="absolute top-0 left-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 translate-y-1/2"></div>
 
@@ -68,7 +68,7 @@ const LoginPage: React.FC<{ onRegister?: () => void }> = ({ onRegister }) => {
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
+        <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-12 flex flex-col justify-center">
           <div className="mb-8">
             <h3 className="text-2xl font-bold text-slate-800">Welcome Back</h3>
             <p className="text-slate-500 text-sm mt-1">Enter your credentials to access the dashboard.</p>
@@ -115,7 +115,7 @@ const LoginPage: React.FC<{ onRegister?: () => void }> = ({ onRegister }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-lg"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

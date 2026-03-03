@@ -281,27 +281,27 @@ const RoundMode: React.FC = () => {
       {/* ─── Main Card ─── */}
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Patient Header */}
-        <div className={`p-5 ${icuWardNames.has(patient.ward ?? '') ? 'bg-red-900' : 'bg-slate-900'} text-white`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-black text-2xl border-2 border-white/20 ${icuWardNames.has(patient.ward ?? '') ? 'bg-red-700' : 'bg-white/10'}`}>
+        <div className={`p-4 sm:p-5 ${icuWardNames.has(patient.ward ?? '') ? 'bg-red-900' : 'bg-slate-900'} text-white`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-xl flex items-center justify-center font-black text-lg sm:text-2xl border-2 border-white/20 ${icuWardNames.has(patient.ward ?? '') ? 'bg-red-700' : 'bg-white/10'}`}>
                 {patient.bed}
               </div>
-              <div>
-                <h3 className="text-xl font-bold">{patient.name}</h3>
-                <p className="text-slate-400 text-sm">{patient.age}y / {patient.gender} · {patient.ward} · IP: {patient.ipNo}</p>
+              <div className="min-w-0">
+                <h3 className="text-lg sm:text-xl font-bold truncate">{patient.name}</h3>
+                <p className="text-slate-400 text-xs sm:text-sm truncate">{patient.age}y / {patient.gender} · {patient.ward} · IP: {patient.ipNo}</p>
               </div>
             </div>
             {patient.pod !== undefined && (
-              <div className="bg-green-500/20 border border-green-400/30 rounded-xl px-4 py-2 text-center">
-                <span className="block text-[10px] uppercase font-bold text-green-300 tracking-wider">POD</span>
-                <span className="block text-3xl font-black text-green-200 leading-none">{patient.pod}</span>
+              <div className="bg-green-500/20 border border-green-400/30 rounded-xl px-3 py-1.5 text-center shrink-0">
+                <span className="block text-[9px] uppercase font-bold text-green-300 tracking-wider">POD</span>
+                <span className="block text-2xl sm:text-3xl font-black text-green-200 leading-none">{patient.pod}</span>
               </div>
             )}
           </div>
-          <div className="mt-3 pt-3 border-t border-white/10">
-            <p className="text-sm font-medium text-white">{patient.diagnosis}</p>
-            {patient.procedure && <p className="text-xs text-slate-400 mt-0.5">{patient.procedure}</p>}
+          <div className="mt-2 pt-2 border-t border-white/10">
+            <p className="text-sm font-medium text-white line-clamp-2">{patient.diagnosis}</p>
+            {patient.procedure && <p className="text-xs text-slate-400 mt-0.5 truncate">{patient.procedure}</p>}
           </div>
         </div>
 
@@ -387,7 +387,7 @@ const RoundMode: React.FC = () => {
                 ref={todoInputRef}
                 type="text"
                 placeholder="New order / task…"
-                className="flex-1 text-sm p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                className="flex-1 text-sm p-2.5 min-h-[44px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                 value={newTodoText}
                 onChange={e => setNewTodoText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTodo(); } }}
@@ -395,7 +395,7 @@ const RoundMode: React.FC = () => {
               <button
                 onClick={handleAddTodo}
                 disabled={!newTodoText.trim()}
-                className="p-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white rounded-lg transition-colors"
+                className="w-11 h-11 flex items-center justify-center bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white rounded-lg transition-colors shrink-0"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -405,11 +405,11 @@ const RoundMode: React.FC = () => {
       </div>
 
       {/* ─── Navigation & Actions ─── */}
-      <div className="mt-5 flex items-center gap-3">
+      <div className="mt-4 flex items-center gap-2">
         <button
           onClick={goPrev}
           disabled={index === 0}
-          className="p-3 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="w-11 h-11 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -417,18 +417,18 @@ const RoundMode: React.FC = () => {
         <div className="flex-1 flex gap-2">
           <button
             onClick={() => handleSave(false)}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors text-sm"
+            className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors text-sm"
           >
-            <Save className="w-4 h-4" /> Save
+            <Save className="w-4 h-4 shrink-0" /> Save
           </button>
           <button
             onClick={() => handleSave(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-sm shadow-sm"
+            className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-xs sm:text-sm shadow-sm"
           >
             {index < activePatients.length - 1 ? (
-              <>Save & Next <ChevronRight className="w-4 h-4" /></>
+              <><Save className="w-3.5 h-3.5 shrink-0" /> Save & Next</>
             ) : (
-              <>Done — Exit Rounds <X className="w-4 h-4" /></>
+              <>Done <X className="w-3.5 h-3.5 shrink-0" /></>
             )}
           </button>
         </div>
@@ -436,7 +436,7 @@ const RoundMode: React.FC = () => {
         <button
           onClick={goNext}
           disabled={index === activePatients.length - 1}
-          className="p-3 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="w-11 h-11 flex items-center justify-center shrink-0 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <ChevronRight className="w-5 h-5" />
         </button>

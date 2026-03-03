@@ -79,40 +79,40 @@ const PatientDetail: React.FC = () => {
 
       {/* Patient Header Card */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6 text-white">
-          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="bg-white/10 backdrop-blur-sm w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold border border-white/20">
+        <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-4 sm:p-6 text-white">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 backdrop-blur-sm w-14 h-14 sm:w-16 sm:h-16 shrink-0 rounded-xl flex items-center justify-center text-xl sm:text-2xl font-bold border border-white/20">
                 {patient.bed}
               </div>
-              <div>
-                <h1 className="text-2xl font-bold">{patient.name}</h1>
-                <div className="flex items-center gap-3 text-slate-300 text-sm mt-1">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold truncate">{patient.name}</h1>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-300 text-xs sm:text-sm mt-1">
                   <span>{patient.age}y / {patient.gender}</span>
-                  <span>•</span>
+                  <span className="opacity-50">•</span>
                   <span>IP: {patient.ipNo}</span>
-                  <span>•</span>
+                  <span className="opacity-50">•</span>
                   <span>{patient.ward}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
               {patient.pod !== undefined && (
-                <div className="bg-green-500/20 border border-green-400/30 rounded-xl px-4 py-2 text-center">
-                  <span className="block text-[10px] uppercase font-bold text-green-300 tracking-wider">Post-Op Day</span>
-                  <span className="block text-3xl font-black text-green-200 leading-none">{patient.pod}</span>
+                <div className="bg-green-500/20 border border-green-400/30 rounded-xl px-3 py-1.5 text-center">
+                  <span className="block text-[9px] uppercase font-bold text-green-300 tracking-wider">Post-Op Day</span>
+                  <span className="block text-2xl sm:text-3xl font-black text-green-200 leading-none">{patient.pod}</span>
                 </div>
               )}
-              <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-center">
-                <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Admitted</span>
-                <span className="block text-lg font-bold text-white leading-none">{daysSinceAdmission}d</span>
+              <div className="bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-center">
+                <span className="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">Admitted</span>
+                <span className="block text-base sm:text-lg font-bold text-white leading-none">{daysSinceAdmission}d</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
             <p className="text-sm font-medium text-slate-800 mt-0.5">{patient.diagnosis}</p>
@@ -150,38 +150,38 @@ const PatientDetail: React.FC = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 p-3 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
-          <ClipboardCheck className="w-4 h-4 text-blue-500" /> Daily Rounds
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+          <ClipboardCheck className="w-4 h-4 text-blue-500 shrink-0" /> Daily Rounds
         </button>
-        <button onClick={() => navigateTo('labs')} className="flex items-center gap-2 p-3 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
-          <Droplet className="w-4 h-4 text-blue-500" /> Lab Trends
+        <button onClick={() => navigateTo('labs')} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+          <Droplet className="w-4 h-4 text-blue-500 shrink-0" /> Lab Trends
         </button>
-        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 p-3 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
-          <FileImage className="w-4 h-4 text-blue-500" /> Radiology
+        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+          <FileImage className="w-4 h-4 text-blue-500 shrink-0" /> Radiology
         </button>
-        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 p-3 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
-          <HeartPulse className="w-4 h-4 text-blue-500" /> PAC Status
+        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 p-3 min-h-[44px] bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700">
+          <HeartPulse className="w-4 h-4 text-blue-500 shrink-0" /> PAC Status
         </button>
         <button
           onClick={() => setShowFhirExport(true)}
-          className="flex items-center gap-2 p-3 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700"
+          className="flex items-center gap-2 p-3 min-h-[44px] bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700"
         >
-          <FileJson className="w-4 h-4 text-teal-600" /> Export FHIR
+          <FileJson className="w-4 h-4 text-teal-600 shrink-0" /> Export FHIR
         </button>
         {isAlreadyDischarged ? (
           <button
             onClick={() => navigateTo('discharge', { id: patient.ipNo })}
-            className="flex items-center gap-2 p-3 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700"
+            className="flex items-center gap-2 p-3 min-h-[44px] bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700"
           >
-            <FileText className="w-4 h-4 text-teal-600" /> Discharge Summary
+            <FileText className="w-4 h-4 text-teal-600 shrink-0" /> Discharge Summary
           </button>
         ) : canDischarge ? (
           <button
             onClick={() => setShowDischargeConfirm(true)}
-            className="flex items-center gap-2 p-3 bg-red-50 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-sm font-medium text-red-700"
+            className="flex items-center gap-2 p-3 min-h-[44px] bg-red-50 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-sm font-medium text-red-700"
           >
-            <LogOut className="w-4 h-4 text-red-500" /> Discharge Patient
+            <LogOut className="w-4 h-4 text-red-500 shrink-0" /> Discharge Patient
           </button>
         ) : null}
       </div>

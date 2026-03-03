@@ -231,6 +231,9 @@ const App: React.FC = () => {
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
             onViewPatient={(ipNo: string) => navigateTo('patient', { id: ipNo })}
             onStartRounds={() => navigateTo('round-mode')}
+            onAddLab={async (ipNo, type, value, date) => {
+              addLabResult(ipNo, { id: Math.random().toString(36).substr(2, 9), date, type, value });
+            }}
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
             onLoadMore={loadMorePatients}
@@ -240,7 +243,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row overflow-x-hidden">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         * { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -253,16 +256,21 @@ const App: React.FC = () => {
       <OfflineBanner />
 
       {/* ─── Mobile Header ─── */}
-      <header className="md:hidden bg-slate-900 text-white px-4 pt-[env(safe-area-inset-top)] pb-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-2">
-          <Stethoscope className="w-5 h-5 text-blue-400" />
-          <span className="font-bold">MediWard</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <NotificationCenter />
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg">
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+      <header className="md:hidden bg-slate-900 text-white sticky top-0 z-50">
+        {/* Safe-area spacer: fills the status-bar height on notched / display-cutout phones.
+            On Android with no notch env(safe-area-inset-top) = 0 so this div collapses to zero. */}
+        <div style={{ height: 'env(safe-area-inset-top)' }} />
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Stethoscope className="w-5 h-5 text-blue-400" />
+            <span className="font-bold">MediWard</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <NotificationCenter />
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg">
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -306,7 +314,7 @@ const App: React.FC = () => {
               {items.map(item => (
                 <button
                   key={item.id}
-                  onClick={() => navigateTo(item.id)}
+                  onClick={() => { navigateTo(item.id); setIsMobileMenuOpen(false); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
                     currentView === item.id
                       ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-900/50'
@@ -359,7 +367,7 @@ const App: React.FC = () => {
       </aside>
 
       {/* ─── Main Content ─── */}
-      <main className="flex-1 p-4 md:p-8 h-[calc(100vh-64px)] md:h-screen overflow-y-auto">
+      <main className="flex-1 p-3 sm:p-4 md:p-8 h-[calc(100svh-56px)] md:h-screen overflow-y-auto overflow-x-hidden">
         <div className="max-w-7xl mx-auto pb-28 md:pb-0">
 
           {/* ─── Superadmin: Viewing another hospital banner ─── */}
@@ -382,7 +390,7 @@ const App: React.FC = () => {
           <header className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-1">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 tracking-tight mb-1">
                   {meta.title}
                 </h2>
                 <p className="text-slate-600 text-sm">{meta.description}</p>

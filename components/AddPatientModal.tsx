@@ -251,7 +251,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90svh] overflow-y-auto flex flex-col">
 
         {/* ── Sticky header with progress bar ── */}
         <div className="sticky top-0 z-10 bg-slate-50 rounded-t-lg border-b border-slate-200">
@@ -308,7 +308,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
 
           {/* Scan error banner */}
           {scanError && (
@@ -361,7 +361,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bed No.</label>
                   <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.bed} onChange={e => setFormData({...formData, bed: e.target.value})} />
@@ -370,7 +370,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">IP Number</label>
                   <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.ipNo} disabled={!!initialData} onChange={e => setFormData({...formData, ipNo: e.target.value})} />
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mobile Number</label>
                   <input type="tel" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
                 </div>
@@ -469,12 +469,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Admission</label>
                   <input type="date" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Procedure</label>
                   <input type="text" placeholder="Planned or Completed Procedure" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.procedure} onChange={e => setFormData({...formData, procedure: e.target.value})} />
                 </div>
@@ -491,20 +491,20 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           {/* ── Navigation footer ── */}
           <div className="pt-2 flex gap-3">
             {step > 1 ? (
-              <button type="button" onClick={() => setStep(s => s - 1)} className="flex-1 px-4 py-2 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
+              <button type="button" onClick={() => setStep(s => s - 1)} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
                 ← Back
               </button>
             ) : (
-              <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
+              <button type="button" onClick={onClose} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
                 Cancel
               </button>
             )}
             {step < 3 ? (
-              <button type="button" onClick={() => setStep(s => s + 1)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition-colors">
+              <button type="button" onClick={() => setStep(s => s + 1)} className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition-colors">
                 Next →
               </button>
             ) : (
-              <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded flex items-center justify-center gap-2">
+              <button type="submit" className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded flex items-center justify-center gap-2">
                 <Save className="w-4 h-4" />
                 {initialData ? 'Update Patient' : 'Admit Patient'}
               </button>

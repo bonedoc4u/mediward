@@ -318,7 +318,7 @@ const AdminSettings: React.FC = () => {
   const sortedLabs = [...labTypes].sort((a, b) => a.category.localeCompare(b.category) || a.sortOrder - b.sortOrder);
 
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-6 pb-24">
 
       {/* ── Hospital Settings ── */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -335,13 +335,13 @@ const AdminSettings: React.FC = () => {
               <label className="text-xs font-medium text-slate-600">Quick Presets</label>
               <span className="text-xs text-slate-400">— click to auto-fill department, units & module names</span>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5">
               {DEPARTMENT_PRESETS.map(p => (
                 <button
                   key={p.label}
                   type="button"
                   onClick={() => applyPreset(p)}
-                  className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 rounded-full border border-slate-200 hover:border-blue-300 transition-colors font-medium"
+                  className="px-2 py-1.5 text-xs bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors font-medium text-center truncate"
                 >
                   {p.label}
                 </button>
@@ -406,18 +406,18 @@ const AdminSettings: React.FC = () => {
                 </span>
               ))}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 value={newUnit}
                 onChange={e => setNewUnit(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleAddUnit(); }}
                 placeholder="Add unit, e.g. OR6"
-                className="w-36 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="flex-1 min-w-32 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
               <button
                 onClick={handleAddUnit}
                 disabled={!newUnit.trim()}
-                className="flex items-center gap-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 min-h-[38px] bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" /> Add
               </button>
