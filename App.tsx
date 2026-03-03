@@ -33,6 +33,7 @@ const RoundMode = lazy(() => import('./components/RoundMode'));
 const AuditLogViewer = lazy(() => import('./components/AuditLogViewer'));
 const AdminSettings = lazy(() => import('./components/AdminSettings'));
 import OfflineBanner from './components/OfflineBanner';
+import PwaInstallBanner from './components/PwaInstallBanner';
 
 // ─── Navigation Config ───
 interface NavItem {
@@ -252,7 +253,7 @@ const App: React.FC = () => {
       <OfflineBanner />
 
       {/* ─── Mobile Header ─── */}
-      <header className="md:hidden bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-50">
+      <header className="md:hidden bg-slate-900 text-white px-4 pt-[env(safe-area-inset-top)] pb-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <Stethoscope className="w-5 h-5 text-blue-400" />
           <span className="font-bold">MediWard</span>
@@ -359,7 +360,7 @@ const App: React.FC = () => {
 
       {/* ─── Main Content ─── */}
       <main className="flex-1 p-4 md:p-8 h-[calc(100vh-64px)] md:h-screen overflow-y-auto">
-        <div className="max-w-7xl mx-auto pb-20 md:pb-0">
+        <div className="max-w-7xl mx-auto pb-28 md:pb-0">
 
           {/* ─── Superadmin: Viewing another hospital banner ─── */}
           {user?.role === 'superadmin' && viewingHospitalId && (
@@ -437,7 +438,9 @@ const App: React.FC = () => {
       )}
 
       {/* ─── Mobile Bottom Tab Bar ─── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+      <PwaInstallBanner />
+
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5">
           {mobileTabs.map(tab => (
             <button
