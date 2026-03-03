@@ -69,6 +69,14 @@ const LoginPage: React.FC<{ onRegister?: () => void }> = ({ onRegister }) => {
 
         {/* Right Side - Login Form */}
         <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-12 flex flex-col justify-center">
+          {/* Mobile-only brand header */}
+          <div className="flex md:hidden items-center gap-2 mb-8">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <Stethoscope className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-xl tracking-tight text-slate-800">MediWard</span>
+          </div>
+
           <div className="mb-8">
             <h3 className="text-2xl font-bold text-slate-800">Welcome Back</h3>
             <p className="text-slate-500 text-sm mt-1">Enter your credentials to access the dashboard.</p>
