@@ -41,13 +41,13 @@ export function useApp() {
  * Order: Config (no deps) → Auth → Patient (needs auth) → UI (needs both).
  */
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ConfigProvider>
-    <AuthProvider>
+  <AuthProvider>
+    <ConfigProvider>
       <PatientProvider>
         <UIProvider>
           {children}
         </UIProvider>
       </PatientProvider>
-    </AuthProvider>
-  </ConfigProvider>
+    </ConfigProvider>
+  </AuthProvider>
 );

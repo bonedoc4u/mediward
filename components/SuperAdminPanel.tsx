@@ -11,7 +11,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Stethoscope, LogOut, RefreshCw, CheckCircle, XCircle,
   PauseCircle, PlayCircle, Clock, Building2, Users,
-  AlertTriangle, Loader2,
+  AlertTriangle, Loader2, LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AppContext';
 import {
@@ -38,7 +38,10 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const SuperAdminPanel: React.FC = () => {
+const SuperAdminPanel: React.FC<{
+  onSwitchToApp?: () => void;
+  onViewWorkspace?: (id: string, name: string) => void;
+}> = ({ onSwitchToApp, onViewWorkspace }) => {
   const { user, logout } = useAuth();
   const [hospitals, setHospitals] = useState<HospitalRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,6 +105,15 @@ const SuperAdminPanel: React.FC = () => {
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
+          {onSwitchToApp && (
+            <button
+              onClick={onSwitchToApp}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm transition-colors"
+              title="Switch to Clinical App"
+            >
+              <LayoutDashboard className="w-4 h-4" /> Clinical App
+            </button>
+          )}
           <button
             onClick={logout}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors"
@@ -221,19 +233,29 @@ const SuperAdminPanel: React.FC = () => {
                                   </>
                                 )}
                                 {(h.status === 'active' || h.status === 'suspended') && (
-                                  <button
-                                    onClick={() => handle(h.id, () => toggleSuspendHospital(h.id, h.status), h.status === 'suspended' ? `"${h.name}" reactivated` : `"${h.name}" suspended`)}
-                                    className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-                                      h.status === 'suspended'
-                                        ? 'bg-green-100 hover:bg-green-200 text-green-700'
-                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                                    }`}
-                                  >
-                                    {h.status === 'suspended'
-                                      ? <><PlayCircle className="w-3.5 h-3.5" /> Reactivate</>
-                                      : <><PauseCircle className="w-3.5 h-3.5" /> Suspend</>
-                                    }
-                                  </button>
+                                  <>
+                                    {h.status === 'active' && onViewWorkspace && (
+                                      <button
+                                        onClick={() => { onViewWorkspace(h.id, h.name); onSwitchToApp?.(); }}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold rounded-lg transition-colors"
+                                      >
+                                        <LayoutDashboard className="w-3.5 h-3.5" /> View
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handle(h.id, () => toggleSuspendHospital(h.id, h.status), h.status === 'suspended' ? `"${h.name}" reactivated` : `"${h.name}" suspended`)}
+                                      className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                                        h.status === 'suspended'
+                                          ? 'bg-green-100 hover:bg-green-200 text-green-700'
+                                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                                      }`}
+                                    >
+                                      {h.status === 'suspended'
+                                        ? <><PlayCircle className="w-3.5 h-3.5" /> Reactivate</>
+                                        : <><PauseCircle className="w-3.5 h-3.5" /> Suspend</>
+                                      }
+                                    </button>
+                                  </>
                                 )}
                               </>
                             )}

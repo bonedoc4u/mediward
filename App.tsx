@@ -68,10 +68,11 @@ const ViewLoader = () => (
 
 // ─── Main App ───
 const App: React.FC = () => {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, viewingHospitalId, viewingHospitalName, setViewingHospital } = useAuth();
   const [showRegister, setShowRegister] = useState(
     () => window.location.hash === '#/register',
   );
+  const [superAdminMode, setSuperAdminMode] = useState(true);
   const {
     patients, isLoadingPatients, updatePatient, addPatient,
     addLabResult, addInvestigation, deleteInvestigation,
@@ -81,7 +82,7 @@ const App: React.FC = () => {
     currentView, navigateTo, navParams,
     isMobileMenuOpen, setIsMobileMenuOpen, isTransitioning,
   } = useUI();
-  const { preOpModuleName, procedureListName } = useConfig();
+  const { preOpModuleName, procedureListName, hospitalName, department } = useConfig();
 
   const mobileTabs = useMemo(() => [
     { id: 'dashboard' as ViewMode, label: 'Ward',                icon: LayoutDashboard },
@@ -176,8 +177,13 @@ const App: React.FC = () => {
   }
 
   // ─── Super Admin ───
-  if (user?.role === 'superadmin') {
-    return <SuperAdminPanel />;
+  if (user?.role === 'superadmin' && superAdminMode) {
+    return (
+      <SuperAdminPanel
+        onSwitchToApp={() => setSuperAdminMode(false)}
+        onViewWorkspace={(id, name) => { setViewingHospital(id, name); setSuperAdminMode(false); }}
+      />
+    );
   }
 
   // ─── Render View ───
@@ -274,7 +280,7 @@ const App: React.FC = () => {
             </div>
             <div>
               <h1 className="font-bold text-white text-xl tracking-tight">MediWard</h1>
-              <p className="text-[10px] text-slate-500 tracking-wider uppercase">Orthopedic Unit</p>
+              <p className="text-[10px] text-slate-500 tracking-wider uppercase truncate max-w-[148px]" title={department}>{department || 'Clinical Suite'}</p>
             </div>
           </div>
         </div>
@@ -317,7 +323,16 @@ const App: React.FC = () => {
           ))}
 
           {/* Logout */}
-          <div className="pt-3 mt-3 border-t border-slate-800/50">
+          <div className="pt-3 mt-3 border-t border-slate-800/50 space-y-1">
+            {user?.role === 'superadmin' && (
+              <button
+                onClick={() => { setViewingHospital(null); setSuperAdminMode(true); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-purple-400 hover:bg-purple-900/20 hover:text-purple-300 transition-all group"
+              >
+                <Shield className="w-5 h-5 transition-transform group-hover:scale-110" />
+                <span className="font-medium text-sm">Super Admin Console</span>
+              </button>
+            )}
             <button
               onClick={logout}
               className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-400 hover:bg-red-900/20 hover:text-red-400 transition-all group"
@@ -345,6 +360,23 @@ const App: React.FC = () => {
       {/* ─── Main Content ─── */}
       <main className="flex-1 p-4 md:p-8 h-[calc(100vh-64px)] md:h-screen overflow-y-auto">
         <div className="max-w-7xl mx-auto pb-20 md:pb-0">
+
+          {/* ─── Superadmin: Viewing another hospital banner ─── */}
+          {user?.role === 'superadmin' && viewingHospitalId && (
+            <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-purple-700 text-sm font-medium">
+                <Shield className="w-4 h-4 shrink-0" />
+                Viewing workspace: <span className="font-bold">{viewingHospitalName}</span>
+              </div>
+              <button
+                onClick={() => { setViewingHospital(null); setSuperAdminMode(true); }}
+                className="text-xs text-purple-600 hover:text-purple-800 font-bold px-3 py-1 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+              >
+                ← Back to Console
+              </button>
+            </div>
+          )}
+
           {/* Header */}
           <header className="mb-8">
             <div className="flex items-center justify-between mb-4">

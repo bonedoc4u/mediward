@@ -104,10 +104,12 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  const { viewingHospitalId } = useAuth();
+
   // ─── Background Fetch — paginated (cache-first then network) ───
   // user.unit filters patients to only this unit; admins (no unit) see all.
   useEffect(() => {
-    fetchActivePatientsPage(user?.unit, 0, PATIENT_PAGE_SIZE)
+    fetchActivePatientsPage(user?.unit, 0, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined)
       .then(({ patients: data, hasMore: more }) => {
         const enriched = enrichPatientData(data);
         setPatients(enriched);
@@ -128,7 +130,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // become false showing an empty (but not broken) dashboard.
       })
       .finally(() => setIsLoadingPatients(false));
-  }, [user?.unit]);
+  }, [user?.unit, viewingHospitalId]);
 
   // ─── Offline Sync Queue — replay on reconnect ───
   useEffect(() => {

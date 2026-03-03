@@ -13,9 +13,50 @@
 import React, { useState } from 'react';
 import {
   Stethoscope, Building2, ArrowRight, ArrowLeft, CheckCircle,
-  Mail, Lock, User, Eye, EyeOff, AlertCircle, Loader2,
+  Mail, Lock, User, Eye, EyeOff, AlertCircle, Loader2, ChevronDown,
 } from 'lucide-react';
 import { registerHospital } from '../services/hospitalService';
+
+// ─── Kerala Medical Colleges ──────────────────────────────────────────────────
+const KERALA_COLLEGES = [
+  // Government
+  'Government Medical College, Thiruvananthapuram',
+  'Government Medical College, Kozhikode',
+  'Government Medical College, Kottayam',
+  'Government Medical College, Thrissur',
+  'Government Medical College, Alappuzha',
+  'Government Medical College, Ernakulam',
+  'Government Medical College, Kannur',
+  'Government Medical College, Manjeri',
+  'Government Medical College, Palakkad',
+  'Government Medical College, Kollam',
+  'Government Medical College, Kasaragod',
+  'Government Medical College, Idukki',
+  'Government Medical College, Pathanamthitta',
+  'Sree Uthradom Thirunal Academy of Medical Sciences, Thiruvananthapuram',
+  // Private / Aided
+  'Amrita Institute of Medical Sciences, Kochi',
+  'Jubilee Mission Medical College, Thrissur',
+  'Pushpagiri Medical College, Thiruvalla',
+  'Believers Church Medical College, Thiruvalla',
+  'Sree Gokulam Medical College, Thiruvananthapuram',
+  'Azeezia Medical College, Kollam',
+  'Dr. Somervell Memorial CSI Medical College, Karakonam',
+  'MES Medical College, Perinthalmanna',
+  'Malabar Medical College, Kozhikode',
+  'MOSC Medical College, Kolenchery',
+  'PK Das Medical College, Ottapalam',
+  'Noorul Islam Medical College, Thiruvananthapuram',
+  'Pariyaram Medical College, Kannur',
+  'KMCT Medical College, Kozhikode',
+  'Al Azhar Medical College, Thodupuzha',
+  'Sree Narayana Institute of Medical Sciences, Ernakulam',
+  'Kannur Medical College, Anjarakandy',
+  'Mount Zion Medical College, Pathanamthitta',
+  'DM WIMS Medical College, Wayanad',
+  'Aster MIMS, Kozhikode',
+  'Travancore Medical College, Kollam',
+];
 
 // ─── Department presets ───────────────────────────────────────────────────────
 const PRESETS: { label: string; department: string; units: string[]; preOp: string; procedure: string }[] = [
@@ -210,18 +251,23 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
                 {/* Hospital Name */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-600 uppercase">Hospital Name</label>
+                  <label className="text-xs font-bold text-slate-600 uppercase">Medical College / Hospital Name</label>
                   <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none z-10" />
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <input
-                      type="text"
+                      list="kerala-colleges"
                       required
-                      placeholder="e.g. City Medical Centre"
+                      placeholder="Type or select your college…"
                       value={hospitalName}
                       onChange={e => setHospitalName(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                      className="w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
                     />
+                    <datalist id="kerala-colleges">
+                      {KERALA_COLLEGES.map(c => <option key={c} value={c} />)}
+                    </datalist>
                   </div>
+                  <p className="text-[11px] text-slate-400">Select from the list or type your institution name.</p>
                 </div>
 
                 {/* Department Presets */}

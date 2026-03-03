@@ -34,6 +34,12 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
+  /** Superadmin: ID of the hospital workspace currently being viewed (null = own hospital). */
+  viewingHospitalId: string | null;
+  /** Superadmin: display name of the hospital being viewed. */
+  viewingHospitalName: string | null;
+  /** Set the hospital workspace the superadmin is viewing. Pass null to exit. */
+  setViewingHospital: (id: string | null, name?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -46,6 +52,14 @@ export function useAuth(): AuthContextType {
 
 // ─── Provider ───
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [viewingHospitalId, setViewingHospitalId] = useState<string | null>(null);
+  const [viewingHospitalName, setViewingHospitalName] = useState<string | null>(null);
+
+  const setViewingHospital = useCallback((id: string | null, name?: string) => {
+    setViewingHospitalId(id);
+    setViewingHospitalName(id ? (name ?? null) : null);
+  }, []);
+
   const [user, setUser] = useState<AuthUser | null>(() => {
     const saved = loadFromStorage<AuthUser>('session');
     if (saved && saved.sessionExpiry > Date.now()) return saved;
@@ -209,6 +223,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       logout,
       isAuthenticated: !!user && user.sessionExpiry > Date.now(),
+      viewingHospitalId,
+      viewingHospitalName,
+      setViewingHospital,
     }}>
       {children}
     </AuthContext.Provider>

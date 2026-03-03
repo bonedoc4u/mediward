@@ -14,7 +14,11 @@ export type Permission =
   | 'team:manage';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  superadmin: [], // superadmin uses separate panel, doesn't need patient permissions
+  superadmin: [
+    'patient:add', 'patient:edit', 'patient:delete', 'patient:discharge',
+    'rounds:write', 'labs:write', 'investigations:write',
+    'pac:write', 'preop:write', 'otlist:write', 'team:manage',
+  ],
   admin: [
     'patient:add', 'patient:edit', 'patient:delete', 'patient:discharge',
     'rounds:write', 'labs:write', 'investigations:write',

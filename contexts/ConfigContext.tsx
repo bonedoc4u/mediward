@@ -18,6 +18,7 @@ import {
 } from '../services/configService';
 import { saveToStorage, loadFromStorage } from '../services/persistence';
 import { toast } from '../utils/toast';
+import { useAuth } from './AuthContext';
 
 // ─── localStorage cache keys ───
 const WARD_CACHE_KEY          = 'config_wards';
@@ -94,6 +95,8 @@ export function useConfig(): ConfigContextType {
 
 // ─── Provider ───
 export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { viewingHospitalId } = useAuth();
+
   const [wards, setWards] = useState<WardConfig[]>(() => {
     return loadFromStorage<WardConfig[]>(WARD_CACHE_KEY) ?? DEFAULT_WARDS;
   });
@@ -120,20 +123,24 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
-  // Background fetch on mount
+  // Background fetch — re-runs when superadmin switches to a different hospital workspace
   useEffect(() => {
-    Promise.all([fetchWards(), fetchLabTypes(), fetchHospitalConfig()])
+    const hid = viewingHospitalId ?? undefined;
+    Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchHospitalConfig(hid)])
       .then(([freshWards, freshLabs, freshHospital]) => {
         setWards(freshWards);
         setLabTypes(freshLabs);
         setHospitalConfigState(freshHospital);
-        saveToStorage(WARD_CACHE_KEY, freshWards);
-        saveToStorage(LAB_CACHE_KEY, freshLabs);
-        saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, freshHospital);
+        // Only cache own-hospital config (not viewed hospitals)
+        if (!viewingHospitalId) {
+          saveToStorage(WARD_CACHE_KEY, freshWards);
+          saveToStorage(LAB_CACHE_KEY, freshLabs);
+          saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, freshHospital);
+        }
       })
       .catch(err => console.error('[Config] Failed to load from Supabase — using cache:', err))
       .finally(() => setIsLoadingConfig(false));
-  }, []);
+  }, [viewingHospitalId]);
 
   const saveHospitalConfig = useCallback(async (config: HospitalConfig) => {
     await upsertHospitalConfig(config);

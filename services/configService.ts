@@ -34,11 +34,10 @@ function parseLabRow(row: Record<string, unknown>): LabTypeConfig {
 
 // ─── Ward Config ───
 
-export async function fetchWards(): Promise<WardConfig[]> {
-  const { data, error } = await supabase
-    .from('ward_config')
-    .select('*')
-    .order('sort_order');
+export async function fetchWards(hospitalId?: string): Promise<WardConfig[]> {
+  let query = supabase.from('ward_config').select('*').order('sort_order');
+  if (hospitalId) query = query.eq('hospital_id', hospitalId);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(parseWardRow);
 }
@@ -79,12 +78,10 @@ export async function deleteWard(id: string): Promise<void> {
 
 // ─── Lab Type Config ───
 
-export async function fetchLabTypes(): Promise<LabTypeConfig[]> {
-  const { data, error } = await supabase
-    .from('lab_type_config')
-    .select('*')
-    .order('category')
-    .order('sort_order');
+export async function fetchLabTypes(hospitalId?: string): Promise<LabTypeConfig[]> {
+  let query = supabase.from('lab_type_config').select('*').order('category').order('sort_order');
+  if (hospitalId) query = query.eq('hospital_id', hospitalId);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(parseLabRow);
 }
@@ -135,12 +132,12 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   procedureListName: 'Procedure List',
 };
 
-export async function fetchHospitalConfig(): Promise<HospitalConfig> {
-  const { data, error } = await supabase
+export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
+  let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name')
-    .limit(1)
-    .maybeSingle();
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name');
+  if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
+  const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
   if (!data) return DEFAULT_HOSPITAL_CONFIG;
   return {

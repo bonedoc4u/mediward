@@ -169,6 +169,7 @@ export async function fetchActivePatientsPage(
   unit?: string,
   page = 0,
   pageSize = PATIENT_PAGE_SIZE,
+  hospitalId?: string,
 ): Promise<{ patients: Patient[]; hasMore: boolean }> {
   const from = page * pageSize;
   const to = from + pageSize; // inclusive, fetches pageSize+1 rows
@@ -180,9 +181,8 @@ export async function fetchActivePatientsPage(
     .order('created_at', { ascending: false })
     .range(from, to);
 
-  if (unit) {
-    query = query.eq('unit', unit);
-  }
+  if (unit) query = query.eq('unit', unit);
+  if (hospitalId) query = query.eq('hospital_id', hospitalId);
 
   const { data, error } = await query;
   if (error) throw new Error(`fetchActivePatientsPage: ${error.message}`);
@@ -198,7 +198,7 @@ export async function fetchActivePatientsPage(
  * Used by realtime sync handlers and offline queue replays (small targeted syncs).
  * If `unit` is provided, only that unit's patients are returned.
  */
-export async function fetchActivePatients(unit?: string): Promise<Patient[]> {
+export async function fetchActivePatients(unit?: string, hospitalId?: string): Promise<Patient[]> {
   let query = supabase
     .from('patients')
     .select(PATIENT_SELECT)
@@ -206,9 +206,8 @@ export async function fetchActivePatients(unit?: string): Promise<Patient[]> {
     .order('created_at', { ascending: false })
     .limit(500);
 
-  if (unit) {
-    query = query.eq('unit', unit);
-  }
+  if (unit) query = query.eq('unit', unit);
+  if (hospitalId) query = query.eq('hospital_id', hospitalId);
 
   const { data, error } = await query;
   if (error) throw new Error(`fetchActivePatients: ${error.message}`);
@@ -219,16 +218,15 @@ export async function fetchActivePatients(unit?: string): Promise<Patient[]> {
  * Load ALL patients including discharged — used for Master List & Discharge views.
  * If `unit` is provided, only that unit's patients are returned.
  */
-export async function fetchAllPatients(unit?: string): Promise<Patient[]> {
+export async function fetchAllPatients(unit?: string, hospitalId?: string): Promise<Patient[]> {
   let query = supabase
     .from('patients')
     .select(PATIENT_SELECT)
     .order('created_at', { ascending: false })
     .limit(1000);
 
-  if (unit) {
-    query = query.eq('unit', unit);
-  }
+  if (unit) query = query.eq('unit', unit);
+  if (hospitalId) query = query.eq('hospital_id', hospitalId);
 
   const { data, error } = await query;
   if (error) throw new Error(`fetchAllPatients: ${error.message}`);
