@@ -13,9 +13,10 @@
 import React, { useState } from 'react';
 import {
   Stethoscope, Building2, ArrowRight, ArrowLeft, CheckCircle,
-  Mail, Lock, User, Eye, EyeOff, AlertCircle, Loader2, ChevronDown,
+  Mail, Lock, User, Eye, EyeOff, AlertCircle, Loader2, ChevronDown, KeyRound,
 } from 'lucide-react';
 import { registerHospital } from '../services/hospitalService';
+import { validateInvite } from '../services/inviteService';
 
 // ─── Kerala Medical Colleges ──────────────────────────────────────────────────
 const KERALA_COLLEGES = [
@@ -75,6 +76,7 @@ const PRESETS: { label: string; department: string; units: string[]; preOp: stri
 // ─── Component ────────────────────────────────────────────────────────────────
 const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [step, setStep]               = useState<1 | 2>(1);
+  const [inviteCode, setInviteCode]   = useState('');
   const [hospitalName, setHospitalName] = useState('');
   const [department, setDepartment]   = useState('');
   const [units, setUnits]             = useState('');
@@ -98,14 +100,29 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     setUnits(preset.units.join(', '));
   };
 
-  // ─── Step 1 → Step 2 ─────────────────────────────────────────────────────
-  const goToStep2 = (e: React.FormEvent) => {
+  // ─── Step 1 → Step 2 (validates invite code) ─────────────────────────────
+  const goToStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inviteCode.trim()) {
+      setError('An invite code is required to register.');
+      return;
+    }
     if (!hospitalName.trim() || !department.trim()) {
       setError('Please fill in hospital name and department.');
       return;
     }
+    setIsLoading(true);
     setError('');
+    const inviteError = await validateInvite(
+      inviteCode.trim(),
+      hospitalName.trim(),
+      department.trim(),
+    );
+    setIsLoading(false);
+    if (inviteError) {
+      setError(inviteError);
+      return;
+    }
     setStep(2);
   };
 
@@ -135,6 +152,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       adminName:    adminName.trim(),
       adminEmail:   email.trim(),
       adminPassword: password,
+      inviteCode:   inviteCode.trim(),
     });
 
     setIsLoading(false);
@@ -249,6 +267,23 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   </div>
                 )}
 
+                {/* Invite Code */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase">Invite Code <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="XXXX-XXXX-XXXX"
+                      value={inviteCode}
+                      onChange={e => setInviteCode(e.target.value.toUpperCase())}
+                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm font-mono tracking-widest"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400">Contact the MediWard admin to receive an invite code for your college and department.</p>
+                </div>
+
                 {/* Hospital Name */}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-600 uppercase">Medical College / Hospital Name</label>
@@ -320,9 +355,10 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 mt-2"
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                 >
-                  Next <ArrowRight className="w-4 h-4" />
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Next <ArrowRight className="w-4 h-4" /></>}
                 </button>
 
                 <div className="text-center">

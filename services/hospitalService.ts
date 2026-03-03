@@ -14,6 +14,7 @@ export interface RegisterHospitalParams {
   adminName: string;
   adminEmail: string;
   adminPassword: string;
+  inviteCode: string;
 }
 
 export interface RegisterHospitalResult {
@@ -59,9 +60,18 @@ export async function registerHospital(
     p_admin_name:    params.adminName,
     p_admin_email:   params.adminEmail.toLowerCase(),
     p_auth_user_id:  authData.user.id,
+    p_invite_code:   params.inviteCode.trim().toUpperCase(),
   });
 
   if (rpcError) {
+    // Parse known error codes from the RPC
+    const msg = rpcError.message ?? '';
+    if (msg.includes('INVALID_INVITE'))
+      return { hospitalId: '', requiresEmailConfirm: false, error: 'Invite code is invalid, already used, or does not match the selected college and department.' };
+    if (msg.includes('INVITE_REQUIRED'))
+      return { hospitalId: '', requiresEmailConfirm: false, error: 'An invite code is required to register.' };
+    if (msg.includes('DUPLICATE_WORKSPACE'))
+      return { hospitalId: '', requiresEmailConfirm: false, error: 'A workspace for this department already exists at this college.' };
     return { hospitalId: '', requiresEmailConfirm: false, error: rpcError.message };
   }
 
