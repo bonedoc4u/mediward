@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import FHIRExportModal from './FHIRExportModal';
+import VitalsWidget from './VitalsWidget';
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
@@ -222,6 +223,16 @@ const PatientDetail: React.FC = () => {
       {showFhirExport && (
         <FHIRExportModal patient={patient} onClose={() => setShowFhirExport(false)} />
       )}
+
+      {/* Vital Signs */}
+      <VitalsWidget
+        vitals={patient.vitals ?? []}
+        onAdd={v => {
+          const id = Math.random().toString(36).slice(2, 11);
+          const updated = [{ ...v, id }, ...(patient.vitals ?? [])];
+          updatePatient({ ...patient, vitals: updated });
+        }}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Lab Trends Summary */}

@@ -8,7 +8,7 @@
 import { supabase } from '../lib/supabase';
 import {
   Patient, DailyRound, Investigation, LabResult, ToDoItem,
-  PacChecklistItem, PreOpChecklist, DischargeSummary,
+  PacChecklistItem, PreOpChecklist, DischargeSummary, VitalSigns,
 } from '../types';
 
 // ─── Joined row shapes from normalized tables ───
@@ -53,6 +53,7 @@ interface PatientRow {
   pac_checklist: PacChecklistItem[] | null;
   pre_op_checklist: PreOpChecklist | null;
   discharge_summary: DischargeSummary | null;
+  vitals: VitalSigns[] | null;
   created_at: string;
   updated_at: string;
   // Joined relations (present on SELECT queries, absent on Realtime payloads)
@@ -132,6 +133,7 @@ function rowToPatient(row: PatientRow): Patient {
     pacChecklist:     row.pac_checklist    ?? undefined,
     preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
+    vitals:           Array.isArray(row.vitals) ? row.vitals : [],
   };
 }
 
@@ -162,6 +164,7 @@ function patientToRow(patient: Patient): Omit<PatientRow, 'created_at' | 'update
     pac_checklist:     patient.pacChecklist     ?? null,
     pre_op_checklist:  patient.preOpChecklist   ?? null,
     discharge_summary: patient.dischargeSummary ?? null,
+    vitals:            patient.vitals           ?? null,
   };
 }
 
@@ -169,7 +172,7 @@ function patientToRow(patient: Patient): Omit<PatientRow, 'created_at' | 'update
 const PATIENT_SELECT = [
   'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit', 'diagnosis', 'procedure',
   'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'pac_status', 'patient_status',
-  'daily_rounds', 'todos', 'pac_checklist', 'pre_op_checklist', 'discharge_summary',
+  'daily_rounds', 'todos', 'pac_checklist', 'pre_op_checklist', 'discharge_summary', 'vitals',
   'created_at', 'updated_at',
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url)',

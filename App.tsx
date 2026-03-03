@@ -34,6 +34,7 @@ const AuditLogViewer = lazy(() => import('./components/AuditLogViewer'));
 const AdminSettings = lazy(() => import('./components/AdminSettings'));
 import OfflineBanner from './components/OfflineBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
+import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/ClinicalDisclaimer';
 
 // ─── Navigation Config ───
 interface NavItem {
@@ -73,6 +74,7 @@ const App: React.FC = () => {
   const [showRegister, setShowRegister] = useState(
     () => window.location.hash === '#/register',
   );
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => hasAcceptedDisclaimer());
   const [superAdminMode, setSuperAdminMode] = useState(true);
   const {
     patients, isLoadingPatients, updatePatient, addPatient,
@@ -175,6 +177,11 @@ const App: React.FC = () => {
         }}
       />
     );
+  }
+
+  // ─── Clinical Disclaimer (first login) ───
+  if (!disclaimerAccepted) {
+    return <ClinicalDisclaimer onAccept={() => setDisclaimerAccepted(true)} />;
   }
 
   // ─── Super Admin ───

@@ -81,6 +81,34 @@ export interface LabResult {
   value: number;
 }
 
+/**
+ * Vital signs observation recorded by nursing staff.
+ * All numeric fields are optional — a partial observation is still valid.
+ */
+export interface VitalSigns {
+  id: string;
+  /** ISO 8601 datetime, e.g. "2026-03-04T08:30:00" */
+  timestamp: string;
+  recordedBy?: string;
+  /** Systolic blood pressure in mmHg */
+  bpSystolic?: number;
+  /** Diastolic blood pressure in mmHg */
+  bpDiastolic?: number;
+  /** Heart rate in beats per minute */
+  heartRate?: number;
+  /** Temperature in °C */
+  temperature?: number;
+  /** Peripheral oxygen saturation % */
+  spo2?: number;
+  /** Respiratory rate in breaths/min */
+  respiratoryRate?: number;
+  /** Weight in kg */
+  weight?: number;
+  /** Pain score 0–10 (VAS) */
+  painScore?: number;
+  notes?: string;
+}
+
 export interface Investigation {
   id: string;
   date: string;
@@ -151,6 +179,8 @@ export interface Patient {
   labResults: LabResult[];
   todos: ToDoItem[];
   preOpChecklist?: PreOpChecklist;
+  /** Vital signs observations — newest first. Recorded by nursing staff. */
+  vitals?: VitalSigns[];
   dod?: string;
   dischargeSummary?: DischargeSummary;
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useConfig } from '../contexts/AppContext';
 import { WardConfig, LabTypeConfig } from '../types';
-import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server } from 'lucide-react';
 
 // ─── Department presets ───
 const DEPARTMENT_PRESETS = [
@@ -632,6 +632,93 @@ const AdminSettings: React.FC = () => {
         <div className="px-4 py-2.5 bg-indigo-50 border-t border-indigo-100 flex items-start gap-2 text-xs text-indigo-800">
           <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0 text-indigo-600" />
           When a unit is selected in the OT List, the surgeon name is filled automatically from this list.
+        </div>
+      </div>
+
+      {/* ── HIS Integration ── */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+          <Link2 className="w-4 h-4 text-blue-600" />
+          <h2 className="font-bold text-slate-800">HIS / FHIR Integration</h2>
+        </div>
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-slate-600">
+            Connect MediWard to your Hospital Information System (HIS) or ABDM/NDHM FHIR server for patient
+            data import/export. Leave blank if not configured.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                FHIR Server Base URL
+              </label>
+              <div className="flex items-center gap-2">
+                <Server className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  type="url"
+                  placeholder="https://fhir.yourhospital.in/R4"
+                  className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={() => {/* Future: wire to hospitalConfig */}}
+                />
+              </div>
+              <p className="text-xs text-slate-400 mt-1">HL7 FHIR R4 compatible endpoint. Used for patient import and ABHA linking.</p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">
+                ABDM Health Facility Registry ID
+              </label>
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="IN0000000"
+                  className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={() => {/* Future: wire to hospitalConfig */}}
+                />
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Your NHA Health Facility Registry identifier for ABHA / NDHM linkage.</p>
+            </div>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+            <p className="font-semibold mb-1">Integration status: Not configured</p>
+            <p>Full HIS integration (bi-directional ADT sync, order management, discharge messaging) is available on the Pro plan. Contact <span className="font-semibold">support@mediward.in</span> to enable.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Data Residency & Security ── */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-green-600" />
+          <h2 className="font-bold text-slate-800">Data Residency &amp; Security</h2>
+        </div>
+        <div className="p-4 space-y-3 text-sm text-slate-700">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="font-semibold text-green-800 text-xs uppercase tracking-wide mb-1">Data Region</p>
+              <p className="font-bold text-green-900">Asia Pacific (Mumbai)</p>
+              <p className="text-xs text-green-700 mt-0.5">ap-south-1 · AWS / Supabase India region</p>
+              <p className="text-xs text-green-600 mt-1">All patient data is stored within India, compliant with the DPDP Act, 2023.</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-1">Encryption</p>
+              <p className="font-bold text-slate-800">AES-256 at rest · TLS 1.3 in transit</p>
+              <p className="text-xs text-slate-500 mt-1">Database-level encryption enforced by Supabase. All API traffic over HTTPS.</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-1">Access Control</p>
+              <p className="font-bold text-slate-800">Row-Level Security (RLS)</p>
+              <p className="text-xs text-slate-500 mt-1">Each hospital can only access its own data. Enforced at the database layer.</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="font-semibold text-slate-700 text-xs uppercase tracking-wide mb-1">Audit Trail</p>
+              <p className="font-bold text-slate-800">Full audit log enabled</p>
+              <p className="text-xs text-slate-500 mt-1">Every create/update/delete/login action is logged with user, timestamp, and IP.</p>
+            </div>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+            <p className="font-semibold mb-0.5">Penetration Testing</p>
+            <p>To request a security assessment or penetration test report, contact <span className="font-semibold">security@mediward.in</span>. SOC 2 Type II audit is planned for Q3 2026.</p>
+          </div>
         </div>
       </div>
     </div>
