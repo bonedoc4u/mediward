@@ -16,7 +16,7 @@ import React, {
   createContext, useContext, useState, useEffect,
   useCallback, useMemo, useRef,
 } from 'react';
-import { Patient, LabResult, Investigation } from '../types';
+import { Patient, LabResult, Investigation, DailyRound, VitalSigns } from '../types';
 import { enrichPatientData } from '../utils/calculations';
 import { sanitizeInput } from '../utils/sanitize';
 import { logAuditEvent } from '../services/auditLog';
@@ -26,6 +26,8 @@ import {
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
+import { upsertRound } from '../services/roundsService';
+import { insertVital } from '../services/vitalsService';
 import { enqueue, getQueue, dequeue, incrementAttempts } from '../services/syncQueue';
 import {
   registerServiceWorker,
@@ -63,6 +65,10 @@ interface PatientContextType {
   addInvestigation: (patientId: string, inv: Investigation) => void;
   deleteInvestigation: (patientId: string, invId: string) => void;
   getPatient: (ipNo: string) => Patient | undefined;
+  /** Persist a daily round note to the normalized rounds table + update local state. */
+  saveRound: (patientIpNo: string, round: DailyRound) => void;
+  /** Insert a new vitals observation to the normalized table + update local state. */
+  addVitalSign: (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => Promise<void>;
 }
 
 const PatientContext = createContext<PatientContextType | null>(null);
@@ -228,6 +234,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         ...fromPayload,
                         labResults:     p.labResults,
                         investigations: p.investigations,
+                        // Normalized tables are not in the realtime payload — preserve in-memory
+                        dailyRounds:    p.dailyRounds,
+                        vitals:         p.vitals,
                       };
                     }),
                   );
@@ -446,6 +455,46 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
+  const saveRound = useCallback((patientIpNo: string, round: DailyRound) => {
+    // Optimistic local update
+    setPatients(prev => {
+      const next = prev.map(p => {
+        if (p.ipNo !== patientIpNo) return p;
+        const existing = p.dailyRounds.filter(r => r.date !== round.date);
+        return { ...p, dailyRounds: [round, ...existing] };
+      });
+      saveActiveCache(next);
+      return next;
+    });
+    // Persist to normalized rounds table
+    upsertRound(patientIpNo, user?.hospitalId, round).catch(err => {
+      console.error('[Patients] saveRound sync failed:', err);
+      toast.error('Round note may not have synced — check your connection.');
+    });
+    if (user) {
+      logAuditEvent(user.id, user.name, 'CREATE', 'round', patientIpNo,
+        `Round note saved for ${round.date}`);
+    }
+  }, [user]);
+
+  const addVitalSign = useCallback(async (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => {
+    // Write to normalized table first so we get the server-generated UUID
+    const created = await insertVital(patientIpNo, user?.hospitalId, vital);
+    // Optimistic local update
+    setPatients(prev => {
+      const next = prev.map(p =>
+        p.ipNo !== patientIpNo ? p
+          : { ...p, vitals: [created, ...(p.vitals ?? [])] },
+      );
+      saveActiveCache(next);
+      return next;
+    });
+    if (user) {
+      logAuditEvent(user.id, user.name, 'CREATE', 'vital', patientIpNo,
+        `Vitals recorded at ${vital.timestamp}`);
+    }
+  }, [user]);
+
   const getPatient = useCallback((ipNo: string) =>
     patients.find(p => p.ipNo === ipNo),
   [patients]);
@@ -467,11 +516,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addInvestigation,
     deleteInvestigation,
     getPatient,
+    saveRound,
+    addVitalSign,
   }), [
     patients, isLoadingPatients, isStale, cacheTimestamp,
     hasMore, isLoadingMore, loadMorePatients,
     hasLoadedAll, loadAllPatients, updatePatient, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation, getPatient,
+    saveRound, addVitalSign,
   ]);
 
   return <PatientContext.Provider value={value}>{children}</PatientContext.Provider>;

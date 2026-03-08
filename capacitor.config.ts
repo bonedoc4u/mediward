@@ -21,6 +21,13 @@ const config: CapacitorConfig = {
     BiometricAuth: {
       androidBiometricStrength: 'STRONG',
     },
+    Keyboard: {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      resize: 'none' as any,    // KeyboardResize.None — handle layout shifts in CSS, not WebView resize
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      style: 'dark' as any,     // KeyboardStyle.Dark
+      resizeOnFullScreen: false,
+    },
   },
 };
 

@@ -11,6 +11,28 @@ import {
   PacChecklistItem, PreOpChecklist, DischargeSummary, VitalSigns,
 } from '../types';
 
+// ─── Joined row shapes from normalized rounds / vitals tables ─────
+interface RoundsRowRead {
+  date: string;
+  note: string;
+  todos: ToDoItem[];
+}
+
+interface VitalRowRead {
+  id: string;
+  timestamp: string;
+  recorded_by: string | null;
+  bp_systolic: number | null;
+  bp_diastolic: number | null;
+  heart_rate: number | null;
+  temperature: string | null;
+  spo2: number | null;
+  respiratory_rate: number | null;
+  weight: string | null;
+  pain_score: number | null;
+  notes: string | null;
+}
+
 // ─── Joined row shapes from normalized tables ───
 interface LabRowRead {
   id: string;
@@ -48,17 +70,20 @@ interface PatientRow {
   pod: number | null;
   pac_status: string;
   patient_status: string;
-  daily_rounds: DailyRound[];
+  // Still present in DB (legacy JSONB) — used as fallback when normalized tables have no data
+  daily_rounds?: DailyRound[] | null;
   todos: ToDoItem[];
   pac_checklist: PacChecklistItem[] | null;
   pre_op_checklist: PreOpChecklist | null;
   discharge_summary: DischargeSummary | null;
-  vitals: VitalSigns[] | null;
+  vitals?: VitalSigns[] | null;
   created_at: string;
   updated_at: string;
-  // Joined relations (present on SELECT queries, absent on Realtime payloads)
+  // Joined relations from normalized tables
   labs?: LabRowRead[] | null;
   imaging?: ImagingRowRead[] | null;
+  rounds?: RoundsRowRead[] | null;
+  patient_vitals?: VitalRowRead[] | null;
 }
 
 // ─── Backward-compatible migration: old PreOpChecklist object → PacChecklistItem[] ───
@@ -106,6 +131,29 @@ function rowToPatient(row: PatientRow): Patient {
       }))
     : [];
 
+  // Rounds: prefer normalized table; fall back to legacy JSONB for backward compat
+  const dailyRounds: DailyRound[] = Array.isArray(row.rounds) && row.rounds.length > 0
+    ? row.rounds.map(r => ({ date: r.date, note: r.note, todos: Array.isArray(r.todos) ? r.todos : [] }))
+    : Array.isArray(row.daily_rounds) ? row.daily_rounds : [];
+
+  // Vitals: prefer normalized table; fall back to legacy JSONB
+  const vitals: VitalSigns[] = Array.isArray(row.patient_vitals) && row.patient_vitals.length > 0
+    ? row.patient_vitals.map(v => ({
+        id:              v.id,
+        timestamp:       v.timestamp,
+        recordedBy:      v.recorded_by      ?? undefined,
+        bpSystolic:      v.bp_systolic      ?? undefined,
+        bpDiastolic:     v.bp_diastolic     ?? undefined,
+        heartRate:       v.heart_rate       ?? undefined,
+        temperature:     v.temperature != null ? Number(v.temperature) : undefined,
+        spo2:            v.spo2             ?? undefined,
+        respiratoryRate: v.respiratory_rate ?? undefined,
+        weight:          v.weight != null   ? Number(v.weight)       : undefined,
+        painScore:       v.pain_score       ?? undefined,
+        notes:           v.notes            ?? undefined,
+      }))
+    : Array.isArray(row.vitals) ? row.vitals : [];
+
   return {
     ipNo:             row.ip_no,
     abhaId:           row.abha_id ?? undefined,
@@ -126,19 +174,21 @@ function rowToPatient(row: PatientRow): Patient {
     pod:              row.pod              ?? undefined,
     pacStatus:        row.pac_status       as Patient['pacStatus'],
     patientStatus:    row.patient_status,
-    dailyRounds:      Array.isArray(row.daily_rounds)    ? row.daily_rounds    : [],
+    dailyRounds,
     investigations,
     labResults,
     todos:            Array.isArray(row.todos)            ? row.todos           : [],
     pacChecklist:     row.pac_checklist    ?? undefined,
     preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
-    vitals:           Array.isArray(row.vitals) ? row.vitals : [],
+    vitals,
   };
 }
 
-// ─── TypeScript Patient → DB row (labs/imaging excluded — written via services) ───
-function patientToRow(patient: Patient): Omit<PatientRow, 'created_at' | 'updated_at' | 'labs' | 'imaging'> {
+// ─── TypeScript Patient → DB row ───
+// NOTE: daily_rounds and vitals are now written via roundsService / vitalsService.
+//       We still write todos here (small JSONB, part of the main patient record).
+function patientToRow(patient: Patient) {
   return {
     ip_no:             patient.ipNo,
     abha_id:           patient.abhaId ?? null,
@@ -159,23 +209,28 @@ function patientToRow(patient: Patient): Omit<PatientRow, 'created_at' | 'update
     pod:               patient.pod              ?? null,
     pac_status:        patient.pacStatus,
     patient_status:    patient.patientStatus,
-    daily_rounds:      patient.dailyRounds,
     todos:             patient.todos,
     pac_checklist:     patient.pacChecklist     ?? null,
     pre_op_checklist:  patient.preOpChecklist   ?? null,
     discharge_summary: patient.dischargeSummary ?? null,
-    vitals:            patient.vitals           ?? null,
+    // daily_rounds and vitals intentionally omitted — normalized tables own these
   };
 }
 
-// ─── Shared SELECT string (patients columns + joined labs/imaging) ───
+// ─── Shared SELECT string ────────────────────────────────────────────────────
+// daily_rounds and vitals JSONB columns are excluded — data comes from the
+// normalized rounds and patient_vitals tables (joined below).
+// The legacy JSONB columns remain in the DB as backup but are not queried.
 const PATIENT_SELECT = [
-  'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit', 'diagnosis', 'procedure',
-  'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'pac_status', 'patient_status',
-  'daily_rounds', 'todos', 'pac_checklist', 'pre_op_checklist', 'discharge_summary', 'vitals',
-  'created_at', 'updated_at',
+  'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
+  'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
+  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
+  'discharge_summary', 'created_at', 'updated_at',
+  // Normalized tables
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url)',
+  'rounds(date, note, todos)',
+  'patient_vitals(id, timestamp, recorded_by, bp_systolic, bp_diastolic, heart_rate, temperature, spo2, respiratory_rate, weight, pain_score, notes)',
 ].join(', ');
 
 // ─── Public API ───

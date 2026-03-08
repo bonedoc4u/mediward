@@ -13,7 +13,7 @@ import FHIRExportModal from './FHIRExportModal';
 import VitalsWidget from './VitalsWidget';
 
 const PatientDetail: React.FC = () => {
-  const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
+  const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
   const { labTypes } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -242,11 +242,7 @@ const PatientDetail: React.FC = () => {
       {/* Vital Signs */}
       <VitalsWidget
         vitals={patient.vitals ?? []}
-        onAdd={v => {
-          const id = Math.random().toString(36).slice(2, 11);
-          const updated = [{ ...v, id }, ...(patient.vitals ?? [])];
-          updatePatient({ ...patient, vitals: updated });
-        }}
+        onAdd={v => addVitalSign(patient.ipNo, v)}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

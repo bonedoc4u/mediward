@@ -80,6 +80,19 @@ textarea {
 /* ── Active state ripple for mobile buttons ───────────────────── */
 button:active, a:active { opacity: 0.85; }
 
+/* ── Capacitor / native WebView safe-area enforcement ─────────── */
+/*
+ * On Capacitor Android the WKWebView/ChromeCustomTab doesn't always propagate
+ * env(safe-area-inset-*) without this explicit override.
+ * .ion-padding-bottom and similar are Ionic conventions re-used here.
+ */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .cap-safe-top    { padding-top:    env(safe-area-inset-top,    0px) !important; }
+  .cap-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px) !important; }
+  .cap-safe-left   { padding-left:   env(safe-area-inset-left,   0px) !important; }
+  .cap-safe-right  { padding-right:  env(safe-area-inset-right,  0px) !important; }
+}
+
 /* ── Horizontal scroll fade-edge helper (apply .scroll-x-fade to the wrapper) ─ */
 .scroll-x-fade {
   position: relative;

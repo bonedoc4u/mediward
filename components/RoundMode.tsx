@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 const RoundMode: React.FC = () => {
-  const { patients, updatePatient, navigateTo } = useApp();
+  const { patients, updatePatient, saveRound, navigateTo } = useApp();
   const { icuWardNames } = useConfig();
 
   // ─── All active patients (unfiltered) ───
@@ -59,16 +59,13 @@ const RoundMode: React.FC = () => {
   const goTo = useCallback((next: number) => {
     // Auto-save any typed note before switching patients
     if (patient && roundNote.trim()) {
-      const note = roundNote.trim();
-      const newRound = { date: today, note, todos: patient.todos };
-      const existingRounds = patient.dailyRounds.filter(r => r.date !== today);
-      updatePatient({ ...patient, dailyRounds: [...existingRounds, newRound] });
+      saveRound(patient.ipNo, { date: today, note: roundNote.trim(), todos: patient.todos });
       setSavedSet(prev => new Set(prev).add(patient.ipNo));
     }
     setIndex(Math.max(0, Math.min(next, activePatients.length - 1)));
     setRoundNote('');
     setNewTodoText('');
-  }, [activePatients.length, patient, roundNote, today, updatePatient]);
+  }, [activePatients.length, patient, roundNote, today, saveRound]);
 
   const goNext = () => {
     if (navCooldownRef.current) return;
@@ -117,19 +114,11 @@ const RoundMode: React.FC = () => {
     if (!patient) return;
     const note = roundNote.trim();
 
-    const newRound = {
+    saveRound(patient.ipNo, {
       date:  today,
       note:  note || patient.patientStatus,
       todos: patient.todos,
-    };
-
-    const existingRounds = patient.dailyRounds.filter(r => r.date !== today);
-    const updatedPatient: Patient = {
-      ...patient,
-      dailyRounds: [...existingRounds, newRound],
-    };
-
-    updatePatient(updatedPatient);
+    });
     setSavedSet(prev => new Set(prev).add(patient.ipNo));
 
     if (andNext && index < activePatients.length - 1) {
@@ -137,7 +126,7 @@ const RoundMode: React.FC = () => {
     } else if (andNext) {
       navigateTo('dashboard');
     }
-  }, [patient, roundNote, today, index, activePatients.length, updatePatient, navigateTo, goNext]);
+  }, [patient, roundNote, today, index, activePatients.length, saveRound, navigateTo, goNext]);
 
   // ─── Toggle todo ───
   const handleToggleTodo = useCallback((todoId: string) => {
