@@ -48,6 +48,7 @@ const RoundMode: React.FC = () => {
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
 
   const touchStartX = useRef(0);
+  const navCooldownRef = useRef(false);
   const todoInputRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const today = new Date().toISOString().split('T')[0];
@@ -61,8 +62,18 @@ const RoundMode: React.FC = () => {
     setNewTodoText('');
   }, [activePatients.length]);
 
-  const goNext = () => goTo(index + 1);
-  const goPrev = () => goTo(index - 1);
+  const goNext = () => {
+    if (navCooldownRef.current) return;
+    navCooldownRef.current = true;
+    goTo(index + 1);
+    setTimeout(() => { navCooldownRef.current = false; }, 400);
+  };
+  const goPrev = () => {
+    if (navCooldownRef.current) return;
+    navCooldownRef.current = true;
+    goTo(index - 1);
+    setTimeout(() => { navCooldownRef.current = false; }, 400);
+  };
 
   // ─── Swipe support ───
   const handleTouchStart = (e: React.TouchEvent) => {

@@ -4,20 +4,23 @@ import { AlertTriangle, RefreshCw } from 'lucide-react';
 interface Props {
   children: React.ReactNode;
   fallbackMessage?: string;
+  /** Called after the error state is cleared, before children re-mount. */
+  onReset?: () => void;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
+  resetCount: number;
 }
 
 class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, resetCount: 0 };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
 
@@ -26,7 +29,12 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.props.onReset?.();
+    this.setState(s => ({ hasError: false, error: null, resetCount: s.resetCount + 1 }));
+  };
+
+  handleReload = () => {
+    window.location.reload();
   };
 
   render() {
@@ -49,13 +57,21 @@ class ErrorBoundary extends React.Component<Props, State> {
                 </pre>
               </details>
             )}
-            <button
-              onClick={this.handleReset}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Try Again
-            </button>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={this.handleReset}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-medium hover:bg-slate-700 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Try Again
+              </button>
+              <button
+                onClick={this.handleReload}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       );

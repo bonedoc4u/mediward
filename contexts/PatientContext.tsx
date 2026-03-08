@@ -212,28 +212,24 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               const rowUnit = (payload.new as { unit?: string })?.unit;
               if (userUnit && rowUnit && rowUnit !== userUnit) return;
               if (ipNo) {
-                try {
-                  const all = await fetchActivePatients(userUnit);
-                  const updated = all.find(p => p.ipNo === ipNo);
-                  if (updated) {
-                    setPatients(prev => {
-                      const next = enrichPatientData(
-                        prev.map(p => p.ipNo === updated.ipNo ? updated : p),
-                      );
-                      saveActiveCache(next);
-                      return next;
-                    });
-                  }
-                } catch {
-                  const updated = parsePatientRow(payload.new);
-                  setPatients(prev => {
-                    const next = enrichPatientData(
-                      prev.map(p => p.ipNo === updated.ipNo ? updated : p),
-                    );
-                    saveActiveCache(next);
-                    return next;
-                  });
-                }
+                // Parse the payload directly — no network fetch.
+                // Labs & imaging come from separate tables and aren't in the
+                // realtime payload, so we preserve them from the in-memory copy.
+                const fromPayload = parsePatientRow(payload.new);
+                setPatients(prev => {
+                  const next = enrichPatientData(
+                    prev.map(p => {
+                      if (p.ipNo !== fromPayload.ipNo) return p;
+                      return {
+                        ...fromPayload,
+                        labResults:     p.labResults,
+                        investigations: p.investigations,
+                      };
+                    }),
+                  );
+                  saveActiveCache(next);
+                  return next;
+                });
               }
             } else if (payload.eventType === 'DELETE') {
               const deletedIpNo = (payload.old as { ip_no?: string })?.ip_no;
