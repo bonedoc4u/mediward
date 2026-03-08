@@ -66,10 +66,17 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     if (s === 1) {
       if (!formData.ipNo.trim()) return 'IP Number is required.';
       if (!formData.bed.trim()) return 'Bed number is required.';
+      if (formData.abhaId && !/^\d{14}$|^\d{2}-\d{4}-\d{4}-\d{4}$/.test(formData.abhaId.trim())) {
+        return 'ABHA ID must be 14 digits (e.g. 12345678901234 or 12-3456-7890-1234).';
+      }
+      if (formData.mobile && !/^[6-9]\d{9}$/.test(formData.mobile.replace(/\s/g, ''))) {
+        return 'Mobile number must be a valid 10-digit Indian number.';
+      }
     }
     if (s === 2) {
       if (!formData.name.trim()) return 'Patient name is required.';
       if (!formData.age || parseInt(formData.age) <= 0) return 'A valid age is required.';
+      if (parseInt(formData.age) > 130) return 'Please enter a valid age.';
       if (!formData.diagnosis.trim()) return 'Diagnosis is required.';
     }
     return null;
@@ -82,6 +89,10 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   const handleFhirImport = () => {
     setFhirImportError(null);
+    if (fhirJson.length > 50_000) {
+      setFhirImportError('JSON too large (max 50 KB). Paste only the Patient resource.');
+      return;
+    }
     try {
       const partial = parseFhirPatient(fhirJson);
       setFormData(prev => ({
