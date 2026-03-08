@@ -282,7 +282,7 @@ const RoundMode: React.FC = () => {
     if (!patient.labResults?.length) return [];
     const byType = new Map<string, { type: string; value: number; date: string }>();
     [...patient.labResults]
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
       .forEach(r => byType.set(r.type, { type: r.type, value: r.value, date: r.date }));
     return [...byType.values()].slice(0, 6);
   })();
@@ -399,7 +399,7 @@ const RoundMode: React.FC = () => {
           </div>
 
           {/* Comorbidities */}
-          {patient.comorbidities.length > 0 && (
+          {(patient.comorbidities?.length ?? 0) > 0 && (
             <div className="flex flex-wrap gap-1">
               {patient.comorbidities.map(c => (
                 <span key={c} className="px-2 py-0.5 text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100 rounded-full">
@@ -508,9 +508,9 @@ const RoundMode: React.FC = () => {
               POD {nextPatient.pod}
             </span>
           )}
-          {nextPatient.comorbidities.length > 0 && (
+          {(nextPatient.comorbidities?.length ?? 0) > 0 && (
             <span className="text-[9px] text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-full shrink-0 hidden sm:block truncate max-w-[80px]">
-              {nextPatient.comorbidities[0]}{nextPatient.comorbidities.length > 1 ? ` +${nextPatient.comorbidities.length - 1}` : ''}
+              {nextPatient.comorbidities[0]}{(nextPatient.comorbidities?.length ?? 0) > 1 ? ` +${nextPatient.comorbidities.length - 1}` : ''}
             </span>
           )}
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Patient, LabType, PatientStatus } from '../types';
 import { Sparkles, X, Loader2, AlertTriangle, CheckCircle, Brain, RefreshCw, Settings, Zap } from 'lucide-react';
 
@@ -141,11 +141,119 @@ function generateRuleBasedAlerts(patients: Patient[]): AiAlert[] {
   return alerts.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 }
 
+// ─── Draggable FAB position (AssistiveTouch-style) ───────────────────────────
+const BTN_SIZE = 56; // px — must match p-3.5 rounded-full w (14*4 = 56)
+const EDGE_MARGIN = 8; // px from screen edge when snapped
+
+function loadFabPos(): { side: 'left' | 'right'; yPx: number } {
+  try {
+    const raw = localStorage.getItem('mediward_fab_pos');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { side: 'right', yPx: 120 };
+}
+
+function saveFabPos(pos: { side: 'left' | 'right'; yPx: number }) {
+  try { localStorage.setItem('mediward_fab_pos', JSON.stringify(pos)); } catch { /* ignore */ }
+}
+
 const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alerts, setAlerts] = useState<AiAlert[] | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  // ── Draggable FAB state ──
+  const [fabPos, setFabPos] = useState<{ side: 'left' | 'right'; yPx: number }>(loadFabPos);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragging = useRef(false);
+  const dragMoved = useRef(false);
+  const dragStartY = useRef(0);
+  const dragStartTouchY = useRef(0);
+  const dragStartTouchX = useRef(0);
+
+  // Clamp y so button stays fully on screen
+  const clampY = (y: number) => Math.max(EDGE_MARGIN, Math.min(y, window.innerHeight - BTN_SIZE - EDGE_MARGIN));
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    dragging.current = true;
+    dragMoved.current = false;
+    setIsDragging(true);
+    dragStartY.current = fabPos.yPx;
+    dragStartTouchY.current = t.clientY;
+    dragStartTouchX.current = t.clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!dragging.current || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dy = t.clientY - dragStartTouchY.current;
+    const dx = t.clientX - dragStartTouchX.current;
+    if (Math.abs(dy) > 4 || Math.abs(dx) > 4) {
+      dragMoved.current = true;
+      e.preventDefault(); // stop page scroll while dragging FAB
+    }
+    setFabPos(prev => ({ ...prev, yPx: clampY(dragStartY.current + dy) }));
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    setIsDragging(false);
+
+    if (!dragMoved.current) {
+      // Treat as tap — open assistant
+      setIsOpen(true);
+      if (!alerts) generateInsights();
+      return;
+    }
+
+    // Snap to nearest horizontal edge
+    const touch = e.changedTouches[0];
+    const newSide: 'left' | 'right' = touch.clientX < window.innerWidth / 2 ? 'left' : 'right';
+    const newPos = { side: newSide, yPx: clampY(fabPos.yPx) };
+    setFabPos(newPos);
+    saveFabPos(newPos);
+  };
+
+  // Also allow mouse drag (desktop testing)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragging.current = true;
+    dragMoved.current = false;
+    setIsDragging(true);
+    dragStartY.current = fabPos.yPx;
+    dragStartTouchY.current = e.clientY;
+    dragStartTouchX.current = e.clientX;
+  };
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const dy = e.clientY - dragStartTouchY.current;
+      const dx = e.clientX - dragStartTouchX.current;
+      if (Math.abs(dy) > 4 || Math.abs(dx) > 4) dragMoved.current = true;
+      setFabPos(prev => ({ ...prev, yPx: clampY(dragStartY.current + dy) }));
+    };
+    const onMouseUp = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      setIsDragging(false);
+      if (!dragMoved.current) return; // click handled by onClick
+      const newSide: 'left' | 'right' = e.clientX < window.innerWidth / 2 ? 'left' : 'right';
+      const newPos = { side: newSide, yPx: clampY(fabPos.yPx) };
+      setFabPos(newPos);
+      saveFabPos(newPos);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fabPos.yPx]);
 
   const generateInsights = useCallback(async () => {
     setLoading(true);
@@ -184,15 +292,39 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
 
   return (
     <>
-      <button
-        onClick={() => { setIsOpen(true); if (!alerts) generateInsights(); }}
-        className="fixed right-4 z-40 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-lg shadow-indigo-900/30 flex items-center justify-center transition-all hover:scale-105 group"
-        style={{ bottom: 'var(--fab-bottom, calc(72px + env(safe-area-inset-bottom, 0px)))' }}
+      {/* ─── Draggable AssistiveTouch-style FAB ─── */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
+        onClick={() => {
+          if (dragMoved.current) return; // suppress click after drag
+          setIsOpen(true);
+          if (!alerts) generateInsights();
+        }}
         aria-label="Clinical Assistant"
-        title="Clinical Assistant"
+        title="Clinical Assistant (drag to move)"
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { setIsOpen(true); if (!alerts) generateInsights(); } }}
+        className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-full shadow-lg shadow-indigo-900/30 flex items-center justify-center select-none"
+        style={{
+          position: 'fixed',
+          top: fabPos.yPx,
+          ...(fabPos.side === 'right' ? { right: EDGE_MARGIN } : { left: EDGE_MARGIN }),
+          width: BTN_SIZE,
+          height: BTN_SIZE,
+          zIndex: 40,
+          touchAction: 'none',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          transition: isDragging ? 'none' : 'top 0.18s ease, left 0.18s ease, right 0.18s ease',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+        }}
       >
-        <Zap className="w-6 h-6 group-hover:animate-pulse" />
-      </button>
+        <Zap className="w-6 h-6 pointer-events-none" />
+      </div>
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
