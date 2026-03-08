@@ -274,6 +274,19 @@ const RoundMode: React.FC = () => {
   const pendingTodos = patient.todos.filter(t => !t.isDone);
   const doneTodos    = patient.todos.filter(t => t.isDone);
 
+  // Next patient preview
+  const nextPatient = activePatients[index + 1];
+
+  // Latest lab value per type (most recent date wins, max 6 shown)
+  const latestLabs = (() => {
+    if (!patient.labResults?.length) return [];
+    const byType = new Map<string, { type: string; value: number; date: string }>();
+    [...patient.labResults]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .forEach(r => byType.set(r.type, { type: r.type, value: r.value, date: r.date }));
+    return [...byType.values()].slice(0, 6);
+  })();
+
   return (
     <div
       className="min-h-[80vh] flex flex-col select-none"
@@ -373,12 +386,44 @@ const RoundMode: React.FC = () => {
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.patientStatus)}`}>
               {patient.patientStatus}
             </span>
+            {patient.pod !== undefined && (
+              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">
+                POD {patient.pod}
+              </span>
+            )}
             {patient.dos && (
               <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                 <Calendar className="w-3 h-3" /> DOS: {patient.dos}
               </span>
             )}
           </div>
+
+          {/* Comorbidities */}
+          {patient.comorbidities.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {patient.comorbidities.map(c => (
+                <span key={c} className="px-2 py-0.5 text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-100 rounded-full">
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Latest investigations */}
+          {latestLabs.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Latest Investigations</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                {latestLabs.map(lab => (
+                  <div key={lab.type} className="bg-slate-50 rounded-lg px-2 py-1.5 border border-slate-100 min-w-0">
+                    <p className="text-[9px] text-slate-400 uppercase tracking-wide truncate">{lab.type}</p>
+                    <p className="text-sm font-bold text-slate-800">{lab.value}</p>
+                    <p className="text-[9px] text-slate-400">{lab.date}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Daily Status Notes */}
           <div>
@@ -446,6 +491,30 @@ const RoundMode: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ─── Next patient preview ─── */}
+      {nextPatient && (
+        <div className="mt-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 shrink-0">Next</span>
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-base shrink-0 border ${icuWardNames.has(nextPatient.ward ?? '') ? 'bg-red-100 border-red-200 text-red-800' : 'bg-slate-200 border-slate-300 text-slate-700'}`}>
+            {nextPatient.bed}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-slate-700 truncate">{nextPatient.name}</p>
+            <p className="text-[10px] text-slate-400 truncate">{nextPatient.diagnosis}</p>
+          </div>
+          {nextPatient.pod !== undefined && (
+            <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full shrink-0">
+              POD {nextPatient.pod}
+            </span>
+          )}
+          {nextPatient.comorbidities.length > 0 && (
+            <span className="text-[9px] text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-full shrink-0 hidden sm:block truncate max-w-[80px]">
+              {nextPatient.comorbidities[0]}{nextPatient.comorbidities.length > 1 ? ` +${nextPatient.comorbidities.length - 1}` : ''}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ─── Navigation & Actions ─── */}
       <div className="mt-4 flex items-center gap-2">
