@@ -53,6 +53,9 @@ const RoundMode: React.FC = () => {
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const today = new Date().toISOString().split('T')[0];
 
+  // patient must be declared before the useEffect hooks that reference it
+  const patient: Patient | undefined = activePatients[index];
+
   // ─── Session-expiry guard: persist unsaved note to localStorage ───
   // If the session expires mid-round, the note survives and is restored on re-login.
   const DRAFT_KEY = `mediward_round_draft_${today}`;
@@ -80,8 +83,6 @@ const RoundMode: React.FC = () => {
 
   // Clear draft after successful save
   const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } };
-
-  const patient: Patient | undefined = activePatients[index];
 
   // ─── Navigate between patients ───
   const goTo = useCallback((next: number) => {
