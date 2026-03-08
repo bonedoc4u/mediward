@@ -15,12 +15,33 @@
 html {
   /* Use dvh so the viewport height accounts for mobile browser chrome */
   height: 100%;
+  /*
+   * Page-level horizontal overflow containment.
+   * IMPORTANT: overflow-x:hidden on <html> / <body> is special-cased by
+   * WebKit/iOS — it does NOT block touch-scroll on descendant overflow-x:auto
+   * containers (unlike overflow-x:hidden on a regular ancestor div, which
+   * breaks horizontal scroll on iOS Safari).
+   */
+  overflow-x: hidden;
 }
 body {
   min-height: 100dvh;
   /* Prevent elastic overscroll creating horizontal white bars */
   overscroll-behavior-x: none;
   -webkit-text-size-adjust: 100%; /* Prevent iOS font-size inflation on rotate */
+}
+
+/*
+ * ── iOS horizontal scroll fix ──────────────────────────────────
+ * On iOS Safari, overflow-x:auto containers need this to:
+ *   1. Enable momentum (inertial) scrolling (-webkit-overflow-scrolling:touch)
+ *   2. Tell the browser that horizontal pan is handled here, so it doesn't
+ *      pass the gesture up to a parent that might swallow it (touch-action)
+ */
+.overflow-x-auto,
+.overflow-x-scroll {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
 }
 
 /* ── Tap highlight ────────────────────────────────────────────── */
@@ -46,7 +67,10 @@ input[type="password"],
 input[type="number"],
 input[type="search"],
 input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
 input[type="tel"],
+input[type="url"],
 select,
 textarea {
   font-size: max(16px, 1em);
