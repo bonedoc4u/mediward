@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useConfig } from '../contexts/AppContext';
 import { WardConfig, LabTypeConfig } from '../types';
-import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { createIncident, updateIncidentStatus, deleteIncident, fetchIncidents, StatusIncident, IncidentSeverity, IncidentStatus } from '../services/statusService';
 
 // ─── Department presets ───
 const DEPARTMENT_PRESETS = [
@@ -237,6 +238,52 @@ const AdminSettings: React.FC = () => {
   const [newUnit, setNewUnit] = useState('');
   const [newPreOpItem, setNewPreOpItem] = useState('');
   const [savingHospital, setSavingHospital] = useState(false);
+
+  // ── Incident Management state ──
+  const [incidents, setIncidents] = useState<StatusIncident[]>([]);
+  const [incLoading, setIncLoading] = useState(false);
+  const [incExpanded, setIncExpanded] = useState(false);
+  const [newIncTitle, setNewIncTitle] = useState('');
+  const [newIncSeverity, setNewIncSeverity] = useState<IncidentSeverity>('minor');
+  const [newIncStatus, setNewIncStatus] = useState<IncidentStatus>('investigating');
+  const [newIncDesc, setNewIncDesc] = useState('');
+  const [incSaving, setIncSaving] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState<Record<string, string>>({});
+
+  const loadIncidents = async () => {
+    setIncLoading(true);
+    try { setIncidents(await fetchIncidents(20)); } finally { setIncLoading(false); }
+  };
+
+  const handleCreateIncident = async () => {
+    if (!newIncTitle.trim()) return;
+    setIncSaving(true);
+    try {
+      await createIncident(newIncTitle.trim(), newIncSeverity, newIncStatus, newIncDesc.trim() || undefined);
+      setNewIncTitle(''); setNewIncDesc('');
+      await loadIncidents();
+    } finally { setIncSaving(false); }
+  };
+
+  const handleUpdateIncident = async (id: string, status: IncidentStatus) => {
+    const msg = updateMsg[id]?.trim();
+    if (!msg) return;
+    await updateIncidentStatus(id, status, msg);
+    setUpdateMsg(prev => ({ ...prev, [id]: '' }));
+    await loadIncidents();
+  };
+
+  const handleDeleteIncident = async (id: string) => {
+    if (!window.confirm('Delete this incident?')) return;
+    await deleteIncident(id);
+    await loadIncidents();
+  };
+
+  const INC_SEVERITY_COLORS: Record<IncidentSeverity, string> = {
+    minor:    'bg-yellow-50 border-yellow-200 text-yellow-800',
+    major:    'bg-orange-50 border-orange-200 text-orange-800',
+    critical: 'bg-red-50   border-red-200   text-red-800',
+  };
 
   const handleAddUnit = () => {
     const trimmed = newUnit.trim().toUpperCase();
@@ -683,6 +730,143 @@ const AdminSettings: React.FC = () => {
             <p>Full HIS integration (bi-directional ADT sync, order management, discharge messaging) is available on the Pro plan. Contact <span className="font-semibold">support@mediward.in</span> to enable.</p>
           </div>
         </div>
+      </div>
+
+      {/* ── Incident Management ── */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <button
+          type="button"
+          onClick={() => { setIncExpanded(v => !v); if (!incExpanded) loadIncidents(); }}
+          className="w-full flex items-center gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+        >
+          <Radio className="w-4 h-4 text-red-600" />
+          <h2 className="font-bold text-slate-800">Incident Management</h2>
+          <span className="text-xs text-slate-500 ml-1">· Public status page</span>
+          <span className="ml-auto text-xs text-slate-400">{incExpanded ? '▲' : '▼'}</span>
+        </button>
+
+        {incExpanded && (
+          <div className="p-4 space-y-5">
+            {/* Create Incident */}
+            <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Create New Incident</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Elevated API response times"
+                    value={newIncTitle}
+                    onChange={e => setNewIncTitle(e.target.value)}
+                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 outline-none bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Severity</label>
+                  <select value={newIncSeverity} onChange={e => setNewIncSeverity(e.target.value as IncidentSeverity)}
+                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-red-500 outline-none">
+                    <option value="minor">Minor (partial degradation)</option>
+                    <option value="major">Major (significant impact)</option>
+                    <option value="critical">Critical (service down)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Initial Status</label>
+                  <select value={newIncStatus} onChange={e => setNewIncStatus(e.target.value as IncidentStatus)}
+                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-red-500 outline-none">
+                    <option value="investigating">Investigating</option>
+                    <option value="identified">Identified</option>
+                    <option value="monitoring">Monitoring</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Description (optional)</label>
+                  <textarea rows={2} placeholder="Brief description visible on status page…"
+                    value={newIncDesc} onChange={e => setNewIncDesc(e.target.value)}
+                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 outline-none resize-none bg-white"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleCreateIncident}
+                disabled={incSaving || !newIncTitle.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" /> {incSaving ? 'Creating…' : 'Create Incident'}
+              </button>
+            </div>
+
+            {/* Active & Recent Incidents */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Recent Incidents</p>
+              {incLoading ? (
+                <div className="h-16 bg-slate-100 rounded animate-pulse" />
+              ) : incidents.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" /> No incidents on record.
+                </div>
+              ) : (
+                incidents.map(inc => (
+                  <div key={inc.id} className={`border rounded-xl p-3 space-y-2 ${INC_SEVERITY_COLORS[inc.severity]}`}>
+                    <div className="flex items-start gap-2">
+                      {inc.status === 'resolved'
+                        ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                        : inc.severity === 'critical'
+                          ? <XCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                          : <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-sm">{inc.title}</span>
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-black/10">{inc.severity}</span>
+                          <span className="text-[10px] font-semibold uppercase opacity-70">{inc.status}</span>
+                        </div>
+                        {inc.description && <p className="text-xs opacity-75 mt-0.5">{inc.description}</p>}
+                        <p className="text-[10px] opacity-60 mt-1">
+                          Started: {new Date(inc.createdAt).toLocaleString('en-IN')}
+                          {inc.resolvedAt && ` · Resolved: ${new Date(inc.resolvedAt).toLocaleString('en-IN')}`}
+                        </p>
+                      </div>
+                      <button onClick={() => handleDeleteIncident(inc.id)} className="p-1 hover:bg-black/10 rounded text-current opacity-50 hover:opacity-100 shrink-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {inc.status !== 'resolved' && (
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Update message…"
+                          value={updateMsg[inc.id] ?? ''}
+                          onChange={e => setUpdateMsg(prev => ({ ...prev, [inc.id]: e.target.value }))}
+                          className="flex-1 text-xs border border-current/30 rounded-lg px-2.5 py-1.5 bg-white/60 outline-none focus:bg-white"
+                        />
+                        <select
+                          defaultValue={inc.status}
+                          id={`status-${inc.id}`}
+                          className="text-xs border border-current/30 rounded-lg px-2 py-1.5 bg-white/60 outline-none"
+                        >
+                          <option value="investigating">Investigating</option>
+                          <option value="identified">Identified</option>
+                          <option value="monitoring">Monitoring</option>
+                          <option value="resolved">Resolved ✓</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            const sel = document.getElementById(`status-${inc.id}`) as HTMLSelectElement;
+                            handleUpdateIncident(inc.id, sel.value as IncidentStatus);
+                          }}
+                          disabled={!updateMsg[inc.id]?.trim()}
+                          className="px-3 py-1.5 text-xs font-semibold bg-black/10 hover:bg-black/20 disabled:opacity-40 rounded-lg transition-colors"
+                        >
+                          Post
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Data Residency & Security ── */}

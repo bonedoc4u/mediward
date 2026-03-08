@@ -32,6 +32,7 @@ const DischargeSummaryView = lazy(() => import('./components/DischargeSummary'))
 const RoundMode = lazy(() => import('./components/RoundMode'));
 const AuditLogViewer = lazy(() => import('./components/AuditLogViewer'));
 const AdminSettings = lazy(() => import('./components/AdminSettings'));
+const StatusPage = lazy(() => import('./components/StatusPage'));
 import OfflineBanner from './components/OfflineBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/ClinicalDisclaimer';
@@ -73,6 +74,9 @@ const App: React.FC = () => {
   const { isAuthenticated, user, logout, viewingHospitalId, viewingHospitalName, setViewingHospital } = useAuth();
   const [showRegister, setShowRegister] = useState(
     () => window.location.hash === '#/register',
+  );
+  const [showStatus, setShowStatus] = useState(
+    () => window.location.hash === '#/status',
   );
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => hasAcceptedDisclaimer());
   const [superAdminMode, setSuperAdminMode] = useState(true);
@@ -159,6 +163,13 @@ const App: React.FC = () => {
 
   // ─── Auth Guard ───
   if (!isAuthenticated) {
+    if (showStatus) {
+      return (
+        <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>}>
+          <StatusPage onBack={() => { setShowStatus(false); window.location.hash = ''; }} />
+        </Suspense>
+      );
+    }
     if (showRegister) {
       return (
         <HospitalRegisterPage
@@ -174,6 +185,10 @@ const App: React.FC = () => {
         onRegister={() => {
           setShowRegister(true);
           window.location.hash = '#/register';
+        }}
+        onStatus={() => {
+          setShowStatus(true);
+          window.location.hash = '#/status';
         }}
       />
     );
@@ -205,6 +220,8 @@ const App: React.FC = () => {
         return <AuditLogViewer />;
       case 'settings':
         return <AdminSettings />;
+      case 'status':
+        return <StatusPage onBack={() => navigateTo('settings')} />;
       case 'patient':
         return <PatientDetail />;
       case 'radiology':

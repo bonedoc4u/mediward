@@ -245,4 +245,4 @@ export type ViewMode =
   | 'dashboard' | 'pending' | 'master' | 'discharge'
   | 'radiology' | 'labs' | 'team' | 'audit'
   | 'rounds' | 'pac' | 'preop' | 'otlist'
-  | 'patient' | 'round-mode' | 'settings';
+  | 'patient' | 'round-mode' | 'settings' | 'status';
