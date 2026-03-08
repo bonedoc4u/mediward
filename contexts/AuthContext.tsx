@@ -9,8 +9,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { AuthUser, UserRole } from '../types';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '../services/persistence';
 import { logAuditEvent } from '../services/auditLog';
-import { getUserCount, upsertAppUser, findUserByEmail, createAuthUser } from '../services/userService';
-import { generateId } from '../utils/sanitize';
+import { findUserByEmail, createAuthUser } from '../services/userService';
 import { hashPassword } from '../utils/crypto';
 import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
@@ -19,11 +18,6 @@ import { toast } from '../utils/toast';
 // TODO: Remove hashPassword import + usage after LEGACY_AUTH_DEADLINE passes.
 // All users should have migrated to Supabase Auth by then via the auto-migration on login.
 const LEGACY_AUTH_DEADLINE = new Date('2026-04-02').getTime(); // 30 days from 2026-03-03
-
-const DEFAULT_USERS: { email: string; password: string; name: string; role: UserRole }[] = [
-  { email: 'dr.ortho@hospital.com', password: 'Ortho@2024', name: 'Dr. Akhil',     role: 'admin'    },
-  { email: 'resident@hospital.com', password: 'Res@2024',   name: 'Dr. Priya Nair', role: 'resident' },
-];
 
 const SESSION_DURATION   = 8 * 60 * 60 * 1000; // 8 hours
 const WARN_BEFORE_EXPIRY = 5 * 60 * 1000;       // warn 5 min before expiry
@@ -66,32 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     removeFromStorage('session');
     return null;
   });
-
-  // ─── Seed Default Users (only if table is genuinely empty) ───
-  useEffect(() => {
-    const seedUsers = async () => {
-      const count = await getUserCount();
-      // null = query failed (RLS or network) — skip seeding; we can't tell if empty
-      if (count === null || count > 0) return;
-
-      for (const u of DEFAULT_USERS) {
-        const err = await createAuthUser(u.email, u.password, u.name, u.role);
-        if (err) {
-          // Auth signup failed (email confirm required, etc.) — use legacy hash
-          const hash = await hashPassword(u.password);
-          await upsertAppUser({
-            id:           generateId(),
-            email:        u.email,
-            name:         u.name,
-            role:         u.role,
-            hospitalId:   '00000000-0000-0000-0000-000000000001',
-            passwordHash: hash,
-          });
-        }
-      }
-    };
-    seedUsers().catch(err => console.error('[Auth] Failed to seed users:', err));
-  }, []);
 
   // ─── Session Expiry Timers ───
   useEffect(() => {

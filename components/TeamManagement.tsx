@@ -80,6 +80,7 @@ const TeamManagement: React.FC = () => {
         form.role,
         undefined,
         form.unit || undefined,
+        user?.hospitalId,
       );
       if (errMsg) {
         setFormError(errMsg);

@@ -85,6 +85,7 @@ export async function upsertAppUser(user: StoredUser): Promise<void> {
         password_hash: user.passwordHash,
         ward:          user.ward ?? null,
         unit:          user.unit ?? null,
+        hospital_id:   user.hospitalId,
       },
       { onConflict: 'email' }
     );
@@ -114,13 +115,14 @@ export async function createAuthUser(
   role: UserRole,
   ward?: string,
   unit?: string,
+  hospitalId?: string,
 ): Promise<string | null> {
   // Step 1: Create Supabase Auth account
   const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
   if (authError) return authError.message;
   if (!authData.user) return 'Failed to create auth account.';
 
-  // Step 2: Store role/name/unit in app_users (keyed by Supabase Auth UID)
+  // Step 2: Store role/name/unit/hospital in app_users (keyed by Supabase Auth UID)
   const { error: dbError } = await supabase.from('app_users').upsert(
     {
       id:            authData.user.id,
@@ -130,6 +132,7 @@ export async function createAuthUser(
       password_hash: '', // Supabase Auth handles passwords now
       ward:          ward ?? null,
       unit:          unit ?? null,
+      hospital_id:   hospitalId ?? '00000000-0000-0000-0000-000000000001',
     },
     { onConflict: 'email' },
   );
