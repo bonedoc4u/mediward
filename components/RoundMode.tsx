@@ -57,10 +57,18 @@ const RoundMode: React.FC = () => {
 
   // ─── Navigate between patients ───
   const goTo = useCallback((next: number) => {
+    // Auto-save any typed note before switching patients
+    if (patient && roundNote.trim()) {
+      const note = roundNote.trim();
+      const newRound = { date: today, note, todos: patient.todos };
+      const existingRounds = patient.dailyRounds.filter(r => r.date !== today);
+      updatePatient({ ...patient, dailyRounds: [...existingRounds, newRound] });
+      setSavedSet(prev => new Set(prev).add(patient.ipNo));
+    }
     setIndex(Math.max(0, Math.min(next, activePatients.length - 1)));
     setRoundNote('');
     setNewTodoText('');
-  }, [activePatients.length]);
+  }, [activePatients.length, patient, roundNote, today, updatePatient]);
 
   const goNext = () => {
     if (navCooldownRef.current) return;

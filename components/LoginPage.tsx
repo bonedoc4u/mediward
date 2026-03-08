@@ -9,11 +9,21 @@ const LoginPage: React.FC<{ onRegister?: () => void }> = ({ onRegister }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Client-side rate limiting: exponential backoff after failed attempts
+  const [failCount, setFailCount] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       setError('Please enter both email and password.');
+      return;
+    }
+    // Rate limit check
+    const now = Date.now();
+    if (lockUntil > now) {
+      const secs = Math.ceil((lockUntil - now) / 1000);
+      setError(`Too many failed attempts. Please wait ${secs}s before trying again.`);
       return;
     }
     setIsLoading(true);
@@ -22,7 +32,17 @@ const LoginPage: React.FC<{ onRegister?: () => void }> = ({ onRegister }) => {
     try {
       const result = await login(email, password);
       if (!result.success) {
+        const newCount = failCount + 1;
+        setFailCount(newCount);
+        // Backoff: 3 attempts free, then 5s × 2^(n-3): 5s, 10s, 20s, 40s, 60s max
+        if (newCount >= 3) {
+          const backoffMs = Math.min(60_000, 5_000 * Math.pow(2, newCount - 3));
+          setLockUntil(Date.now() + backoffMs);
+        }
         setError(result.error || 'Authentication failed.');
+      } else {
+        setFailCount(0);
+        setLockUntil(0);
       }
     } catch {
       setError('An unexpected error occurred. Please try again.');

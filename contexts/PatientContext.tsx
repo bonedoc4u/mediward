@@ -105,6 +105,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const { viewingHospitalId } = useAuth();
+  // Ref so the online-reconnect handler (useEffect with [] deps) always reads
+  // the latest hospitalId even if it changed after the effect was registered.
+  const hospitalIdRef = useRef<string | undefined>(viewingHospitalId ?? undefined);
+  useEffect(() => { hospitalIdRef.current = viewingHospitalId ?? undefined; }, [viewingHospitalId]);
 
   // ─── Background Fetch — paginated (cache-first then network) ───
   // user.unit filters patients to only this unit; admins (no unit) see all.
@@ -163,7 +167,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (remaining === 0) {
         toast.success('All offline changes synced');
         // Refresh from Supabase now that writes are replayed
-        fetchActivePatients(user?.unit)
+        fetchActivePatients(user?.unit, hospitalIdRef.current)
           .then(data => {
             const enriched = enrichPatientData(data);
             setPatients(enriched);

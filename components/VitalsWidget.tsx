@@ -52,12 +52,15 @@ function buildPoints(vals: number[], w = W, h = H) {
   if (valid.length < 1) return [];
   const minV = Math.min(...valid);
   const maxV = Math.max(...valid);
-  const range = maxV - minV || 1;
+  const range = maxV - minV;
   const plotH = h - PAD.t - PAD.b;
   const plotW = w - PAD.l - PAD.r;
   return vals.map((v, i) => {
     const x = PAD.l + (vals.length === 1 ? plotW / 2 : (i / (vals.length - 1)) * plotW);
-    const y = PAD.t + plotH - ((v - minV) / range) * plotH;
+    // When all values are identical (range=0), center the flat line vertically
+    const y = range === 0
+      ? PAD.t + plotH / 2
+      : PAD.t + plotH - ((v - minV) / range) * plotH;
     return { x, y, v };
   });
 }

@@ -59,7 +59,21 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   // ── Wizard step (1 = Location & Identity, 2 = Patient, 3 = Status & Plan) ──
   const [step, setStep] = useState(1);
+  const [stepError, setStepError] = useState<string | null>(null);
   const STEP_LABELS = ['Location & Identity', 'Patient', 'Status & Plan'];
+
+  const validateStep = (s: number): string | null => {
+    if (s === 1) {
+      if (!formData.ipNo.trim()) return 'IP Number is required.';
+      if (!formData.bed.trim()) return 'Bed number is required.';
+    }
+    if (s === 2) {
+      if (!formData.name.trim()) return 'Patient name is required.';
+      if (!formData.age || parseInt(formData.age) <= 0) return 'A valid age is required.';
+      if (!formData.diagnosis.trim()) return 'Diagnosis is required.';
+    }
+    return null;
+  };
 
   // ── FHIR import ──
   const [showFhirImport, setShowFhirImport] = useState(false);
@@ -278,37 +292,46 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           </div>
 
           {/* Progress bar + step labels */}
-          <div className="px-4 pb-3 space-y-2">
+          <div className="px-4 pb-3 space-y-1">
             <div className="flex gap-1">
               {[1, 2, 3].map(s => (
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setStep(s)}
-                  className={`flex-1 h-1.5 rounded-full transition-colors ${
+                  onClick={() => { setStepError(null); setStep(s); }}
+                  className={`flex-1 py-2 flex flex-col items-center`}
+                  aria-label={`Step ${s}: ${STEP_LABELS[s - 1]}`}
+                >
+                  <div className={`w-full h-1.5 rounded-full transition-colors ${
                     s < step ? 'bg-blue-600' : s === step ? 'bg-blue-400' : 'bg-slate-200'
-                  }`}
-                />
+                  }`} />
+                </button>
               ))}
             </div>
             <div className="flex">
               {STEP_LABELS.map((label, idx) => (
-                <button
+                <span
                   key={label}
-                  type="button"
-                  onClick={() => setStep(idx + 1)}
-                  className={`flex-1 text-center text-[10px] font-semibold transition-colors ${
+                  className={`flex-1 text-center text-[10px] font-semibold ${
                     idx + 1 === step ? 'text-blue-600' : idx + 1 < step ? 'text-blue-400' : 'text-slate-400'
                   }`}
                 >
                   {idx + 1}. {label}
-                </button>
+                </span>
               ))}
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+
+          {/* Step validation error banner */}
+          {stepError && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <X className="w-4 h-4 shrink-0" />
+              <span>{stepError}</span>
+            </div>
+          )}
 
           {/* Scan error banner */}
           {scanError && (
@@ -439,7 +462,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                     {selectedComorbidities.map(c => (
                       <span key={c} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${getTagColor(c)} shadow-sm`}>
                         {c}
-                        <button type="button" onClick={() => toggleComorbidity(c)} className="hover:bg-black/10 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                        <button type="button" onClick={() => toggleComorbidity(c)} aria-label={`Remove ${c}`} className="hover:bg-black/10 rounded-full p-1"><X className="w-3.5 h-3.5" /></button>
                       </span>
                     ))}
                   </div>
@@ -482,7 +505,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Surgery (If completed)</label>
-                <input type="date" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
+                <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
                 <p className="text-[10px] text-slate-400 mt-1">Leave blank if surgery is pending.</p>
               </div>
             </div>
@@ -500,7 +523,16 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               </button>
             )}
             {step < 3 ? (
-              <button type="button" onClick={() => setStep(s => s + 1)} className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  const err = validateStep(step);
+                  if (err) { setStepError(err); return; }
+                  setStepError(null);
+                  setStep(s => s + 1);
+                }}
+                className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition-colors"
+              >
                 Next →
               </button>
             ) : (

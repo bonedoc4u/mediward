@@ -117,7 +117,9 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   const WardTab = ({ ward, icon: Icon, count, colorClass, activeClass }: any) => (
     <button
       onClick={() => setSelectedWard(ward)}
-      className={`flex-1 flex flex-col items-center justify-center p-2 md:p-4 rounded-xl border transition-all duration-200 ${
+      aria-label={`${ward} ward, ${count} patients`}
+      aria-pressed={selectedWard === ward}
+      className={`shrink-0 w-[90px] md:w-auto md:flex-1 flex flex-col items-center justify-center p-2 md:p-4 rounded-xl border transition-all duration-200 ${
         selectedWard === ward
           ? `${activeClass} shadow-md scale-[1.02]`
           : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
@@ -175,7 +177,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       )}
 
       {/* Ward Selection Tabs — rendered from ward_config */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+      <div className="flex overflow-x-auto gap-2 pb-1 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0">
         <WardTab ward="All" icon={Layers} count={counts.All} colorClass="text-slate-600" activeClass="bg-slate-800 border-slate-900 text-white" />
         {activeConfigWards.map((w, i) => {
           const NON_ICU_STYLES = [
@@ -354,6 +356,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                               onClick={() => onViewPatient(patient.ipNo)}
                               className="p-2 hover:bg-blue-100 rounded-full text-slate-400 hover:text-blue-600 transition-colors"
                               title="View Details"
+                              aria-label={`View details for ${patient.name}`}
                             >
                               <ExternalLink className="w-4 h-4" />
                             </button>
@@ -363,6 +366,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                               onClick={() => onEditPatient(patient)}
                               className="p-2 hover:bg-slate-200 rounded-full text-slate-500 hover:text-blue-600 transition-colors"
                               title="Edit"
+                              aria-label={`Edit ${patient.name}`}
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
@@ -482,6 +486,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                             onClick={(e) => { e.stopPropagation(); setQuickLabIp(item.patient.ipNo); setQuickLabType(''); setQuickLabValue(''); }}
                             className="p-2 bg-teal-50 hover:bg-teal-100 rounded-lg text-teal-700 transition-colors"
                             title="Quick Lab Entry"
+                            aria-label={`Add lab result for ${item.patient.name}`}
                           >
                             <FlaskConical className="w-4 h-4" />
                           </button>
@@ -491,6 +496,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                             onClick={(e) => { e.stopPropagation(); onEditPatient(item.patient); }}
                             className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
                             title="Edit"
+                            aria-label={`Edit ${item.patient.name}`}
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -499,6 +505,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           <button
                             onClick={() => onViewPatient(item.patient.ipNo)}
                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors"
+                            aria-label={`View details for ${item.patient.name}`}
                           >
                             <ExternalLink className="w-3.5 h-3.5" /> View
                           </button>
