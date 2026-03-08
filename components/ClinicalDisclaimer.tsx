@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { ShieldCheck, AlertTriangle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface Props {
   onAccept: () => void;
 }
 
-const STORAGE_KEY = 'mediward_disclaimer_accepted';
+const STORAGE_KEY = 'mediward_disclaimer_accepted_v1';
+const DOC_VERSION = '1.0';
 
 export function hasAcceptedDisclaimer(): boolean {
   return localStorage.getItem(STORAGE_KEY) === 'true';
@@ -15,11 +17,46 @@ export function markDisclaimerAccepted(): void {
   localStorage.setItem(STORAGE_KEY, 'true');
 }
 
-const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
-  const [checked, setChecked] = useState(false);
+/** Clears local acceptance flag — call on logout so the next user sees the disclaimer. */
+export function clearDisclaimerAccepted(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
 
-  const handleAccept = () => {
+async function logAcceptanceToDB(): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Get hospital_id for this user
+    const { data: appUser } = await supabase
+      .from('app_users')
+      .select('hospital_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!appUser?.hospital_id) return;
+
+    await supabase.from('compliance_acceptances').insert({
+      user_id:         user.id,
+      hospital_id:     appUser.hospital_id,
+      acceptance_type: 'clinical_disclaimer',
+      doc_version:     DOC_VERSION,
+      user_agent:      navigator.userAgent.slice(0, 500),
+    });
+  } catch {
+    // Non-blocking — localStorage already records acceptance
+  }
+}
+
+const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
+  const [checked, setChecked]   = useState(false);
+  const [loading, setLoading]   = useState(false);
+
+  const handleAccept = async () => {
+    setLoading(true);
     markDisclaimerAccepted();
+    await logAcceptanceToDB();
+    setLoading(false);
     onAccept();
   };
 
@@ -33,7 +70,7 @@ const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
           </div>
           <div>
             <h2 className="font-bold text-slate-800 text-lg leading-tight">Clinical Decision Support — Disclaimer</h2>
-            <p className="text-xs text-amber-700 mt-0.5">Please read before proceeding</p>
+            <p className="text-xs text-amber-700 mt-0.5">Please read before proceeding · v{DOC_VERSION}</p>
           </div>
         </div>
 
@@ -60,7 +97,7 @@ const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
           </p>
 
           <div className="space-y-2">
-            <p className="font-semibold text-slate-800">Data & Privacy</p>
+            <p className="font-semibold text-slate-800">Data &amp; Privacy</p>
             <p>
               Patient data is stored in a secure cloud database and is subject to applicable data protection laws
               (including the DPDP Act, 2023 for Indian deployments). Your institution is the data controller.
@@ -77,6 +114,7 @@ const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
           </div>
 
           <p className="text-xs text-slate-400">
+            Your acceptance is logged with a timestamp for audit purposes as required by the DPDP Act, 2023.
             By continuing, you acknowledge that you are a licensed healthcare professional authorised by your
             institution to access this system.
           </p>
@@ -97,14 +135,14 @@ const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
             </span>
           </label>
           <button
-            disabled={!checked}
+            disabled={!checked || loading}
             onClick={handleAccept}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all
               disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed
               enabled:bg-blue-600 enabled:hover:bg-blue-700 enabled:text-white"
           >
             <ShieldCheck className="w-4 h-4" />
-            Accept &amp; Continue
+            {loading ? 'Recording acceptance…' : 'Accept & Continue'}
           </button>
         </div>
       </div>

@@ -6,7 +6,7 @@ import { getStatusColor, getLabTrend } from '../utils/calculations';
 import {
   ArrowLeft, Calendar, Phone, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
-  TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2, FileJson
+  TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2, FileJson, Download
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import FHIRExportModal from './FHIRExportModal';
@@ -169,6 +169,21 @@ const PatientDetail: React.FC = () => {
           className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700 whitespace-nowrap"
         >
           <FileJson className="w-4 h-4 text-teal-600 shrink-0" /> Export FHIR
+        </button>
+        <button
+          onClick={() => {
+            const blob = new Blob([JSON.stringify(patient, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `patient_${patient.ipNo}_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-slate-50 rounded-lg shadow-sm border border-slate-200 hover:bg-slate-100 transition-colors text-sm font-medium text-slate-600 whitespace-nowrap"
+          title="Export patient data (DPDP data portability)"
+        >
+          <Download className="w-4 h-4 text-slate-500 shrink-0" /> Export JSON
         </button>
         {isAlreadyDischarged ? (
           <button
