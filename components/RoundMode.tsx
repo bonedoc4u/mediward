@@ -53,6 +53,34 @@ const RoundMode: React.FC = () => {
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const today = new Date().toISOString().split('T')[0];
 
+  // ─── Session-expiry guard: persist unsaved note to localStorage ───
+  // If the session expires mid-round, the note survives and is restored on re-login.
+  const DRAFT_KEY = `mediward_round_draft_${today}`;
+  React.useEffect(() => {
+    if (roundNote.trim() && patient) {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ ipNo: patient.ipNo, note: roundNote }));
+      } catch { /* storage full */ }
+    }
+  }, [roundNote, patient, DRAFT_KEY]);
+
+  // Restore draft on mount (e.g., after session re-login)
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved && patient) {
+        const draft = JSON.parse(saved) as { ipNo: string; note: string };
+        if (draft.ipNo === patient.ipNo && draft.note.trim()) {
+          setRoundNote(draft.note);
+        }
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patient?.ipNo]);
+
+  // Clear draft after successful save
+  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } };
+
   const patient: Patient | undefined = activePatients[index];
 
   // ─── Navigate between patients ───
@@ -85,7 +113,12 @@ const RoundMode: React.FC = () => {
     touchStartX.current = e.touches[0].clientX;
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
-    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    const startX = touchStartX.current;
+    const endX = e.changedTouches[0].clientX;
+    const diff = startX - endX;
+    // Ignore swipes that start within 30px of the left edge — reserved for
+    // iOS Safari's native back gesture (avoids competing with the system).
+    if (startX < 30) return;
     if (Math.abs(diff) > 50) {
       if (diff > 0) goNext();
       else goPrev();
@@ -120,6 +153,7 @@ const RoundMode: React.FC = () => {
       todos: patient.todos,
     });
     setSavedSet(prev => new Set(prev).add(patient.ipNo));
+    clearDraft();
 
     if (andNext && index < activePatients.length - 1) {
       goNext();

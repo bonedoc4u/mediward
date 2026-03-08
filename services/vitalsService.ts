@@ -6,6 +6,7 @@
 
 import { supabase } from '../lib/supabase';
 import { VitalSigns } from '../types';
+import { enqueue } from './syncQueue';
 
 interface VitalRow {
   id: string;
@@ -66,26 +67,32 @@ export async function insertVital(
   hospitalId: string | undefined,
   vital: Omit<VitalSigns, 'id'>,
 ): Promise<VitalSigns> {
+  const payload = {
+    patient_ip_no:    patientIpNo,
+    hospital_id:      hospitalId        ?? null,
+    timestamp:        vital.timestamp,
+    recorded_by:      vital.recordedBy  ?? null,
+    bp_systolic:      vital.bpSystolic  ?? null,
+    bp_diastolic:     vital.bpDiastolic ?? null,
+    heart_rate:       vital.heartRate   ?? null,
+    temperature:      vital.temperature ?? null,
+    spo2:             vital.spo2        ?? null,
+    respiratory_rate: vital.respiratoryRate ?? null,
+    weight:           vital.weight      ?? null,
+    pain_score:       vital.painScore   ?? null,
+    notes:            vital.notes       ?? null,
+  };
   const { data, error } = await supabase
     .from('patient_vitals')
-    .insert({
-      patient_ip_no:    patientIpNo,
-      hospital_id:      hospitalId        ?? null,
-      timestamp:        vital.timestamp,
-      recorded_by:      vital.recordedBy  ?? null,
-      bp_systolic:      vital.bpSystolic  ?? null,
-      bp_diastolic:     vital.bpDiastolic ?? null,
-      heart_rate:       vital.heartRate   ?? null,
-      temperature:      vital.temperature ?? null,
-      spo2:             vital.spo2        ?? null,
-      respiratory_rate: vital.respiratoryRate ?? null,
-      weight:           vital.weight      ?? null,
-      pain_score:       vital.painScore   ?? null,
-      notes:            vital.notes       ?? null,
-    })
+    .insert(payload)
     .select('*')
     .single();
-  if (error) throw new Error(`insertVital(${patientIpNo}): ${error.message}`);
+  if (error) {
+    // Queue for offline replay — generate a temporary ID for optimistic UI
+    const tempId = crypto.randomUUID();
+    enqueue('insert_vital', payload);
+    return { ...vital, id: tempId };
+  }
   return rowToVital(data as unknown as VitalRow);
 }
 

@@ -15,9 +15,6 @@ const config: CapacitorConfig = {
       backgroundColor: '#1e293b',
       showSpinner: false,
     },
-    PushNotifications: {
-      presentationOptions: ['badge', 'sound', 'alert'],
-    },
     BiometricAuth: {
       androidBiometricStrength: 'STRONG',
     },

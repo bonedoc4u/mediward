@@ -58,7 +58,18 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   });
 
   // ── Wizard step (1 = Location & Identity, 2 = Patient, 3 = Status & Plan) ──
-  const [step, setStep] = useState(1);
+  // Bug #20: persist step across screen rotation (sessionStorage survives re-mount)
+  const STEP_KEY = 'mediward_admit_step';
+  const [step, setStepRaw] = useState<number>(() => {
+    if (initialData) return 1; // edit mode always starts at 1
+    const saved = sessionStorage.getItem(STEP_KEY);
+    const n = saved ? parseInt(saved, 10) : 1;
+    return n >= 1 && n <= 3 ? n : 1;
+  });
+  const setStep = (s: number) => {
+    sessionStorage.setItem(STEP_KEY, String(s));
+    setStepRaw(s);
+  };
   const [stepError, setStepError] = useState<string | null>(null);
   const STEP_LABELS = ['Location & Identity', 'Patient', 'Status & Plan'];
 
@@ -264,6 +275,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       todos: initialData?.todos || []
     };
     
+    sessionStorage.removeItem(STEP_KEY);
     onSave(patientData);
     onClose();
   };
@@ -525,11 +537,11 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           {/* ── Navigation footer ── */}
           <div className="pt-2 flex gap-3">
             {step > 1 ? (
-              <button type="button" onClick={() => setStep(s => s - 1)} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
+              <button type="button" onClick={() => setStep(step - 1)} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
                 ← Back
               </button>
             ) : (
-              <button type="button" onClick={onClose} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
+              <button type="button" onClick={() => { sessionStorage.removeItem(STEP_KEY); onClose(); }} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
                 Cancel
               </button>
             )}
@@ -540,7 +552,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   const err = validateStep(step);
                   if (err) { setStepError(err); return; }
                   setStepError(null);
-                  setStep(s => s + 1);
+                  setStep(step + 1);
                 }}
                 className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition-colors"
               >

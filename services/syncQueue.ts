@@ -4,7 +4,13 @@
  * Failed Supabase writes are queued here and replayed when connectivity returns.
  */
 
-export type QueuedOpType = 'upsert_patient' | 'insert_lab' | 'insert_imaging' | 'delete_imaging';
+export type QueuedOpType =
+  | 'upsert_patient'
+  | 'insert_lab'
+  | 'insert_imaging'
+  | 'delete_imaging'
+  | 'upsert_round'
+  | 'insert_vital';
 
 export interface QueuedOp {
   id: string;

@@ -39,14 +39,139 @@ function buildDefaultSummary(patient: Patient): DS {
     hospitalCourse: buildDefaultCourse(patient),
     conditionAtDischarge: 'Stable, afebrile, vitals within normal limits. Wound healthy.',
     dischargeMedications: '',
-    followUpInstructions: 'Review in Orthopaedic OPD.',
+    followUpInstructions: 'Review in OPD.',
     followUpDate: '',
     woundCare: 'Keep wound clean and dry. Change dressing as advised.',
-    restrictions: 'No heavy lifting. Weight-bearing as per surgeon advice.',
+    restrictions: 'As advised by surgeon.',
     attendingDoctor: '',
     residentDoctor: '',
+    icd10Code: '',
+    icd10Secondary: '',
+    finalDiagnosis: patient.diagnosis,
   };
 }
+
+// ─── Common ICD-10 codes for surgical wards ───────────────────────
+// Covers ortho, general surgery, gynaec, urology, ENT, neurosurgery
+const COMMON_ICD10: { code: string; desc: string }[] = [
+  // Orthopaedics
+  { code: 'S72.0', desc: 'Fracture of neck of femur' },
+  { code: 'S72.1', desc: 'Pertrochanteric fracture of femur' },
+  { code: 'S72.3', desc: 'Fracture of shaft of femur' },
+  { code: 'S82.1', desc: 'Fracture of proximal tibia' },
+  { code: 'S82.3', desc: 'Fracture of shaft of tibia' },
+  { code: 'S52.5', desc: 'Fracture of lower end of radius' },
+  { code: 'M16.1', desc: 'Primary coxarthrosis (Hip OA)' },
+  { code: 'M17.1', desc: 'Primary gonarthrosis (Knee OA)' },
+  { code: 'M51.1', desc: 'Lumbar disc degeneration with radiculopathy' },
+  { code: 'M48.0', desc: 'Spinal stenosis' },
+  { code: 'M80.0', desc: 'Osteoporosis with pathological fracture' },
+  // General Surgery
+  { code: 'K40.9', desc: 'Inguinal hernia, unilateral, without obstruction' },
+  { code: 'K41.9', desc: 'Femoral hernia, unilateral, without obstruction' },
+  { code: 'K80.1', desc: 'Calculus of gallbladder with acute cholecystitis' },
+  { code: 'K35.8', desc: 'Acute appendicitis' },
+  { code: 'K57.3', desc: 'Diverticular disease of large intestine' },
+  { code: 'K92.1', desc: 'Melaena (GI bleed)' },
+  { code: 'C18.9', desc: 'Malignant neoplasm of colon, unspecified' },
+  { code: 'C20', desc: 'Malignant neoplasm of rectum' },
+  // Urology
+  { code: 'N20.0', desc: 'Calculus of kidney (nephrolithiasis)' },
+  { code: 'N20.1', desc: 'Calculus of ureter' },
+  { code: 'N40.0', desc: 'Benign prostatic hyperplasia (BPH)' },
+  { code: 'C61', desc: 'Malignant neoplasm of prostate' },
+  { code: 'C67.9', desc: 'Malignant neoplasm of bladder, unspecified' },
+  // ENT
+  { code: 'J35.1', desc: 'Hypertrophy of tonsils (tonsillectomy)' },
+  { code: 'J34.2', desc: 'Deviated nasal septum' },
+  { code: 'H26.9', desc: 'Cataract, unspecified' },
+  // Gynaecology
+  { code: 'D25.9', desc: 'Leiomyoma of uterus, unspecified (fibroid)' },
+  { code: 'N83.2', desc: 'Ovarian cyst' },
+  { code: 'C53.9', desc: 'Malignant neoplasm of cervix uteri, unspecified' },
+  // Neurosurgery
+  { code: 'G91.0', desc: 'Communicating hydrocephalus' },
+  { code: 'I61.9', desc: 'Intracerebral haemorrhage, unspecified' },
+  { code: 'I63.9', desc: 'Cerebral infarction, unspecified' },
+  { code: 'G35', desc: 'Multiple sclerosis' },
+  // Comorbidities
+  { code: 'I10', desc: 'Essential (primary) hypertension' },
+  { code: 'E11.9', desc: 'Type 2 diabetes mellitus, without complications' },
+  { code: 'I25.1', desc: 'Atherosclerotic heart disease (CAD)' },
+  { code: 'N18.9', desc: 'Chronic kidney disease, unspecified (CKD)' },
+  { code: 'J44.1', desc: 'Chronic obstructive pulmonary disease with exacerbation (COPD)' },
+  { code: 'J45.9', desc: 'Asthma, unspecified' },
+];
+
+// ─── ICD-10 search widget ──────────────────────────────────────────
+const Icd10Field: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}> = ({ label, value, onChange, placeholder }) => {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+
+  const matches = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return COMMON_ICD10.filter(
+      i => i.code.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)
+    ).slice(0, 8);
+  }, [query]);
+
+  const select = (item: { code: string; desc: string }) => {
+    onChange(`${item.code} — ${item.desc}`);
+    setQuery('');
+    setOpen(false);
+  };
+
+  return (
+    <div className="mb-5">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1 flex items-center justify-between">
+        <span>{label}</span>
+        <span className="text-[9px] font-normal text-slate-400 normal-case">ICD-10 / ICD-11</span>
+      </div>
+      {/* Current value */}
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder ?? 'e.g. S72.0 — Fracture of neck of femur'}
+        className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800 mb-2"
+      />
+      {/* Search */}
+      <div className="relative">
+        <input
+          type="text"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Search ICD-10 codes…"
+          className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+        {open && matches.length > 0 && (
+          <ul className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+            {matches.map(item => (
+              <li key={item.code}>
+                <button
+                  type="button"
+                  onMouseDown={() => select(item)}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-baseline gap-2"
+                >
+                  <span className="font-mono font-bold text-blue-700 shrink-0">{item.code}</span>
+                  <span className="text-slate-700">{item.desc}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ─── Editable section field ───
 const DocField = ({
@@ -192,8 +317,22 @@ const DischargeForm: React.FC<{
     }
 
     // ── Document Sections ──
-    sectionHeader('DIAGNOSIS');
+    sectionHeader('ADMISSION DIAGNOSIS');
     bodyText(patient.diagnosis);
+
+    if (summary.finalDiagnosis && summary.finalDiagnosis !== patient.diagnosis) {
+      sectionHeader('FINAL DIAGNOSIS (AT DISCHARGE)');
+      bodyText(summary.finalDiagnosis);
+    }
+
+    if (summary.icd10Code) {
+      sectionHeader('ICD-10 CODE — PRIMARY');
+      bodyText(summary.icd10Code);
+    }
+    if (summary.icd10Secondary) {
+      sectionHeader('ICD-10 CODES — SECONDARY / COMORBIDITIES');
+      bodyText(summary.icd10Secondary);
+    }
 
     if (patient.procedure) {
       sectionHeader('PROCEDURE / OPERATION DONE');
@@ -365,8 +504,8 @@ const DischargeForm: React.FC<{
             </div>
           </div>
 
-          {/* Fixed: Diagnosis & Procedure */}
-          <DocField label="Diagnosis" value={patient.diagnosis} readOnly />
+          {/* Admission Diagnosis (read-only) */}
+          <DocField label="Admission Diagnosis" value={patient.diagnosis} readOnly />
           {patient.procedure && (
             <DocField
               label={`Procedure / Operation Done${patient.dos ? ` (Date: ${patient.dos})` : ''}`}
@@ -374,6 +513,25 @@ const DischargeForm: React.FC<{
               readOnly
             />
           )}
+
+          {/* Final Diagnosis & ICD-10 — structured coding */}
+          <DocField
+            label="Final Diagnosis (at Discharge)"
+            value={summary.finalDiagnosis ?? ''}
+            onChange={v => update('finalDiagnosis', v)}
+            rows={2}
+          />
+          <Icd10Field
+            label="Primary ICD-10 Code"
+            value={summary.icd10Code ?? ''}
+            onChange={v => update('icd10Code', v)}
+          />
+          <Icd10Field
+            label="Secondary ICD-10 Codes (comorbidities)"
+            value={summary.icd10Secondary ?? ''}
+            onChange={v => update('icd10Secondary', v)}
+            placeholder="e.g. I10 — Hypertension, E11.9 — Type 2 DM"
+          />
 
           {/* Editable sections */}
           <DocField

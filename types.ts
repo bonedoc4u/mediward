@@ -150,6 +150,12 @@ export interface DischargeSummary {
   restrictions: string;
   attendingDoctor: string;
   residentDoctor: string;
+  /** ICD-10 / ICD-11 primary diagnosis code (e.g. "S72.0 — Fracture of neck of femur") */
+  icd10Code?: string;
+  /** ICD-10 / ICD-11 secondary / comorbidity codes (comma-separated) */
+  icd10Secondary?: string;
+  /** Structured final diagnosis text (may differ from admission diagnosis) */
+  finalDiagnosis?: string;
 }
 
 export interface Patient {
@@ -183,6 +189,8 @@ export interface Patient {
   vitals?: VitalSigns[];
   dod?: string;
   dischargeSummary?: DischargeSummary;
+  /** Server-side timestamp of last DB update — used for concurrent-edit detection. */
+  updatedAt?: string;
 }
 
 // ─── Auth Types ───

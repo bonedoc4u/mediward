@@ -162,6 +162,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             await insertImaging(patientId, inv);
           } else if (op.type === 'delete_imaging') {
             await deleteImaging(op.payload as string);
+          } else if (op.type === 'upsert_round') {
+            const p = op.payload as { patient_ip_no: string; hospital_id: string | null; date: string; note: string; todos: unknown[] };
+            await supabase.from('rounds').upsert(p, { onConflict: 'patient_ip_no,date' });
+          } else if (op.type === 'insert_vital') {
+            await supabase.from('patient_vitals').insert(op.payload);
           }
           dequeue(op.id);
         } catch {
@@ -352,6 +357,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .then(() => toast.success(`${updatedPatient.name} updated`))
       .catch(err => {
         console.error('[Patients] updatePatient failed:', err);
+        // Bug #9: concurrent edit — another user saved this patient first
+        if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT:')) {
+          toast.error(
+            `${updatedPatient.name} was modified by another user. Reload the page to see the latest version before editing.`,
+            { duration: 8000 },
+          );
+          return; // do NOT enqueue a stale overwrite
+        }
         enqueue('upsert_patient', updatedPatient);
         toast.warning('Saved locally — will sync when online.');
       });

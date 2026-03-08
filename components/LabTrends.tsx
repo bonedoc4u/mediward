@@ -233,7 +233,7 @@ const LabTrends: React.FC<Props> = ({ patients, onAddResult }) => {
       const num = parseFloat(val);
       if (isNaN(num)) return;
       const newResult: LabResult = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         date,
         type: lt.name,
         value: num,

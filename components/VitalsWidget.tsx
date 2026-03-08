@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Activity, Plus, ChevronDown, ChevronUp, AlertTriangle, BarChart2, Table2 } from 'lucide-react';
 import { VitalSigns } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
 interface Props {
   vitals: VitalSigns[];
-  onAdd: (v: Omit<VitalSigns, 'id'>) => void;
+  onAdd: (v: Omit<VitalSigns, 'id'>) => Promise<void> | void;
 }
 
 // ── Clinical alert thresholds ──────────────────────────────────────
@@ -295,9 +295,12 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
   const [showAll, setShowAll]     = useState(false);
   const [viewMode, setViewMode]   = useState<'table' | 'chart'>('table');
   const [form, setForm]           = useState<Omit<VitalSigns, 'id'>>({ ...EMPTY, timestamp: new Date().toISOString().slice(0, 16) });
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving]       = useState(false);
 
   const openForm = () => {
     setForm({ ...EMPTY, timestamp: new Date().toISOString().slice(0, 16) });
+    setSaveError(null);
     setShowForm(true);
   };
 
@@ -309,10 +312,23 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
     setForm(f => ({ ...f, [key]: val === '' ? undefined : isNaN(num) ? val : num }));
   };
 
-  const handleSave = () => {
-    onAdd({ ...form, recordedBy: user?.name ?? 'Nurse' });
-    setForm({ ...EMPTY, timestamp: new Date().toISOString().slice(0, 16) });
-    setShowForm(false);
+  // Bug #6: scroll input into view when keyboard appears on mobile
+  const scrollIntoView = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150);
+  }, []);
+
+  const handleSave = async () => {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await onAdd({ ...form, recordedBy: user?.name ?? 'Nurse' });
+      setForm({ ...EMPTY, timestamp: new Date().toISOString().slice(0, 16) });
+      setShowForm(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save vitals. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const fmt = (v?: number, dec = 0) => v !== undefined ? v.toFixed(dec) : '—';
@@ -372,6 +388,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="datetime-local"
                 value={form.timestamp as string}
                 onChange={e => set('timestamp', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -381,6 +398,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" placeholder="mmHg" min={40} max={300}
                 value={form.bpSystolic ?? ''}
                 onChange={e => set('bpSystolic', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -390,6 +408,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" placeholder="mmHg" min={20} max={200}
                 value={form.bpDiastolic ?? ''}
                 onChange={e => set('bpDiastolic', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -399,6 +418,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" placeholder="bpm" min={20} max={300}
                 value={form.heartRate ?? ''}
                 onChange={e => set('heartRate', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -408,6 +428,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" step="0.1" placeholder="°C" min={30} max={45}
                 value={form.temperature ?? ''}
                 onChange={e => set('temperature', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -417,6 +438,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" placeholder="%" min={50} max={100}
                 value={form.spo2 ?? ''}
                 onChange={e => set('spo2', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -426,6 +448,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" placeholder="breaths/min" min={1} max={60}
                 value={form.respiratoryRate ?? ''}
                 onChange={e => set('respiratoryRate', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -435,6 +458,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" step="0.1" placeholder="kg" min={1} max={500}
                 value={form.weight ?? ''}
                 onChange={e => set('weight', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -444,6 +468,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
                 type="number" min={0} max={10} placeholder="0–10"
                 value={form.painScore ?? ''}
                 onChange={e => set('painScore', e.target.value)}
+                onFocus={scrollIntoView}
                 className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
               />
             </div>
@@ -454,9 +479,13 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
               type="text" placeholder="Optional clinical note"
               value={form.notes ?? ''}
               onChange={e => set('notes', e.target.value)}
+              onFocus={scrollIntoView}
               className="w-full mt-0.5 px-2 py-1.5 border border-slate-200 rounded-lg text-sm bg-white"
             />
           </div>
+          {saveError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
+          )}
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => setShowForm(false)}
@@ -466,9 +495,10 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-1.5 text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors"
+              disabled={saving}
+              className="px-4 py-1.5 text-sm font-semibold bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white rounded-lg transition-colors"
             >
-              Save
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>

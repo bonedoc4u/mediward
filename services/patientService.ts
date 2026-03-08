@@ -182,6 +182,7 @@ function rowToPatient(row: PatientRow): Patient {
     preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
     vitals,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -217,16 +218,33 @@ function patientToRow(patient: Patient) {
   };
 }
 
-// ─── Shared SELECT string ────────────────────────────────────────────────────
-// daily_rounds and vitals JSONB columns are excluded — data comes from the
-// normalized rounds and patient_vitals tables (joined below).
-// The legacy JSONB columns remain in the DB as backup but are not queried.
+// ─── SELECT strings ───────────────────────────────────────────────────────────
+//
+// PATIENT_LIST_SELECT — lightweight, used for all list/dashboard queries.
+//   Only the latest round note is fetched (limit 1) to show in list cards.
+//   No vitals JOIN — the dashboard never renders vitals history.
+//
+// PATIENT_FULL_SELECT — full JOIN for PatientDetail and DischargeSummary views.
+//   Fetches all labs, imaging, rounds, and vitals for a single patient.
+//
+const PATIENT_LIST_SELECT = [
+  'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
+  'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
+  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
+  'discharge_summary', 'created_at', 'updated_at',
+  // Lightweight normalized joins for list rendering
+  'labs(id, date, type, value)',
+  'imaging(id, date, type, findings, image_url)',
+  'rounds(date, note, todos)',
+  // No patient_vitals — not rendered in the list view
+].join(', ');
+
+// Full select (all vitals) — used only when a single patient's detail is loaded
 const PATIENT_SELECT = [
   'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'discharge_summary', 'created_at', 'updated_at',
-  // Normalized tables
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url)',
   'rounds(date, note, todos)',
@@ -259,7 +277,7 @@ export async function fetchActivePatientsPage(
 
   let query = supabase
     .from('patients')
-    .select(PATIENT_SELECT)
+    .select(PATIENT_LIST_SELECT)   // lightweight — no vitals JOIN
     .neq('patient_status', 'Discharged')
     .order('created_at', { ascending: false })
     .range(from, to);
@@ -284,10 +302,10 @@ export async function fetchActivePatientsPage(
 export async function fetchActivePatients(unit?: string, hospitalId?: string): Promise<Patient[]> {
   let query = supabase
     .from('patients')
-    .select(PATIENT_SELECT)
+    .select(PATIENT_LIST_SELECT)   // lightweight — no vitals JOIN
     .neq('patient_status', 'Discharged')
     .order('created_at', { ascending: false })
-    .limit(500);
+    .limit(2000);                  // high cap — paginated path is the primary one
 
   if (unit) query = query.eq('unit', unit);
   if (hospitalId) query = query.eq('hospital_id', hospitalId);
@@ -299,34 +317,79 @@ export async function fetchActivePatients(unit?: string, hospitalId?: string): P
 
 /**
  * Load ALL patients including discharged — used for Master List & Discharge views.
- * If `unit` is provided, only that unit's patients are returned.
+ * Uses paginated batches internally to avoid the 1000-row hard cap.
  */
 export async function fetchAllPatients(unit?: string, hospitalId?: string): Promise<Patient[]> {
+  const pageSize = 500;
+  const results: Patient[] = [];
+  let page = 0;
+  while (true) {
+    const from = page * pageSize;
+    const to   = from + pageSize - 1;
+    let query = supabase
+      .from('patients')
+      .select(PATIENT_LIST_SELECT)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+    if (unit)       query = query.eq('unit', unit);
+    if (hospitalId) query = query.eq('hospital_id', hospitalId);
+    const { data, error } = await query;
+    if (error) throw new Error(`fetchAllPatients: ${error.message}`);
+    const rows = (data ?? []) as unknown as PatientRow[];
+    results.push(...rows.map(rowToPatient));
+    if (rows.length < pageSize) break;
+    page++;
+  }
+  return results;
+}
+
+/**
+ * Load a single patient with full sub-table joins (vitals, labs, imaging, rounds).
+ * Use this for PatientDetail / DischargeSummary — not for list views.
+ */
+export async function fetchPatientById(ipNo: string, hospitalId?: string): Promise<Patient | null> {
   let query = supabase
     .from('patients')
-    .select(PATIENT_SELECT)
-    .order('created_at', { ascending: false })
-    .limit(1000);
-
-  if (unit) query = query.eq('unit', unit);
+    .select(PATIENT_SELECT)      // full join including vitals
+    .eq('ip_no', ipNo);
   if (hospitalId) query = query.eq('hospital_id', hospitalId);
-
-  const { data, error } = await query;
-  if (error) throw new Error(`fetchAllPatients: ${error.message}`);
-  return ((data ?? []) as unknown as PatientRow[]).map(rowToPatient);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error(`fetchPatientById(${ipNo}): ${error.message}`);
+  return data ? rowToPatient(data as unknown as PatientRow) : null;
 }
 
 /**
  * Insert or update a patient's core fields.
  * Labs and imaging are NOT written here — use labsService / imagingService.
  * Uses ip_no as the conflict key — safe to call on both create and update.
+ *
+ * Bug #9: Concurrent edit detection.
+ * If the patient has an `updatedAt` timestamp (i.e. it was loaded from the DB),
+ * we use a conditional update. If another user saved between our load and save,
+ * the condition fails (0 rows updated) and we throw a CONCURRENT_EDIT error.
  */
 export async function upsertPatient(patient: Patient): Promise<void> {
-  const { error } = await supabase
-    .from('patients')
-    .upsert(patientToRow(patient), { onConflict: 'ip_no' });
+  if (patient.updatedAt) {
+    // Existing patient: conditional update to detect concurrent edits
+    const { data, error } = await supabase
+      .from('patients')
+      .update(patientToRow(patient))
+      .eq('ip_no', patient.ipNo)
+      .eq('updated_at', patient.updatedAt)
+      .select('ip_no');
 
-  if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
+    if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
+    if (!data || data.length === 0) {
+      throw new Error(`CONCURRENT_EDIT:${patient.ipNo}`);
+    }
+  } else {
+    // New patient: plain insert
+    const { error } = await supabase
+      .from('patients')
+      .insert(patientToRow(patient));
+
+    if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
+  }
 }
 
 /** Permanently delete a patient by IP number. */

@@ -6,6 +6,7 @@
 
 import { supabase } from '../lib/supabase';
 import { DailyRound, ToDoItem } from '../types';
+import { enqueue } from './syncQueue';
 
 interface RoundRow {
   id: string;
@@ -46,19 +47,21 @@ export async function upsertRound(
   hospitalId: string | undefined,
   round: DailyRound,
 ): Promise<void> {
+  const payload = {
+    patient_ip_no: patientIpNo,
+    hospital_id:   hospitalId ?? null,
+    date:          round.date,
+    note:          round.note,
+    todos:         round.todos,
+  };
   const { error } = await supabase
     .from('rounds')
-    .upsert(
-      {
-        patient_ip_no: patientIpNo,
-        hospital_id:   hospitalId ?? null,
-        date:          round.date,
-        note:          round.note,
-        todos:         round.todos,
-      },
-      { onConflict: 'patient_ip_no,date' },
-    );
-  if (error) throw new Error(`upsertRound(${patientIpNo}): ${error.message}`);
+    .upsert(payload, { onConflict: 'patient_ip_no,date' });
+  if (error) {
+    // Queue for offline replay
+    enqueue('upsert_round', payload);
+    throw new Error(`upsertRound(${patientIpNo}): ${error.message}`);
+  }
 }
 
 /** Update only the todos for an existing round (e.g. check/uncheck a todo). */

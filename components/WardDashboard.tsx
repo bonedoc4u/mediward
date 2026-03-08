@@ -484,7 +484,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {onAddLab && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickLabIp(item.patient.ipNo); setQuickLabType(''); setQuickLabValue(''); }}
-                            className="p-2 bg-teal-50 hover:bg-teal-100 rounded-lg text-teal-700 transition-colors"
+                            className="w-11 h-11 flex items-center justify-center bg-teal-50 hover:bg-teal-100 rounded-lg text-teal-700 transition-colors"
                             title="Quick Lab Entry"
                             aria-label={`Add lab result for ${item.patient.name}`}
                           >
@@ -494,7 +494,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {onEditPatient && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onEditPatient(item.patient); }}
-                            className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
+                            className="w-11 h-11 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
                             title="Edit"
                             aria-label={`Edit ${item.patient.name}`}
                           >

@@ -22,12 +22,15 @@ export interface Invite {
   createdAt: string;
 }
 
-/** Generates a human-readable code like "XKVT-2MNP-8JQH". */
+/** Generates a cryptographically secure human-readable code like "XKVT-2MNP-8JQH". */
 export function generateInviteCode(): string {
   // Excludes O, 0, I, 1 to prevent confusion
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const seg = (n: number) =>
-    Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const seg = (n: number) => {
+    const buf = new Uint32Array(n);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, v => chars[v % chars.length]).join('');
+  };
   return `${seg(4)}-${seg(4)}-${seg(4)}`;
 }
 

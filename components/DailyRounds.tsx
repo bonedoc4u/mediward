@@ -9,6 +9,7 @@ import { jsPDF } from "jspdf";
 interface Props {
   patients: Patient[];
   onUpdatePatient: (patient: Patient) => void;
+  onSaveRound?: (patientIpNo: string, round: DailyRound) => void;
 }
 
 // ─── Mobile Patient Card (extracted for performance) ───
@@ -171,7 +172,7 @@ const PatientRoundCard = memo(({ patient, isToday, selectedDate, todoInput, onTo
 PatientRoundCard.displayName = 'PatientRoundCard';
 
 // ─── Main Component ───
-const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient }) => {
+const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }) => {
   const { wards: configWards, icuWardNames } = useConfig();
   const activeConfigWards = useMemo(
     () => configWards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder),
@@ -233,9 +234,11 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient }) => {
       if (existingIndex >= 0) history[existingIndex] = entry;
       else history.push(entry);
       updatedPatient.dailyRounds = history;
+      // Bug #14: also persist to the normalized rounds table
+      onSaveRound?.(updatedPatient.ipNo, entry);
     }
     onUpdatePatient(updatedPatient);
-  }, [isToday, todayStr, onUpdatePatient]);
+  }, [isToday, todayStr, onUpdatePatient, onSaveRound]);
 
   const generatePdf = useCallback((patient: Patient) => {
     let displayStatus = patient.patientStatus;

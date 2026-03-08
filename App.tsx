@@ -83,7 +83,7 @@ const App: React.FC = () => {
   const {
     patients, isLoadingPatients, updatePatient, addPatient,
     addLabResult, addInvestigation, deleteInvestigation,
-    hasMore, isLoadingMore, loadMorePatients,
+    hasMore, isLoadingMore, loadMorePatients, saveRound,
   } = usePatients();
   const {
     currentView, navigateTo, navParams,
@@ -236,7 +236,7 @@ const App: React.FC = () => {
       case 'labs':
         return <LabTrends patients={patients} onAddResult={addLabResult} />;
       case 'rounds':
-        return <DailyRounds patients={patients} onUpdatePatient={updatePatient} />;
+        return <DailyRounds patients={patients} onUpdatePatient={updatePatient} onSaveRound={saveRound} />;
       case 'team':
         return <TeamManagement />;
       case 'pac':
