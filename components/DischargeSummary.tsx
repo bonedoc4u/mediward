@@ -4,7 +4,7 @@ import { Patient, PatientStatus, DischargeSummary as DS } from '../types';
 import { jsPDF } from 'jspdf';
 import {
   ArrowLeft, FileDown, Save, Search, FileText,
-  CheckCircle, LogOut, RotateCcw, AlertTriangle,
+  CheckCircle, LogOut, RotateCcw, AlertTriangle, Plus, X as XIcon,
 } from 'lucide-react';
 
 // ─── Auto-generate hospital course from patient data ───
@@ -103,13 +103,12 @@ const COMMON_ICD10: { code: string; desc: string }[] = [
   { code: 'J45.9', desc: 'Asthma, unspecified' },
 ];
 
-// ─── ICD-10 search widget ──────────────────────────────────────────
-const Icd10Field: React.FC<{
-  label: string;
+// ─── Inline ICD-10 search (single row) ────────────────────────────
+const Icd10Picker: React.FC<{
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-}> = ({ label, value, onChange, placeholder }) => {
+}> = ({ value, onChange, placeholder }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
 
@@ -121,53 +120,146 @@ const Icd10Field: React.FC<{
     ).slice(0, 8);
   }, [query]);
 
-  const select = (item: { code: string; desc: string }) => {
-    onChange(`${item.code} — ${item.desc}`);
-    setQuery('');
-    setOpen(false);
+  return (
+    <div className="relative flex-1 min-w-0">
+      <input
+        type="text"
+        value={value || query}
+        onChange={e => { onChange(e.target.value); setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder={placeholder ?? 'ICD-10 code or search…'}
+        className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+      />
+      {open && matches.length > 0 && (
+        <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          {matches.map(item => (
+            <li key={item.code}>
+              <button
+                type="button"
+                onMouseDown={() => { onChange(`${item.code} — ${item.desc}`); setQuery(''); setOpen(false); }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-baseline gap-2"
+              >
+                <span className="font-mono font-bold text-blue-700 shrink-0">{item.code}</span>
+                <span className="text-slate-700">{item.desc}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+// ─── Multi-diagnosis list (final diagnosis + ICD-10 per entry) ─────
+interface DiagnosisEntry { text: string; icd10: string; }
+
+/** Encodes/decodes DiagnosisEntry[] ↔ two newline-separated strings */
+function encodeDiagnoses(entries: DiagnosisEntry[]): { finalDiagnosis: string; icd10Code: string } {
+  return {
+    finalDiagnosis: entries.map(e => e.text).join('\n'),
+    icd10Code: entries.map(e => e.icd10).join('\n'),
   };
+}
+function decodeDiagnoses(finalDiagnosis: string, icd10Code: string): DiagnosisEntry[] {
+  const texts = (finalDiagnosis || '').split('\n');
+  const codes = (icd10Code || '').split('\n');
+  const len = Math.max(texts.length, 1);
+  return Array.from({ length: len }, (_, i) => ({
+    text: texts[i] ?? '',
+    icd10: codes[i] ?? '',
+  }));
+}
+
+const MultiDiagnosisField: React.FC<{
+  finalDiagnosis: string;
+  icd10Code: string;
+  icd10Secondary: string;
+  onChange: (patch: { finalDiagnosis: string; icd10Code: string; icd10Secondary: string }) => void;
+}> = ({ finalDiagnosis, icd10Code, icd10Secondary, onChange }) => {
+  const [entries, setEntries] = useState<DiagnosisEntry[]>(() =>
+    decodeDiagnoses(finalDiagnosis, icd10Code)
+  );
+
+  const commit = (next: DiagnosisEntry[]) => {
+    setEntries(next);
+    const { finalDiagnosis: fd, icd10Code: ic } = encodeDiagnoses(next.filter(e => e.text.trim() || e.icd10.trim()));
+    onChange({ finalDiagnosis: fd, icd10Code: ic, icd10Secondary });
+  };
+
+  const updateEntry = (idx: number, patch: Partial<DiagnosisEntry>) => {
+    commit(entries.map((e, i) => i === idx ? { ...e, ...patch } : e));
+  };
+  const removeEntry = (idx: number) => {
+    const next = entries.filter((_, i) => i !== idx);
+    commit(next.length ? next : [{ text: '', icd10: '' }]);
+  };
+  const addEntry = () => commit([...entries, { text: '', icd10: '' }]);
 
   return (
     <div className="mb-5">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1 flex items-center justify-between">
-        <span>{label}</span>
-        <span className="text-[9px] font-normal text-slate-400 normal-case">ICD-10 / ICD-11</span>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 border-b border-slate-200 pb-1 flex items-center justify-between">
+        <span>Final Diagnosis (at Discharge)</span>
+        <button
+          type="button"
+          onClick={addEntry}
+          className="flex items-center gap-1 text-[10px] normal-case font-semibold text-blue-600 hover:text-blue-800 px-2 py-0.5 rounded-md hover:bg-blue-50 transition-colors"
+        >
+          <Plus className="w-3 h-3" /> Add Diagnosis
+        </button>
       </div>
-      {/* Current value */}
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder ?? 'e.g. S72.0 — Fracture of neck of femur'}
-        className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800 mb-2"
-      />
-      {/* Search */}
-      <div className="relative">
+
+      <div className="space-y-2">
+        {entries.map((entry, idx) => (
+          <div key={idx} className="flex items-start gap-2 group">
+            {/* Diagnosis number badge */}
+            <span className="shrink-0 w-5 h-5 mt-1.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center">
+              {idx + 1}
+            </span>
+
+            {/* Diagnosis text */}
+            <input
+              type="text"
+              value={entry.text}
+              onChange={e => updateEntry(idx, { text: e.target.value })}
+              placeholder="Diagnosis description…"
+              className="flex-1 min-w-0 text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
+            />
+
+            {/* ICD-10 picker */}
+            <Icd10Picker
+              value={entry.icd10}
+              onChange={v => updateEntry(idx, { icd10: v })}
+              placeholder="ICD-10…"
+            />
+
+            {/* Remove row */}
+            {entries.length > 1 && (
+              <button
+                type="button"
+                onClick={() => removeEntry(idx)}
+                className="shrink-0 mt-1.5 p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Secondary / comorbidity ICD-10 codes */}
+      <div className="mt-4">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1 flex items-center justify-between">
+          <span>Secondary ICD-10 Codes (comorbidities)</span>
+          <span className="text-[9px] font-normal text-slate-400 normal-case">ICD-10 / ICD-11</span>
+        </div>
         <input
           type="text"
-          value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Search ICD-10 codes…"
-          className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          value={icd10Secondary}
+          onChange={e => onChange({ finalDiagnosis, icd10Code, icd10Secondary: e.target.value })}
+          placeholder="e.g. I10 — Hypertension, E11.9 — Type 2 DM"
+          className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
         />
-        {open && matches.length > 0 && (
-          <ul className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-            {matches.map(item => (
-              <li key={item.code}>
-                <button
-                  type="button"
-                  onMouseDown={() => select(item)}
-                  className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-baseline gap-2"
-                >
-                  <span className="font-mono font-bold text-blue-700 shrink-0">{item.code}</span>
-                  <span className="text-slate-700">{item.desc}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
     </div>
   );
@@ -320,17 +412,18 @@ const DischargeForm: React.FC<{
     sectionHeader('ADMISSION DIAGNOSIS');
     bodyText(patient.diagnosis);
 
-    if (summary.finalDiagnosis && summary.finalDiagnosis !== patient.diagnosis) {
+    if (summary.finalDiagnosis) {
       sectionHeader('FINAL DIAGNOSIS (AT DISCHARGE)');
-      bodyText(summary.finalDiagnosis);
+      const diagLines = summary.finalDiagnosis.split('\n').filter(Boolean);
+      const codeLines = (summary.icd10Code || '').split('\n');
+      diagLines.forEach((line, i) => {
+        const code = codeLines[i]?.trim();
+        bodyText(code ? `${i + 1}. ${line}  [${code}]` : `${i + 1}. ${line}`);
+      });
     }
 
-    if (summary.icd10Code) {
-      sectionHeader('ICD-10 CODE — PRIMARY');
-      bodyText(summary.icd10Code);
-    }
     if (summary.icd10Secondary) {
-      sectionHeader('ICD-10 CODES — SECONDARY / COMORBIDITIES');
+      sectionHeader('SECONDARY ICD-10 CODES (COMORBIDITIES)');
       bodyText(summary.icd10Secondary);
     }
 
@@ -514,23 +607,12 @@ const DischargeForm: React.FC<{
             />
           )}
 
-          {/* Final Diagnosis & ICD-10 — structured coding */}
-          <DocField
-            label="Final Diagnosis (at Discharge)"
-            value={summary.finalDiagnosis ?? ''}
-            onChange={v => update('finalDiagnosis', v)}
-            rows={2}
-          />
-          <Icd10Field
-            label="Primary ICD-10 Code"
-            value={summary.icd10Code ?? ''}
-            onChange={v => update('icd10Code', v)}
-          />
-          <Icd10Field
-            label="Secondary ICD-10 Codes (comorbidities)"
-            value={summary.icd10Secondary ?? ''}
-            onChange={v => update('icd10Secondary', v)}
-            placeholder="e.g. I10 — Hypertension, E11.9 — Type 2 DM"
+          {/* Final Diagnosis & ICD-10 — multi-diagnosis list */}
+          <MultiDiagnosisField
+            finalDiagnosis={summary.finalDiagnosis ?? ''}
+            icd10Code={summary.icd10Code ?? ''}
+            icd10Secondary={summary.icd10Secondary ?? ''}
+            onChange={patch => setSummary(s => s ? { ...s, ...patch } : s)}
           />
 
           {/* Editable sections */}
