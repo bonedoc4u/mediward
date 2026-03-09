@@ -163,39 +163,25 @@ const SuperAdminPanel: React.FC<{
     }
   };
 
-  // ── Department grouping ────────────────────────────────────────────────────
-  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(['__pending__']));
-  const toggleDept = (key: string) =>
-    setExpandedDepts(prev => {
+  // ── Per-hospital expand/collapse ──────────────────────────────────────────
+  const [expandedHospitals, setExpandedHospitals] = useState<Set<string>>(new Set());
+  const toggleHospital = (id: string) =>
+    setExpandedHospitals(prev => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
 
-  // Group hospitals: pending bucket first, then by department label
-  const deptGroups = (() => {
-    const pending: HospitalRow[] = hospitals.filter(h => h.status === 'pending');
-    const rest = hospitals.filter(h => h.status !== 'pending');
+  // Sort: pending first, then active, then others; alphabetical within each
+  const sortedHospitals = [...hospitals].sort((a, b) => {
+    const order: Record<string, number> = { pending: 0, active: 1, suspended: 2, rejected: 3 };
+    const diff = (order[a.status] ?? 9) - (order[b.status] ?? 9);
+    return diff !== 0 ? diff : a.name.localeCompare(b.name);
+  });
 
-    const byDept = new Map<string, HospitalRow[]>();
-    for (const h of rest) {
-      // Clean up department string: "DEPARTMENT OF ORTHOPAEDICS" → "Orthopaedics"
-      const raw = h.department ?? '';
-      const label = raw
-        ? raw.replace(/^DEPARTMENT\s+OF\s+/i, '').replace(/\b\w/g, c => c.toUpperCase())
-        : 'Uncategorised';
-      const arr = byDept.get(label) ?? [];
-      arr.push(h);
-      byDept.set(label, arr);
-    }
-
-    const groups: { key: string; label: string; hospitals: HospitalRow[]; isPending?: boolean }[] = [];
-    if (pending.length) groups.push({ key: '__pending__', label: 'Awaiting Approval', hospitals: pending, isPending: true });
-    [...byDept.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([label, hs]) => groups.push({ key: label, label, hospitals: hs }));
-    return groups;
-  })();
+  // Helper: clean department label
+  const deptLabel = (raw?: string) =>
+    raw ? raw.replace(/^DEPARTMENT\s+OF\s+/i, '').replace(/\b\w/g, c => c.toUpperCase()) : null;
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const pending = hospitals.filter(h => h.status === 'pending').length;
@@ -307,178 +293,155 @@ const SuperAdminPanel: React.FC<{
 
         {/* ════════════════════ HOSPITALS TAB ════════════════════ */}
         {activeTab === 'hospitals' && (
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-slate-500" />
-                <h2 className="font-semibold text-slate-800">Hospitals by Department</h2>
-                <span className="text-xs text-slate-400 ml-1">{hospitals.length} total · {deptGroups.filter(g => !g.isPending).length} departments</span>
-              </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-500" />
+              <h2 className="font-semibold text-slate-800">Registered Hospitals</h2>
+              <span className="text-xs text-slate-400 ml-1">{hospitals.length} total</span>
             </div>
 
             {isLoadingHospitals ? (
-              <div className="bg-white rounded-xl border border-slate-100 flex justify-center items-center py-16">
+              <div className="flex justify-center items-center py-16">
                 <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
               </div>
             ) : hospitals.length === 0 ? (
-              <div className="bg-white rounded-xl border border-slate-100 text-center py-16 text-slate-400">
+              <div className="text-center py-16 text-slate-400">
                 <Building2 className="w-8 h-8 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">No hospitals registered yet.</p>
               </div>
             ) : (
-              deptGroups.map(group => {
-                const isOpen = expandedDepts.has(group.key);
-                const activeCount    = group.hospitals.filter(h => h.status === 'active').length;
-                const suspendedCount = group.hospitals.filter(h => h.status === 'suspended' || h.status === 'rejected').length;
-                return (
-                  <div key={group.key} className={`rounded-xl border overflow-hidden shadow-sm ${group.isPending ? 'border-amber-200' : 'border-slate-200'}`}>
-                    {/* Category header — click to expand/collapse */}
-                    <button
-                      onClick={() => toggleDept(group.key)}
-                      className={`w-full flex items-center gap-3 px-5 py-4 text-left transition-colors ${
-                        group.isPending
-                          ? 'bg-amber-50 hover:bg-amber-100'
-                          : 'bg-slate-50 hover:bg-slate-100'
-                      }`}
-                    >
-                      {isOpen
-                        ? <ChevronDown className={`w-4 h-4 shrink-0 ${group.isPending ? 'text-amber-500' : 'text-slate-400'}`} />
-                        : <ChevronRight className={`w-4 h-4 shrink-0 ${group.isPending ? 'text-amber-500' : 'text-slate-400'}`} />
-                      }
-                      {group.isPending
-                        ? <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
-                        : <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                      }
-                      <div className="flex-1 min-w-0">
-                        <span className={`font-bold text-sm ${group.isPending ? 'text-amber-800' : 'text-slate-800'}`}>
-                          {group.label}
-                        </span>
+              <div className="divide-y divide-slate-100">
+                {sortedHospitals.map(h => {
+                  const isOpen   = expandedHospitals.has(h.id);
+                  const isActing = actionId === h.id;
+                  const dept     = deptLabel(h.department);
+                  return (
+                    <div key={h.id}>
+                      {/* ── Hospital row (always visible) ── */}
+                      <div className="flex items-center gap-3 px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                        {/* Expand toggle */}
+                        <button
+                          onClick={() => toggleHospital(h.id)}
+                          className="shrink-0 p-1 rounded hover:bg-slate-200 transition-colors text-slate-400"
+                          title={isOpen ? 'Collapse' : 'Show department details'}
+                        >
+                          {isOpen
+                            ? <ChevronDown className="w-4 h-4" />
+                            : <ChevronRight className="w-4 h-4" />}
+                        </button>
+
+                        {/* Initials avatar */}
+                        <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black ${
+                          h.status === 'active'    ? 'bg-green-100 text-green-700' :
+                          h.status === 'pending'   ? 'bg-amber-100 text-amber-700' :
+                          h.status === 'suspended' ? 'bg-slate-100 text-slate-500' :
+                                                     'bg-red-100 text-red-600'
+                        }`}>
+                          {h.name.slice(0, 2).toUpperCase()}
+                        </div>
+
+                        {/* Name + slug */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-800 text-sm leading-tight">{h.name}</p>
+                          {h.slug && <p className="text-[11px] text-slate-400">/{h.slug}</p>}
+                        </div>
+
+                        {/* Status + plan */}
+                        <div className="hidden sm:flex items-center gap-2 shrink-0">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-600 uppercase">{h.plan}</span>
+                          <StatusBadge status={h.status} />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isActing ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                          ) : (
+                            <>
+                              {h.status === 'pending' && (
+                                <>
+                                  <button onClick={() => handleHospital(h.id, () => approveHospital(h.id), `"${h.name}" approved`)}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors">
+                                    <CheckCircle className="w-3.5 h-3.5" /> Approve
+                                  </button>
+                                  <button onClick={() => handleHospital(h.id, () => rejectHospital(h.id), `"${h.name}" rejected`)}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold rounded-lg transition-colors">
+                                    <XCircle className="w-3.5 h-3.5" /> Reject
+                                  </button>
+                                </>
+                              )}
+                              {(h.status === 'active' || h.status === 'suspended') && (
+                                <>
+                                  {h.status === 'active' && onViewWorkspace && (
+                                    <button onClick={() => { onViewWorkspace(h.id, h.name); onSwitchToApp?.(); }}
+                                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold rounded-lg transition-colors">
+                                      <LayoutDashboard className="w-3.5 h-3.5" /> View
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleHospital(h.id, () => toggleSuspendHospital(h.id, h.status), h.status === 'suspended' ? `"${h.name}" reactivated` : `"${h.name}" suspended`)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${h.status === 'suspended' ? 'bg-green-100 hover:bg-green-200 text-green-700' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>
+                                    {h.status === 'suspended'
+                                      ? <><PlayCircle  className="w-3.5 h-3.5" /> Reactivate</>
+                                      : <><PauseCircle className="w-3.5 h-3.5" /> Suspend</>}
+                                  </button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
-                      {/* Pill counts */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {group.isPending ? (
-                          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500 text-white">
-                            {group.hospitals.length} pending
-                          </span>
-                        ) : (
-                          <>
-                            {activeCount > 0 && (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-100 text-green-700 border border-green-200">
-                                {activeCount} active
-                              </span>
-                            )}
-                            {suspendedCount > 0 && (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                                {suspendedCount} inactive
-                              </span>
-                            )}
-                            <span className="text-xs text-slate-400">{group.hospitals.length} total</span>
-                          </>
-                        )}
-                      </div>
-                    </button>
 
-                    {/* Hospital cards inside category */}
-                    {isOpen && (
-                      <div className="divide-y divide-slate-100 bg-white">
-                        {group.hospitals.map(h => {
-                          const isActing = actionId === h.id;
-                          return (
-                            <div key={h.id} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                              {/* Hospital identity */}
-                              <div className="flex items-start gap-3 flex-1 min-w-0">
-                                <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black ${
-                                  h.status === 'active'    ? 'bg-green-100 text-green-700' :
-                                  h.status === 'pending'   ? 'bg-amber-100 text-amber-700' :
-                                  h.status === 'suspended' ? 'bg-slate-100 text-slate-500' :
-                                                             'bg-red-100 text-red-600'
-                                }`}>
-                                  {h.name.slice(0, 2).toUpperCase()}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-semibold text-slate-800 text-sm leading-tight truncate">{h.name}</p>
-                                  {h.slug && <p className="text-[11px] text-slate-400 truncate">/{h.slug}</p>}
-                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
-                                    {h.adminName && (
-                                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                                        <Users className="w-3 h-3" /> {h.adminName}
-                                      </span>
-                                    )}
-                                    {h.adminEmail && (
-                                      <span className="text-xs text-slate-400 truncate">{h.adminEmail}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Meta badges */}
-                              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
-                                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-600 uppercase">{h.plan}</span>
-                                <StatusBadge status={h.status} />
-                                <span className="text-[11px] text-slate-400">
-                                  {new Date(h.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                </span>
-                              </div>
-
-                              {/* Actions */}
-                              <div className="flex items-center gap-2 shrink-0">
-                                {isActing ? (
-                                  <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                                ) : (
-                                  <>
-                                    {h.status === 'pending' && (
-                                      <>
-                                        <button
-                                          onClick={() => handleHospital(h.id, () => approveHospital(h.id), `"${h.name}" approved`)}
-                                          className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors"
-                                        >
-                                          <CheckCircle className="w-3.5 h-3.5" /> Approve
-                                        </button>
-                                        <button
-                                          onClick={() => handleHospital(h.id, () => rejectHospital(h.id), `"${h.name}" rejected`)}
-                                          className="flex items-center gap-1 px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold rounded-lg transition-colors"
-                                        >
-                                          <XCircle className="w-3.5 h-3.5" /> Reject
-                                        </button>
-                                      </>
-                                    )}
-                                    {(h.status === 'active' || h.status === 'suspended') && (
-                                      <>
-                                        {h.status === 'active' && onViewWorkspace && (
-                                          <button
-                                            onClick={() => { onViewWorkspace(h.id, h.name); onSwitchToApp?.(); }}
-                                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold rounded-lg transition-colors"
-                                          >
-                                            <LayoutDashboard className="w-3.5 h-3.5" /> View
-                                          </button>
-                                        )}
-                                        <button
-                                          onClick={() => handleHospital(h.id, () => toggleSuspendHospital(h.id, h.status), h.status === 'suspended' ? `"${h.name}" reactivated` : `"${h.name}" suspended`)}
-                                          className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-                                            h.status === 'suspended'
-                                              ? 'bg-green-100 hover:bg-green-200 text-green-700'
-                                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                                          }`}
-                                        >
-                                          {h.status === 'suspended'
-                                            ? <><PlayCircle className="w-3.5 h-3.5" /> Reactivate</>
-                                            : <><PauseCircle className="w-3.5 h-3.5" /> Suspend</>
-                                          }
-                                        </button>
-                                      </>
-                                    )}
-                                  </>
-                                )}
-                              </div>
+                      {/* ── Expanded: department details panel ── */}
+                      {isOpen && (
+                        <div className="mx-5 mb-4 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+                          {/* Department header */}
+                          <div className="flex items-center gap-2 px-4 py-3 bg-indigo-50 border-b border-indigo-100">
+                            <Layers className="w-4 h-4 text-indigo-500 shrink-0" />
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Registered Department</p>
+                              <p className="text-sm font-bold text-indigo-900 leading-tight">
+                                {dept ?? <span className="text-slate-400 font-normal italic">Not configured</span>}
+                              </p>
+                              {h.department && h.department !== dept && (
+                                <p className="text-[10px] text-indigo-300 mt-0.5">{h.department}</p>
+                              )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                          </div>
+
+                          {/* Details grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-slate-200">
+                            {[
+                              { label: 'Admin',      value: h.adminName  ?? '—' },
+                              { label: 'Email',      value: h.adminEmail ?? '—' },
+                              { label: 'Plan',       value: h.plan.toUpperCase() },
+                              { label: 'Registered', value: new Date(h.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) },
+                            ].map(item => (
+                              <div key={item.label} className="bg-white px-4 py-3">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{item.label}</p>
+                                <p className="text-xs font-semibold text-slate-700 truncate" title={item.value}>{item.value}</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Status row */}
+                          <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-200">
+                            <StatusBadge status={h.status} />
+                            {h.trialEndsAt && (
+                              <span className="text-[11px] text-slate-500">
+                                Trial ends: {new Date(h.trialEndsAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                            )}
+                            {h.slug && (
+                              <span className="text-[11px] text-slate-400 ml-auto">ID: {h.slug}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
