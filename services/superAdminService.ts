@@ -16,6 +16,7 @@ export interface HospitalRow {
   createdAt: string;
   adminEmail?: string;
   adminName?: string;
+  department?: string;
 }
 
 /** Fetch all hospitals with their admin user's name and email. */
@@ -46,6 +47,16 @@ export async function fetchAllHospitals(): Promise<HospitalRow[]> {
     }
   }
 
+  // Fetch department from hospital_config per hospital
+  const { data: configs } = await supabase
+    .from('hospital_config')
+    .select('hospital_id, department');
+  const deptByHospital: Record<string, string> = {};
+  for (const c of configs ?? []) {
+    const row = c as { hospital_id: string; department: string };
+    if (row.hospital_id) deptByHospital[row.hospital_id] = row.department;
+  }
+
   return hospitals.map(h => ({
     id:          h.id,
     name:        h.name,
@@ -56,6 +67,7 @@ export async function fetchAllHospitals(): Promise<HospitalRow[]> {
     createdAt:   h.created_at,
     adminEmail:  adminByHospital[h.id]?.email,
     adminName:   adminByHospital[h.id]?.name,
+    department:  deptByHospital[h.id],
   }));
 }
 
