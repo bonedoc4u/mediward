@@ -4,7 +4,7 @@ import { Patient, PatientStatus, DischargeSummary as DS } from '../types';
 import { jsPDF } from 'jspdf';
 import {
   ArrowLeft, FileDown, Save, Search, FileText,
-  CheckCircle, LogOut, RotateCcw, AlertTriangle, Plus, X as XIcon,
+  CheckCircle, LogOut, RotateCcw, AlertTriangle, Plus, X as XIcon, Pill,
 } from 'lucide-react';
 
 // ─── Auto-generate hospital course from patient data ───
@@ -288,6 +288,172 @@ const DocField = ({
     )}
   </div>
 );
+
+// ─── Medication Picker (discharge medications with autocomplete) ────────────
+const FREQUENCIES = ['OD', 'BD', 'TDS', 'QID', 'SOS', 'PRN', 'Stat', 'Weekly', 'Alternate day'];
+const DURATIONS   = ['3 days', '5 days', '7 days', '10 days', '2 weeks', '1 month', '3 months', 'Continue', 'Till review'];
+
+interface MedEntry { name: string; dose: string; freq: string; duration: string; }
+
+function parseMedLines(raw: string): MedEntry[] {
+  if (!raw.trim()) return [];
+  return raw.split('\n').filter(Boolean).map(line => {
+    // Format: "Tab. Metformin 500mg — BD — 1 month"
+    const parts = line.split(' — ');
+    return { name: parts[0] ?? line, dose: '', freq: parts[1] ?? '', duration: parts[2] ?? '' };
+  });
+}
+function formatMedEntry(e: MedEntry): string {
+  const parts = [e.name];
+  if (e.freq)     parts.push(e.freq);
+  if (e.duration) parts.push(e.duration);
+  return parts.join(' — ');
+}
+
+const MedicationPicker: React.FC<{
+  value: string;
+  onChange: (v: string) => void;
+}> = ({ value, onChange }) => {
+  const { medications } = useConfig();
+  const [entries, setEntries] = useState<MedEntry[]>(() => parseMedLines(value));
+  const [search, setSearch] = useState('');
+  const [showDrop, setShowDrop] = useState(false);
+  const [addForm, setAddForm] = useState<{ name: string; dose: string; freq: string; duration: string } | null>(null);
+
+  const commit = (next: MedEntry[]) => {
+    setEntries(next);
+    onChange(next.map(formatMedEntry).join('\n'));
+  };
+
+  const suggestions = useMemo(() => {
+    if (!search.trim()) return [];
+    const q = search.toLowerCase();
+    return medications
+      .filter(m => m.active && (
+        m.name.toLowerCase().includes(q) ||
+        m.brand.toLowerCase().includes(q) ||
+        m.category.toLowerCase().includes(q)
+      ))
+      .slice(0, 10);
+  }, [search, medications]);
+
+  const selectMed = (name: string, form: string, strength: string) => {
+    const label = `${form === 'Injection' ? 'Inj.' : form === 'Syrup' ? 'Syr.' : form === 'Tablet' ? 'Tab.' : form === 'Capsule' ? 'Cap.' : form === 'Infusion' ? 'Inf.' : form.slice(0, 4) + '.'} ${name}${strength ? ' ' + strength : ''}`;
+    setAddForm({ name: label, dose: '', freq: 'OD', duration: '5 days' });
+    setSearch('');
+    setShowDrop(false);
+  };
+
+  const confirmAdd = () => {
+    if (!addForm) return;
+    commit([...entries, addForm]);
+    setAddForm(null);
+  };
+
+  const removeEntry = (idx: number) => {
+    commit(entries.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="mb-5">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 border-b border-slate-200 pb-1 flex items-center gap-1.5">
+        <Pill className="w-3.5 h-3.5" />
+        <span>Discharge Medications</span>
+      </div>
+
+      {/* Existing entries */}
+      {entries.length > 0 && (
+        <div className="mb-3 space-y-1.5">
+          {entries.map((e, i) => (
+            <div key={i} className="flex items-start gap-2 group bg-blue-50/60 border border-blue-100 rounded-lg px-3 py-2">
+              <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-blue-200 text-blue-800 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800 leading-tight">{e.name}</p>
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  {e.freq && <span className="text-[10px] font-medium bg-white border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded">{e.freq}</span>}
+                  {e.duration && <span className="text-[10px] font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{e.duration}</span>}
+                </div>
+              </div>
+              <button type="button" onClick={() => removeEntry(i)}
+                className="shrink-0 mt-0.5 p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add form (shown after selecting a med) */}
+      {addForm && (
+        <div className="mb-3 border border-indigo-200 bg-indigo-50/50 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-semibold text-indigo-800">{addForm.name}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Frequency</label>
+              <select value={addForm.freq} onChange={e => setAddForm(f => f && ({ ...f, freq: e.target.value }))}
+                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                {FREQUENCIES.map(f => <option key={f}>{f}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Duration</label>
+              <select value={addForm.duration} onChange={e => setAddForm(f => f && ({ ...f, duration: e.target.value }))}
+                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                {DURATIONS.map(d => <option key={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button type="button" onClick={() => setAddForm(null)}
+              className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+            <button type="button" onClick={confirmAdd}
+              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Add to list</button>
+          </div>
+        </div>
+      )}
+
+      {/* Search box */}
+      <div className="relative">
+        <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus-within:ring-1 focus-within:ring-blue-400 focus-within:border-blue-400">
+          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setShowDrop(true); }}
+            onFocus={() => setShowDrop(true)}
+            onBlur={() => setTimeout(() => setShowDrop(false), 150)}
+            placeholder={medications.length ? 'Search medication by name or brand…' : 'No medications loaded — seed list in Admin settings'}
+            className="flex-1 text-xs bg-transparent focus:outline-none text-slate-700 placeholder-slate-400"
+          />
+          <button type="button" onClick={() => { setShowDrop(false); setSearch(''); setAddForm({ name: search.trim(), dose: '', freq: 'OD', duration: '5 days' }); }}
+            disabled={!search.trim()}
+            className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-30">
+            <Plus className="w-3 h-3" /> Custom
+          </button>
+        </div>
+
+        {showDrop && suggestions.length > 0 && (
+          <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+            {suggestions.map(m => (
+              <li key={m.id}>
+                <button type="button"
+                  onMouseDown={() => selectMed(m.name, m.form, m.strength)}
+                  className="w-full text-left px-3 py-2.5 hover:bg-blue-50 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800">{m.name} {m.strength && <span className="font-normal text-slate-500">{m.strength}</span>}</p>
+                    {m.brand && <p className="text-[10px] text-slate-400">{m.brand}</p>}
+                  </div>
+                  <span className="shrink-0 text-[9px] font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mt-0.5">{m.form}</span>
+                  <span className="shrink-0 text-[9px] font-medium bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded mt-0.5">{m.category}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ─── Discharge Document Form ───
 const DischargeForm: React.FC<{
@@ -628,11 +794,9 @@ const DischargeForm: React.FC<{
             onChange={v => update('conditionAtDischarge', v)}
             rows={2}
           />
-          <DocField
-            label="Discharge Medications"
+          <MedicationPicker
             value={summary.dischargeMedications}
             onChange={v => update('dischargeMedications', v)}
-            rows={5}
           />
           <DocField
             label="Wound Care"

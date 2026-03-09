@@ -74,6 +74,18 @@ export interface LabTypeConfig {
   active: boolean;
 }
 
+/** A medication row from the medication_config table. */
+export interface MedicationConfig {
+  id: string;
+  name: string;      // generic name
+  brand: string;     // brand name (may be empty)
+  category: string;  // e.g. Analgesic, Antibiotic
+  form: string;      // Tablet, Capsule, Syrup, Injection, etc.
+  strength: string;  // default strength e.g. "500mg"
+  sortOrder: number;
+  active: boolean;
+}
+
 export interface LabResult {
   id: string;
   date: string;

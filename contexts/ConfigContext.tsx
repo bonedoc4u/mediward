@@ -10,21 +10,24 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { WardConfig, LabTypeConfig, HospitalConfig } from '../types';
+import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig } from '../types';
 import {
   fetchWards, createWard, updateWard, deleteWard,
   fetchLabTypes, createLabType, updateLabType, deleteLabType,
   fetchHospitalConfig, upsertHospitalConfig,
+  fetchMedications, createMedication, updateMedication, deleteMedication,
+  seedDefaultMedications,
 } from '../services/configService';
 import { saveToStorage, loadFromStorage } from '../services/persistence';
 import { toast } from '../utils/toast';
 import { useAuth } from './AuthContext';
 
 // ─── localStorage cache keys ───
-const WARD_CACHE_KEY          = 'config_wards';
-const LAB_CACHE_KEY           = 'config_lab_types';
-const UNIT_CHIEFS_CACHE_KEY   = 'config_unit_chiefs';
-const HOSPITAL_CONFIG_CACHE_KEY = 'config_hospital';
+const WARD_CACHE_KEY             = 'config_wards';
+const LAB_CACHE_KEY              = 'config_lab_types';
+const MED_CACHE_KEY              = 'config_medications';
+const UNIT_CHIEFS_CACHE_KEY      = 'config_unit_chiefs';
+const HOSPITAL_CONFIG_CACHE_KEY  = 'config_hospital';
 
 const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   hospitalName: 'MY HOSPITAL',
@@ -89,6 +92,14 @@ interface ConfigContextType {
   addLabType:    (name: string, unit: string, alertHigh: number | null, category: string) => Promise<void>;
   saveLabType:   (lab: LabTypeConfig) => Promise<void>;
   removeLabType: (id: string) => Promise<void>;
+
+  // Medication list (for discharge summary autocomplete)
+  medications: MedicationConfig[];
+  // Admin CRUD — medications
+  addMedication:    (med: Omit<MedicationConfig, 'id'>) => Promise<void>;
+  saveMedication:   (med: MedicationConfig) => Promise<void>;
+  removeMedication: (id: string) => Promise<void>;
+  seedMedications:  () => Promise<void>;
 }
 
 const ConfigContext = createContext<ConfigContextType | null>(null);
@@ -109,6 +120,10 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [labTypes, setLabTypes] = useState<LabTypeConfig[]>(() => {
     return loadFromStorage<LabTypeConfig[]>(LAB_CACHE_KEY) ?? DEFAULT_LAB_TYPES;
+  });
+
+  const [medications, setMedications] = useState<MedicationConfig[]>(() => {
+    return loadFromStorage<MedicationConfig[]>(MED_CACHE_KEY) ?? [];
   });
 
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
@@ -132,16 +147,18 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Background fetch — re-runs when superadmin switches to a different hospital workspace
   useEffect(() => {
     const hid = viewingHospitalId ?? undefined;
-    Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchHospitalConfig(hid)])
-      .then(([freshWards, freshLabs, freshHospital]) => {
+    Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchHospitalConfig(hid), fetchMedications(hid)])
+      .then(([freshWards, freshLabs, freshHospital, freshMeds]) => {
         setWards(freshWards);
         setLabTypes(freshLabs);
         setHospitalConfigState(freshHospital);
+        setMedications(freshMeds);
         // Only cache own-hospital config (not viewed hospitals)
         if (!viewingHospitalId) {
           saveToStorage(WARD_CACHE_KEY, freshWards);
           saveToStorage(LAB_CACHE_KEY, freshLabs);
           saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, freshHospital);
+          saveToStorage(MED_CACHE_KEY, freshMeds);
         }
       })
       .catch(err => console.error('[Config] Failed to load from Supabase — using cache:', err))
@@ -239,6 +256,45 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success('Lab type removed');
   }, []);
 
+  // ─── Medication mutations ───
+  const addMedication = useCallback(async (med: Omit<MedicationConfig, 'id'>) => {
+    const created = await createMedication(med);
+    setMedications(prev => {
+      const next = [...prev, created].sort((a, b) => a.name.localeCompare(b.name));
+      saveToStorage(MED_CACHE_KEY, next);
+      return next;
+    });
+    toast.success(`Medication "${med.name}" added`);
+  }, []);
+
+  const saveMedication = useCallback(async (med: MedicationConfig) => {
+    await updateMedication(med);
+    setMedications(prev => {
+      const next = prev.map(m => m.id === med.id ? med : m);
+      saveToStorage(MED_CACHE_KEY, next);
+      return next;
+    });
+    toast.success(`Medication "${med.name}" updated`);
+  }, []);
+
+  const removeMedication = useCallback(async (id: string) => {
+    await deleteMedication(id);
+    setMedications(prev => {
+      const next = prev.filter(m => m.id !== id);
+      saveToStorage(MED_CACHE_KEY, next);
+      return next;
+    });
+    toast.success('Medication removed');
+  }, []);
+
+  const seedMedications = useCallback(async () => {
+    await seedDefaultMedications();
+    const freshMeds = await fetchMedications();
+    setMedications(freshMeds);
+    saveToStorage(MED_CACHE_KEY, freshMeds);
+    toast.success(`${freshMeds.length} medications loaded`);
+  }, []);
+
   const value = useMemo<ConfigContextType>(() => ({
     wards, labTypes, isLoadingConfig,
     icuWardNames, labTypesByCategory,
@@ -254,6 +310,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveHospitalConfig,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
+    medications, addMedication, saveMedication, removeMedication, seedMedications,
   }), [
     wards, labTypes, isLoadingConfig,
     icuWardNames, labTypesByCategory,
@@ -261,6 +318,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     hospitalConfig, saveHospitalConfig,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
+    medications, addMedication, saveMedication, removeMedication, seedMedications,
   ]);
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
