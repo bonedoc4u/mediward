@@ -86,6 +86,97 @@ export interface MedicationConfig {
   active: boolean;
 }
 
+// ─── Specialty Template Types ────────────────────────────────────────────────
+
+export type SpecialtyFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'select'
+  | 'boolean'
+  | 'score'
+  | 'date'
+  | 'multi_select';
+
+export interface SpecialtyField {
+  key: string;
+  label: string;
+  type: SpecialtyFieldType;
+  options?: string[];
+  min?: number;
+  max?: number;
+  unit?: string;
+  placeholder?: string;
+  required?: boolean;
+}
+
+export interface SpecialtyFieldGroup {
+  key: string;
+  label: string;
+  icon?: string;
+  fields: SpecialtyField[];
+}
+
+/**
+ * Per-hospital customisation of a specialty template.
+ * Stored in the department_templates table.
+ * fieldGroups fully overrides the default template when present.
+ */
+export interface DepartmentTemplateOverride {
+  id: string;
+  hospitalId: string;
+  specialty: string;
+  /** Full field group override — replaces default template groups. */
+  fieldGroups: SpecialtyFieldGroup[];
+  updatedAt: string;
+}
+
+// ─── SBAR Handover ────────────────────────────────────────────────────────────
+
+export interface SBARHandover {
+  id: string;
+  patientIpNo: string;
+  hospitalId?: string;
+  shift: 'morning' | 'evening' | 'night';
+  handoverAt: string;
+  handingOverBy: string;
+  handingOverByName: string;
+  receivedBy?: string;
+  /** Situation — what is happening RIGHT NOW */
+  situation: string;
+  /** Background — admission diagnosis, key history, surgery performed */
+  background: string;
+  /** Assessment — current clinical status, trends, concerns */
+  assessment: string;
+  /** Recommendation — what the incoming team must watch/do */
+  recommendation: string;
+  acknowledged: boolean;
+  acknowledgedAt?: string;
+}
+
+// ─── Inter-departmental Consult ───────────────────────────────────────────────
+
+export interface ConsultRequest {
+  id: string;
+  patientIpNo: string;
+  hospitalId?: string;
+  patientName: string;
+  requestingDept: string;
+  targetDept: string;
+  urgency: 'routine' | 'urgent' | 'stat';
+  clinicalQuestion: string;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: string;
+  status: 'pending' | 'seen' | 'responded';
+  response?: string;
+  respondedBy?: string;
+  respondedByName?: string;
+  respondedAt?: string;
+}
+
+// ─── Lab & Investigation ──────────────────────────────────────────────────────
+
 export interface LabResult {
   id: string;
   date: string;
@@ -191,7 +282,8 @@ export interface Patient {
   pod?: number;
   pacStatus: PacStatus;
   pacChecklist?: PacChecklistItem[];
-  patientStatus: string;
+  /** Fixed to PatientStatus enum — was incorrectly typed as `string` (P0 fix). */
+  patientStatus: PatientStatus;
   dailyRounds: DailyRound[];
   investigations: Investigation[];
   labResults: LabResult[];
@@ -201,11 +293,22 @@ export interface Patient {
   vitals?: VitalSigns[];
   dod?: string;
   dischargeSummary?: DischargeSummary;
+  /**
+   * Specialty key — determines which template is used for specialtyData rendering.
+   * Stored in the `specialty` column of the patients table.
+   */
+  specialty?: string;
+  /**
+   * Specialty-specific clinical data (JSONB in DB).
+   * Keys and schema are defined by the specialty template for this patient's department.
+   */
+  specialtyData?: Record<string, unknown>;
   /** Server-side timestamp of last DB update — used for concurrent-edit detection. */
   updatedAt?: string;
 }
 
-// ─── Auth Types ───
+// ─── Auth Types ───────────────────────────────────────────────────────────────
+
 export type UserRole = 'attending' | 'resident' | 'house_surgeon' | 'admin' | 'superadmin';
 
 export interface AuthUser {
@@ -234,7 +337,8 @@ export interface StoredUser {
   passwordHash: string;
 }
 
-// ─── Audit Types ───
+// ─── Audit Types ──────────────────────────────────────────────────────────────
+
 export interface AuditEntry {
   id: string;
   timestamp: string;
@@ -246,7 +350,8 @@ export interface AuditEntry {
   details: string;
 }
 
-// ─── Notification Types ───
+// ─── Notification Types ───────────────────────────────────────────────────────
+
 export type NotificationPriority = 'high' | 'medium' | 'low' | 'info';
 
 export interface AppNotification {
@@ -260,7 +365,8 @@ export interface AppNotification {
   category: 'lab' | 'pac' | 'todo' | 'system' | 'pod';
 }
 
-// ─── Route Types ───
+// ─── Route Types ──────────────────────────────────────────────────────────────
+
 export type ViewMode =
   | 'dashboard' | 'pending' | 'master' | 'discharge'
   | 'radiology' | 'labs' | 'team' | 'audit'

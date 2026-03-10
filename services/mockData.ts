@@ -50,7 +50,7 @@ export const loadDummyData = (): Patient[] => {
         { id: 'pc1', task: 'Cardiology Opinion', isDone: true },
         { id: 'pc2', task: 'Echo', isDone: false }
       ],
-      patientStatus: "Review",
+      patientStatus: PatientStatus.Review,
       dailyRounds: [
         {
             date: daysAgo(1),
@@ -77,7 +77,7 @@ export const loadDummyData = (): Patient[] => {
       doa: daysAgo(5),
       pacStatus: PacStatus.Fit,
       pacChecklist: [],
-      patientStatus: "Fit",
+      patientStatus: PatientStatus.Fit,
       dailyRounds: [
          {
             date: daysAgo(2),
@@ -109,7 +109,7 @@ export const loadDummyData = (): Patient[] => {
       dos: daysAgo(3),
       pacStatus: PacStatus.Fit,
       pacChecklist: [],
-      patientStatus: "Review",
+      patientStatus: PatientStatus.Review,
       dailyRounds: [
         {
             date: daysAgo(1),
@@ -142,7 +142,7 @@ export const loadDummyData = (): Patient[] => {
       doa: daysAgo(2),
       pacStatus: PacStatus.Pending,
       pacChecklist: [],
-      patientStatus: "Review",
+      patientStatus: PatientStatus.Review,
       dailyRounds: [],
       investigations: [],
       labResults: [],
@@ -164,7 +164,7 @@ export const loadDummyData = (): Patient[] => {
       procedure: "Implant Removal",
       pacStatus: PacStatus.Fit,
       pacChecklist: [],
-      patientStatus: "Fit",
+      patientStatus: PatientStatus.Fit,
       dailyRounds: [],
       investigations: [],
       labResults: [],

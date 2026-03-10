@@ -89,7 +89,7 @@ const App: React.FC = () => {
     currentView, navigateTo, navParams,
     isMobileMenuOpen, setIsMobileMenuOpen, isTransitioning,
   } = useUI();
-  const { preOpModuleName, procedureListName, hospitalName, department } = useConfig();
+  const { preOpModuleName, procedureListName, department } = useConfig();
 
   const mobileTabs = useMemo(() => [
     { id: 'dashboard' as ViewMode, label: 'Ward',                icon: LayoutDashboard },
@@ -256,7 +256,7 @@ const App: React.FC = () => {
             onViewPatient={(ipNo: string) => navigateTo('patient', { id: ipNo })}
             onStartRounds={() => navigateTo('round-mode')}
             onAddLab={async (ipNo, type, value, date) => {
-              addLabResult(ipNo, { id: Math.random().toString(36).substr(2, 9), date, type, value });
+              addLabResult(ipNo, { id: crypto.randomUUID(), date, type, value });
             }}
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
@@ -269,7 +269,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         :root {
           --bottom-nav-height: 56px;
           --safe-area-top: env(safe-area-inset-top, 0px);

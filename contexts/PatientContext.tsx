@@ -16,6 +16,15 @@ import React, {
   createContext, useContext, useState, useEffect,
   useCallback, useMemo, useRef,
 } from 'react';
+
+// Simple debounce utility — avoids serialising the full patient array on every realtime event
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout>;
+  return ((...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  }) as T;
+}
 import { Patient, LabResult, Investigation, DailyRound, VitalSigns } from '../types';
 import { enrichPatientData } from '../utils/calculations';
 import { sanitizeInput } from '../utils/sanitize';
@@ -111,6 +120,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const { viewingHospitalId } = useAuth();
+
+  // Debounced cache write — avoids serialising the full patient array on every realtime event.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSaveActiveCache = useCallback(
+    debounce((pts: Patient[]) => saveActiveCache(pts), 2000),
+    [],
+  );
+
   // Ref so the online-reconnect handler (useEffect with [] deps) always reads
   // the latest hospitalId even if it changed after the effect was registered.
   const hospitalIdRef = useRef<string | undefined>(viewingHospitalId ?? undefined);
@@ -205,13 +222,19 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let retryDelay = 2000;
 
     const connect = () => {
+      // hospital_id filter pushes server-side scoping — only events for this
+      // hospital are delivered, preventing cross-tenant realtime leakage.
+      const hospitalFilter = user?.hospitalId
+        ? `hospital_id=eq.${user.hospitalId}`
+        : undefined;
+
       const ch = supabase
         .channel(`patients-realtime-${Date.now()}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'patients' },
+          { event: '*', schema: 'public', table: 'patients', ...(hospitalFilter ? { filter: hospitalFilter } : {}) },
           async (payload) => {
-            // For unit-scoped users, only process events for their unit
+            // Secondary unit-scoped client-side filter (belt-and-suspenders)
             const userUnit = user?.unit;
             if (payload.eventType === 'INSERT') {
               const newPatient = parsePatientRow(payload.new);
@@ -219,7 +242,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               setPatients(prev => {
                 if (prev.some(p => p.ipNo === newPatient.ipNo)) return prev;
                 const next = enrichPatientData([newPatient, ...prev]);
-                saveActiveCache(next);
+                debouncedSaveActiveCache(next);
                 return next;
               });
             } else if (payload.eventType === 'UPDATE') {
@@ -227,9 +250,6 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               const rowUnit = (payload.new as { unit?: string })?.unit;
               if (userUnit && rowUnit && rowUnit !== userUnit) return;
               if (ipNo) {
-                // Parse the payload directly — no network fetch.
-                // Labs & imaging come from separate tables and aren't in the
-                // realtime payload, so we preserve them from the in-memory copy.
                 const fromPayload = parsePatientRow(payload.new);
                 setPatients(prev => {
                   const next = enrichPatientData(
@@ -239,13 +259,12 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                         ...fromPayload,
                         labResults:     p.labResults,
                         investigations: p.investigations,
-                        // Normalized tables are not in the realtime payload — preserve in-memory
                         dailyRounds:    p.dailyRounds,
                         vitals:         p.vitals,
                       };
                     }),
                   );
-                  saveActiveCache(next);
+                  debouncedSaveActiveCache(next);
                   return next;
                 });
               }
@@ -254,7 +273,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               if (deletedIpNo) {
                 setPatients(prev => {
                   const next = prev.filter(p => p.ipNo !== deletedIpNo);
-                  saveActiveCache(next);
+                  debouncedSaveActiveCache(next);
                   return next;
                 });
               }
@@ -360,8 +379,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Bug #9: concurrent edit — another user saved this patient first
         if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT:')) {
           toast.error(
-            `${updatedPatient.name} was modified by another user. Reload the page to see the latest version before editing.`,
-            { duration: 8000 },
+            `${updatedPatient.name} was modified by another user. Please reload to see the latest version.`,
           );
           return; // do NOT enqueue a stale overwrite
         }

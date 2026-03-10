@@ -241,7 +241,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
   }, [isToday, todayStr, onUpdatePatient, onSaveRound]);
 
   const generatePdf = useCallback((patient: Patient) => {
-    let displayStatus = patient.patientStatus;
+    let displayStatus: string = patient.patientStatus;
     let displayTodos = patient.todos;
     if (!isToday) {
       const historicalData = patient.dailyRounds?.find(r => r.date === selectedDate);
@@ -332,7 +332,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
       yPos += 12;
 
       wardPatients.forEach((patient, idx) => {
-        let displayStatus = patient.patientStatus;
+        let displayStatus: string = patient.patientStatus;
         let displayTodos = patient.todos;
         if (!isToday) {
           const historicalData = patient.dailyRounds?.find(r => r.date === selectedDate);
@@ -532,7 +532,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
               selectedDate={selectedDate}
               todoInput={todoInputs[currentMobilePatient.ipNo] || ''}
               onTodoInputChange={(v) => setTodoInputs(prev => ({ ...prev, [currentMobilePatient.ipNo]: v }))}
-              onStatusChange={(s) => updatePatientWithHistory({ ...currentMobilePatient, patientStatus: s })}
+              onStatusChange={(s) => updatePatientWithHistory({ ...currentMobilePatient, patientStatus: s as PatientStatus })}
               onToggleTodo={(id) => {
                 const updated = currentMobilePatient.todos.map(t => t.id === id ? { ...t, isDone: !t.isDone } : t);
                 updatePatientWithHistory({ ...currentMobilePatient, todos: updated });
@@ -572,7 +572,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
                 selectedDate={selectedDate}
                 todoInput={todoInputs[patient.ipNo] || ''}
                 onTodoInputChange={(v) => setTodoInputs(prev => ({ ...prev, [patient.ipNo]: v }))}
-                onStatusChange={(s) => updatePatientWithHistory({ ...patient, patientStatus: s })}
+                onStatusChange={(s) => updatePatientWithHistory({ ...patient, patientStatus: s as PatientStatus })}
                 onToggleTodo={(id) => {
                   const updated = patient.todos.map(t => t.id === id ? { ...t, isDone: !t.isDone } : t);
                   updatePatientWithHistory({ ...patient, todos: updated });

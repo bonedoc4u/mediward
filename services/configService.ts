@@ -696,3 +696,60 @@ export const DEFAULT_INDIAN_MEDICATIONS: MedSeed[] = [
   { name: 'Framycetin', brand: 'Soframycin', category: 'Topical / Wound', form: 'Cream', strength: '1%' },
   { name: 'Neomycin + Polymyxin B', brand: 'Neosporin', category: 'Topical / Wound', form: 'Ointment', strength: '' },
 ];
+
+// ─── Department Template Overrides ────────────────────────────────────────────
+
+import type { SpecialtyFieldGroup, DepartmentTemplateOverride } from '../types';
+
+function parseDeptTemplateRow(row: Record<string, unknown>): DepartmentTemplateOverride {
+  return {
+    id:          String(row.id),
+    hospitalId:  String(row.hospital_id),
+    specialty:   String(row.specialty),
+    fieldGroups: Array.isArray(row.field_groups) ? (row.field_groups as SpecialtyFieldGroup[]) : [],
+    updatedAt:   String(row.updated_at ?? ''),
+  };
+}
+
+/** Fetch the department template override for a specific hospital + specialty. */
+export async function fetchDepartmentTemplate(
+  hospitalId: string,
+  specialty: string,
+): Promise<DepartmentTemplateOverride | null> {
+  const { data, error } = await supabase
+    .from('department_templates')
+    .select('*')
+    .eq('hospital_id', hospitalId)
+    .eq('specialty', specialty)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? parseDeptTemplateRow(data as Record<string, unknown>) : null;
+}
+
+/** Upsert (insert or update) a department template override. */
+export async function saveDepartmentTemplate(
+  hospitalId: string,
+  specialty: string,
+  fieldGroups: SpecialtyFieldGroup[],
+): Promise<DepartmentTemplateOverride> {
+  const { data, error } = await supabase
+    .from('department_templates')
+    .upsert(
+      { hospital_id: hospitalId, specialty, field_groups: fieldGroups, updated_at: new Date().toISOString() },
+      { onConflict: 'hospital_id,specialty' },
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return parseDeptTemplateRow(data as Record<string, unknown>);
+}
+
+/** Delete a department template override, reverting to the system default. */
+export async function deleteDepartmentTemplate(hospitalId: string, specialty: string): Promise<void> {
+  const { error } = await supabase
+    .from('department_templates')
+    .delete()
+    .eq('hospital_id', hospitalId)
+    .eq('specialty', specialty);
+  if (error) throw error;
+}

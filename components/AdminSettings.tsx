@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useConfig } from '../contexts/AppContext';
-import { WardConfig, LabTypeConfig, MedicationConfig } from '../types';
-import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle, Pill, RefreshCw } from 'lucide-react';
+import { WardConfig, LabTypeConfig, MedicationConfig, SpecialtyFieldGroup, SpecialtyField } from '../types';
+import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle, Pill, RefreshCw, LayoutTemplate, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { SPECIALTY_DISPLAY_NAMES } from '../services/specialtyTemplates';
 import { createIncident, updateIncidentStatus, deleteIncident, fetchIncidents, StatusIncident, IncidentSeverity, IncidentStatus } from '../services/statusService';
 
 // ─── Department presets ───
@@ -274,7 +275,7 @@ const MedRow: React.FC<{ med: MedicationConfig; onSave: (m: MedicationConfig) =>
 
 // ─── Main AdminSettings view ───
 const AdminSettings: React.FC = () => {
-  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, saveHospitalConfig, medications, addMedication, saveMedication, removeMedication, seedMedications } = useConfig();
+  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, saveHospitalConfig, medications, addMedication, saveMedication, removeMedication, seedMedications, activeSpecialty, activeFieldGroups, templateOverride, saveTemplateOverride, resetTemplateOverride } = useConfig();
 
   // Hospital settings form
   const [localHospitalName, setLocalHospitalName] = useState(hospitalName);
@@ -434,6 +435,79 @@ const AdminSettings: React.FC = () => {
       setNewLabAlertHigh('');
       setNewLabCategory('');
     } finally { setAddingLab(false); }
+  };
+
+  // ── Department Template state ──
+  const [editingTemplate, setEditingTemplate] = useState(false);
+  const [draftGroups, setDraftGroups] = useState<SpecialtyFieldGroup[]>([]);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [newGroupLabel, setNewGroupLabel] = useState('');
+  const [newFieldLabels, setNewFieldLabels] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (editingTemplate) {
+      setDraftGroups(JSON.parse(JSON.stringify(activeFieldGroups)));
+      setExpandedGroups(new Set(activeFieldGroups.map(g => g.key)));
+    }
+  }, [editingTemplate, activeFieldGroups]);
+
+  const toggleGroupExpand = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const handleAddGroup = () => {
+    const label = newGroupLabel.trim();
+    if (!label) return;
+    const key = label.toLowerCase().replace(/\s+/g, '_');
+    if (draftGroups.some(g => g.key === key)) return;
+    setDraftGroups(prev => [...prev, { key, label, fields: [] }]);
+    setExpandedGroups(prev => new Set([...prev, key]));
+    setNewGroupLabel('');
+  };
+
+  const handleRemoveGroup = (key: string) => {
+    setDraftGroups(prev => prev.filter(g => g.key !== key));
+  };
+
+  const handleGroupLabelChange = (key: string, label: string) => {
+    setDraftGroups(prev => prev.map(g => g.key === key ? { ...g, label } : g));
+  };
+
+  const handleAddField = (groupKey: string) => {
+    const label = (newFieldLabels[groupKey] ?? '').trim();
+    if (!label) return;
+    const fieldKey = label.toLowerCase().replace(/\s+/g, '_');
+    setDraftGroups(prev => prev.map(g =>
+      g.key === groupKey
+        ? { ...g, fields: [...g.fields, { key: fieldKey, label, type: 'text' as SpecialtyField['type'] }] }
+        : g
+    ));
+    setNewFieldLabels(prev => ({ ...prev, [groupKey]: '' }));
+  };
+
+  const handleRemoveField = (groupKey: string, fieldKey: string) => {
+    setDraftGroups(prev => prev.map(g =>
+      g.key === groupKey
+        ? { ...g, fields: g.fields.filter(f => f.key !== fieldKey) }
+        : g
+    ));
+  };
+
+  const handleSaveTemplate = async () => {
+    setSavingTemplate(true);
+    try { await saveTemplateOverride(draftGroups); setEditingTemplate(false); }
+    finally { setSavingTemplate(false); }
+  };
+
+  const handleResetTemplate = async () => {
+    if (!window.confirm('Reset to system default template? Your customizations will be lost.')) return;
+    await resetTemplateOverride();
+    setEditingTemplate(false);
   };
 
   const sortedWards = [...wards].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -1062,6 +1136,160 @@ const AdminSettings: React.FC = () => {
             <p className="font-semibold mb-0.5">Penetration Testing</p>
             <p>To request a security assessment or penetration test report, contact <span className="font-semibold">security@mediward.in</span>. SOC 2 Type II audit is planned for Q3 2026.</p>
           </div>
+        </div>
+      </div>
+
+      {/* ── Department Template ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <div className="flex items-center gap-2">
+            <LayoutTemplate className="w-5 h-5 text-indigo-600" />
+            <h2 className="font-bold text-slate-800">Department Clinical Template</h2>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${templateOverride ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+              {templateOverride ? 'Custom' : 'Default'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {templateOverride && !editingTemplate && (
+              <button
+                onClick={handleResetTemplate}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" /> Reset to Default
+              </button>
+            )}
+            {!editingTemplate ? (
+              <button
+                onClick={() => setEditingTemplate(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Customize
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditingTemplate(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" /> Cancel
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4">
+          {/* Specialty tag */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-slate-500">Active specialty:</span>
+            <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold border border-indigo-100">
+              {SPECIALTY_DISPLAY_NAMES[activeSpecialty] ?? activeSpecialty}
+            </span>
+            <span className="text-xs text-slate-400">(auto-detected from department)</span>
+          </div>
+
+          {!editingTemplate ? (
+            /* Read-only view */
+            <div className="space-y-2">
+              {activeFieldGroups.map(group => (
+                <div key={group.key} className="border border-slate-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => toggleGroupExpand(group.key)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                  >
+                    <span className="text-sm font-semibold text-slate-700">{group.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">{group.fields.length} fields</span>
+                      {expandedGroups.has(group.key) ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </div>
+                  </button>
+                  {expandedGroups.has(group.key) && (
+                    <div className="px-4 py-2 grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {group.fields.map(f => (
+                        <span key={f.key} className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded px-2 py-1">
+                          {f.label} <span className="text-slate-400">({f.type})</span>
+                        </span>
+                      ))}
+                      {group.fields.length === 0 && <span className="text-xs text-slate-400 col-span-3">No fields</span>}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {activeFieldGroups.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-6">No field groups configured.</p>
+              )}
+            </div>
+          ) : (
+            /* Edit mode */
+            <div className="space-y-3">
+              {draftGroups.map((group, gi) => (
+                <div key={group.key} className="border border-indigo-100 rounded-lg overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50">
+                    <button onClick={() => toggleGroupExpand(group.key)} className="shrink-0">
+                      {expandedGroups.has(group.key) ? <ChevronUp className="w-4 h-4 text-indigo-400" /> : <ChevronDown className="w-4 h-4 text-indigo-400" />}
+                    </button>
+                    <input
+                      value={group.label}
+                      onChange={e => handleGroupLabelChange(group.key, e.target.value)}
+                      className="flex-1 text-sm font-semibold bg-transparent text-indigo-800 outline-none border-b border-indigo-200 focus:border-indigo-500"
+                    />
+                    <span className="text-xs text-indigo-400">{group.fields.length} fields</span>
+                    <button onClick={() => handleRemoveGroup(group.key)} className="shrink-0 text-red-400 hover:text-red-600">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {expandedGroups.has(group.key) && (
+                    <div className="px-3 py-2 space-y-1.5">
+                      {group.fields.map(field => (
+                        <div key={field.key} className="flex items-center gap-2">
+                          <span className="flex-1 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1">{field.label}</span>
+                          <span className="text-[10px] text-slate-400 w-16 shrink-0">{field.type}</span>
+                          <button onClick={() => handleRemoveField(group.key, field.key)} className="text-red-400 hover:text-red-600 shrink-0">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          placeholder="Add field label..."
+                          value={newFieldLabels[group.key] ?? ''}
+                          onChange={e => setNewFieldLabels(prev => ({ ...prev, [group.key]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && handleAddField(group.key)}
+                          className="flex-1 text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        />
+                        <button onClick={() => handleAddField(group.key)} className="text-indigo-600 hover:text-indigo-800 shrink-0">
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Add new group */}
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  placeholder="New group name..."
+                  value={newGroupLabel}
+                  onChange={e => setNewGroupLabel(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddGroup()}
+                  className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <button onClick={handleAddGroup} className="flex items-center gap-1 px-3 py-2 text-sm text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+                  <Plus className="w-4 h-4" /> Add Group
+                </button>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={handleSaveTemplate}
+                  disabled={savingTemplate}
+                  className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingTemplate ? 'Saving…' : 'Save Template'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

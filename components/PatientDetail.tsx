@@ -11,10 +11,11 @@ import {
 import ConfirmDialog from './ConfirmDialog';
 import FHIRExportModal from './FHIRExportModal';
 import VitalsWidget from './VitalsWidget';
+import SpecialtyDataPanel from './SpecialtyDataPanel';
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
-  const { labTypes } = useConfig();
+  const { labTypes, activeFieldGroups, activeSpecialty } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFhirExport, setShowFhirExport] = useState(false);
@@ -327,6 +328,17 @@ const PatientDetail: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Specialty Clinical Data */}
+      {activeFieldGroups.length > 0 && (
+        <SpecialtyDataPanel
+          fieldGroups={activeFieldGroups}
+          data={patient.specialtyData ?? {}}
+          specialtyLabel={activeSpecialty.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+          canEdit={can(user, 'patient:edit')}
+          onSave={updatedData => updatePatient({ ...patient, specialtyData: updatedData })}
+        />
       )}
 
       {/* Daily Rounds History */}

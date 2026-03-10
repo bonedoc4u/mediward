@@ -10,14 +10,20 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig } from '../types';
+import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig, DepartmentTemplateOverride, SpecialtyFieldGroup } from '../types';
 import {
   fetchWards, createWard, updateWard, deleteWard,
   fetchLabTypes, createLabType, updateLabType, deleteLabType,
   fetchHospitalConfig, upsertHospitalConfig,
   fetchMedications, createMedication, updateMedication, deleteMedication,
   seedDefaultMedications,
+  fetchDepartmentTemplate, saveDepartmentTemplate, deleteDepartmentTemplate,
 } from '../services/configService';
+import {
+  SPECIALTY_TEMPLATES,
+  detectSpecialtyFromDepartment,
+  type SpecialtyKey,
+} from '../services/specialtyTemplates';
 import { saveToStorage, loadFromStorage } from '../services/persistence';
 import { toast } from '../utils/toast';
 import { useAuth } from './AuthContext';
@@ -59,6 +65,17 @@ interface ConfigContextType {
   wards: WardConfig[];
   labTypes: LabTypeConfig[];
   isLoadingConfig: boolean;
+
+  /** Detected specialty key for this department (e.g. 'orthopaedics'). */
+  activeSpecialty: SpecialtyKey;
+  /** Merged field groups: hospital override if present, else default template. */
+  activeFieldGroups: SpecialtyFieldGroup[];
+  /** The hospital-specific template override, or null if using default. */
+  templateOverride: DepartmentTemplateOverride | null;
+  /** Save a custom field-group layout for this hospital's department. */
+  saveTemplateOverride: (groups: SpecialtyFieldGroup[]) => Promise<void>;
+  /** Delete custom override, reverting to the system default. */
+  resetTemplateOverride: () => Promise<void>;
   /** Names of all ICU wards (for ICU-specific styling). */
   icuWardNames: Set<string>;
   /** Lab types grouped by category, preserving sort order. */
@@ -112,7 +129,7 @@ export function useConfig(): ConfigContextType {
 
 // ─── Provider ───
 export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { viewingHospitalId } = useAuth();
+  const { viewingHospitalId, user } = useAuth();
 
   const [wards, setWards] = useState<WardConfig[]>(() => {
     return loadFromStorage<WardConfig[]>(WARD_CACHE_KEY) ?? DEFAULT_WARDS;
@@ -135,6 +152,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [unitChiefs, setUnitChiefsState] = useState<Record<string, string>>(
     () => loadFromStorage<Record<string, string>>(UNIT_CHIEFS_CACHE_KEY) ?? {}
   );
+
+  const [templateOverride, setTemplateOverride] = useState<DepartmentTemplateOverride | null>(null);
 
   const setUnitChief = useCallback((unit: string, name: string) => {
     setUnitChiefsState(prev => {
@@ -164,6 +183,43 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       .catch(err => console.error('[Config] Failed to load from Supabase — using cache:', err))
       .finally(() => setIsLoadingConfig(false));
   }, [viewingHospitalId]);
+
+  // Detect specialty from department string
+  const activeSpecialty = useMemo<SpecialtyKey>(
+    () => detectSpecialtyFromDepartment(hospitalConfig.department),
+    [hospitalConfig.department],
+  );
+
+  // Fetch department template override whenever hospitalId or specialty changes
+  useEffect(() => {
+    const hospitalId = viewingHospitalId ?? user?.hospitalId;
+    if (!hospitalId) return;
+    fetchDepartmentTemplate(hospitalId, activeSpecialty)
+      .then(override => setTemplateOverride(override))
+      .catch(err => console.error('[Config] Failed to load department template:', err));
+  }, [viewingHospitalId, user?.hospitalId, activeSpecialty]);
+
+  // Active field groups: hospital override takes precedence over system default
+  const activeFieldGroups = useMemo<SpecialtyFieldGroup[]>(() => {
+    if (templateOverride?.fieldGroups?.length) return templateOverride.fieldGroups;
+    return SPECIALTY_TEMPLATES[activeSpecialty]?.fieldGroups ?? [];
+  }, [templateOverride, activeSpecialty]);
+
+  const saveTemplateOverride = useCallback(async (groups: SpecialtyFieldGroup[]) => {
+    const hospitalId = viewingHospitalId ?? user?.hospitalId;
+    if (!hospitalId) return;
+    const saved = await saveDepartmentTemplate(hospitalId, activeSpecialty, groups);
+    setTemplateOverride(saved);
+    toast.success('Department template saved');
+  }, [viewingHospitalId, user?.hospitalId, activeSpecialty]);
+
+  const resetTemplateOverride = useCallback(async () => {
+    const hospitalId = viewingHospitalId ?? user?.hospitalId;
+    if (!hospitalId) return;
+    await deleteDepartmentTemplate(hospitalId, activeSpecialty);
+    setTemplateOverride(null);
+    toast.success('Template reset to system default');
+  }, [viewingHospitalId, user?.hospitalId, activeSpecialty]);
 
   const saveHospitalConfig = useCallback(async (config: HospitalConfig) => {
     await upsertHospitalConfig(config);
@@ -311,6 +367,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
     medications, addMedication, saveMedication, removeMedication, seedMedications,
+    activeSpecialty, activeFieldGroups, templateOverride,
+    saveTemplateOverride, resetTemplateOverride,
   }), [
     wards, labTypes, isLoadingConfig,
     icuWardNames, labTypesByCategory,
@@ -319,6 +377,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
     medications, addMedication, saveMedication, removeMedication, seedMedications,
+    activeSpecialty, activeFieldGroups, templateOverride,
+    saveTemplateOverride, resetTemplateOverride,
   ]);
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;

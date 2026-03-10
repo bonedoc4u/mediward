@@ -60,6 +60,8 @@ interface PatientRow {
   ward: string;
   bed: string;
   unit: string | null;
+  specialty: string | null;
+  specialty_data: Record<string, unknown> | null;
   diagnosis: string;
   procedure: string | null;
   comorbidities: string[];
@@ -173,7 +175,7 @@ function rowToPatient(row: PatientRow): Patient {
     dod:              row.dod              ?? undefined,
     pod:              row.pod              ?? undefined,
     pacStatus:        row.pac_status       as Patient['pacStatus'],
-    patientStatus:    row.patient_status,
+    patientStatus:    row.patient_status   as Patient['patientStatus'],
     dailyRounds,
     investigations,
     labResults,
@@ -182,6 +184,8 @@ function rowToPatient(row: PatientRow): Patient {
     preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
     vitals,
+    specialty:        row.specialty        ?? undefined,
+    specialtyData:    row.specialty_data   ?? undefined,
     updatedAt: row.updated_at,
   };
 }
@@ -200,6 +204,8 @@ function patientToRow(patient: Patient) {
     ward:              patient.ward,
     bed:               patient.bed,
     unit:              patient.unit ?? null,
+    specialty:         patient.specialty         ?? null,
+    specialty_data:    patient.specialtyData     ?? null,
     diagnosis:         patient.diagnosis,
     procedure:         patient.procedure        ?? null,
     comorbidities:     patient.comorbidities,
@@ -229,6 +235,7 @@ function patientToRow(patient: Patient) {
 //
 const PATIENT_LIST_SELECT = [
   'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
+  'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'discharge_summary', 'created_at', 'updated_at',
@@ -242,6 +249,7 @@ const PATIENT_LIST_SELECT = [
 // Full select (all vitals) — used only when a single patient's detail is loaded
 const PATIENT_SELECT = [
   'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
+  'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'discharge_summary', 'created_at', 'updated_at',
