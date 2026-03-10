@@ -142,8 +142,14 @@ function generateRuleBasedAlerts(patients: Patient[]): AiAlert[] {
 }
 
 // ─── Draggable FAB position (AssistiveTouch-style) ───────────────────────────
-const BTN_SIZE = 56; // px — must match p-3.5 rounded-full w (14*4 = 56)
+const BTN_SIZE = 56;   // px
 const EDGE_MARGIN = 8; // px from screen edge when snapped
+
+function snappedLeft(side: 'left' | 'right') {
+  return side === 'right'
+    ? window.innerWidth - BTN_SIZE - EDGE_MARGIN
+    : EDGE_MARGIN;
+}
 
 function loadFabPos(): { side: 'left' | 'right'; yPx: number } {
   try {
@@ -165,84 +171,95 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
 
   // ── Draggable FAB state ──
   const [fabPos, setFabPos] = useState<{ side: 'left' | 'right'; yPx: number }>(loadFabPos);
-  const [isDragging, setIsDragging] = useState(false);
+  // liveDrag: free x/y while finger is down; null = snapped position
+  const [liveDrag, setLiveDrag] = useState<{ x: number; y: number } | null>(null);
   const dragging = useRef(false);
   const dragMoved = useRef(false);
-  const dragStartY = useRef(0);
-  const dragStartTouchY = useRef(0);
-  const dragStartTouchX = useRef(0);
+  const startTouchX = useRef(0);
+  const startTouchY = useRef(0);
+  const startFabX = useRef(0);
+  const startFabY = useRef(0);
 
-  // Clamp y so button stays fully on screen
   const clampY = (y: number) => Math.max(EDGE_MARGIN, Math.min(y, window.innerHeight - BTN_SIZE - EDGE_MARGIN));
+  const clampX = (x: number) => Math.max(EDGE_MARGIN, Math.min(x, window.innerWidth - BTN_SIZE - EDGE_MARGIN));
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     dragging.current = true;
     dragMoved.current = false;
-    setIsDragging(true);
-    dragStartY.current = fabPos.yPx;
-    dragStartTouchY.current = t.clientY;
-    dragStartTouchX.current = t.clientX;
+    startTouchX.current = t.clientX;
+    startTouchY.current = t.clientY;
+    startFabX.current = snappedLeft(fabPos.side);
+    startFabY.current = fabPos.yPx;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!dragging.current || e.touches.length !== 1) return;
     const t = e.touches[0];
-    const dy = t.clientY - dragStartTouchY.current;
-    const dx = t.clientX - dragStartTouchX.current;
-    if (Math.abs(dy) > 4 || Math.abs(dx) > 4) {
+    const dx = t.clientX - startTouchX.current;
+    const dy = t.clientY - startTouchY.current;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
       dragMoved.current = true;
-      e.preventDefault(); // stop page scroll while dragging FAB
+      e.preventDefault();
     }
-    setFabPos(prev => ({ ...prev, yPx: clampY(dragStartY.current + dy) }));
+    if (dragMoved.current) {
+      setLiveDrag({
+        x: clampX(startFabX.current + dx),
+        y: clampY(startFabY.current + dy),
+      });
+    }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!dragging.current) return;
     dragging.current = false;
-    setIsDragging(false);
 
     if (!dragMoved.current) {
-      // Treat as tap — open assistant
+      setLiveDrag(null);
       setIsOpen(true);
       if (!alerts) generateInsights();
       return;
     }
 
-    // Snap to nearest horizontal edge
     const touch = e.changedTouches[0];
     const newSide: 'left' | 'right' = touch.clientX < window.innerWidth / 2 ? 'left' : 'right';
-    const newPos = { side: newSide, yPx: clampY(fabPos.yPx) };
+    const newPos = { side: newSide, yPx: clampY(liveDrag?.y ?? fabPos.yPx) };
+    setLiveDrag(null); // triggers transition to snapped position
     setFabPos(newPos);
     saveFabPos(newPos);
   };
 
-  // Also allow mouse drag (desktop testing)
+  // Mouse drag (desktop)
   const handleMouseDown = (e: React.MouseEvent) => {
     dragging.current = true;
     dragMoved.current = false;
-    setIsDragging(true);
-    dragStartY.current = fabPos.yPx;
-    dragStartTouchY.current = e.clientY;
-    dragStartTouchX.current = e.clientX;
+    startTouchX.current = e.clientX;
+    startTouchY.current = e.clientY;
+    startFabX.current = snappedLeft(fabPos.side);
+    startFabY.current = fabPos.yPx;
   };
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return;
-      const dy = e.clientY - dragStartTouchY.current;
-      const dx = e.clientX - dragStartTouchX.current;
-      if (Math.abs(dy) > 4 || Math.abs(dx) > 4) dragMoved.current = true;
-      setFabPos(prev => ({ ...prev, yPx: clampY(dragStartY.current + dy) }));
+      const dx = e.clientX - startTouchX.current;
+      const dy = e.clientY - startTouchY.current;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved.current = true;
+      if (dragMoved.current) {
+        setLiveDrag({
+          x: clampX(startFabX.current + dx),
+          y: clampY(startFabY.current + dy),
+        });
+      }
     };
     const onMouseUp = (e: MouseEvent) => {
       if (!dragging.current) return;
       dragging.current = false;
-      setIsDragging(false);
-      if (!dragMoved.current) return; // click handled by onClick
+      if (!dragMoved.current) { setLiveDrag(null); return; }
       const newSide: 'left' | 'right' = e.clientX < window.innerWidth / 2 ? 'left' : 'right';
-      const newPos = { side: newSide, yPx: clampY(fabPos.yPx) };
+      const newPos = { side: newSide, yPx: clampY(liveDrag?.y ?? fabPos.yPx) };
+      setLiveDrag(null);
       setFabPos(newPos);
       saveFabPos(newPos);
     };
@@ -253,7 +270,7 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
       window.removeEventListener('mouseup', onMouseUp);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fabPos.yPx]);
+  }, [fabPos, liveDrag]);
 
   const generateInsights = useCallback(async () => {
     setLoading(true);
@@ -311,14 +328,16 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
         className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-full shadow-lg shadow-indigo-900/30 flex items-center justify-center select-none"
         style={{
           position: 'fixed',
-          top: fabPos.yPx,
-          ...(fabPos.side === 'right' ? { right: EDGE_MARGIN } : { left: EDGE_MARGIN }),
+          top: liveDrag ? liveDrag.y : fabPos.yPx,
+          left: liveDrag ? liveDrag.x : snappedLeft(fabPos.side),
           width: BTN_SIZE,
           height: BTN_SIZE,
           zIndex: 40,
           touchAction: 'none',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          transition: isDragging ? 'none' : 'top 0.18s ease, left 0.18s ease, right 0.18s ease',
+          cursor: liveDrag ? 'grabbing' : 'grab',
+          transition: liveDrag
+            ? 'none'
+            : 'top 0.35s cubic-bezier(0.34,1.56,0.64,1), left 0.35s cubic-bezier(0.34,1.56,0.64,1)',
           userSelect: 'none',
           WebkitUserSelect: 'none',
         }}

@@ -22,7 +22,7 @@ interface AddFormState {
 
 const BLANK_FORM: AddFormState = { name: '', email: '', password: '', role: 'resident', unit: '' };
 
-const TeamManagement: React.FC = () => {
+const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSuperAdmin }) => {
   const { user } = useApp();
   const { unitOptions } = useConfig();
 
@@ -177,15 +177,26 @@ const TeamManagement: React.FC = () => {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-slate-500">{users.length} user{users.length !== 1 ? 's' : ''} have access to this system</p>
-        <button
-          onClick={() => { setShowAddForm(v => !v); setForm(BLANK_FORM); setFormError(''); }}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          {showAddForm ? <X className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-          {showAddForm ? 'Cancel' : 'Add User'}
-        </button>
+        <div className="flex items-center gap-2">
+          {user?.role === 'superadmin' && onOpenSuperAdmin && (
+            <button
+              onClick={onOpenSuperAdmin}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Shield className="w-4 h-4" />
+              Super Admin
+            </button>
+          )}
+          <button
+            onClick={() => { setShowAddForm(v => !v); setForm(BLANK_FORM); setFormError(''); }}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            {showAddForm ? <X className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+            {showAddForm ? 'Cancel' : 'Add User'}
+          </button>
+        </div>
       </div>
 
       {/* ─── Add User Form ─── */}

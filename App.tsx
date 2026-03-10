@@ -238,7 +238,7 @@ const App: React.FC = () => {
       case 'rounds':
         return <DailyRounds patients={patients} onUpdatePatient={updatePatient} onSaveRound={saveRound} />;
       case 'team':
-        return <TeamManagement />;
+        return <TeamManagement onOpenSuperAdmin={user?.role === 'superadmin' ? () => { setViewingHospital(null); setSuperAdminMode(true); } : undefined} />;
       case 'pac':
         return <PacManagement patients={patients} onUpdatePatient={updatePatient} />;
       case 'preop':
