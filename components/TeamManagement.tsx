@@ -43,7 +43,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
   const [resetPw, setResetPw] = useState('');
   const [showResetPw, setShowResetPw] = useState(false);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   // ─── Load users from Supabase ───
   const loadUsers = useCallback(async () => {
