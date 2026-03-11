@@ -20,17 +20,18 @@ export default defineConfig(({ mode }) => {
           registerType: 'autoUpdate',
           includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
           manifest: {
-            name: 'MediWard - Orthopaedic Ward Manager',
+            name: 'MediWard',
             short_name: 'MediWard',
-            description: 'Digital ward management system for orthopaedic surgeons',
+            description: 'Digital ward management for clinical teams',
             theme_color: '#1e293b',
             background_color: '#f8fafc',
             display: 'standalone',
             scope: '/',
             start_url: '/',
             icons: [
-              { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
-              { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+              { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+              { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+              { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
             ],
           },
           workbox: {
@@ -42,7 +43,7 @@ export default defineConfig(({ mode }) => {
                 handler: 'NetworkFirst',
                 options: {
                   cacheName: 'supabase-api-cache',
-                  expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 },
+                  expiration: { maxEntries: 100, maxAgeSeconds: 300 },
                   networkTimeoutSeconds: 10,
                 },
               },

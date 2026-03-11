@@ -125,6 +125,32 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const [selectedComorbidities, setSelectedComorbidities] = useState<string[]>([]);
   const [customComorbidity, setCustomComorbidity] = useState('');
 
+  // ── Focus trap ──
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    dialogRef.current?.focus();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+      if (e.key !== 'Tab') return;
+      const el = dialogRef.current;
+      if (!el) return;
+      const focusable = el.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable.length) { e.preventDefault(); return; }
+      const first = focusable[0];
+      const last  = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // ── Admission slip scanner ──
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [scanning, setScanning] = useState(false);
@@ -288,7 +314,14 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90svh] overflow-y-auto flex flex-col">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={initialData ? 'Edit Patient Details' : 'Admit New Patient'}
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90svh] overflow-y-auto flex flex-col outline-none"
+      >
 
         {/* ── Sticky header with progress bar ── */}
         <div className="sticky top-0 z-10 bg-slate-50 rounded-t-lg border-b border-slate-200">

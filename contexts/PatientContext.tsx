@@ -32,6 +32,7 @@ import { logAuditEvent } from '../services/auditLog';
 import {
   fetchActivePatients, fetchActivePatientsPage, fetchAllPatients,
   upsertPatient, removePatient, parsePatientRow, PATIENT_PAGE_SIZE,
+  fetchPatientById,
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
@@ -52,6 +53,11 @@ import { toast } from '../utils/toast';
 import { useAuth } from './AuthContext';
 
 // ─── Context Shape ───
+export interface ConcurrentEditConflict {
+  localPatient: Patient;
+  remotePatient: Patient;
+}
+
 interface PatientContextType {
   patients: Patient[];
   isLoadingPatients: boolean;
@@ -78,6 +84,10 @@ interface PatientContextType {
   saveRound: (patientIpNo: string, round: DailyRound) => void;
   /** Insert a new vitals observation to the normalized table + update local state. */
   addVitalSign: (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => Promise<void>;
+  /** Non-null when a concurrent edit conflict needs user resolution. */
+  concurrentEditConflict: ConcurrentEditConflict | null;
+  /** Resolve a concurrent edit: 'local' force-saves the user's version, 'remote' discards it. */
+  resolveConcurrentEdit: (choice: 'local' | 'remote') => void;
 }
 
 const PatientContext = createContext<PatientContextType | null>(null);
@@ -113,6 +123,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 
   const [hasLoadedAll, setHasLoadedAll] = useState(false);
+
+  // ─── Concurrent edit conflict state ───
+  const [concurrentEditConflict, setConcurrentEditConflict] = useState<ConcurrentEditConflict | null>(null);
 
   // ─── Pagination state ───
   const [currentPage, setCurrentPage] = useState(0);
@@ -376,11 +389,17 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .then(() => toast.success(`${updatedPatient.name} updated`))
       .catch(err => {
         console.error('[Patients] updatePatient failed:', err);
-        // Bug #9: concurrent edit — another user saved this patient first
         if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT:')) {
-          toast.error(
-            `${updatedPatient.name} was modified by another user. Please reload to see the latest version.`,
-          );
+          // Fetch the remote version so the user can compare and decide
+          fetchPatientById(updatedPatient.ipNo, user?.hospitalId).then(remote => {
+            if (remote) {
+              setConcurrentEditConflict({ localPatient: updatedPatient, remotePatient: remote });
+            } else {
+              toast.error(`${updatedPatient.name} was modified by another user. Reload to see latest.`);
+            }
+          }).catch(() => {
+            toast.error(`${updatedPatient.name} was modified by another user. Reload to see latest.`);
+          });
           return; // do NOT enqueue a stale overwrite
         }
         enqueue('upsert_patient', updatedPatient);
@@ -530,6 +549,30 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     patients.find(p => p.ipNo === ipNo),
   [patients]);
 
+  const resolveConcurrentEdit = useCallback((choice: 'local' | 'remote') => {
+    if (!concurrentEditConflict) return;
+    const { localPatient, remotePatient } = concurrentEditConflict;
+    setConcurrentEditConflict(null);
+
+    if (choice === 'local') {
+      // Force-save: strip updatedAt to bypass the optimistic-lock check
+      const forced = { ...localPatient, updatedAt: undefined };
+      upsertPatient(forced)
+        .then(() => toast.success(`${forced.name} saved (overwrite).`))
+        .catch(() => toast.error('Force-save failed. Please try again.'));
+    } else {
+      // Keep remote: update local state to the server's version
+      setPatients(prev => {
+        const next = enrichPatientData(
+          prev.map(p => p.ipNo === remotePatient.ipNo ? remotePatient : p),
+        );
+        saveActiveCache(next);
+        return next;
+      });
+      toast.success(`Showing latest version of ${remotePatient.name}.`);
+    }
+  }, [concurrentEditConflict]);
+
   const value = useMemo<PatientContextType>(() => ({
     patients,
     isLoadingPatients,
@@ -549,12 +592,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     getPatient,
     saveRound,
     addVitalSign,
+    concurrentEditConflict,
+    resolveConcurrentEdit,
   }), [
     patients, isLoadingPatients, isStale, cacheTimestamp,
     hasMore, isLoadingMore, loadMorePatients,
     hasLoadedAll, loadAllPatients, updatePatient, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation, getPatient,
-    saveRound, addVitalSign,
+    saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
   ]);
 
   return <PatientContext.Provider value={value}>{children}</PatientContext.Provider>;

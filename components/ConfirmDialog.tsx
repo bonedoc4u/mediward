@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
 interface Props {
@@ -22,6 +22,38 @@ const ConfirmDialog: React.FC<Props> = ({
   onConfirm,
   onCancel,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap: keep Tab and Shift+Tab inside the dialog; Escape → cancel
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = dialogRef.current;
+    if (!el) return;
+    el.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
+      if (e.key !== 'Tab') return;
+
+      const focusable = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable.length) { e.preventDefault(); return; }
+
+      const first = focusable[0];
+      const last  = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onCancel]);
+
   if (!isOpen) return null;
 
   const confirmStyles = variant === 'danger'
@@ -40,8 +72,16 @@ const ConfirmDialog: React.FC<Props> = ({
         onClick={onCancel}
       />
 
-      {/* Dialog */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 fade-in duration-200">
+      {/* Dialog — tabIndex=-1 so .focus() works on the container */}
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-message"
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 fade-in duration-200 outline-none"
+      >
         <div className="p-6">
           {/* Icon */}
           <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${iconStyles}`}>
@@ -52,12 +92,13 @@ const ConfirmDialog: React.FC<Props> = ({
           <button
             onClick={onCancel}
             className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
 
-          <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
-          <p className="text-sm text-slate-600 leading-relaxed">{message}</p>
+          <h3 id="confirm-dialog-title" className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
+          <p id="confirm-dialog-message" className="text-sm text-slate-600 leading-relaxed">{message}</p>
         </div>
 
         <div className="flex gap-3 px-6 pb-6">

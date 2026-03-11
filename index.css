@@ -93,6 +93,38 @@ button:active, a:active { opacity: 0.85; }
   .cap-safe-right  { padding-right:  env(safe-area-inset-right,  0px) !important; }
 }
 
+/* ── Print stylesheet ─────────────────────────────────────────── */
+@media print {
+  /* Hide all navigation chrome */
+  header, aside, nav, footer,
+  .md\:hidden,               /* mobile header */
+  [class*="fixed"],          /* sticky/fixed bars, toasts */
+  button:not(.print-show),   /* action buttons */
+  .PwaInstallBanner,
+  .ToastContainer,
+  .OfflineBanner { display: none !important; }
+
+  /* Full-width, no chrome */
+  body { background: white !important; }
+  main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
+  .max-w-7xl { max-width: none !important; }
+
+  /* Cards: no shadows, border only */
+  .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
+  .rounded-xl, .rounded-2xl { border: 1px solid #e2e8f0 !important; border-radius: 4px !important; }
+
+  /* Text contrast */
+  * { color: black !important; }
+  .text-white { color: black !important; }
+  .bg-slate-900, .bg-gradient-to-r { background: white !important; }
+
+  /* Avoid page breaks inside cards */
+  .patient-card, section, article { break-inside: avoid; }
+
+  /* Page margins */
+  @page { margin: 12mm 15mm; }
+}
+
 /* ── Horizontal scroll fade-edge helper (apply .scroll-x-fade to the wrapper) ─ */
 .scroll-x-fade {
   position: relative;

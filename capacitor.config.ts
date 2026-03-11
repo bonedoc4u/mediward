@@ -15,15 +15,12 @@ const config: CapacitorConfig = {
       backgroundColor: '#1e293b',
       showSpinner: false,
     },
-    BiometricAuth: {
-      androidBiometricStrength: 'STRONG',
-    },
     Keyboard: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      resize: 'none' as any,    // KeyboardResize.None — handle layout shifts in CSS, not WebView resize
+      resize: 'body' as any,    // KeyboardResize.Body — WebView body shrinks; CSS handles remaining layout
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       style: 'dark' as any,     // KeyboardStyle.Dark
-      resizeOnFullScreen: false,
+      resizeOnFullScreen: true,
     },
   },
 };

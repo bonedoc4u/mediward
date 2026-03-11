@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode } from './types';
 import { can } from './utils/permissions';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
 import LoginPage from './components/LoginPage';
 import HospitalRegisterPage from './components/HospitalRegisterPage';
 import SuperAdminPanel from './components/SuperAdminPanel';
@@ -36,6 +38,7 @@ const StatusPage = lazy(() => import('./components/StatusPage'));
 import OfflineBanner from './components/OfflineBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/ClinicalDisclaimer';
+import ConcurrentEditModal from './components/ConcurrentEditModal';
 
 // ─── Navigation Config ───
 interface NavItem {
@@ -84,6 +87,7 @@ const App: React.FC = () => {
     patients, isLoadingPatients, updatePatient, addPatient,
     addLabResult, addInvestigation, deleteInvestigation,
     hasMore, isLoadingMore, loadMorePatients, saveRound,
+    concurrentEditConflict, resolveConcurrentEdit,
   } = usePatients();
   const {
     currentView, navigateTo, navParams,
@@ -148,6 +152,37 @@ const App: React.FC = () => {
   }, []);
 
   const meta = viewMeta[currentView] || viewMeta.dashboard;
+
+  // ─── Capacitor native hooks ───
+  useEffect(() => {
+    // Set status bar to dark text on light background (matches app chrome)
+    StatusBar.setStyle({ style: StatusBarStyle.Dark }).catch(() => {/* web — no-op */});
+
+    // Android hardware back button handler
+    const subscription = CapApp.addListener('backButton', () => {
+      // Priority: close overlays first, then navigate, then exit
+      if (isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+        return;
+      }
+      if (isAddPatientModalOpen) {
+        setIsAddPatientModalOpen(false);
+        return;
+      }
+      if (currentView !== 'dashboard') {
+        navigateTo('dashboard');
+        return;
+      }
+      // On dashboard root — confirm exit
+      if (window.confirm('Exit MediWard?')) {
+        CapApp.exitApp();
+      }
+    });
+
+    return () => {
+      subscription.then(h => h.remove()).catch(() => {});
+    };
+  }, [isMobileMenuOpen, isAddPatientModalOpen, currentView, setIsMobileMenuOpen, navigateTo]);
 
   // Group nav items by section — filter Team Settings to admin only
   const navSections = useMemo(() => {
@@ -514,6 +549,14 @@ const App: React.FC = () => {
           </button>
         </div>
       </nav>
+
+      {/* ─── Concurrent Edit Conflict Modal ─── */}
+      {concurrentEditConflict && (
+        <ConcurrentEditModal
+          conflict={concurrentEditConflict}
+          onResolve={resolveConcurrentEdit}
+        />
+      )}
 
       {/* ─── Toast Notifications ─── */}
       <ToastContainer />
