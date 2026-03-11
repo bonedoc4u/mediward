@@ -50,6 +50,7 @@ import {
 } from '../services/patientCache';
 import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
+import { hapticSuccess } from '../utils/capacitorInit';
 import { useAuth } from './AuthContext';
 
 // ─── Context Shape ───
@@ -385,8 +386,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       saveActiveCache(next);
       return next;
     });
+    const isDischarge = updatedPatient.patientStatus === 'Discharged';
     upsertPatient(updatedPatient)
-      .then(() => toast.success(`${updatedPatient.name} updated`))
+      .then(() => { toast.success(`${updatedPatient.name} updated`); if (isDischarge) hapticSuccess(); })
       .catch(err => {
         console.error('[Patients] updatePatient failed:', err);
         if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT:')) {
@@ -424,7 +426,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return next;
     });
     upsertPatient(p)
-      .then(() => toast.success(`${p.name} admitted to Bed ${p.bed}`))
+      .then(() => { toast.success(`${p.name} admitted to Bed ${p.bed}`); hapticSuccess(); })
       .catch(err => {
         console.error('[Patients] addPatient failed:', err);
         enqueue('upsert_patient', p);

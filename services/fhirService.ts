@@ -261,8 +261,21 @@ export function parseFhirPatient(json: string): Partial<Patient> {
   if (raw.resourceType === 'Patient') {
     pr = raw;
   } else if (raw.resourceType === 'Bundle') {
+    if (!Array.isArray(raw.entry)) {
+      throw new Error('FHIR Bundle is missing a valid "entry" array.');
+    }
     type Entry = { resource?: Record<string, unknown> };
-    pr = (raw.entry as Entry[] | undefined)?.find(e => e.resource?.resourceType === 'Patient')?.resource ?? null;
+    const entries = raw.entry as Entry[];
+    if (entries.length === 0) {
+      throw new Error('FHIR Bundle is empty — no resources found.');
+    }
+    pr = entries.find(e => e?.resource?.resourceType === 'Patient')?.resource ?? null;
+    if (!pr) {
+      const found = entries.map(e => e?.resource?.resourceType).filter(Boolean).join(', ');
+      throw new Error(`No Patient resource found in Bundle. Found: ${found || 'unknown resource types'}.`);
+    }
+  } else if (raw.resourceType) {
+    throw new Error(`Unsupported resource type "${raw.resourceType}". Paste a FHIR Patient or Bundle.`);
   }
   if (!pr) throw new Error('No FHIR Patient resource found. Paste a FHIR Patient or Bundle JSON.');
 

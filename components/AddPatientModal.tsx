@@ -71,6 +71,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     setStepRaw(s);
   };
   const [stepError, setStepError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const STEP_LABELS = ['Location & Identity', 'Patient', 'Status & Plan'];
 
   const validateStep = (s: number): string | null => {
@@ -190,6 +191,13 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       const result = await res.json();
       if (!res.ok) throw new Error(result.error ?? 'Scan failed');
 
+      // Check if any field was actually extracted
+      const hasData = result.name || result.age || result.ipNo || result.mobile;
+      if (!hasData) {
+        setScanError('No patient data found in image. Try a clearer photo of the admission slip.');
+        return;
+      }
+
       // Map extracted fields into form (only overwrite non-null values)
       setFormData(prev => ({
         ...prev,
@@ -201,7 +209,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         ...(result.mobile ? { mobile: String(result.mobile) } : {}),
       }));
     } catch (err: any) {
-      setScanError(err.message ?? 'Could not read slip');
+      const msg = err.message ?? '';
+      if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
+        setScanError('Network error — check your connection and try again.');
+      } else {
+        setScanError(msg || 'Could not read slip. Please fill in details manually.');
+      }
     } finally {
       setScanning(false);
       // Reset file input so same file can be re-selected
@@ -277,6 +290,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const patientData: Patient = {
       // Preserve IDs and existing arrays if editing, otherwise create new
       ...((initialData || {}) as any),
@@ -592,8 +607,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 Next →
               </button>
             ) : (
-              <button type="submit" className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded flex items-center justify-center gap-2">
-                <Save className="w-4 h-4" />
+              <button type="submit" disabled={isSubmitting} className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2.5 rounded flex items-center justify-center gap-2">
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {initialData ? 'Update Patient' : 'Admit Patient'}
               </button>
             )}

@@ -106,6 +106,8 @@ function getCategoryStyle(category: string): { icon: React.ReactNode; headerClas
 }
 
 // ─── Category Panel ───
+const ROW_LIMIT = 20;
+
 const CategoryPanel: React.FC<{
   category: string;
   labTypes: LabTypeConfig[];
@@ -116,6 +118,7 @@ const CategoryPanel: React.FC<{
   onInputChange: (name: string, val: string) => void;
   onAdd: (labTypes: LabTypeConfig[]) => void;
 }> = ({ category, labTypes, labResults, date, onDateChange, inputs, onInputChange, onAdd }) => {
+  const [showAll, setShowAll] = useState(false);
   const { icon, headerClass } = getCategoryStyle(category);
 
   const getGroupedData = (types: LabTypeConfig[]) => {
@@ -132,7 +135,8 @@ const CategoryPanel: React.FC<{
     });
   };
 
-  const grouped = getGroupedData(labTypes);
+  const allGrouped = getGroupedData(labTypes);
+  const grouped = showAll ? allGrouped : allGrouped.slice(0, ROW_LIMIT);
   const chartLines = labTypes.map((t, i) => ({ key: t.name, color: LINE_COLORS[i % LINE_COLORS.length] }));
   const addButtonColor = getCategoryStyle(category).headerClass.includes('blue') ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700';
 
@@ -207,6 +211,14 @@ const CategoryPanel: React.FC<{
           </tbody>
         </table>
       </div>
+      {allGrouped.length > ROW_LIMIT && (
+        <button
+          onClick={() => setShowAll(s => !s)}
+          className="w-full py-2 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-t border-slate-100 transition-colors"
+        >
+          {showAll ? `Show recent ${ROW_LIMIT}` : `Show all ${allGrouped.length} dates`}
+        </button>
+      )}
     </div>
   );
 };

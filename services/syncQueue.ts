@@ -25,12 +25,30 @@ const MAX_ATTEMPTS = 5;
 
 export function enqueue(type: QueuedOpType, payload: unknown): void {
   const queue = getQueue();
+
+  // Deduplication: for upsert_patient, replace any existing queued op for the
+  // same patient (same ipNo) so we never accumulate stale overwrite chains.
+  if (type === 'upsert_patient' && payload && typeof payload === 'object') {
+    const ipNo = (payload as Record<string, unknown>).ipNo as string | undefined;
+    if (ipNo) {
+      const idx = queue.findIndex(
+        op => op.type === 'upsert_patient' &&
+              (op.payload as Record<string, unknown>)?.ipNo === ipNo,
+      );
+      if (idx !== -1) {
+        queue[idx] = { ...queue[idx], payload, attempts: 0 };
+        persist(queue);
+        return;
+      }
+    }
+  }
+
   queue.push({
-    id:        crypto.randomUUID(),
+    id:       crypto.randomUUID(),
     type,
     payload,
-    queuedAt:  new Date().toISOString(),
-    attempts:  0,
+    queuedAt: new Date().toISOString(),
+    attempts: 0,
   });
   persist(queue);
 }

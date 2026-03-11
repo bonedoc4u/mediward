@@ -218,14 +218,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             )}
             <button
               onClick={() => setFilterPending(!filterPending)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm border transition-colors ${filterPending ? 'bg-red-50 text-red-700 border-red-200' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+              className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-lg font-medium text-sm border transition-colors ${filterPending ? 'bg-red-50 text-red-700 border-red-200' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
             >
               <Filter className="w-4 h-4" /> PAC Pending
             </button>
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 px-3 py-2 rounded-lg font-medium text-xs border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg font-medium text-xs border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
               >
                 ✕ Clear
               </button>

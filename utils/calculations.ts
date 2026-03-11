@@ -26,20 +26,41 @@ export const enrichPatientData = (patients: Patient[]): Patient[] => {
 
 // ─── Status Colors ───
 export const getStatusColor = (status: string) => {
-  if (!status) return 'bg-gray-100 text-gray-800 border-gray-200';
+  if (!status) return 'bg-slate-100 text-slate-700 border-slate-300';
   switch (status.toLowerCase()) {
+    // PAC statuses
     case 'pac pending':
-      return 'bg-red-100 text-red-800 border-red-200';
+    case 'pending':
+      return 'bg-red-100 text-red-800 border-red-300';
     case 'pac fit':
-      return 'bg-green-100 text-green-800 border-green-200';
-    case 'critical':
-      return 'bg-orange-100 text-orange-800 border-orange-200 animate-pulse';
     case 'fit':
-      return 'bg-blue-100 text-blue-800 border-blue-200';
+      return 'bg-green-100 text-green-800 border-green-300';
+    // Patient statuses
+    case 'admitted':
+      return 'bg-blue-100 text-blue-800 border-blue-300';
+    case 'scheduled':
+      return 'bg-violet-100 text-violet-800 border-violet-300';
+    case 'in surgery':
+    case 'insurgery':
+      return 'bg-amber-100 text-amber-900 border-amber-300';
+    case 'recovery room':
+    case 'recoveryroom':
+      return 'bg-teal-100 text-teal-800 border-teal-300';
+    case 'icu':
+      return 'bg-red-200 text-red-900 border-red-400 font-bold';
+    case 'post op':
+    case 'postop':
+      return 'bg-cyan-100 text-cyan-800 border-cyan-300';
+    case 'discharged':
+      return 'bg-slate-100 text-slate-600 border-slate-300';
     case 'discharge ready':
-      return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    case 'critical':
+      return 'bg-red-200 text-red-900 border-red-400 animate-pulse';
+    case 'review':
+      return 'bg-amber-100 text-amber-900 border-amber-300';
     default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
+      return 'bg-slate-100 text-slate-700 border-slate-300';
   }
 };
 

@@ -42,7 +42,16 @@ const RoundMode: React.FC = () => {
     [allActivePatients, selectedWard]
   );
 
-  const [index, setIndex] = useState(0);
+  const ROUND_IDX_KEY = 'mediward_round_index';
+  const [index, setIndexRaw] = useState<number>(() => {
+    const saved = sessionStorage.getItem(ROUND_IDX_KEY);
+    const n = saved ? parseInt(saved, 10) : 0;
+    return isNaN(n) || n < 0 ? 0 : n;
+  });
+  const setIndex = (n: number) => {
+    sessionStorage.setItem(ROUND_IDX_KEY, String(n));
+    setIndexRaw(n);
+  };
   const [roundNote, setRoundNote] = useState('');
   const [newTodoText, setNewTodoText] = useState('');
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
@@ -52,6 +61,13 @@ const RoundMode: React.FC = () => {
   const todoInputRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const today = new Date().toISOString().split('T')[0];
+
+  // Clamp index when patient list changes (e.g. after ward selection or rotation)
+  React.useEffect(() => {
+    if (activePatients.length > 0 && index >= activePatients.length) {
+      setIndex(activePatients.length - 1);
+    }
+  }, [activePatients.length]);
 
   // patient must be declared before the useEffect hooks that reference it
   const patient: Patient | undefined = activePatients[index];
