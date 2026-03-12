@@ -127,6 +127,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user]);
 
+  // ─── Supabase auth state listener (catches server-side token expiry / revocation) ───
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        if (event === 'SIGNED_OUT') {
+          // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
+          // clear our local session too so the user is redirected to login.
+          setUser(prev => {
+            if (prev) {
+              removeFromStorage('session');
+              toast.warning('Your session has expired. Please log in again.');
+              window.location.hash = '#/dashboard';
+            }
+            return null;
+          });
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // ─── Login ───
   const login = useCallback(async (
     email: string,

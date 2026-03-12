@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { WifiOff, RefreshCw, DatabaseZap } from 'lucide-react';
+import { WifiOff, RefreshCw, DatabaseZap, CloudOff } from 'lucide-react';
 import { usePatients } from '../contexts/AppContext';
 import { formatCacheAge } from '../services/patientCache';
+import { getQueueSize } from '../services/syncQueue';
 
 const OfflineBanner: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showReconnected, setShowReconnected] = useState(false);
+  const [pendingCount, setPendingCount] = useState(() => getQueueSize());
   const { isStale, cacheTimestamp } = usePatients();
+
+  // Poll queue size every 5s so the count stays current
+  useEffect(() => {
+    const id = setInterval(() => setPendingCount(getQueueSize()), 5000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -31,7 +39,7 @@ const OfflineBanner: React.FC = () => {
     return (
       <div role="status" aria-live="polite" className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-2 px-4 text-sm font-semibold shadow-lg bg-emerald-500 text-white transition-all duration-300">
         <RefreshCw className="w-4 h-4 animate-spin" />
-        Back online — syncing offline changes…
+        Back online — syncing{pendingCount > 0 ? ` ${pendingCount} offline change${pendingCount > 1 ? 's' : ''}` : ' offline changes'}…
       </div>
     );
   }
@@ -45,6 +53,11 @@ const OfflineBanner: React.FC = () => {
         {cacheTimestamp && (
           <span className="opacity-75 text-xs font-normal ml-1">
             · last synced {formatCacheAge(cacheTimestamp)}
+          </span>
+        )}
+        {pendingCount > 0 && (
+          <span className="flex items-center gap-1 ml-2 bg-amber-700/50 rounded-full px-2 py-0.5 text-xs font-bold">
+            <CloudOff className="w-3 h-3" /> {pendingCount} pending
           </span>
         )}
       </div>

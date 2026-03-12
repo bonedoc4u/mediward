@@ -456,3 +456,47 @@ export async function anonymizePatient(ipNo: string, hospitalId: string): Promis
     if (error) console.warn(`anonymizePatient ${table} delete: ${error.message}`);
   }
 }
+
+/**
+ * DPDP Act 2023 — Right to Data Portability (§16)
+ * Returns a structured JSON export of all data held for a single patient.
+ * Triggers a browser download of the JSON file.
+ */
+export async function exportPatientData(ipNo: string, hospitalId: string): Promise<void> {
+  // 1. Core patient record
+  const { data: patient, error: patErr } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('ip_no', ipNo)
+    .eq('hospital_id', hospitalId)
+    .maybeSingle();
+  if (patErr) throw new Error(`exportPatientData: ${patErr.message}`);
+  if (!patient) throw new Error(`Patient ${ipNo} not found.`);
+
+  // 2. Linked tables
+  const [labsRes, imagingRes, roundsRes, notesRes] = await Promise.all([
+    supabase.from('labs').select('*').eq('patient_ip_no', ipNo),
+    supabase.from('imaging').select('*').eq('patient_ip_no', ipNo),
+    supabase.from('rounds').select('*').eq('patient_ip_no', ipNo),
+    supabase.from('nursing_notes').select('*').eq('patient_ip_no', ipNo),
+  ]);
+
+  const exportBundle = {
+    exportedAt: new Date().toISOString(),
+    exportedBy: 'MediWard — DPDP §16 Data Portability',
+    patient,
+    labs:          labsRes.data    ?? [],
+    imaging:       imagingRes.data ?? [],
+    rounds:        roundsRes.data  ?? [],
+    nursingNotes:  notesRes.data   ?? [],
+  };
+
+  // Trigger browser download
+  const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `mediward_patient_${ipNo.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
