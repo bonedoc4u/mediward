@@ -284,7 +284,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           </div>
 
           {/* Desktop Table (md and up) */}
-          <div className="hidden md:block bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+          <div className="hidden md:block bg-white rounded-lg shadow-sm border border-slate-200 overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                 <tr>

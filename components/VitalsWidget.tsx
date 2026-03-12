@@ -349,9 +349,9 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50 rounded-t-xl">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-teal-600" />
           <span className="font-semibold text-slate-800 text-sm">Vital Signs</span>
