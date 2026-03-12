@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useConfig } from '../contexts/AppContext';
 import { WardConfig, LabTypeConfig, MedicationConfig, SpecialtyFieldGroup, SpecialtyField } from '../types';
-import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle, Pill, RefreshCw, LayoutTemplate, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle, Pill, RefreshCw, LayoutTemplate, ChevronDown, ChevronUp, RotateCcw, ToggleRight } from 'lucide-react';
 import { SPECIALTY_DISPLAY_NAMES } from '../services/specialtyTemplates';
 import { createIncident, updateIncidentStatus, deleteIncident, fetchIncidents, StatusIncident, IncidentSeverity, IncidentStatus } from '../services/statusService';
 
@@ -275,7 +275,7 @@ const MedRow: React.FC<{ med: MedicationConfig; onSave: (m: MedicationConfig) =>
 
 // ─── Main AdminSettings view ───
 const AdminSettings: React.FC = () => {
-  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, saveHospitalConfig, medications, addMedication, saveMedication, removeMedication, seedMedications, activeSpecialty, activeFieldGroups, templateOverride, saveTemplateOverride, resetTemplateOverride } = useConfig();
+  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, showNursingNotes, showMedicationChart, saveHospitalConfig, medications, addMedication, saveMedication, removeMedication, seedMedications, activeSpecialty, activeFieldGroups, templateOverride, saveTemplateOverride, resetTemplateOverride } = useConfig();
 
   // Hospital settings form
   const [localHospitalName, setLocalHospitalName] = useState(hospitalName);
@@ -284,6 +284,8 @@ const AdminSettings: React.FC = () => {
   const [localPreOpName, setLocalPreOpName] = useState(preOpModuleName);
   const [localProcedureName, setLocalProcedureName] = useState(procedureListName);
   const [localPreOpItems, setLocalPreOpItems] = useState<string[]>(preOpChecklistTemplate);
+  const [localShowNursingNotes, setLocalShowNursingNotes] = useState(showNursingNotes);
+  const [localShowMedicationChart, setLocalShowMedicationChart] = useState(showMedicationChart);
   const [newUnit, setNewUnit] = useState('');
   const [newPreOpItem, setNewPreOpItem] = useState('');
   const [savingHospital, setSavingHospital] = useState(false);
@@ -365,6 +367,7 @@ const AdminSettings: React.FC = () => {
         hospitalName: localHospitalName, department: localDepartment,
         units: localUnits, preOpModuleName: localPreOpName,
         procedureListName: localProcedureName, preOpChecklistTemplate: localPreOpItems,
+        showNursingNotes: localShowNursingNotes, showMedicationChart: localShowMedicationChart,
       });
     } finally { setSavingHospital(false); }
   };
@@ -675,6 +678,54 @@ const AdminSettings: React.FC = () => {
             </button>
           </div>
           <p className="text-xs text-slate-400">Changes take effect after clicking "Save Settings" above.</p>
+        </div>
+      </div>
+
+      {/* ── Feature Modules ── */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center gap-2 bg-slate-50">
+          <ToggleRight className="w-5 h-5 text-violet-600" />
+          <h2 className="font-bold text-slate-800">Feature Modules</h2>
+          <span className="text-xs text-slate-500 ml-1">Enable or disable optional tabs in Patient Detail</span>
+        </div>
+        <div className="p-4 space-y-3">
+          <p className="text-xs text-slate-500">
+            These modules are hidden by default. Enable them once the required database tables have been set up.
+            Changes are saved with the "Save Settings" button above.
+          </p>
+          {[
+            {
+              id: 'nursing',
+              label: 'Nursing Notes',
+              description: 'Adds a Nursing tab in Patient Detail for shift notes (Morning / Afternoon / Night).',
+              value: localShowNursingNotes,
+              onChange: setLocalShowNursingNotes,
+            },
+            {
+              id: 'medication',
+              label: 'Medication Chart (MAR)',
+              description: 'Adds a Medications tab in Patient Detail for prescribing and recording drug administration.',
+              value: localShowMedicationChart,
+              onChange: setLocalShowMedicationChart,
+            },
+          ].map(item => (
+            <label key={item.id} className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+              <div className="relative mt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  className="sr-only"
+                  checked={item.value}
+                  onChange={e => item.onChange(e.target.checked)}
+                />
+                <div className={`w-10 h-5 rounded-full transition-colors ${item.value ? 'bg-violet-600' : 'bg-slate-300'}`} />
+                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${item.value ? 'translate-x-5' : 'translate-x-0'}`} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-800">{item.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+              </div>
+            </label>
+          ))}
         </div>
       </div>
 

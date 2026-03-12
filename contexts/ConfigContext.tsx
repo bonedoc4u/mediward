@@ -45,6 +45,8 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
     'Consent', 'Pre-OP Order', 'Inj. Cefuroxime', 'Part Preparation (Shave)',
     'Pre-OP X-Ray', 'C-Sample (Cross Match)', 'CBD (Catheter)', 'Implant Order', 'Things / Materials',
   ],
+  showNursingNotes: false,
+  showMedicationChart: false,
 };
 
 // ─── Fallback defaults (used when DB is unreachable and no cache exists) ───
@@ -97,6 +99,10 @@ interface ConfigContextType {
   procedureListName: string;
   /** Configurable pre-op checklist item labels for the Pre-Op Prep screen. */
   preOpChecklistTemplate: string[];
+  /** Whether the Nursing Notes tab is enabled (admin-configurable). */
+  showNursingNotes: boolean;
+  /** Whether the Medication Chart (MAR) tab is enabled (admin-configurable). */
+  showMedicationChart: boolean;
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
 
@@ -363,6 +369,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preOpChecklistTemplate: hospitalConfig.preOpChecklistTemplate?.length
       ? hospitalConfig.preOpChecklistTemplate
       : DEFAULT_HOSPITAL_CONFIG.preOpChecklistTemplate,
+    showNursingNotes:    hospitalConfig.showNursingNotes   ?? false,
+    showMedicationChart: hospitalConfig.showMedicationChart ?? false,
     saveHospitalConfig,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,

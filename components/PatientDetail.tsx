@@ -19,7 +19,7 @@ const NursingNotes = lazy(() => import('./NursingNotes'));
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
-  const { labTypes, activeFieldGroups, activeSpecialty } = useConfig();
+  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFhirExport, setShowFhirExport] = useState(false);
@@ -245,29 +245,33 @@ const PatientDetail: React.FC = () => {
         <FHIRExportModal patient={patient} onClose={() => setShowFhirExport(false)} />
       )}
 
-      {/* Tab Bar */}
-      <div className="flex gap-1 border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2">
-        {([
-          { key: 'overview',    label: 'Overview',    icon: <Activity className="w-4 h-4" /> },
-          { key: 'medications', label: 'Medications', icon: <Pill className="w-4 h-4" /> },
-          { key: 'nursing',     label: 'Nursing',     icon: <ClipboardList className="w-4 h-4" /> },
-        ] as { key: 'overview' | 'medications' | 'nursing'; label: string; icon: React.ReactNode }[]).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
-              activeTab === tab.key
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Tab Bar — only show extra tabs when enabled in hospital config */}
+      {(showMedicationChart || showNursingNotes) && (
+        <div className="flex gap-1 border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2">
+          {([
+            { key: 'overview',    label: 'Overview',    icon: <Activity className="w-4 h-4" />,     always: true },
+            { key: 'medications', label: 'Medications', icon: <Pill className="w-4 h-4" />,         always: false, enabled: showMedicationChart },
+            { key: 'nursing',     label: 'Nursing',     icon: <ClipboardList className="w-4 h-4" />, always: false, enabled: showNursingNotes },
+          ] as { key: 'overview' | 'medications' | 'nursing'; label: string; icon: React.ReactNode; always: boolean; enabled?: boolean }[])
+            .filter(tab => tab.always || tab.enabled)
+            .map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
+                  activeTab === tab.key
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+        </div>
+      )}
 
       {/* Medications Tab */}
-      {activeTab === 'medications' && (
+      {showMedicationChart && activeTab === 'medications' && (
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
           <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
             <MedicationChart patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
@@ -276,7 +280,7 @@ const PatientDetail: React.FC = () => {
       )}
 
       {/* Nursing Notes Tab */}
-      {activeTab === 'nursing' && (
+      {showNursingNotes && activeTab === 'nursing' && (
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
           <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
             <NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />

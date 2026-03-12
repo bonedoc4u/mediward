@@ -49,6 +49,10 @@ export interface HospitalConfig {
   /** Configurable pre-op checklist items shown in the Pre-Op Prep screen.
    *  Admin can customise per department. Defaults to orthopaedic items. */
   preOpChecklistTemplate: string[];
+  /** Show the Nursing Notes tab in PatientDetail. Off by default. */
+  showNursingNotes: boolean;
+  /** Show the Medication Chart (MAR) tab in PatientDetail. Off by default. */
+  showMedicationChart: boolean;
 }
 
 /** A ward row from the ward_config table. */

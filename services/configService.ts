@@ -136,12 +136,14 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   preOpModuleName: 'Pre-op Clearance',
   procedureListName: 'Procedure List',
   preOpChecklistTemplate: DEFAULT_PREOP_TEMPLATE,
+  showNursingNotes: false,
+  showMedicationChart: false,
 };
 
 export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
   let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template');
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart');
   if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
   const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
@@ -157,6 +159,8 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     preOpChecklistTemplate: Array.isArray(data.pre_op_checklist_template) && data.pre_op_checklist_template.length > 0
       ? data.pre_op_checklist_template as string[]
       : DEFAULT_PREOP_TEMPLATE,
+    showNursingNotes:   Boolean(data.show_nursing_notes   ?? false),
+    showMedicationChart: Boolean(data.show_medication_chart ?? false),
   };
 }
 
@@ -178,6 +182,8 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         pre_op_module_name:         config.preOpModuleName,
         procedure_list_name:        config.procedureListName,
         pre_op_checklist_template:  config.preOpChecklistTemplate,
+        show_nursing_notes:         config.showNursingNotes,
+        show_medication_chart:      config.showMedicationChart,
         updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
@@ -192,6 +198,8 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         pre_op_module_name:         config.preOpModuleName,
         procedure_list_name:        config.procedureListName,
         pre_op_checklist_template:  config.preOpChecklistTemplate,
+        show_nursing_notes:         config.showNursingNotes,
+        show_medication_chart:      config.showMedicationChart,
       });
     if (error) throw error;
   }
