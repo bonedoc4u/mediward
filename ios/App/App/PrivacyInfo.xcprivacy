@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  PrivacyInfo.xcprivacy — Apple Privacy Manifest (required since May 2024)
+  Declares which "required reason" APIs this app uses and why.
+  Reference: https://developer.apple.com/documentation/bundleresources/privacy_manifest_files
+
+  MediWard usage summary:
+  - NSUserDefaults (UserDefaults): @capacitor/preferences uses UserDefaults as
+    the durable backing store for the offline sync queue. This lets offline writes
+    survive iOS WKWebView memory eviction without persisting any data outside the
+    app sandbox.
+  - File timestamp APIs: used internally by Capacitor / WKWebView to track asset
+    modification times (caching). No user file data is read.
+  - System boot time: used by Capacitor networking layer for request timestamps.
+    Not collected or transmitted.
+-->
+<dict>
+  <!-- ── Privacy Nutrition Labels ───────────────────────────────────────── -->
+  <key>NSPrivacyTracking</key>
+  <false/>
+
+  <key>NSPrivacyTrackingDomains</key>
+  <array/>
+
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array>
+    <!--
+      Health data (patient demographics, vitals, labs) is processed in-app
+      for clinical decision support only. It is stored in Supabase under a
+      Business Associate Agreement (BAA). It is NOT sold or used for ads.
+    -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeHealthAndFitness</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeName</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+  </array>
+
+  <!-- ── Required Reason APIs ──────────────────────────────────────────── -->
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array>
+
+    <!--
+      NSUserDefaults — CA92.1
+      Used by @capacitor/preferences to persist the offline sync queue
+      (patient edits made while offline) in UserDefaults so writes survive
+      iOS memory pressure eviction of the WKWebView process.
+      Data never leaves the device sandbox except via explicit Supabase sync.
+    -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>CA92.1</string>
+      </array>
+    </dict>
+
+    <!--
+      File timestamp APIs — C617.1
+      Capacitor's WKWebView bridge reads modification timestamps of bundled
+      web assets to implement cache invalidation. No user files are accessed.
+    -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>C617.1</string>
+      </array>
+    </dict>
+
+    <!--
+      System boot time — 35F9.1
+      Used by the Capacitor networking layer for monotonic request timestamping
+      to detect duplicate responses. Not transmitted to any server.
+    -->
+    <dict>
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>35F9.1</string>
+      </array>
+    </dict>
+
+  </array>
+</dict>
+</plist>
