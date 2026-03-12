@@ -83,7 +83,7 @@ const App: React.FC = () => {
     () => window.location.hash === '#/status',
   );
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => hasAcceptedDisclaimer());
-  const [superAdminMode, setSuperAdminMode] = useState(true);
+  const [superAdminMode, setSuperAdminMode] = useState(false);
   const {
     patients, isLoadingPatients, updatePatient, addPatient,
     addLabResult, addInvestigation, deleteInvestigation,
@@ -415,10 +415,10 @@ const App: React.FC = () => {
             {user?.role === 'superadmin' && (
               <button
                 onClick={() => { setViewingHospital(null); setSuperAdminMode(true); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-purple-400 hover:bg-purple-900/20 hover:text-purple-300 transition-all group"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl bg-purple-900/30 text-purple-300 hover:bg-purple-800/40 hover:text-purple-200 transition-all group border border-purple-700/30"
               >
-                <Shield className="w-5 h-5 transition-transform group-hover:scale-110" />
-                <span className="font-medium text-sm">Super Admin Console</span>
+                <Shield className="w-5 h-5 shrink-0 transition-transform group-hover:scale-110" />
+                <span className="font-semibold text-sm">Super Admin Console</span>
               </button>
             )}
             <button
