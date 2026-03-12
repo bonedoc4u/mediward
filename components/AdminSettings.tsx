@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useConfig } from '../contexts/AppContext';
+import { useConfig, useAuth } from '../contexts/AppContext';
 import { WardConfig, LabTypeConfig, MedicationConfig, SpecialtyFieldGroup, SpecialtyField } from '../types';
-import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle, Pill, RefreshCw, LayoutTemplate, ChevronDown, ChevronUp, RotateCcw, ToggleRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle, Pill, RefreshCw, LayoutTemplate, ChevronDown, ChevronUp, RotateCcw, ToggleRight, UserX } from 'lucide-react';
+import { anonymizePatient } from '../services/patientService';
 import { SPECIALTY_DISPLAY_NAMES } from '../services/specialtyTemplates';
 import { createIncident, updateIncidentStatus, deleteIncident, fetchIncidents, StatusIncident, IncidentSeverity, IncidentStatus } from '../services/statusService';
 
@@ -273,8 +274,65 @@ const MedRow: React.FC<{ med: MedicationConfig; onSave: (m: MedicationConfig) =>
   );
 };
 
+// ─── DPDP Right-to-Erasure Panel ───
+const DpdpErasurePanel: React.FC<{ hospitalId: string }> = ({ hospitalId }) => {
+  const [ipNo, setIpNo] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleErase = async () => {
+    if (!ipNo.trim()) return;
+    if (!window.confirm(`Permanently anonymise ALL personal data for patient ${ipNo}? This cannot be undone.`)) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await anonymizePatient(ipNo.trim(), hospitalId);
+      setMsg({ ok: true, text: `Patient ${ipNo} — personal data anonymised per DPDP §13.` });
+      setIpNo('');
+    } catch (err: any) {
+      setMsg({ ok: false, text: err.message ?? 'Anonymisation failed.' });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+        <UserX className="w-4 h-4 text-red-600" />
+        <h2 className="font-bold text-slate-800">Patient Data Erasure (DPDP §13)</h2>
+      </div>
+      <div className="p-4 space-y-3 text-sm text-slate-700">
+        <p className="text-xs text-slate-500">Right to erasure under the Digital Personal Data Protection Act, 2023. Anonymises name, mobile, ABHA ID, and all clinical notes for the specified patient. The anonymised record is retained for audit/billing continuity.</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={ipNo}
+            onChange={e => setIpNo(e.target.value)}
+            placeholder="IP Number (e.g. IP/2024/1234)"
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 outline-none"
+          />
+          <button
+            onClick={handleErase}
+            disabled={busy || !ipNo.trim()}
+            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+          >
+            {busy ? 'Processing…' : 'Anonymise'}
+          </button>
+        </div>
+        {msg && (
+          <div className={`flex items-center gap-2 p-3 rounded-lg text-xs font-medium ${msg.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            {msg.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+            {msg.text}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── Main AdminSettings view ───
 const AdminSettings: React.FC = () => {
+  const { user } = useAuth();
+  const hospitalId = user?.hospitalId ?? '';
   const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, showNursingNotes, showMedicationChart, saveHospitalConfig, medications, addMedication, saveMedication, removeMedication, seedMedications, activeSpecialty, activeFieldGroups, templateOverride, saveTemplateOverride, resetTemplateOverride } = useConfig();
 
   // Hospital settings form
@@ -1189,6 +1247,9 @@ const AdminSettings: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ── DPDP Right to Erasure ── */}
+      <DpdpErasurePanel hospitalId={hospitalId} />
 
       {/* ── Department Template ── */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

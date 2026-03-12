@@ -157,7 +157,7 @@ const PatientDetail: React.FC = () => {
       </div>
 
       {/* Quick Actions — horizontal scroll on mobile, wrap on larger screens */}
-      <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-x-visible">
+      <div className="flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-x-visible">
         <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
           <ClipboardCheck className="w-4 h-4 text-blue-500 shrink-0" /> Daily Rounds
         </button>

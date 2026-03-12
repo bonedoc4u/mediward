@@ -73,12 +73,14 @@ const NursingNotes: React.FC<Props> = ({ patientIpNo, hospitalId }) => {
           <ClipboardList className="w-4 h-4 text-teal-600" />
           <h3 className="font-bold text-slate-800 text-sm">Nursing Notes</h3>
         </div>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" /> Add Note
-        </button>
+        {user?.role !== 'attending' && (
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Note
+          </button>
+        )}
       </div>
 
       {showAdd && (

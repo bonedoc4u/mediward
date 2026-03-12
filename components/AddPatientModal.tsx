@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Patient, Gender, PacStatus, Ward } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { supabase } from '../lib/supabase';
 import { parseFhirPatient } from '../services/fhirService';
-import { X, Save, UserPlus, Pencil, ScanLine, Loader2, FileJson, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Save, UserPlus, Pencil, Loader2, FileJson, ChevronDown, ChevronUp } from 'lucide-react';
 import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
 
 
@@ -208,75 +207,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [step]);
 
-  // ── Admission slip scanner ──
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
-
-  const handleScanSlip = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setScanError(null);
-    setScanning(true);
-
-    try {
-      // Read file as base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      // Get session token for Edge Function auth
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-admission-slip`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ image: base64, mimeType: file.type }),
-        },
-      );
-
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error ?? 'Scan failed');
-
-      // Check if any field was actually extracted
-      const hasData = result.name || result.age || result.ipNo || result.mobile;
-      if (!hasData) {
-        setScanError('No patient data found in image. Try a clearer photo of the admission slip.');
-        return;
-      }
-
-      // Map extracted fields into form (only overwrite non-null values)
-      setFormData(prev => ({
-        ...prev,
-        ...(result.name   ? { name: String(result.name) }   : {}),
-        ...(result.age    ? { age: String(Math.round(Number(result.age))) } : {}),
-        ...(result.gender && ['Male','Female','Other'].includes(result.gender) ? { gender: result.gender as Gender } : {}),
-        ...(result.ipNo   ? { ipNo: String(result.ipNo) }   : {}),
-        ...(result.doa    ? { doa: String(result.doa) }     : {}),
-        ...(result.mobile ? { mobile: String(result.mobile) } : {}),
-      }));
-    } catch (err: any) {
-      const msg = err.message ?? '';
-      if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
-        setScanError('Network error — check your connection and try again.');
-      } else {
-        setScanError(msg || 'Could not read slip. Please fill in details manually.');
-      }
-    } finally {
-      setScanning(false);
-      // Reset file input so same file can be re-selected
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
 
   // Effect to populate form when editing
   useEffect(() => {
@@ -447,18 +377,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <h3 className="font-bold text-slate-800">{initialData ? 'Edit Patient Details' : 'Admit New Patient'}</h3>
             </div>
             <div className="flex items-center gap-2">
-              <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanSlip} />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={scanning}
-                title="Scan admission slip to auto-fill"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg transition-colors"
-              >
-                {scanning
-                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Scanning…</>
-                  : <><ScanLine className="w-3.5 h-3.5" /> Scan Slip</>}
-              </button>
               <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
           </div>
@@ -505,14 +423,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
         <form onSubmit={handleSubmit} autoComplete="off" className="p-4 sm:p-6 space-y-4 sm:space-y-5">
 
-          {/* Scan error banner */}
-          {scanError && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              <X className="w-4 h-4 shrink-0" />
-              <span><strong>Scan failed:</strong> {scanError}</span>
-              <button type="button" onClick={() => setScanError(null)} className="ml-auto text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
-            </div>
-          )}
 
           {/* ── Step 1: Location & Identity ── */}
           {step === 1 && (

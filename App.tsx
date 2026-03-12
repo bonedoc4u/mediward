@@ -156,8 +156,8 @@ const App: React.FC = () => {
 
   // ─── Capacitor native hooks ───
   useEffect(() => {
-    // Set status bar to dark text on light background (matches app chrome)
-    StatusBar.setStyle({ style: StatusBarStyle.Dark }).catch(() => {/* web — no-op */});
+    // Set status bar to light text on dark background (matches dark header)
+    StatusBar.setStyle({ style: StatusBarStyle.Light }).catch(() => {/* web — no-op */});
 
     // Android hardware back button handler
     const subscription = CapApp.addListener('backButton', () => {

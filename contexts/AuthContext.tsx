@@ -18,7 +18,7 @@ import { clearDisclaimerAccepted } from '../components/ClinicalDisclaimer';
 // ─── Legacy SHA-256 (fallback for accounts not yet on Supabase Auth) ───
 // TODO: Remove hashPassword import + usage after LEGACY_AUTH_DEADLINE passes.
 // All users should have migrated to Supabase Auth by then via the auto-migration on login.
-const LEGACY_AUTH_DEADLINE = new Date('2026-04-02').getTime(); // 30 days from 2026-03-03
+const LEGACY_AUTH_DEADLINE = new Date('2026-03-26').getTime(); // 14-day forced migration window (shortened from Apr 2)
 
 const SESSION_DURATION    = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
 const WARN_BEFORE_EXPIRY  = 5 * 60 * 1000;        // warn 5 min before expiry

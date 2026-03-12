@@ -415,3 +415,44 @@ export async function removePatient(ipNo: string): Promise<void> {
 
   if (error) throw new Error(`removePatient (${ipNo}): ${error.message}`);
 }
+
+/**
+ * DPDP Act 2023 — Right to Erasure (§13)
+ * Anonymises all PII fields for a patient record and deletes linked
+ * labs, imaging, rounds and nursing_notes rows.
+ * The anonymised patient row is retained for billing / audit continuity.
+ */
+export async function anonymizePatient(ipNo: string, hospitalId: string): Promise<void> {
+  const redacted = '[REDACTED]';
+  const redactedDate = '1900-01-01';
+
+  // 1. Anonymise PII in patients table
+  const { error: patErr } = await supabase
+    .from('patients')
+    .update({
+      name:            redacted,
+      mobile:          null,
+      abha_id:         null,
+      age:             0,
+      comorbidities:   null,
+      rounds:          null,
+      pre_op_checklist: null,
+      pac_checklist:   null,
+      notes:           null,
+      date_of_admission: redactedDate,
+      date_of_surgery:   null,
+    })
+    .eq('ip_no', ipNo)
+    .eq('hospital_id', hospitalId);
+  if (patErr) throw new Error(`anonymizePatient PII wipe: ${patErr.message}`);
+
+  // 2. Delete linked normalized tables
+  const tables = ['labs', 'imaging', 'rounds', 'nursing_notes'] as const;
+  for (const table of tables) {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('patient_ip_no', ipNo);
+    if (error) console.warn(`anonymizePatient ${table} delete: ${error.message}`);
+  }
+}
