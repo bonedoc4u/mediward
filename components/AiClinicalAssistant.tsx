@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Patient, LabType, PatientStatus } from '../types';
-import { Sparkles, X, Loader2, AlertTriangle, CheckCircle, Brain, RefreshCw, Settings, Zap } from 'lucide-react';
+import { Patient, PatientStatus } from '../types';
+import { X, Loader2, AlertTriangle, CheckCircle, Brain, RefreshCw, Zap, Cpu } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useConfig } from '../contexts/AppContext';
 
 interface Props {
   patients: Patient[];
@@ -164,10 +166,12 @@ function saveFabPos(pos: { side: 'left' | 'right'; yPx: number }) {
 }
 
 const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
+  const { department } = useConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alerts, setAlerts] = useState<AiAlert[] | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [aiMode, setAiMode] = useState<'gemini' | 'rules'>('rules');
 
   // ── Draggable FAB state ──
   const [fabPos, setFabPos] = useState<{ side: 'left' | 'right'; yPx: number }>(loadFabPos);
@@ -275,19 +279,94 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
   const generateInsights = useCallback(async () => {
     setLoading(true);
     setAlerts(null);
+    const today = new Date();
+
     try {
-      // Simulates brief processing time for UX
-      await new Promise(resolve => setTimeout(resolve, 600));
-      const results = generateRuleBasedAlerts(patients);
-      setAlerts(results);
+      // Build a sanitised patient summary payload (no raw PHI beyond clinical need)
+      const summaries = patients
+        .filter(p => p.patientStatus !== PatientStatus.Discharged)
+        .map(p => {
+          const vitals = Array.isArray(p.vitals) ? p.vitals : [];
+          const latest = vitals[0];
+          const doa = new Date(p.doa);
+          const daysAdmitted = Math.max(0, Math.floor((today.getTime() - doa.getTime()) / 86_400_000));
+          const recentLabs = (Array.isArray(p.labResults) ? p.labResults : [])
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, 8)
+            .map(l => ({ type: l.type, value: l.value, date: l.date }));
+          const lastRound = (Array.isArray(p.dailyRounds) ? p.dailyRounds : [])
+            .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+          return {
+            bed: p.bed,
+            name: p.name,
+            age: p.age,
+            diagnosis: p.diagnosis,
+            comorbidities: Array.isArray(p.comorbidities) ? p.comorbidities : [],
+            procedure: p.procedure,
+            daysAdmitted,
+            pod: p.pod,
+            pacStatus: p.pacStatus,
+            patientStatus: p.patientStatus,
+            latestVitals: latest ? {
+              bp: latest.bpSystolic != null && latest.bpDiastolic != null
+                ? `${latest.bpSystolic}/${latest.bpDiastolic}`
+                : undefined,
+              hr: latest.heartRate,
+              temp: latest.temperature,
+              spo2: latest.spo2,
+              rr: latest.respiratoryRate,
+              news2Score: latest.news2Score,
+            } : undefined,
+            recentLabs,
+            pendingTodos: (Array.isArray(p.todos) ? p.todos : [])
+              .filter(t => !t.isDone).map(t => t.task),
+            lastRoundNote: lastRound?.note?.slice(0, 200),
+          };
+        });
+
+      // Try Gemini Edge Function first
+      let usedGemini = false;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/clinical-insights`;
+
+        const res = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ patients: summaries, department }),
+          signal: AbortSignal.timeout(15_000), // 15s timeout
+        });
+
+        const json = await res.json();
+        if (res.ok && Array.isArray(json.alerts) && !json.fallback) {
+          setAlerts(json.alerts as AiAlert[]);
+          usedGemini = true;
+          setAiMode('gemini');
+        }
+      } catch {
+        // Network error or Edge Function not deployed — fall through to rules
+      }
+
+      // Fallback: rule-based engine
+      if (!usedGemini) {
+        await new Promise(resolve => setTimeout(resolve, 400)); // brief UX pause
+        setAlerts(generateRuleBasedAlerts(patients));
+        setAiMode('rules');
+      }
+
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (error) {
-      console.error("Clinical Engine Error:", error);
+      console.error('Clinical Engine Error:', error);
       setAlerts([]);
     } finally {
       setLoading(false);
     }
-  }, [patients]);
+  }, [patients, department]);
 
   const getPriorityColor = (p: string) => {
     switch (p) {
@@ -357,7 +436,11 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800">Clinical Assistant</h3>
-                  <p className="text-xs text-slate-500">Rule-Based Protocol Engine</p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    {aiMode === 'gemini'
+                      ? <><Zap className="w-3 h-3 text-indigo-500" /> Gemini AI</>
+                      : <><Cpu className="w-3 h-3 text-slate-400" /> Rule-Based Protocol Engine</>}
+                  </p>
                 </div>
               </div>
               <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600 p-1">

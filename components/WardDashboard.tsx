@@ -1,9 +1,37 @@
 import React, { useState, useMemo, useRef, memo } from 'react';
-import { Patient, PacStatus, PatientStatus } from '../types';
+import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart } from 'lucide-react';
+
+// ─── NEWS2 Badge ─────────────────────────────────────────────────────────────
+function getNews2Config(score: number): { label: string; badge: string; dot: string } {
+  if (score >= 7) return { label: `N2: ${score}`, badge: 'bg-red-100 text-red-800 border-red-300 animate-pulse font-bold', dot: 'bg-red-500' };
+  if (score >= 5) return { label: `N2: ${score}`, badge: 'bg-orange-100 text-orange-800 border-orange-300 font-bold', dot: 'bg-orange-500' };
+  if (score >= 2) return { label: `N2: ${score}`, badge: 'bg-amber-100 text-amber-800 border-amber-200', dot: 'bg-amber-400' };
+  return { label: `N2: ${score}`, badge: 'bg-green-100 text-green-800 border-green-200', dot: 'bg-green-500' };
+}
+
+function News2Badge({ vitals, compact = false }: { vitals?: VitalSigns[]; compact?: boolean }) {
+  const latest = vitals?.[0];
+  if (!latest || latest.news2Score == null) {
+    return compact ? null : (
+      <span className="px-1.5 py-0.5 rounded text-[10px] border bg-slate-50 text-slate-400 border-slate-200" title="No vitals recorded">
+        <Heart className="w-2.5 h-2.5 inline mr-0.5 opacity-50" />N2—
+      </span>
+    );
+  }
+  const cfg = getNews2Config(latest.news2Score);
+  return (
+    <span
+      className={`px-1.5 py-0.5 rounded text-[10px] border ${cfg.badge}`}
+      title={`NEWS2 score ${latest.news2Score} — recorded ${new Date(latest.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}`}
+    >
+      <Heart className="w-2.5 h-2.5 inline mr-0.5" />{cfg.label}
+    </span>
+  );
+}
 import HandoverSummary from './HandoverSummary';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 
@@ -290,6 +318,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 <tr>
                   <th className="px-6 py-3 min-w-[56px]">Bed</th>
                   <th className="px-6 py-3 min-w-[160px]">Patient</th>
+                  <th className="px-4 py-3 min-w-[80px] text-center" title="NEWS2 Early Warning Score">NEWS2</th>
                   <th className="px-6 py-3 min-w-[140px]">Diagnosis</th>
                   <th className="px-6 py-3 min-w-[120px]">Comorbidities</th>
                   <th className="px-6 py-3 min-w-[140px]">Status</th>
@@ -331,6 +360,9 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         )}
                       </div>
                       <div className="text-xs text-blue-600">{patient.mobile}</div>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <News2Badge vitals={patient.vitals} />
                     </td>
                     <td className="px-6 py-4 max-w-xs">
                       <div className="truncate" title={patient.diagnosis}>{patient.diagnosis}</div>
@@ -547,12 +579,15 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           </div>
                         </div>
                       </div>
-                      {item.patient.pod !== undefined && (
-                        <div className="text-xs font-bold uppercase text-slate-500 border-2 border-green-500 bg-green-50 p-1.5 rounded text-center">
-                          <span className="text-green-700 block text-[9px]">POD</span>
-                          <span className="text-lg text-green-800 block leading-none">{item.patient.pod}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <News2Badge vitals={item.patient.vitals} compact />
+                        {item.patient.pod !== undefined && (
+                          <div className="text-xs font-bold uppercase text-slate-500 border-2 border-green-500 bg-green-50 p-1.5 rounded text-center">
+                            <span className="text-green-700 block text-[9px]">POD</span>
+                            <span className="text-lg text-green-800 block leading-none">{item.patient.pod}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="text-sm border-t border-slate-100 pt-2">
                       <p className="font-medium text-slate-800">{item.patient.diagnosis}</p>
