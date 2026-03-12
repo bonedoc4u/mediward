@@ -35,8 +35,17 @@ function estimateBirthDate(age: number, doa: string): string {
   return `${new Date(doa).getFullYear() - age}-01-01`;
 }
 
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function xhtml(text: string): string {
-  return `<div xmlns="http://www.w3.org/1999/xhtml">${text.replace(/\n/g, '<br/>')}</div>`;
+  return `<div xmlns="http://www.w3.org/1999/xhtml">${escapeXml(text).replace(/\n/g, '<br/>')}</div>`;
 }
 
 function ref(type: string, id: string): FhirReference {

@@ -29,7 +29,7 @@ const OfflineBanner: React.FC = () => {
   // ─── Reconnected flash ───
   if (showReconnected) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-2 px-4 text-sm font-semibold shadow-lg bg-emerald-500 text-white transition-all duration-300">
+      <div role="status" aria-live="polite" className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-2 px-4 text-sm font-semibold shadow-lg bg-emerald-500 text-white transition-all duration-300">
         <RefreshCw className="w-4 h-4 animate-spin" />
         Back online — syncing offline changes…
       </div>
@@ -39,7 +39,7 @@ const OfflineBanner: React.FC = () => {
   // ─── No connection ───
   if (!isOnline) {
     return (
-      <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-2 px-4 text-sm font-semibold shadow-lg bg-amber-500 text-white transition-all duration-300">
+      <div role="alert" aria-live="assertive" className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-2 px-4 text-sm font-semibold shadow-lg bg-amber-500 text-white transition-all duration-300">
         <WifiOff className="w-4 h-4" />
         You&apos;re offline — showing cached data
         {cacheTimestamp && (
@@ -59,7 +59,7 @@ const OfflineBanner: React.FC = () => {
     if (!isOld) return null;
 
     return (
-      <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-1.5 px-4 text-xs font-medium shadow-md bg-blue-600 text-white transition-all duration-300">
+      <div role="status" aria-live="polite" className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-1.5 px-4 text-xs font-medium shadow-md bg-blue-600 text-white transition-all duration-300">
         <DatabaseZap className="w-3.5 h-3.5 animate-pulse" />
         Showing cached data from {age} · Syncing in background…
       </div>

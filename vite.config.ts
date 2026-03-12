@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
         react(),
         tailwindcss(),
         VitePWA({
-          registerType: 'autoUpdate',
+          registerType: 'prompt',
           includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
           manifest: {
             name: 'MediWard',

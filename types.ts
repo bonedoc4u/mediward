@@ -305,6 +305,10 @@ export interface Patient {
   specialtyData?: Record<string, unknown>;
   /** Server-side timestamp of last DB update — used for concurrent-edit detection. */
   updatedAt?: string;
+  /** DPDP Act 2023: ISO timestamp when informed consent was obtained. */
+  consentGivenAt?: string;
+  /** DPDP Act 2023: Consent form version at time of consent (e.g. 'v1.0'). */
+  consentVersion?: string;
 }
 
 // ─── Auth Types ───────────────────────────────────────────────────────────────

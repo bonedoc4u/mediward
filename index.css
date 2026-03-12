@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Self-hosted DM Sans variable font — no Google CDN, no DPDP exposure */
+@import "@fontsource-variable/dm-sans";
 
 /* ── Global CSS custom properties ─────────────────────────────── */
 :root {
@@ -27,8 +29,8 @@ html {
 body {
   min-height: 100vh; /* Fallback for Firefox < 110 which does not support dvh */
   min-height: 100dvh;
-  /* Prevent elastic overscroll creating horizontal white bars */
-  overscroll-behavior-x: none;
+  /* Prevent iOS rubber-band overscroll and Android pull-to-refresh conflicts */
+  overscroll-behavior: none;
   -webkit-text-size-adjust: 100%; /* Prevent iOS font-size inflation on rotate */
 }
 

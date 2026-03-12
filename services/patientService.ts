@@ -81,6 +81,8 @@ interface PatientRow {
   vitals?: VitalSigns[] | null;
   created_at: string;
   updated_at: string;
+  consent_given_at: string | null;
+  consent_version: string | null;
   // Joined relations from normalized tables
   labs?: LabRowRead[] | null;
   imaging?: ImagingRowRead[] | null;
@@ -186,7 +188,9 @@ function rowToPatient(row: PatientRow): Patient {
     vitals,
     specialty:        row.specialty        ?? undefined,
     specialtyData:    row.specialty_data   ?? undefined,
-    updatedAt: row.updated_at,
+    updatedAt:       row.updated_at,
+    consentGivenAt:  row.consent_given_at ?? undefined,
+    consentVersion:  row.consent_version  ?? undefined,
   };
 }
 
@@ -220,6 +224,8 @@ function patientToRow(patient: Patient) {
     pac_checklist:     patient.pacChecklist     ?? null,
     pre_op_checklist:  patient.preOpChecklist   ?? null,
     discharge_summary: patient.dischargeSummary ?? null,
+    consent_given_at:  patient.consentGivenAt   ?? null,
+    consent_version:   patient.consentVersion   ?? null,
     // daily_rounds and vitals intentionally omitted — normalized tables own these
   };
 }
@@ -238,7 +244,7 @@ const PATIENT_LIST_SELECT = [
   'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
-  'discharge_summary', 'created_at', 'updated_at',
+  'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
   // Lightweight normalized joins for list rendering
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url)',
@@ -252,7 +258,7 @@ const PATIENT_SELECT = [
   'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
-  'discharge_summary', 'created_at', 'updated_at',
+  'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url)',
   'rounds(date, note, todos)',

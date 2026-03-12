@@ -4,6 +4,7 @@ import { useConfig, useAuth } from '../contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import { parseFhirPatient } from '../services/fhirService';
 import { X, Save, UserPlus, Pencil, ScanLine, Loader2, FileJson, ChevronDown, ChevronUp } from 'lucide-react';
+import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
 
 
 interface Props {
@@ -72,6 +73,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   };
   const [stepError, setStepError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
   const STEP_LABELS = ['Location & Identity', 'Patient', 'Status & Plan'];
 
   const validateStep = (s: number): string | null => {
@@ -177,7 +179,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       const token = session?.access_token;
 
       const res = await fetch(
-        'https://mnyjpxkopiktsrqmjilb.supabase.co/functions/v1/parse-admission-slip',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-admission-slip`,
         {
           method: 'POST',
           headers: {
@@ -291,6 +293,11 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    // New patient: show DPDP consent modal before saving
+    if (!initialData && !showConsent) {
+      setShowConsent(true);
+      return;
+    }
     setIsSubmitting(true);
     const patientData: Patient = {
       // Preserve IDs and existing arrays if editing, otherwise create new
@@ -313,9 +320,47 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       patientStatus: formData.patientStatus,
       investigations: initialData?.investigations || [],
       labResults: initialData?.labResults || [],
-      todos: initialData?.todos || []
+      todos: initialData?.todos || [],
+      // Stamp consent on new patient records (DPDP Act 2023)
+      ...(!initialData ? {
+        consentGivenAt: new Date().toISOString(),
+        consentVersion: CONSENT_VERSION,
+      } : {}),
     };
-    
+
+    sessionStorage.removeItem(STEP_KEY);
+    onSave(patientData);
+    onClose();
+  };
+
+  const handleConsentAccepted = () => {
+    setShowConsent(false);
+    // Re-trigger save now that consent is obtained
+    setIsSubmitting(true);
+    const patientData: Patient = {
+      ...({} as any),
+      bed: formData.bed,
+      ward: formData.ward,
+      unit: formData.unit || undefined,
+      ipNo: formData.ipNo,
+      abhaId: formData.abhaId.trim() || undefined,
+      name: formData.name,
+      age: parseInt(formData.age) || 0,
+      gender: formData.gender,
+      mobile: formData.mobile,
+      diagnosis: formData.diagnosis,
+      comorbidities: selectedComorbidities,
+      doa: formData.doa,
+      procedure: formData.procedure,
+      dos: formData.dos || undefined,
+      pacStatus: formData.pacStatus as PacStatus,
+      patientStatus: formData.patientStatus,
+      investigations: [],
+      labResults: [],
+      todos: [],
+      consentGivenAt: new Date().toISOString(),
+      consentVersion: CONSENT_VERSION,
+    };
     sessionStorage.removeItem(STEP_KEY);
     onSave(patientData);
     onClose();
@@ -328,6 +373,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   };
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div
         ref={dialogRef}
@@ -394,7 +440,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
+        <form onSubmit={handleSubmit} autoComplete="off" className="p-4 sm:p-6 space-y-4 sm:space-y-5">
 
           {/* Step validation error banner */}
           {stepError && (
@@ -616,6 +662,16 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         </form>
       </div>
     </div>
+
+    {/* DPDP Act 2023 consent gate — shown above the main modal (z-[400]) */}
+    {showConsent && (
+      <PatientConsentModal
+        patientName={formData.name}
+        onAccept={handleConsentAccepted}
+        onCancel={() => { setShowConsent(false); setIsSubmitting(false); }}
+      />
+    )}
+    </>
   );
 };
 

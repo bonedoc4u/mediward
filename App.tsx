@@ -37,6 +37,7 @@ const AdminSettings = lazy(() => import('./components/AdminSettings'));
 const StatusPage = lazy(() => import('./components/StatusPage'));
 import OfflineBanner from './components/OfflineBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
+import SwUpdateBanner from './components/SwUpdateBanner';
 import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/ClinicalDisclaimer';
 import ConcurrentEditModal from './components/ConcurrentEditModal';
 
@@ -160,7 +161,11 @@ const App: React.FC = () => {
 
     // Android hardware back button handler
     const subscription = CapApp.addListener('backButton', () => {
-      // Priority: close overlays first, then navigate, then exit
+      // Priority: close overlays first (highest → lowest), then navigate, then exit
+      if (concurrentEditConflict) {
+        resolveConcurrentEdit('remote'); // dismiss conflict = keep server version
+        return;
+      }
       if (isMobileMenuOpen) {
         setIsMobileMenuOpen(false);
         return;
@@ -182,7 +187,7 @@ const App: React.FC = () => {
     return () => {
       subscription.then(h => h.remove()).catch(() => {});
     };
-  }, [isMobileMenuOpen, isAddPatientModalOpen, currentView, setIsMobileMenuOpen, navigateTo]);
+  }, [concurrentEditConflict, resolveConcurrentEdit, isMobileMenuOpen, isAddPatientModalOpen, currentView, setIsMobileMenuOpen, navigateTo]);
 
   // Group nav items by section — filter Team Settings to admin only
   const navSections = useMemo(() => {
@@ -557,6 +562,9 @@ const App: React.FC = () => {
           onResolve={resolveConcurrentEdit}
         />
       )}
+
+      {/* ─── SW Update Banner ─── */}
+      <SwUpdateBanner />
 
       {/* ─── Toast Notifications ─── */}
       <ToastContainer />

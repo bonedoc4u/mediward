@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { GitMerge, Save, RefreshCw, X } from 'lucide-react';
 import { ConcurrentEditConflict } from '../contexts/PatientContext';
 
@@ -20,16 +20,47 @@ const DIFF_FIELDS: Array<{ label: string; key: keyof ConcurrentEditConflict['loc
 
 const ConcurrentEditModal: React.FC<Props> = ({ conflict, onResolve }) => {
   const { localPatient, remotePatient } = conflict;
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const changedFields = DIFF_FIELDS.filter(
     f => String(localPatient[f.key] ?? '') !== String(remotePatient[f.key] ?? ''),
   );
+
+  // Focus trap: Tab/Shift-Tab stays inside dialog; Escape → keep server version
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    el.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onResolve('remote'); return; }
+      if (e.key !== 'Tab') return;
+
+      const focusable = el.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable.length) { e.preventDefault(); return; }
+      const first = focusable[0];
+      const last  = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onResolve]);
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ced-title"
