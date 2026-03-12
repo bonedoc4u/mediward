@@ -3,7 +3,7 @@ import { Patient, PacStatus, PatientStatus } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, Loader2, ChevronRight, FlaskConical, X } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck } from 'lucide-react';
 import HandoverSummary from './HandoverSummary';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 
@@ -20,12 +20,13 @@ interface Props {
   onViewPatient?: (ipNo: string) => void;
   onStartRounds?: () => void;
   onAddLab?: (ipNo: string, type: string, value: number, date: string) => Promise<void>;
+  onAssignDate?: (ipNo: string, plannedDos: string) => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
 }
 
-const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, hasMore, isLoadingMore, onLoadMore }) => {
+const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, hasMore, isLoadingMore, onLoadMore }) => {
   const { wards: configWards, icuWardNames, labTypes } = useConfig();
   const { user } = useAuth();
 
@@ -95,6 +96,11 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
     for (const ward of wardsToDisplay) {
       const isIcuWard = icuWardNames.has(ward);
       const wps = [...(patientsByWard[ward] ?? [])].sort((a, b) => {
+        if (viewMode === 'pending') {
+          if (a.plannedDos && b.plannedDos) return a.plannedDos.localeCompare(b.plannedDos);
+          if (a.plannedDos) return -1;
+          if (b.plannedDos) return 1;
+        }
         const diff = getTriagePriority(a) - getTriagePriority(b);
         return diff !== 0 ? diff : sortByBed(a, b);
       });
@@ -142,6 +148,17 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   };
 
   const hasActiveFilters = filterPending || filterSurgeryToday || filterPod01 || filterOverdueTodos || searchTerm;
+
+  // ─── Assign Date state (pending list) ───
+  const [assigningDateIp, setAssigningDateIp] = useState<string | null>(null);
+  const [assigningDateValue, setAssigningDateValue] = useState('');
+
+  const handleAssignDate = (ipNo: string) => {
+    if (!assigningDateValue || !onAssignDate) return;
+    onAssignDate(ipNo, assigningDateValue);
+    setAssigningDateIp(null);
+    setAssigningDateValue('');
+  };
 
   // ─── Quick Lab Entry state ───
   const [quickLabIp, setQuickLabIp] = useState<string | null>(null);
@@ -238,6 +255,12 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       {wardsToDisplay.map(ward => {
         // Sort by clinical urgency first, then bed number as tiebreaker
         const wardPatients = [...patientsByWard[ward]].sort((a, b) => {
+          if (viewMode === 'pending') {
+            // Sort by plannedDos ascending; undated last
+            if (a.plannedDos && b.plannedDos) return a.plannedDos.localeCompare(b.plannedDos);
+            if (a.plannedDos) return -1;
+            if (b.plannedDos) return 1;
+          }
           const diff = getTriagePriority(a) - getTriagePriority(b);
           return diff !== 0 ? diff : sortByBed(a, b);
         });
@@ -272,6 +295,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3 text-center">POD</th>
                   <th className="px-6 py-3">Procedure</th>
+                  {viewMode === 'pending' && <th className="px-6 py-3">Planned Date</th>}
                   {(onEditPatient || onViewPatient) && <th className="px-6 py-3 text-right">Actions</th>}
                 </tr>
               </thead>
@@ -348,6 +372,58 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       {patient.procedure || "Conservative"}
                       {patient.dos && <div className="text-xs text-slate-500 font-medium">DOS: {patient.dos}</div>}
                     </td>
+                    {viewMode === 'pending' && (
+                      <td className="px-6 py-4">
+                        {assigningDateIp === patient.ipNo ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="date"
+                              autoFocus
+                              value={assigningDateValue}
+                              min={today}
+                              onChange={e => setAssigningDateValue(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') handleAssignDate(patient.ipNo); if (e.key === 'Escape') { setAssigningDateIp(null); setAssigningDateValue(''); } }}
+                              className="border border-blue-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                            />
+                            <button
+                              onClick={() => handleAssignDate(patient.ipNo)}
+                              disabled={!assigningDateValue}
+                              className="p-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded"
+                              title="Confirm date"
+                            >
+                              <CalendarCheck className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { setAssigningDateIp(null); setAssigningDateValue(''); }}
+                              className="p-1.5 text-slate-400 hover:text-slate-600 rounded"
+                              title="Cancel"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : patient.plannedDos ? (
+                          <button
+                            onClick={() => { setAssigningDateIp(patient.ipNo); setAssigningDateValue(patient.plannedDos ?? ''); }}
+                            className="flex items-center gap-1.5 px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded text-xs font-semibold transition-colors"
+                            title="Change planned date"
+                          >
+                            <CalendarCheck className="w-3.5 h-3.5" />
+                            {patient.plannedDos}
+                          </button>
+                        ) : onAssignDate ? (
+                          <button
+                            onClick={() => { setAssigningDateIp(patient.ipNo); setAssigningDateValue(''); }}
+                            className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-dashed border-slate-300 hover:border-blue-300 rounded text-xs transition-colors"
+                            title="Assign surgery date"
+                          >
+                            <CalendarClock className="w-3.5 h-3.5" />
+                            Assign date
+                          </button>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+                    )}
                     {(onEditPatient || onViewPatient) && (
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -475,6 +551,28 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       <p className="font-medium text-slate-800">{item.patient.diagnosis}</p>
                       {item.patient.procedure && <p className="text-xs text-slate-500 mt-0.5">{item.patient.procedure}</p>}
                     </div>
+                    {/* Planned date row — pending view only */}
+                    {viewMode === 'pending' && (
+                      <div className="flex items-center gap-2 border-t border-slate-100 pt-2">
+                        {item.patient.plannedDos ? (
+                          <button
+                            onClick={() => { setAssigningDateIp(item.patient.ipNo); setAssigningDateValue(item.patient.plannedDos ?? ''); }}
+                            className="flex items-center gap-1.5 px-2 py-1 bg-violet-50 text-violet-700 border border-violet-200 rounded text-xs font-semibold"
+                          >
+                            <CalendarCheck className="w-3.5 h-3.5" />
+                            {item.patient.plannedDos}
+                          </button>
+                        ) : onAssignDate ? (
+                          <button
+                            onClick={() => { setAssigningDateIp(item.patient.ipNo); setAssigningDateValue(''); }}
+                            className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 text-slate-500 border border-dashed border-slate-300 rounded text-xs"
+                          >
+                            <CalendarClock className="w-3.5 h-3.5" />
+                            Assign surgery date
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="flex flex-wrap gap-1.5">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>{item.patient.pacStatus}</span>
@@ -557,6 +655,38 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ─── Assign Date bottom panel — mobile only ─── */}
+      {assigningDateIp && onAssignDate && (
+        <div className="md:hidden fixed left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200" style={{ bottom: 'calc(var(--bottom-nav-height, 56px) + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)))' }}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="font-semibold text-sm text-slate-800 flex items-center gap-2">
+              <CalendarClock className="w-4 h-4 text-violet-600" />
+              Assign Surgery Date
+            </p>
+            <button onClick={() => { setAssigningDateIp(null); setAssigningDateValue(''); }} className="text-slate-400 hover:text-slate-600 p-1">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              autoFocus
+              value={assigningDateValue}
+              min={today}
+              onChange={e => setAssigningDateValue(e.target.value)}
+              className="flex-1 min-h-[44px] p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-violet-500 outline-none"
+            />
+            <button
+              onClick={() => handleAssignDate(assigningDateIp)}
+              disabled={!assigningDateValue}
+              className="px-4 min-h-[44px] bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors flex items-center gap-1.5"
+            >
+              <CalendarCheck className="w-4 h-4" /> Confirm
+            </button>
+          </div>
         </div>
       )}
 

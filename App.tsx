@@ -298,6 +298,10 @@ const App: React.FC = () => {
             onAddLab={async (ipNo, type, value, date) => {
               addLabResult(ipNo, { id: crypto.randomUUID(), date, type, value });
             }}
+            onAssignDate={(ipNo, plannedDos) => {
+              const patient = patients.find(p => p.ipNo === ipNo);
+              if (patient) updatePatient({ ...patient, plannedDos });
+            }}
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
             onLoadMore={loadMorePatients}
