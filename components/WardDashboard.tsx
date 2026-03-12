@@ -293,7 +293,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   <th className="px-6 py-3 min-w-[140px]">Diagnosis</th>
                   <th className="px-6 py-3 min-w-[120px]">Comorbidities</th>
                   <th className="px-6 py-3 min-w-[140px]">Status</th>
-                  <th className="px-6 py-3 text-center min-w-[60px]">POD</th>
+                  {viewMode !== 'pending' && <th className="px-6 py-3 text-center min-w-[60px]">POD</th>}
                   <th className="px-6 py-3 min-w-[120px]">Procedure</th>
                   {viewMode === 'pending' && <th className="px-6 py-3">Planned Date</th>}
                   {(onEditPatient || onViewPatient) && <th className="px-6 py-3 text-right">Actions</th>}
@@ -326,7 +326,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                       <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
                         <span>{patient.age} / {patient.gender} • IP: {patient.ipNo}</span>
-                        {patient.pod !== undefined && (
+                        {viewMode !== 'pending' && patient.pod !== undefined && (
                           <span className="font-bold text-green-700 bg-green-100 px-1.5 rounded-sm ml-1">POD {patient.pod}</span>
                         )}
                       </div>
@@ -361,16 +361,18 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {patient.patientStatus}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      {patient.pod !== undefined ? (
-                        <div className="inline-block p-2 rounded-lg border-2 border-green-500 bg-green-50">
-                          <span className="block text-[10px] uppercase font-bold text-green-700 leading-none mb-0.5">POD</span>
-                          <span className="font-bold text-lg text-green-800 leading-none">{patient.pod}</span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
+                    {viewMode !== 'pending' && (
+                      <td className="px-6 py-4 text-center">
+                        {patient.pod !== undefined ? (
+                          <div className="inline-block p-2 rounded-lg border-2 border-green-500 bg-green-50">
+                            <span className="block text-[10px] uppercase font-bold text-green-700 leading-none mb-0.5">POD</span>
+                            <span className="font-bold text-lg text-green-800 leading-none">{patient.pod}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       {patient.procedure || "Conservative"}
                       {patient.dos && <div className="text-xs text-slate-500 font-medium">DOS: {patient.dos}</div>}
