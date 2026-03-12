@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Activity, Plus, ChevronDown, ChevronUp, AlertTriangle, BarChart2, Table2 } from 'lucide-react';
 import { VitalSigns } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { calculateNEWS2 } from '../utils/calculations';
 
 interface Props {
   vitals: VitalSigns[];
@@ -321,7 +322,15 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
     setSaveError(null);
     setSaving(true);
     try {
-      await onAdd({ ...form, recordedBy: user?.name ?? 'Nurse' });
+      const news2 = calculateNEWS2({
+        respiratoryRate: form.respiratoryRate,
+        spO2: form.spo2,
+        temperature: form.temperature,
+        bpSystolic: form.bpSystolic,
+        heartRate: form.heartRate,
+      });
+      const news2Score = news2?.total;
+      await onAdd({ ...form, recordedBy: user?.name ?? 'Nurse', news2Score });
       setForm({ ...EMPTY, timestamp: new Date().toISOString().slice(0, 16) });
       setShowForm(false);
     } catch (err) {
@@ -547,6 +556,26 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
             </span>
           )}
           <span className="text-xs text-slate-400 ml-auto">{fmtTime(latest.timestamp)}</span>
+        </div>
+      )}
+
+      {/* NEWS2 badge */}
+      {latest && !showForm && latest.news2Score != null && (
+        <div className="px-4 py-2 border-b border-slate-100 bg-white">
+          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+            latest.news2Score === 0   ? 'bg-green-50  text-green-700  border-green-200' :
+            latest.news2Score <= 4   ? 'bg-blue-50   text-blue-700   border-blue-200' :
+            latest.news2Score <= 6   ? 'bg-amber-50  text-amber-700  border-amber-200' :
+                                       'bg-red-50    text-red-700    border-red-200 animate-pulse'
+          }`}>
+            NEWS2: {latest.news2Score}
+            <span className="font-normal opacity-75 ml-0.5">
+              {latest.news2Score === 0   ? '(Low)' :
+               latest.news2Score <= 4   ? '(Low)' :
+               latest.news2Score <= 6   ? '(Medium — increase monitoring)' :
+                                          '(HIGH RISK — escalate)'}
+            </span>
+          </div>
         </div>
       )}
 

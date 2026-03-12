@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, lazy, Suspense } from 'react';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { PatientStatus } from '../types';
 import { can } from '../utils/permissions';
@@ -6,12 +6,16 @@ import { getStatusColor, getLabTrend } from '../utils/calculations';
 import {
   ArrowLeft, Calendar, Phone, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
-  TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2, FileJson, Download
+  TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2, FileJson, Download,
+  Pill, ClipboardList
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import FHIRExportModal from './FHIRExportModal';
 import VitalsWidget from './VitalsWidget';
 import SpecialtyDataPanel from './SpecialtyDataPanel';
+
+const MedicationChart = lazy(() => import('./MedicationChart'));
+const NursingNotes = lazy(() => import('./NursingNotes'));
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
@@ -19,6 +23,7 @@ const PatientDetail: React.FC = () => {
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFhirExport, setShowFhirExport] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'medications' | 'nursing'>('overview');
   const canDischarge = can(user, 'patient:discharge');
   const canDelete = can(user, 'patient:delete');
   const patient = useMemo(() => patients.find(p => p.ipNo === navParams.id), [patients, navParams.id]);
@@ -240,7 +245,48 @@ const PatientDetail: React.FC = () => {
         <FHIRExportModal patient={patient} onClose={() => setShowFhirExport(false)} />
       )}
 
-      {/* Vital Signs */}
+      {/* Tab Bar */}
+      <div className="flex gap-1 border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2">
+        {([
+          { key: 'overview',    label: 'Overview',    icon: <Activity className="w-4 h-4" /> },
+          { key: 'medications', label: 'Medications', icon: <Pill className="w-4 h-4" /> },
+          { key: 'nursing',     label: 'Nursing',     icon: <ClipboardList className="w-4 h-4" /> },
+        ] as { key: 'overview' | 'medications' | 'nursing'; label: string; icon: React.ReactNode }[]).map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
+              activeTab === tab.key
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Medications Tab */}
+      {activeTab === 'medications' && (
+        <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
+          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <MedicationChart patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
+          </Suspense>
+        </div>
+      )}
+
+      {/* Nursing Notes Tab */}
+      {activeTab === 'nursing' && (
+        <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
+          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
+          </Suspense>
+        </div>
+      )}
+
+      {/* Overview Tab — Vital Signs */}
+      {activeTab === 'overview' && (
+        <>
       <VitalsWidget
         vitals={patient.vitals ?? []}
         onAdd={v => addVitalSign(patient.ipNo, v)}
@@ -364,6 +410,8 @@ const PatientDetail: React.FC = () => {
               ))}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

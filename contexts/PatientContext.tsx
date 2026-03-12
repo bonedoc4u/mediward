@@ -38,7 +38,7 @@ import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
 import { upsertRound } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
-import { enqueue, getQueue, dequeue, incrementAttempts } from '../services/syncQueue';
+import { enqueue, getRetryableQueue, dequeue, incrementAttempts } from '../services/syncQueue';
 import {
   registerServiceWorker,
   requestNotificationPermission,
@@ -176,7 +176,8 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // ─── Offline Sync Queue — replay on reconnect ───
   useEffect(() => {
     const handleOnline = async () => {
-      const queue = getQueue();
+      // Only replay ops whose backoff window has elapsed
+      const queue = getRetryableQueue();
       if (queue.length === 0) return;
 
       toast.info(`Syncing ${queue.length} offline change${queue.length > 1 ? 's' : ''}…`);
@@ -201,14 +202,21 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
           dequeue(op.id);
         } catch {
-          incrementAttempts(op.id);
+          const { dropped, opType, label } = incrementAttempts(op.id);
+          if (dropped) {
+            // Surface permanent failure — data could not be saved after max retries
+            const what = opType === 'upsert_patient'
+              ? `Patient record${label ? ` for ${label}` : ''}`
+              : 'An offline change';
+            toast.error(`${what} could not be saved after repeated attempts. Please re-enter the data.`);
+          }
         }
       }
 
-      const remaining = getQueue().length;
+      // Count ALL remaining ops (including those still in backoff)
+      const remaining = getRetryableQueue().length;
       if (remaining === 0) {
         toast.success('All offline changes synced');
-        // Refresh from Supabase now that writes are replayed
         fetchActivePatients(user?.unit, hospitalIdRef.current)
           .then(data => {
             const enriched = enrichPatientData(data);
@@ -219,7 +227,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           })
           .catch(() => {/* stay on current state */});
       } else {
-        toast.warning(`${remaining} changes couldn't sync. Will retry later.`);
+        toast.warning(`${remaining} change${remaining > 1 ? 's' : ''} couldn't sync. Will retry later.`);
       }
     };
 

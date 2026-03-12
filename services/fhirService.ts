@@ -78,7 +78,7 @@ function buildPatient(p: Patient): FhirResource {
 }
 
 function buildEncounter(p: Patient): FhirResource {
-  const period: FhirPeriod = { start: p.doa };
+  const period: FhirPeriod = { start: p.doa ?? new Date().toISOString().split('T')[0] };
   if (p.dod) period.end = p.dod;
   return {
     resourceType: 'Encounter',

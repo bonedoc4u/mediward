@@ -15,9 +15,9 @@ interface Props {
 }
 
 const COMORBIDITY_OPTIONS = [
-  "HTN", "DM", "CAD", "CKD", "CVA", 
-  "Hypothyroid", "Hyperthyroid", "Asthma", "COPD", "TB", 
-  "Seizure Disorder", "DLP", "NOCM", "CA", "RA", 
+  "HTN", "DM", "CAD", "CKD", "CVA",
+  "Hypothyroid", "Hyperthyroid", "Asthma", "COPD", "TB",
+  "Seizure Disorder", "DLP", "NOCM", "CA", "RA",
   "SVT", "DCM", "Parkinson's", "Hyponatremia", "Factor VIII Def.",
   "Sickle Cell Anemia", "Cardioembolism", "Pulmon Atresia", "RAD", "RDD", "Psy"
 ];
@@ -30,6 +30,8 @@ const COLORS = [
   "bg-fuchsia-100 text-fuchsia-800", "bg-pink-100 text-pink-800", "bg-rose-100 text-rose-800"
 ];
 
+const STEP_LABELS = ['Location & Identity', 'Patient Details', 'Status & Plan'];
+
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
@@ -40,46 +42,94 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const isAdmin = user?.role === 'admin';
   const defaultUnit = user?.unit ?? '';
 
-  const [formData, setFormData] = useState({
-    bed: '',
-    ward: defaultWard as Ward,
-    unit: defaultUnit,
-    ipNo: '',
-    abhaId: '',
-    name: '',
-    age: '',
-    gender: Gender.Male,
-    mobile: '',
-    diagnosis: '',
-    doa: new Date().toISOString().split('T')[0],
-    procedure: '',
-    dos: '',
-    pacStatus: PacStatus.Pending,
-    patientStatus: 'Admitted'
+  // ── Wizard step ──
+  // STEP_KEY sessionStorage stores { step, formData } to survive screen rotation
+  const STEP_KEY = 'mediward_admit_step';
+
+  const [formData, setFormData] = useState(() => {
+    if (initialData) {
+      return {
+        bed: initialData.bed,
+        ward: (initialData.ward || defaultWard) as Ward,
+        unit: initialData.unit ?? defaultUnit,
+        ipNo: initialData.ipNo,
+        abhaId: initialData.abhaId ?? '',
+        name: initialData.name,
+        age: initialData.age.toString(),
+        gender: initialData.gender,
+        mobile: initialData.mobile,
+        diagnosis: initialData.diagnosis,
+        doa: initialData.doa,
+        procedure: initialData.procedure || '',
+        dos: initialData.dos || '',
+        pacStatus: initialData.pacStatus,
+        patientStatus: initialData.patientStatus,
+      };
+    }
+    // Try restoring from sessionStorage (new patient draft)
+    try {
+      const saved = sessionStorage.getItem(STEP_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.formData) return parsed.formData;
+      }
+    } catch { /* ignore */ }
+    return {
+      bed: '',
+      ward: defaultWard as Ward,
+      unit: defaultUnit,
+      ipNo: '',
+      abhaId: '',
+      name: '',
+      age: '',
+      gender: Gender.Male,
+      mobile: '',
+      diagnosis: '',
+      doa: new Date().toISOString().split('T')[0],
+      procedure: '',
+      dos: '',
+      pacStatus: PacStatus.Pending,
+      patientStatus: 'Admitted',
+    };
   });
 
-  // ── Wizard step (1 = Location & Identity, 2 = Patient, 3 = Status & Plan) ──
-  // Bug #20: persist step across screen rotation (sessionStorage survives re-mount)
-  const STEP_KEY = 'mediward_admit_step';
   const [step, setStepRaw] = useState<number>(() => {
-    if (initialData) return 1; // edit mode always starts at 1
-    const saved = sessionStorage.getItem(STEP_KEY);
-    const n = saved ? parseInt(saved, 10) : 1;
-    return n >= 1 && n <= 3 ? n : 1;
+    if (initialData) return 1;
+    try {
+      const saved = sessionStorage.getItem(STEP_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const n = parsed.step ? parseInt(String(parsed.step), 10) : 1;
+        return n >= 1 && n <= 3 ? n : 1;
+      }
+    } catch { /* ignore */ }
+    return 1;
   });
+
   const setStep = (s: number) => {
-    sessionStorage.setItem(STEP_KEY, String(s));
+    try {
+      sessionStorage.setItem(STEP_KEY, JSON.stringify({ step: s, formData }));
+    } catch { /* ignore */ }
     setStepRaw(s);
   };
+
+  // Keep sessionStorage in sync whenever formData changes
+  useEffect(() => {
+    if (!initialData) {
+      try {
+        sessionStorage.setItem(STEP_KEY, JSON.stringify({ step, formData }));
+      } catch { /* ignore */ }
+    }
+  }, [formData, step, initialData]);
+
   const [stepError, setStepError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
-  const STEP_LABELS = ['Location & Identity', 'Patient', 'Status & Plan'];
 
   const validateStep = (s: number): string | null => {
     if (s === 1) {
       if (!formData.ipNo.trim()) return 'IP Number is required.';
-      if (!formData.bed.trim()) return 'Bed number is required.';
+      if (!formData.ward) return 'Ward is required.';
       if (formData.abhaId && !/^\d{14}$|^\d{2}-\d{4}-\d{4}-\d{4}$/.test(formData.abhaId.trim())) {
         return 'ABHA ID must be 14 digits (e.g. 12345678901234 or 12-3456-7890-1234).';
       }
@@ -89,8 +139,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     }
     if (s === 2) {
       if (!formData.name.trim()) return 'Patient name is required.';
-      if (!formData.age || parseInt(formData.age) <= 0) return 'A valid age is required.';
-      if (parseInt(formData.age) > 130) return 'Please enter a valid age.';
       if (!formData.diagnosis.trim()) return 'Diagnosis is required.';
     }
     return null;
@@ -153,6 +201,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  // ── iOS keyboard: scroll first input into view when step changes ──
+  useEffect(() => {
+    const first = dialogRef.current?.querySelector<HTMLElement>('input, select, textarea');
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [step]);
 
   // ── Admission slip scanner ──
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -267,7 +321,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       setSelectedComorbidities([]);
     }
     // Always start at step 1 when modal opens
-    setStep(1);
+    setStepRaw(1);
+    setStepError(null);
   }, [isOpen, initialData]);
 
   if (!isOpen) return null;
@@ -408,47 +463,47 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
             </div>
           </div>
 
-          {/* Progress bar + step labels */}
-          <div className="px-4 pb-3 space-y-1">
-            <div className="flex gap-1">
+          {/* Progress bar */}
+          <div className="px-4 pb-1">
+            <div className="flex gap-1 mt-2">
               {[1, 2, 3].map(s => (
-                <button
+                <div
                   key={s}
-                  type="button"
-                  onClick={() => { setStepError(null); setStep(s); }}
-                  className={`flex-1 py-2 flex flex-col items-center`}
-                  aria-label={`Step ${s}: ${STEP_LABELS[s - 1]}`}
-                >
-                  <div className={`w-full h-1.5 rounded-full transition-colors ${
+                  className={`flex-1 h-1.5 rounded-full transition-colors duration-200 ${
                     s < step ? 'bg-blue-600' : s === step ? 'bg-blue-400' : 'bg-slate-200'
-                  }`} />
-                </button>
+                  }`}
+                />
               ))}
             </div>
-            <div className="flex">
-              {STEP_LABELS.map((label, idx) => (
-                <span
-                  key={label}
-                  className={`flex-1 text-center text-[10px] font-semibold ${
-                    idx + 1 === step ? 'text-blue-600' : idx + 1 < step ? 'text-blue-400' : 'text-slate-400'
-                  }`}
-                >
-                  {idx + 1}. {label}
-                </span>
+
+            {/* Step labels — clickable breadcrumbs in edit mode, static otherwise */}
+            <div className="flex justify-between px-1 mt-0.5 pb-2">
+              {STEP_LABELS.map((label, i) => (
+                initialData ? (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { setStepError(null); setStepRaw(i + 1); }}
+                    className={`text-[10px] font-medium transition-colors ${
+                      step === i + 1 ? 'text-blue-600' : 'text-slate-400 hover:text-blue-400'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ) : (
+                  <span
+                    key={i}
+                    className={`text-[10px] font-medium ${step === i + 1 ? 'text-blue-600' : 'text-slate-400'}`}
+                  >
+                    {label}
+                  </span>
+                )
               ))}
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} autoComplete="off" className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-
-          {/* Step validation error banner */}
-          {stepError && (
-            <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-              <X className="w-4 h-4 shrink-0" />
-              <span>{stepError}</span>
-            </div>
-          )}
 
           {/* Scan error banner */}
           {scanError && (
@@ -542,7 +597,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
             </div>
           )}
 
-          {/* ── Step 2: Patient ── */}
+          {/* ── Step 2: Patient Details ── */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -629,34 +684,52 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           )}
 
           {/* ── Navigation footer ── */}
-          <div className="pt-2 flex gap-3">
-            {step > 1 ? (
-              <button type="button" onClick={() => setStep(step - 1)} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
-                ← Back
-              </button>
-            ) : (
-              <button type="button" onClick={() => { sessionStorage.removeItem(STEP_KEY); onClose(); }} className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium">
-                Cancel
-              </button>
-            )}
-            {step < 3 ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const err = validateStep(step);
-                  if (err) { setStepError(err); return; }
-                  setStepError(null);
-                  setStep(step + 1);
-                }}
-                className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition-colors"
-              >
-                Next →
-              </button>
-            ) : (
-              <button type="submit" disabled={isSubmitting} className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2.5 rounded flex items-center justify-center gap-2">
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {initialData ? 'Update Patient' : 'Admit Patient'}
-              </button>
+          <div className="pt-2 space-y-1">
+            <div className="flex gap-3">
+              {step > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => { setStepError(null); setStep(step - 1); }}
+                  className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium"
+                >
+                  ← Back
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { sessionStorage.removeItem(STEP_KEY); onClose(); }}
+                  className="flex-1 min-h-[44px] px-4 py-2.5 border border-slate-300 rounded text-slate-600 hover:bg-slate-50 font-medium"
+                >
+                  Cancel
+                </button>
+              )}
+              {step < 3 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const err = validateStep(step);
+                    if (err) { setStepError(err); return; }
+                    setStepError(null);
+                    setStep(step + 1);
+                  }}
+                  className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition-colors"
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2.5 rounded flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {initialData ? 'Update Patient' : 'Admit Patient'}
+                </button>
+              )}
+            </div>
+            {/* Inline step validation error */}
+            {stepError && (
+              <p className="text-xs text-red-600 mt-1">{stepError}</p>
             )}
           </div>
         </form>

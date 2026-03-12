@@ -3,7 +3,7 @@ import { Patient, PacStatus, PatientStatus } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck } from 'lucide-react';
 import HandoverSummary from './HandoverSummary';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 
@@ -135,7 +135,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         <Icon className={`w-4 h-4 md:w-5 md:h-5 ${selectedWard === ward ? 'text-white' : colorClass}`} />
       </div>
       <span className={`text-xs md:text-sm font-bold truncate w-full text-center ${selectedWard === ward ? 'text-white' : 'text-slate-700'}`}>{ward === 'All' ? 'All' : ward}</span>
-      <span className={`text-[10px] md:text-xs ${selectedWard === ward ? 'text-white/80' : 'text-slate-400'}`}>{count} pts</span>
+      <span className={`text-[10px] md:text-xs ${selectedWard === ward ? 'text-white/80' : 'text-slate-600'}`}>{count} pts</span>
     </button>
   );
 
@@ -288,13 +288,13 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3">Bed</th>
-                  <th className="px-6 py-3">Patient</th>
-                  <th className="px-6 py-3">Diagnosis</th>
-                  <th className="px-6 py-3">Comorbidities</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-center">POD</th>
-                  <th className="px-6 py-3">Procedure</th>
+                  <th className="px-6 py-3 min-w-[56px]">Bed</th>
+                  <th className="px-6 py-3 min-w-[160px]">Patient</th>
+                  <th className="px-6 py-3 min-w-[140px]">Diagnosis</th>
+                  <th className="px-6 py-3 min-w-[120px]">Comorbidities</th>
+                  <th className="px-6 py-3 min-w-[140px]">Status</th>
+                  <th className="px-6 py-3 text-center min-w-[60px]">POD</th>
+                  <th className="px-6 py-3 min-w-[120px]">Procedure</th>
                   {viewMode === 'pending' && <th className="px-6 py-3">Planned Date</th>}
                   {(onEditPatient || onViewPatient) && <th className="px-6 py-3 text-right">Actions</th>}
                 </tr>
@@ -347,11 +347,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {patient.comorbidities.map(c => (
                           <span key={c} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">{c}</span>
                         ))}
-                        {patient.comorbidities.length === 0 && <span className="text-slate-400">-</span>}
+                        {patient.comorbidities.length === 0 && <span className="text-slate-500">—</span>}
                       </div>
                     </td>
                     <td className="px-6 py-4 space-y-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.pacStatus)} block w-fit`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.pacStatus)} flex items-center gap-1 w-fit`}>
+                        {patient.pacStatus === PacStatus.Pending
+                          ? <AlertCircle className="w-3 h-3 shrink-0" aria-label="PAC Pending" />
+                          : <CheckCircle2 className="w-3 h-3 shrink-0" aria-label="PAC Fit" />}
                         {patient.pacStatus}
                       </span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium border ${patient.patientStatus === PatientStatus.Discharged ? 'bg-slate-100 text-slate-600 border-slate-200' : getStatusColor(patient.patientStatus)} block w-fit`}>
@@ -365,7 +368,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           <span className="font-bold text-lg text-green-800 leading-none">{patient.pod}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                        <span className="text-slate-500">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4">
@@ -639,7 +642,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             <>
               <Search className="w-10 h-10 mb-3 text-slate-300" />
               <p className="font-semibold text-slate-600">No patients match</p>
-              <p className="text-sm text-slate-400 mt-1">Try clearing your filters</p>
+              <p className="text-sm text-slate-600 mt-1">Try clearing your filters</p>
               <button onClick={clearFilters} className="mt-3 text-sm text-blue-600 hover:underline">
                 Clear all filters
               </button>

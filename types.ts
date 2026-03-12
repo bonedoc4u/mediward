@@ -210,6 +210,69 @@ export interface VitalSigns {
   /** Pain score 0–10 (VAS) */
   painScore?: number;
   notes?: string;
+  /** Computed NEWS2 total score at time of recording */
+  news2Score?: number;
+}
+
+export interface News2Detail {
+  respiratoryRate: number;   // 0-3
+  spO2Scale1: number;        // 0-3
+  spO2Scale2: number;        // 0-3 (if on O2)
+  supplementalO2: number;    // 0 or 2
+  temperature: number;       // 0-3
+  systolicBP: number;        // 0-3
+  heartRate: number;         // 0-3
+  consciousness: number;     // 0 or 3 (AVPU)
+  total: number;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+}
+
+// ─── Medication Administration Record ────────────────────────────────────────
+
+export type MedRoute = 'Oral' | 'IV' | 'IM' | 'SC' | 'Topical' | 'Inhaled' | 'PR' | 'SL';
+export type MedAdminStatus = 'pending' | 'given' | 'held' | 'refused' | 'not_due';
+
+export interface PrescribedMedication {
+  id: string;
+  hospitalId: string;
+  patientIpNo: string;
+  drugName: string;
+  dose: string;
+  route: MedRoute | string;
+  frequency: string;
+  prescribedAt: string;
+  prescribedBy?: string;
+  startDate: string;
+  stopDate?: string;
+  active: boolean;
+  notes?: string;
+}
+
+export interface MedAdministration {
+  id: string;
+  hospitalId: string;
+  medicationId: string;
+  patientIpNo: string;
+  scheduledTime?: string;
+  administeredAt?: string;
+  administeredBy?: string;
+  status: MedAdminStatus;
+  doseGiven?: string;
+  notes?: string;
+}
+
+// ─── Nursing Shift Notes ──────────────────────────────────────────────────────
+
+export type NursingShift = 'Morning' | 'Afternoon' | 'Night';
+
+export interface NursingNote {
+  id: string;
+  hospitalId: string;
+  patientIpNo: string;
+  shift: NursingShift;
+  note: string;
+  createdAt: string;
+  createdBy?: string;
 }
 
 export interface Investigation {

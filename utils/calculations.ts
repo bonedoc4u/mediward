@@ -1,4 +1,4 @@
-import { Patient, LabResult, LabType, AppNotification, PatientStatus, PacStatus } from '../types';
+import { Patient, LabResult, LabType, AppNotification, PatientStatus, PacStatus, News2Detail } from '../types';
 // Note: Ward display order is now driven by ward_config.sort_order in ConfigContext.
 import { generateId } from './sanitize';
 
@@ -255,7 +255,118 @@ export function generateNotifications(patients: Patient[]): AppNotification[] {
         });
       }
     }
+
+    // 6. NEWS2 escalation alert
+    const vitals = Array.isArray(p.vitals) ? p.vitals : [];
+    if (vitals.length > 0) {
+      const latestVitals = vitals[0];
+      if (latestVitals.news2Score != null && latestVitals.news2Score >= 5) {
+        notifications.push({
+          id: generateId(),
+          timestamp: new Date().toISOString(),
+          title: `NEWS2 Alert: ${p.name} (score ${latestVitals.news2Score})`,
+          message: `Bed ${p.bed}: NEWS2 score ${latestVitals.news2Score} — ${latestVitals.news2Score >= 7 ? 'HIGH RISK: immediate escalation required.' : 'Medium risk: increase monitoring frequency.'}`,
+          priority: 'high',
+          patientId: p.ipNo,
+          read: false,
+          category: 'system',
+        });
+      }
+    }
   }
 
   return notifications;
+}
+
+// ─── NEWS2 Scoring ──────────────────────────────────────────────────────────
+// Reference: https://www.rcplondon.ac.uk/projects/outputs/national-early-warning-score-news-2
+// Uses Scale 1 SpO2 (standard — not for hypercapnic resp. failure patients)
+
+export function calculateNEWS2(vitals: {
+  respiratoryRate?: number;
+  spO2?: number;
+  supplementalO2?: boolean;
+  temperature?: number;
+  bpSystolic?: number;
+  heartRate?: number;
+  consciousness?: 'A' | 'V' | 'P' | 'U' | 'alert' | 'voice' | 'pain' | 'unresponsive';
+}): News2Detail | null {
+  // All required parameters must be present
+  const { respiratoryRate, spO2, temperature, bpSystolic, heartRate } = vitals;
+  if (
+    respiratoryRate == null || spO2 == null || temperature == null ||
+    bpSystolic == null || heartRate == null
+  ) return null;
+
+  // Respiratory rate score
+  let rrScore = 0;
+  if (respiratoryRate <= 8) rrScore = 3;
+  else if (respiratoryRate <= 11) rrScore = 1;
+  else if (respiratoryRate <= 20) rrScore = 0;
+  else if (respiratoryRate <= 24) rrScore = 2;
+  else rrScore = 3;
+
+  // SpO2 Scale 1 score
+  let spO2Score = 0;
+  if (spO2 <= 91) spO2Score = 3;
+  else if (spO2 <= 93) spO2Score = 2;
+  else if (spO2 <= 95) spO2Score = 1;
+  else spO2Score = 0;
+
+  // Supplemental O2 score
+  const o2Score = vitals.supplementalO2 ? 2 : 0;
+
+  // Temperature score
+  let tempScore = 0;
+  if (temperature <= 35.0) tempScore = 3;
+  else if (temperature <= 36.0) tempScore = 1;
+  else if (temperature <= 38.0) tempScore = 0;
+  else if (temperature <= 39.0) tempScore = 1;
+  else tempScore = 2;
+
+  // Systolic BP score
+  let bpScore = 0;
+  if (bpSystolic <= 90) bpScore = 3;
+  else if (bpSystolic <= 100) bpScore = 2;
+  else if (bpSystolic <= 110) bpScore = 1;
+  else if (bpSystolic <= 219) bpScore = 0;
+  else bpScore = 3;
+
+  // Heart rate score
+  let hrScore = 0;
+  if (heartRate <= 40) hrScore = 3;
+  else if (heartRate <= 50) hrScore = 1;
+  else if (heartRate <= 90) hrScore = 0;
+  else if (heartRate <= 110) hrScore = 1;
+  else if (heartRate <= 130) hrScore = 2;
+  else hrScore = 3;
+
+  // Consciousness score (AVPU — A=0, V/P/U=3)
+  const avpu = vitals.consciousness?.toLowerCase();
+  const consciousnessScore = (!avpu || avpu === 'a' || avpu === 'alert') ? 0 : 3;
+
+  const total = rrScore + spO2Score + o2Score + tempScore + bpScore + hrScore + consciousnessScore;
+
+  let riskLevel: News2Detail['riskLevel'] = 'low';
+  if (total === 0) riskLevel = 'low';
+  else if (total <= 4) riskLevel = 'low';
+  else if (total <= 6) riskLevel = 'medium';
+  else if (total >= 7) riskLevel = 'critical';
+  // Also critical if any single parameter scores 3
+  if ([rrScore, spO2Score, tempScore, bpScore, hrScore, consciousnessScore].some(s => s === 3)) {
+    if (riskLevel === 'low') riskLevel = 'medium';
+  }
+
+  return {
+    respiratoryRate: rrScore,
+    spO2Scale1: spO2Score,
+    spO2Scale2: 0,
+    supplementalO2: o2Score,
+    temperature: tempScore,
+    systolicBP: bpScore,
+    heartRate: hrScore,
+    consciousness: consciousnessScore,
+    total,
+    riskLevel,
+  };
 }
