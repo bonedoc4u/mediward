@@ -53,6 +53,12 @@ export interface HospitalConfig {
   showNursingNotes: boolean;
   /** Show the Medication Chart (MAR) tab in PatientDetail. Off by default. */
   showMedicationChart: boolean;
+  /** Show the Intake/Output documentation tab. Off by default. */
+  showIntakeOutput: boolean;
+  /** Show the Blood Transfusion documentation tab. Off by default. */
+  showBloodTransfusion: boolean;
+  /** Show the Wound Care documentation tab. Off by default. */
+  showWoundCare: boolean;
 }
 
 /** A ward row from the ward_config table. */
@@ -277,6 +283,59 @@ export interface NursingNote {
   note: string;
   createdAt: string;
   createdBy?: string;
+}
+
+// ─── Intake / Output ─────────────────────────────────────────────────────────
+
+export type IOType = 'intake' | 'output';
+
+export interface IntakeOutputEntry {
+  id: string;
+  patientIpNo: string;
+  recordedAt: string;
+  recordedBy?: string;
+  type: IOType;
+  category: string;
+  amountMl: number;
+  notes?: string;
+  createdAt: string;
+}
+
+// ─── Blood Transfusion ────────────────────────────────────────────────────────
+
+export interface BloodTransfusionRecord {
+  id: string;
+  patientIpNo: string;
+  transfusionDate: string;
+  bloodProduct: string;
+  bloodGroup?: string;
+  units: number;
+  bagNo?: string;
+  startedAt?: string;
+  completedAt?: string;
+  reaction?: string;
+  notes?: string;
+  recordedBy?: string;
+  createdAt: string;
+}
+
+// ─── Wound Care ───────────────────────────────────────────────────────────────
+
+export interface WoundCareRecord {
+  id: string;
+  patientIpNo: string;
+  careDate: string;
+  woundSite: string;
+  woundType?: string;
+  woundCondition?: string;
+  dressingType?: string;
+  dressingChanged: boolean;
+  woundMeasurement?: string;
+  exudate?: string;
+  notes?: string;
+  nextDressingDate?: string;
+  recordedBy?: string;
+  createdAt: string;
 }
 
 export interface Investigation {

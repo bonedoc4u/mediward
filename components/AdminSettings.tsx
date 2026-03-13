@@ -388,7 +388,7 @@ const DpdpPortabilityPanel: React.FC<{ hospitalId: string }> = ({ hospitalId }) 
 const AdminSettings: React.FC = () => {
   const { user } = useAuth();
   const hospitalId = user?.hospitalId ?? '';
-  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, showNursingNotes, showMedicationChart, saveHospitalConfig, medications, addMedication, saveMedication, removeMedication, seedMedications, activeSpecialty, activeFieldGroups, templateOverride, saveTemplateOverride, resetTemplateOverride } = useConfig();
+  const { wards, labTypes, addWard, saveWard, removeWard, addLabType, saveLabType, removeLabType, unitChiefs, setUnitChief, hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, saveHospitalConfig, medications, addMedication, saveMedication, removeMedication, seedMedications, activeSpecialty, activeFieldGroups, templateOverride, saveTemplateOverride, resetTemplateOverride } = useConfig();
 
   // Hospital settings form
   const [localHospitalName, setLocalHospitalName] = useState(hospitalName);
@@ -399,6 +399,9 @@ const AdminSettings: React.FC = () => {
   const [localPreOpItems, setLocalPreOpItems] = useState<string[]>(preOpChecklistTemplate);
   const [localShowNursingNotes, setLocalShowNursingNotes] = useState(showNursingNotes);
   const [localShowMedicationChart, setLocalShowMedicationChart] = useState(showMedicationChart);
+  const [localShowIntakeOutput, setLocalShowIntakeOutput] = useState(showIntakeOutput);
+  const [localShowBloodTransfusion, setLocalShowBloodTransfusion] = useState(showBloodTransfusion);
+  const [localShowWoundCare, setLocalShowWoundCare] = useState(showWoundCare);
   const [newUnit, setNewUnit] = useState('');
   const [newPreOpItem, setNewPreOpItem] = useState('');
   const [savingHospital, setSavingHospital] = useState(false);
@@ -481,6 +484,7 @@ const AdminSettings: React.FC = () => {
         units: localUnits, preOpModuleName: localPreOpName,
         procedureListName: localProcedureName, preOpChecklistTemplate: localPreOpItems,
         showNursingNotes: localShowNursingNotes, showMedicationChart: localShowMedicationChart,
+        showIntakeOutput: localShowIntakeOutput, showBloodTransfusion: localShowBloodTransfusion, showWoundCare: localShowWoundCare,
       });
     } finally { setSavingHospital(false); }
   };
@@ -820,6 +824,27 @@ const AdminSettings: React.FC = () => {
               description: 'Adds a Medications tab in Patient Detail for prescribing and recording drug administration.',
               value: localShowMedicationChart,
               onChange: setLocalShowMedicationChart,
+            },
+            {
+              id: 'intake-output',
+              label: 'Intake / Output',
+              description: 'Adds a Fluid Balance tab in Patient Detail to document daily intake and output volumes.',
+              value: localShowIntakeOutput,
+              onChange: setLocalShowIntakeOutput,
+            },
+            {
+              id: 'blood-transfusion',
+              label: 'Blood Transfusion',
+              description: 'Adds a Transfusion tab in Patient Detail to record blood products given and adverse reactions.',
+              value: localShowBloodTransfusion,
+              onChange: setLocalShowBloodTransfusion,
+            },
+            {
+              id: 'wound-care',
+              label: 'Wound Care',
+              description: 'Adds a Wound Care tab in Patient Detail to document dressing changes, wound condition, and healing progress.',
+              value: localShowWoundCare,
+              onChange: setLocalShowWoundCare,
             },
           ].map(item => (
             <label key={item.id} className="flex items-start gap-3 cursor-pointer p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">

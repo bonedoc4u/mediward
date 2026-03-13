@@ -138,12 +138,15 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   preOpChecklistTemplate: DEFAULT_PREOP_TEMPLATE,
   showNursingNotes: false,
   showMedicationChart: false,
+  showIntakeOutput: false,
+  showBloodTransfusion: false,
+  showWoundCare: false,
 };
 
 export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
   let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart');
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care');
   if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
   const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
@@ -159,8 +162,11 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     preOpChecklistTemplate: Array.isArray(data.pre_op_checklist_template) && data.pre_op_checklist_template.length > 0
       ? data.pre_op_checklist_template as string[]
       : DEFAULT_PREOP_TEMPLATE,
-    showNursingNotes:   Boolean(data.show_nursing_notes   ?? false),
-    showMedicationChart: Boolean(data.show_medication_chart ?? false),
+    showNursingNotes:     Boolean(data.show_nursing_notes     ?? false),
+    showMedicationChart:  Boolean(data.show_medication_chart  ?? false),
+    showIntakeOutput:     Boolean(data.show_intake_output     ?? false),
+    showBloodTransfusion: Boolean(data.show_blood_transfusion ?? false),
+    showWoundCare:        Boolean(data.show_wound_care        ?? false),
   };
 }
 
@@ -184,6 +190,9 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         pre_op_checklist_template:  config.preOpChecklistTemplate,
         show_nursing_notes:         config.showNursingNotes,
         show_medication_chart:      config.showMedicationChart,
+        show_intake_output:         config.showIntakeOutput,
+        show_blood_transfusion:     config.showBloodTransfusion,
+        show_wound_care:            config.showWoundCare,
         updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
@@ -200,6 +209,9 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         pre_op_checklist_template:  config.preOpChecklistTemplate,
         show_nursing_notes:         config.showNursingNotes,
         show_medication_chart:      config.showMedicationChart,
+        show_intake_output:         config.showIntakeOutput,
+        show_blood_transfusion:     config.showBloodTransfusion,
+        show_wound_care:            config.showWoundCare,
       });
     if (error) throw error;
   }

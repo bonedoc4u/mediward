@@ -7,7 +7,7 @@ import {
   ArrowLeft, Calendar, Phone, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2, FileJson, Download,
-  Pill, ClipboardList
+  Pill, ClipboardList, Droplets, Bandage
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import FHIRExportModal from './FHIRExportModal';
@@ -16,14 +16,17 @@ import SpecialtyDataPanel from './SpecialtyDataPanel';
 
 const MedicationChart = lazy(() => import('./MedicationChart'));
 const NursingNotes = lazy(() => import('./NursingNotes'));
+const IntakeOutput = lazy(() => import('./IntakeOutput'));
+const BloodTransfusion = lazy(() => import('./BloodTransfusion'));
+const WoundCare = lazy(() => import('./WoundCare'));
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
-  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart } = useConfig();
+  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFhirExport, setShowFhirExport] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'medications' | 'nursing'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'medications' | 'nursing' | 'io' | 'transfusion' | 'wound'>('overview');
   const canDischarge = can(user, 'patient:discharge');
   const canDelete = can(user, 'patient:delete');
   const patient = useMemo(() => patients.find(p => p.ipNo === navParams.id), [patients, navParams.id]);
@@ -246,13 +249,16 @@ const PatientDetail: React.FC = () => {
       )}
 
       {/* Tab Bar — only show extra tabs when enabled in hospital config */}
-      {(showMedicationChart || showNursingNotes) && (
-        <div className="flex gap-1 border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2">
+      {(showMedicationChart || showNursingNotes || showIntakeOutput || showBloodTransfusion || showWoundCare) && (
+        <div className="flex gap-1 border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2 overflow-x-auto scrollbar-hide">
           {([
-            { key: 'overview',    label: 'Overview',    icon: <Activity className="w-4 h-4" />,     always: true },
-            { key: 'medications', label: 'Medications', icon: <Pill className="w-4 h-4" />,         always: false, enabled: showMedicationChart },
-            { key: 'nursing',     label: 'Nursing',     icon: <ClipboardList className="w-4 h-4" />, always: false, enabled: showNursingNotes },
-          ] as { key: 'overview' | 'medications' | 'nursing'; label: string; icon: React.ReactNode; always: boolean; enabled?: boolean }[])
+            { key: 'overview',     label: 'Overview',    icon: <Activity className="w-4 h-4" />,      always: true },
+            { key: 'medications',  label: 'Medications', icon: <Pill className="w-4 h-4" />,          always: false, enabled: showMedicationChart },
+            { key: 'nursing',      label: 'Nursing',     icon: <ClipboardList className="w-4 h-4" />,  always: false, enabled: showNursingNotes },
+            { key: 'io',           label: 'I/O',         icon: <Droplets className="w-4 h-4" />,       always: false, enabled: showIntakeOutput },
+            { key: 'transfusion',  label: 'Transfusion', icon: <Droplet className="w-4 h-4" />,        always: false, enabled: showBloodTransfusion },
+            { key: 'wound',        label: 'Wound',       icon: <Bandage className="w-4 h-4" />,        always: false, enabled: showWoundCare },
+          ] as { key: 'overview' | 'medications' | 'nursing' | 'io' | 'transfusion' | 'wound'; label: string; icon: React.ReactNode; always: boolean; enabled?: boolean }[])
             .filter(tab => tab.always || tab.enabled)
             .map(tab => (
               <button
@@ -284,6 +290,33 @@ const PatientDetail: React.FC = () => {
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
           <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
             <NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
+          </Suspense>
+        </div>
+      )}
+
+      {/* Intake / Output Tab */}
+      {showIntakeOutput && activeTab === 'io' && (
+        <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
+          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <IntakeOutput patientIpNo={patient.ipNo} />
+          </Suspense>
+        </div>
+      )}
+
+      {/* Blood Transfusion Tab */}
+      {showBloodTransfusion && activeTab === 'transfusion' && (
+        <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
+          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <BloodTransfusion patientIpNo={patient.ipNo} />
+          </Suspense>
+        </div>
+      )}
+
+      {/* Wound Care Tab */}
+      {showWoundCare && activeTab === 'wound' && (
+        <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
+          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <WoundCare patientIpNo={patient.ipNo} />
           </Suspense>
         </div>
       )}

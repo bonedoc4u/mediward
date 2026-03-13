@@ -47,6 +47,9 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   ],
   showNursingNotes: false,
   showMedicationChart: false,
+  showIntakeOutput: false,
+  showBloodTransfusion: false,
+  showWoundCare: false,
 };
 
 // ─── Fallback defaults (used when DB is unreachable and no cache exists) ───
@@ -103,6 +106,12 @@ interface ConfigContextType {
   showNursingNotes: boolean;
   /** Whether the Medication Chart (MAR) tab is enabled (admin-configurable). */
   showMedicationChart: boolean;
+  /** Whether the Intake/Output documentation tab is enabled. */
+  showIntakeOutput: boolean;
+  /** Whether the Blood Transfusion documentation tab is enabled. */
+  showBloodTransfusion: boolean;
+  /** Whether the Wound Care documentation tab is enabled. */
+  showWoundCare: boolean;
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
 
@@ -369,8 +378,11 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     preOpChecklistTemplate: hospitalConfig.preOpChecklistTemplate?.length
       ? hospitalConfig.preOpChecklistTemplate
       : DEFAULT_HOSPITAL_CONFIG.preOpChecklistTemplate,
-    showNursingNotes:    hospitalConfig.showNursingNotes   ?? false,
-    showMedicationChart: hospitalConfig.showMedicationChart ?? false,
+    showNursingNotes:     hospitalConfig.showNursingNotes     ?? false,
+    showMedicationChart:  hospitalConfig.showMedicationChart  ?? false,
+    showIntakeOutput:     hospitalConfig.showIntakeOutput     ?? false,
+    showBloodTransfusion: hospitalConfig.showBloodTransfusion ?? false,
+    showWoundCare:        hospitalConfig.showWoundCare        ?? false,
     saveHospitalConfig,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
