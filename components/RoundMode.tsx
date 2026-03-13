@@ -4,6 +4,7 @@ import { Patient, PatientStatus, ToDoItem } from '../types';
 import { getStatusColor } from '../utils/calculations';
 import { generateId } from '../utils/sanitize';
 import { getSmartAlerts } from '../utils/smartAlerts';
+import { hapticTap } from '../utils/capacitorInit';
 import {
   ChevronLeft, ChevronRight, X, CheckSquare, Square,
   AlertTriangle, Calendar, ClipboardCheck, Save, Plus
@@ -123,12 +124,14 @@ const RoundMode: React.FC = () => {
   const goNext = () => {
     if (navCooldownRef.current) return;
     navCooldownRef.current = true;
+    hapticTap().catch(() => {});
     goTo(index + 1);
     setTimeout(() => { navCooldownRef.current = false; }, 400);
   };
   const goPrev = () => {
     if (navCooldownRef.current) return;
     navCooldownRef.current = true;
+    hapticTap().catch(() => {});
     goTo(index - 1);
     setTimeout(() => { navCooldownRef.current = false; }, 400);
   };
@@ -221,7 +224,7 @@ const RoundMode: React.FC = () => {
           </div>
           <button
             onClick={() => navigateTo('dashboard')}
-            className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-800 transition-colors"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -335,14 +338,15 @@ const RoundMode: React.FC = () => {
         </div>
         <button
           onClick={() => navigateTo('dashboard')}
-          className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-800 transition-colors"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-800 transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
 
       {/* ─── Progress ─── */}
-      <div className="flex gap-1 mb-6">
+      {/* py-3 gives 44px+ touch target height without affecting the visual bar */}
+      <div className="flex gap-1 mb-3 py-3 -my-3">
         {activePatients.map((p, i) => (
           <button
             key={p.ipNo}
