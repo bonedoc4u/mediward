@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Patient } from '../types';
 import { patientToFhirBundle, parseFhirPatient, FhirBundleSummary } from '../services/fhirService';
-import { X, Download, Copy, Check, ChevronDown, ChevronUp, Shield, FileJson } from 'lucide-react';
+import { X, Download, Copy, Check, ChevronDown, ChevronUp, Shield, FileJson, AlertTriangle } from 'lucide-react';
 
 interface Props {
   patient: Patient;
@@ -14,6 +14,12 @@ const FHIRExportModal: React.FC<Props> = ({ patient, onClose }) => {
 
   const { bundle, summary } = patientToFhirBundle(patient);
   const jsonString = JSON.stringify(bundle, null, 2);
+
+  // Identify missing required FHIR fields
+  const missingFields: string[] = [];
+  if (!patient.abhaId) missingFields.push('ABHA ID');
+  if (!patient.gender || !['male', 'female', 'other', 'unknown'].includes(patient.gender.toLowerCase())) missingFields.push('structured gender (male/female/other)');
+  if (!patient.age) missingFields.push('age / date of birth');
 
   const handleCopy = useCallback(async () => {
     try {
@@ -69,6 +75,20 @@ const FHIRExportModal: React.FC<Props> = ({ patient, onClose }) => {
         </div>
 
         <div className="p-5 space-y-5">
+
+          {/* FHIR completeness warning */}
+          {missingFields.length > 0 && (
+            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-amber-800">Incomplete FHIR record</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Missing: <span className="font-medium">{missingFields.join(', ')}</span>.
+                  {' '}Update the patient record to improve NDHM / ABDM interoperability.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Patient identity */}
           <div className="bg-teal-50 rounded-lg border border-teal-100 p-4">

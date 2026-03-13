@@ -127,6 +127,23 @@ export function enqueue(type: QueuedOpType, payload: unknown): void {
     }
   }
 
+  // Deduplication: for insert_lab, replace existing queued op for same (patientId, type, date)
+  if (type === 'insert_lab' && payload && typeof payload === 'object') {
+    const { patientId, result } = payload as { patientId?: string; result?: { type?: string; date?: string } };
+    if (patientId && result?.type && result?.date) {
+      const idx = queue.findIndex(op => {
+        if (op.type !== 'insert_lab') return false;
+        const p = op.payload as { patientId?: string; result?: { type?: string; date?: string } };
+        return p?.patientId === patientId && p?.result?.type === result.type && p?.result?.date === result.date;
+      });
+      if (idx !== -1) {
+        queue[idx] = { ...queue[idx], payload, attempts: 0, nextRetryAt: undefined };
+        _persist(queue);
+        return;
+      }
+    }
+  }
+
   queue.push({
     id:       crypto.randomUUID(),
     seq:      _nextSeq(),

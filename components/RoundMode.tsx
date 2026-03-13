@@ -29,8 +29,16 @@ const RoundMode: React.FC = () => {
     return counts;
   }, [allActivePatients]);
 
-  // ─── Ward selection state ───
-  const [selectedWard, setSelectedWard] = useState<string | null>(null);
+  // ─── Ward selection state — persisted so screen rotation doesn't reset it ───
+  const ROUND_WARD_KEY = 'mediward_round_ward';
+  const [selectedWard, setSelectedWardRaw] = useState<string | null>(
+    () => sessionStorage.getItem(ROUND_WARD_KEY) || null,
+  );
+  const setSelectedWard = (ward: string | null) => {
+    if (ward) sessionStorage.setItem(ROUND_WARD_KEY, ward);
+    else sessionStorage.removeItem(ROUND_WARD_KEY);
+    setSelectedWardRaw(ward);
+  };
 
   // ─── Patients filtered by selected ward ───
   const activePatients = useMemo(

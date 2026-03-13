@@ -18,6 +18,9 @@
     <!-- Fonts: self-hosted via @fontsource-variable/dm-sans (no external CDN, no DPDP exposure) -->
     <!-- Imported in index.css via @import '@fontsource-variable/dm-sans' -->
 
+    <!-- Content-Security-Policy: mitigates XSS; unsafe-eval needed by Vite HMR in dev only -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://generativelanguage.googleapis.com; font-src 'self' data:; worker-src 'self' blob:;" />
+
     <link rel="stylesheet" href="/index.css">
   </head>
   <body class="bg-slate-50 text-slate-900 font-sans antialiased">

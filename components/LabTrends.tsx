@@ -157,7 +157,8 @@ const CategoryPanel: React.FC<{
       </div>
 
       <div className="px-4">
-        <SimpleLineChart data={grouped} lines={chartLines} />
+        {/* Cap chart at 30 most recent dates to prevent SVG DOM bloat with large datasets */}
+        <SimpleLineChart data={allGrouped.slice(0, 30)} lines={chartLines} />
       </div>
 
       {/* Input row */}

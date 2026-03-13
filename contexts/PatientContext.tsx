@@ -99,6 +99,12 @@ export function usePatients(): PatientContextType {
   return ctx;
 }
 
+/** Returns true when the error indicates an expired/invalid JWT session. */
+function isAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return msg.includes('jwt') || msg.includes('expired') || msg.includes('unauthorized') || msg.includes('pgrst301');
+}
+
 // ─── Provider ───
 export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -307,6 +313,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             retryDelay = 2000; // reset backoff on success
           }
           if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !destroyed) {
+            toast.warning('Realtime connection lost — reconnecting…');
             supabase.removeChannel(ch);
             channelRef.current = null;
             retryTimer = setTimeout(() => {
@@ -412,6 +419,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           });
           return; // do NOT enqueue a stale overwrite
         }
+        if (isAuthError(err)) {
+          toast.error('Session expired — please log in again.');
+          return; // do NOT enqueue; op will fail again after re-login when user re-submits
+        }
         enqueue('upsert_patient', updatedPatient);
         toast.warning('Saved locally — will sync when online.');
       });
@@ -437,6 +448,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .then(() => { toast.success(`${p.name} admitted to Bed ${p.bed}`); hapticSuccess(); })
       .catch(err => {
         console.error('[Patients] addPatient failed:', err);
+        if (isAuthError(err)) {
+          toast.error('Session expired — please log in again.');
+          return;
+        }
         enqueue('upsert_patient', p);
         toast.warning('Saved locally — will sync when online.');
       });
