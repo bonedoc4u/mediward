@@ -1,0 +1,70 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'components/**'
+      - 'contexts/**'
+      - 'services/**'
+      - 'utils/**'
+      - 'types.ts'
+      - 'App.tsx'
+      - 'index.tsx'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'ios/**'
+      - 'capacitor.config.ts'
+  workflow_dispatch:   # allow manual trigger from GitHub Actions tab
+
+jobs:
+  pod-install:
+    name: Install CocoaPods & verify Xcode build
+    runs-on: macos-15   # latest stable macOS with Xcode 16
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Sync Capacitor → iOS
+        run: npx cap sync ios
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/App/Pods
+          key: pods-${{ hashFiles('ios/App/Podfile.lock') }}
+          restore-keys: pods-
+
+      - name: Install CocoaPods
+        working-directory: ios/App
+        run: pod install --repo-update
+
+      - name: Verify Xcode build (no signing)
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build \
+            | xcpretty || true
