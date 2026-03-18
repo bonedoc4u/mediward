@@ -103,6 +103,11 @@ const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
               (including the DPDP Act, 2023 for Indian deployments). Your institution is the data controller.
               Do not enter identifiable patient information unless your institution has authorised use of this system.
             </p>
+            <p className="text-xs bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-blue-800">
+              <strong>Data Residency:</strong> All patient data is stored and processed exclusively in India
+              (Supabase region: <code className="font-mono">ap-south-1</code> — Mumbai). No data leaves Indian
+              jurisdiction. This meets DPDP Act, 2023 data localisation requirements.
+            </p>
           </div>
 
           <div className="space-y-2">

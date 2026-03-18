@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
         react(),
         tailwindcss(),
         VitePWA({
-          registerType: 'autoUpdate',
+          registerType: 'prompt',
           includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
           manifest: {
             name: 'MediWard',
@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => {
             scope: '/',
             start_url: '/',
             orientation: 'portrait',
+            categories: ['medical', 'health', 'productivity'],
             icons: [
               { src: 'icon-72.png',  sizes: '72x72',   type: 'image/png', purpose: 'any' },
               { src: 'icon-96.png',  sizes: '96x96',   type: 'image/png', purpose: 'any' },
@@ -50,7 +51,7 @@ export default defineConfig(({ mode }) => {
                 handler: 'NetworkFirst',
                 options: {
                   cacheName: 'supabase-api-cache',
-                  expiration: { maxEntries: 100, maxAgeSeconds: 300 },
+                  expiration: { maxEntries: 500, maxAgeSeconds: 300 },
                   networkTimeoutSeconds: 10,
                 },
               },

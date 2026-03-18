@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Patient, Investigation } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { ImageIcon, Camera, X, Trash2, Calendar, Check, Filter, Users, ArrowUp, Loader2 } from 'lucide-react';
-import { uploadInvestigationImage, deleteInvestigationImage } from '../services/storageService';
+import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
 import { generateId } from '../utils/sanitize';
 
 interface Props {
@@ -62,6 +62,15 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate MIME type and size before creating a preview
+    try {
+      validateImageFile(file);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Invalid file');
+      e.target.value = '';
+      return;
+    }
 
     // Revoke previous blob URL
     if (previewUrl && previewUrl.startsWith('blob:')) {

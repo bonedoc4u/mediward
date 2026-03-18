@@ -81,6 +81,18 @@ const RoundMode: React.FC = () => {
   // patient must be declared before the useEffect hooks that reference it
   const patient: Patient | undefined = activePatients[index];
 
+  // ─── beforeunload guard — warn if navigating away with an unsaved note ───
+  React.useEffect(() => {
+    if (!roundNote.trim()) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers show a generic message; returnValue kept for legacy support.
+      e.returnValue = 'You have an unsaved round note. Leave anyway?';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [roundNote]);
+
   // ─── Session-expiry guard: persist unsaved note to localStorage ───
   // If the session expires mid-round, the note survives and is restored on re-login.
   const DRAFT_KEY = `mediward_round_draft_${today}`;
@@ -135,6 +147,18 @@ const RoundMode: React.FC = () => {
     goTo(index - 1);
     setTimeout(() => { navCooldownRef.current = false; }, 400);
   };
+
+  // ─── Desktop keyboard navigation (← → arrow keys) ───
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't intercept while the user is typing in an input or textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goNext();
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goPrev();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goNext, goPrev]);
 
   // ─── Swipe support ───
   const handleTouchStart = (e: React.TouchEvent) => {

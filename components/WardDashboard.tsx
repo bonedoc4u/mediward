@@ -617,9 +617,17 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     )}
                     <div className="flex items-center justify-between">
                       <div className="flex flex-wrap gap-1.5">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>{item.patient.pacStatus}</span>
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>
+                          {item.patient.pacStatus === 'PAC Pending' && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
+                          {item.patient.pacStatus === 'PAC Fit' && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
+                          {item.patient.pacStatus}
+                        </span>
                         {item.patient.patientStatus !== PatientStatus.Fit && (
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.patientStatus)}`}>{item.patient.patientStatus}</span>
+                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.patientStatus)}`}>
+                            {item.patient.patientStatus === PatientStatus.Critical && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
+                            {item.patient.patientStatus === PatientStatus.DischargeReady && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
+                            {item.patient.patientStatus}
+                          </span>
                         )}
                       </div>
                       <div className="flex gap-2 shrink-0">

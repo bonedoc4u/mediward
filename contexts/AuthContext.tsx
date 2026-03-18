@@ -6,7 +6,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { AuthUser, UserRole } from '../types';
+import { AuthUser } from '../types';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '../services/persistence';
 import { logAuditEvent } from '../services/auditLog';
 import { findUserByEmail, createAuthUser } from '../services/userService';
@@ -14,11 +14,12 @@ import { hashPassword } from '../utils/crypto';
 import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
 import { clearDisclaimerAccepted } from '../components/ClinicalDisclaimer';
+import { clearPatientCache } from '../services/patientCache';
 
 // ─── Legacy SHA-256 (fallback for accounts not yet on Supabase Auth) ───
 // TODO: Remove hashPassword import + usage after LEGACY_AUTH_DEADLINE passes.
 // All users should have migrated to Supabase Auth by then via the auto-migration on login.
-const LEGACY_AUTH_DEADLINE = new Date('2026-03-26').getTime(); // 14-day forced migration window (shortened from Apr 2)
+const LEGACY_AUTH_DEADLINE = new Date('2027-01-01').getTime(); // Extended: force-migrate by Jan 2027
 
 const SESSION_DURATION    = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
 const WARN_BEFORE_EXPIRY  = 5 * 60 * 1000;        // warn 5 min before expiry
@@ -154,7 +155,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
   ): Promise<{ success: boolean; error?: string }> => {
 
-    // Step 1: Try Supabase Auth (new accounts)
+    // Step 1: Try Supabase Auth (must complete first — sets the JWT so RLS-gated
+    // tables like app_users become readable in the next call)
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (!authError && authData.user) {
@@ -207,23 +209,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    const found = await findUserByEmail(email);
-    if (!found) return { success: false, error: 'Invalid email or password.' };
+    // Legacy path: fetch user record with anonymous key (no Supabase Auth session)
+    const legacyFound = await findUserByEmail(email);
+    if (!legacyFound) return { success: false, error: 'Invalid email or password.' };
 
     const hash = await hashPassword(password);
-    if (hash !== found.passwordHash) return { success: false, error: 'Invalid email or password.' };
+    if (hash !== legacyFound.passwordHash) return { success: false, error: 'Invalid email or password.' };
 
     // Auto-migrate: create Supabase Auth account so future logins skip this branch
-    createAuthUser(email, password, found.name, found.role, found.ward, found.unit).catch(() => {});
+    createAuthUser(email, password, legacyFound.name, legacyFound.role, legacyFound.ward, legacyFound.unit).catch(() => {});
 
     const session: AuthUser = {
-      id:            found.id,
-      email:         found.email,
-      name:          found.name,
-      role:          found.role,
-      ward:          found.ward,
-      unit:          found.unit,
-      hospitalId:    found.hospitalId,
+      id:            legacyFound.id,
+      email:         legacyFound.email,
+      name:          legacyFound.name,
+      role:          legacyFound.role,
+      ward:          legacyFound.ward,
+      unit:          legacyFound.unit,
+      hospitalId:    legacyFound.hospitalId,
       sessionExpiry: Date.now() + SESSION_DURATION,
     };
     setUser(session);
@@ -236,6 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(() => {
     if (user) {
       logAuditEvent(user.id, user.name, 'LOGOUT', 'session', user.id, 'User logged out');
+      clearPatientCache(user.hospitalId); // clear hospital-scoped cache so next user can't read it
     }
     supabase.auth.signOut().catch(() => {});
     setUser(null);

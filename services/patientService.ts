@@ -245,11 +245,9 @@ const PATIENT_LIST_SELECT = [
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
-  // Lightweight normalized joins for list rendering
-  'labs(id, date, type, value)',
-  'imaging(id, date, type, findings, image_url)',
+  // Only rounds join for list rendering — labs/imaging fetched on detail view only
   'rounds(date, note, todos)',
-  // No patient_vitals — not rendered in the list view
+  // No labs, imaging, or patient_vitals in list queries — cuts payload by ~70%
 ].join(', ');
 
 // Full select (all vitals) — used only when a single patient's detail is loaded

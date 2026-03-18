@@ -1,6 +1,9 @@
 /**
  * patientCache.ts
- * localStorage-based cache for patient data.
+ * localStorage-based cache for patient data, scoped per hospital.
+ *
+ * Keys are prefixed with hospitalId so multiple hospitals on a shared
+ * tablet can never read each other's cached patient data.
  *
  * Used for cache-first loading in PatientContext:
  *  1. On startup → serve cached patients instantly (no spinner)
@@ -12,10 +15,10 @@
  */
 
 import { Patient } from '../types';
-import { saveToStorage, loadFromStorage } from './persistence';
+import { saveToStorage, loadFromStorage, removeFromStorage } from './persistence';
 
-const ACTIVE_CACHE_KEY = 'patients_active_cache';
-const ALL_CACHE_KEY    = 'patients_all_cache';
+const activeKey = (hospitalId: string) => `patients_active_cache_${hospitalId}`;
+const allKey    = (hospitalId: string) => `patients_all_cache_${hospitalId}`;
 
 interface PatientCache {
   patients: Patient[];
@@ -24,28 +27,34 @@ interface PatientCache {
 
 // ─── Active patients cache (non-discharged, loaded at startup) ───
 
-export function saveActiveCache(patients: Patient[]): void {
-  saveToStorage<PatientCache>(ACTIVE_CACHE_KEY, {
+export function saveActiveCache(patients: Patient[], hospitalId: string): void {
+  saveToStorage<PatientCache>(activeKey(hospitalId), {
     patients,
     cachedAt: new Date().toISOString(),
   });
 }
 
-export function loadActiveCache(): PatientCache | null {
-  return loadFromStorage<PatientCache>(ACTIVE_CACHE_KEY);
+export function loadActiveCache(hospitalId: string): PatientCache | null {
+  return loadFromStorage<PatientCache>(activeKey(hospitalId));
 }
 
 // ─── All patients cache (loaded on Master/Discharge views) ───
 
-export function saveAllCache(patients: Patient[]): void {
-  saveToStorage<PatientCache>(ALL_CACHE_KEY, {
+export function saveAllCache(patients: Patient[], hospitalId: string): void {
+  saveToStorage<PatientCache>(allKey(hospitalId), {
     patients,
     cachedAt: new Date().toISOString(),
   });
 }
 
-export function loadAllCache(): PatientCache | null {
-  return loadFromStorage<PatientCache>(ALL_CACHE_KEY);
+export function loadAllCache(hospitalId: string): PatientCache | null {
+  return loadFromStorage<PatientCache>(allKey(hospitalId));
+}
+
+/** Clear all patient caches for a specific hospital (call on logout). */
+export function clearPatientCache(hospitalId: string): void {
+  removeFromStorage(activeKey(hospitalId));
+  removeFromStorage(allKey(hospitalId));
 }
 
 // ─── Helpers ───

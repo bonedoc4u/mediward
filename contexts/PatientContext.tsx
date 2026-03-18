@@ -113,20 +113,23 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Read the cache synchronously during render so the first paint shows real data,
   // not a loading spinner. localStorage reads are ~0.1 ms — safe to call in state
   // initializers without any noticeable cost.
+  // hospitalId used for cache scoping — available synchronously from localStorage-backed auth
+  const _initHid = user?.hospitalId ?? '';
+
   const [patients, setPatients] = useState<Patient[]>(() => {
-    const cached = loadActiveCache();
+    const cached = loadActiveCache(_initHid);
     return cached ? enrichPatientData(cached.patients) : [];
   });
 
   // Show spinner only when there is no cache to fall back on.
-  const [isLoadingPatients, setIsLoadingPatients] = useState(() => !loadActiveCache());
+  const [isLoadingPatients, setIsLoadingPatients] = useState(() => !loadActiveCache(_initHid));
 
   // isStale = we are serving cached data; cleared once fresh data arrives.
-  const [isStale, setIsStale] = useState(() => !!loadActiveCache());
+  const [isStale, setIsStale] = useState(() => !!loadActiveCache(_initHid));
 
   // ISO timestamp of the cache currently on screen (shown in the banner).
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(
-    () => loadActiveCache()?.cachedAt ?? null,
+    () => loadActiveCache(_initHid)?.cachedAt ?? null,
   );
 
   const [hasLoadedAll, setHasLoadedAll] = useState(false);
@@ -141,10 +144,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const { viewingHospitalId } = useAuth();
 
+  // Effective hospitalId for cache scoping: superadmin viewing another hospital uses their target.
+  const effectiveHospitalId = viewingHospitalId ?? user?.hospitalId ?? '';
+
   // Debounced cache write — avoids serialising the full patient array on every realtime event.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSaveActiveCache = useCallback(
-    debounce((pts: Patient[]) => saveActiveCache(pts), 2000),
+    debounce((pts: Patient[], hid: string) => saveActiveCache(pts, hid), 2000),
     [],
   );
 
@@ -155,14 +161,30 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // ─── Background Fetch — paginated (cache-first then network) ───
   // user.unit filters patients to only this unit; admins (no unit) see all.
+  // user?.id is intentionally in the dep array so the fetch re-runs after login
+  // even for admin/ICU users whose unit is undefined both before and after login.
   useEffect(() => {
+    // Don't fetch until the user is authenticated — the pre-login Supabase query
+    // runs unauthenticated (no JWT) so RLS returns nothing, wasting a round-trip
+    // and hiding the spinner before real data can arrive.
+    if (!user) {
+      setIsLoadingPatients(false);
+      return;
+    }
+
+    // If there's no cached data at all, show the skeleton while the first
+    // authenticated fetch is in flight (e.g. fresh device after login).
+    if (!loadActiveCache(effectiveHospitalId)) {
+      setIsLoadingPatients(true);
+    }
+
     fetchActivePatientsPage(user?.unit, 0, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined)
       .then(({ patients: data, hasMore: more }) => {
         const enriched = enrichPatientData(data);
         setPatients(enriched);
         setHasMore(more);
         setCurrentPage(0);
-        saveActiveCache(data);       // update cache with fresh data
+        saveActiveCache(data, effectiveHospitalId);       // update cache with fresh data
         setIsStale(false);
         setCacheTimestamp(null);
 
@@ -177,7 +199,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // become false showing an empty (but not broken) dashboard.
       })
       .finally(() => setIsLoadingPatients(false));
-  }, [user?.unit, viewingHospitalId]);
+  }, [user?.id, user?.unit, viewingHospitalId]);
 
   // ─── Offline Sync Queue — replay on reconnect ───
   useEffect(() => {
@@ -227,7 +249,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           .then(data => {
             const enriched = enrichPatientData(data);
             setPatients(enriched);
-            saveActiveCache(data);
+            saveActiveCache(data, effectiveHospitalId);
             setIsStale(false);
             setCacheTimestamp(null);
           })
@@ -270,7 +292,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               setPatients(prev => {
                 if (prev.some(p => p.ipNo === newPatient.ipNo)) return prev;
                 const next = enrichPatientData([newPatient, ...prev]);
-                debouncedSaveActiveCache(next);
+                debouncedSaveActiveCache(next, effectiveHospitalId);
                 return next;
               });
             } else if (payload.eventType === 'UPDATE') {
@@ -292,7 +314,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                       };
                     }),
                   );
-                  debouncedSaveActiveCache(next);
+                  debouncedSaveActiveCache(next, effectiveHospitalId);
                   return next;
                 });
               }
@@ -301,7 +323,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               if (deletedIpNo) {
                 setPatients(prev => {
                   const next = prev.filter(p => p.ipNo !== deletedIpNo);
-                  debouncedSaveActiveCache(next);
+                  debouncedSaveActiveCache(next, effectiveHospitalId);
                   return next;
                 });
               }
@@ -353,7 +375,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const existingIds = new Set(prev.map(p => p.ipNo));
         const newOnes = enriched.filter(p => !existingIds.has(p.ipNo));
         const combined = [...prev, ...newOnes];
-        saveActiveCache(combined);
+        saveActiveCache(combined, effectiveHospitalId);
         return combined;
       });
       setHasMore(more);
@@ -371,7 +393,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (hasLoadedAll) return;
 
     // Serve all-patients cache immediately if available
-    const cached = loadAllCache();
+    const cached = loadAllCache(effectiveHospitalId);
     if (cached) {
       setPatients(enrichPatientData(cached.patients));
       setIsStale(true);
@@ -382,7 +404,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const data = await fetchAllPatients(user?.unit);
       const enriched = enrichPatientData(data);
       setPatients(enriched);
-      saveAllCache(data);
+      saveAllCache(data, effectiveHospitalId);
       setIsStale(false);
       setCacheTimestamp(null);
       setHasLoadedAll(true);
@@ -398,7 +420,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const next = enrichPatientData(
         prev.map(p => p.ipNo === updatedPatient.ipNo ? updatedPatient : p),
       );
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     const isDischarge = updatedPatient.patientStatus === 'Discharged';
@@ -441,7 +463,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
     setPatients(prev => {
       const next = enrichPatientData([p, ...prev]);
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     upsertPatient(p)
@@ -465,7 +487,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const p = patients.find(pt => pt.ipNo === ipNo);
     setPatients(prev => {
       const next = prev.filter(pt => pt.ipNo !== ipNo);
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     removePatient(ipNo)
@@ -484,7 +506,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const next = prev.map(p =>
         p.ipNo !== patientId ? p : { ...p, labResults: [...p.labResults, result] },
       );
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     insertLab(patientId, result).catch(err => {
@@ -502,7 +524,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const next = prev.map(p =>
         p.ipNo !== patientId ? p : { ...p, investigations: [inv, ...p.investigations] },
       );
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     insertImaging(patientId, inv).catch(err => {
@@ -521,7 +543,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         p.ipNo !== patientId ? p
           : { ...p, investigations: p.investigations.filter(inv => inv.id !== invId) },
       );
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     deleteImaging(invId).catch(err => {
@@ -538,7 +560,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const existing = p.dailyRounds.filter(r => r.date !== round.date);
         return { ...p, dailyRounds: [round, ...existing] };
       });
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     // Persist to normalized rounds table
@@ -561,7 +583,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         p.ipNo !== patientIpNo ? p
           : { ...p, vitals: [created, ...(p.vitals ?? [])] },
       );
-      saveActiveCache(next);
+      saveActiveCache(next, effectiveHospitalId);
       return next;
     });
     if (user) {
@@ -591,7 +613,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const next = enrichPatientData(
           prev.map(p => p.ipNo === remotePatient.ipNo ? remotePatient : p),
         );
-        saveActiveCache(next);
+        saveActiveCache(next, effectiveHospitalId);
         return next;
       });
       toast.success(`Showing latest version of ${remotePatient.name}.`);

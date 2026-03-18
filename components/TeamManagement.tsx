@@ -383,21 +383,21 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setEditingId(u.id); setEditRole(u.role); setEditUnit(u.unit ?? ''); }}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Change role / unit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => { setResetId(resetId === u.id ? null : u.id); setResetPw(''); }}
-                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                             title="Reset password"
                           >
                             <KeyRound className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleRemove(u.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Remove user"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
