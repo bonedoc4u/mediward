@@ -8,7 +8,7 @@
 import { supabase } from '../lib/supabase';
 import {
   Patient, DailyRound, Investigation, LabResult, ToDoItem,
-  PacChecklistItem, PreOpChecklist, DischargeSummary, VitalSigns,
+  PacChecklistItem, PreOpChecklist, DischargeSummary, DamaSummary, DeathSummary, VitalSigns,
 } from '../types';
 
 // ─── Joined row shapes from normalized rounds / vitals tables ─────
@@ -65,6 +65,7 @@ interface PatientRow {
   diagnosis: string;
   procedure: string | null;
   comorbidities: string[];
+  drug_allergies: string[] | null;
   doa: string;
   dos: string | null;
   planned_dos: string | null;
@@ -78,6 +79,8 @@ interface PatientRow {
   pac_checklist: PacChecklistItem[] | null;
   pre_op_checklist: PreOpChecklist | null;
   discharge_summary: DischargeSummary | null;
+  dama_summary: DamaSummary | null;
+  death_summary: DeathSummary | null;
   vitals?: VitalSigns[] | null;
   created_at: string;
   updated_at: string;
@@ -171,6 +174,7 @@ function rowToPatient(row: PatientRow): Patient {
     diagnosis:        row.diagnosis,
     procedure:        row.procedure        ?? undefined,
     comorbidities:    Array.isArray(row.comorbidities)   ? row.comorbidities   : [],
+    drugAllergies:    Array.isArray(row.drug_allergies)  ? row.drug_allergies  : [],
     doa:              row.doa,
     dos:              row.dos              ?? undefined,
     plannedDos:       row.planned_dos      ?? undefined,
@@ -185,6 +189,8 @@ function rowToPatient(row: PatientRow): Patient {
     pacChecklist:     row.pac_checklist    ?? undefined,
     preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
+    damaSummary:      row.dama_summary      ?? undefined,
+    deathSummary:     row.death_summary     ?? undefined,
     vitals,
     specialty:        row.specialty        ?? undefined,
     specialtyData:    row.specialty_data   ?? undefined,
@@ -213,6 +219,7 @@ function patientToRow(patient: Patient) {
     diagnosis:         patient.diagnosis,
     procedure:         patient.procedure        ?? null,
     comorbidities:     patient.comorbidities,
+    drug_allergies:    patient.drugAllergies   ?? [],
     doa:               patient.doa,
     dos:               patient.dos              ?? null,
     planned_dos:       patient.plannedDos       ?? null,
@@ -224,6 +231,8 @@ function patientToRow(patient: Patient) {
     pac_checklist:     patient.pacChecklist     ?? null,
     pre_op_checklist:  patient.preOpChecklist   ?? null,
     discharge_summary: patient.dischargeSummary ?? null,
+    dama_summary:      patient.damaSummary      ?? null,
+    death_summary:     patient.deathSummary     ?? null,
     consent_given_at:  patient.consentGivenAt   ?? null,
     consent_version:   patient.consentVersion   ?? null,
     // daily_rounds and vitals intentionally omitted — normalized tables own these

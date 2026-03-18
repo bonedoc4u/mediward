@@ -98,7 +98,7 @@ async function compressImage(file: File): Promise<File> {
  * Requires a public bucket named "radiology" in your Supabase project:
  *   Dashboard → Storage → New Bucket → Name: "radiology" → Public: ON
  */
-export async function uploadInvestigationImage(file: File, patientIpNo: string): Promise<string> {
+export async function uploadInvestigationImage(file: File, hospitalId: string, patientIpNo: string): Promise<string> {
   // ─── Validate before touching the network ───
   validateImageFile(file);
 
@@ -106,7 +106,8 @@ export async function uploadInvestigationImage(file: File, patientIpNo: string):
   const compressed = await compressImage(file);
 
   const ext = compressed.type === 'image/jpeg' ? 'jpg' : (file.name.split('.').pop()?.toLowerCase() || 'jpg');
-  const filePath = `${patientIpNo}/${generateId()}.${ext}`;
+  // Path: {hospitalId}/{patientIpNo}/{uuid}.{ext} — hospital_id prefix enables RLS scoping
+  const filePath = `${hospitalId}/${patientIpNo}/${generateId()}.${ext}`;
 
   const { error } = await supabase.storage
     .from('radiology')

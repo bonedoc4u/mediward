@@ -23,9 +23,11 @@ const STATUS_CONFIG: Record<MedAdminStatus, { label: string; color: string; icon
 interface Props {
   patientIpNo: string;
   hospitalId: string;
+  /** Known drug allergies — displayed as a banner and checked on prescription entry. */
+  drugAllergies?: string[];
 }
 
-const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId }) => {
+const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId, drugAllergies = [] }) => {
   const { user } = useAuth();
   const [medications, setMedications] = useState<PrescribedMedication[]>([]);
   const [admins, setAdmins] = useState<MedAdministration[]>([]);
@@ -87,8 +89,24 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId }) => {
       (b.administeredAt ?? b.scheduledTime ?? '').localeCompare(a.administeredAt ?? a.scheduledTime ?? '')
     )[0];
 
+  // Check if new drug name matches any known allergy (case-insensitive substring)
+  const allergyMatch = newMed.drugName.trim().length > 2
+    ? drugAllergies.find(a => a.toLowerCase().includes(newMed.drugName.toLowerCase()) || newMed.drugName.toLowerCase().includes(a.toLowerCase()))
+    : undefined;
+
   return (
     <div className="space-y-4">
+      {/* Drug Allergy Banner */}
+      {drugAllergies.length > 0 && (
+        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-bold text-red-700">Known Drug Allergies</p>
+            <p className="text-xs text-red-600 mt-0.5">{drugAllergies.join(' · ')}</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -158,10 +176,16 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId }) => {
               />
             </div>
           </div>
+          {allergyMatch && (
+            <div className="flex items-center gap-2 p-2.5 bg-red-100 border border-red-300 rounded-lg text-xs text-red-800 font-semibold">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              ⚠ ALLERGY ALERT: Patient has a recorded allergy to "{allergyMatch}". Verify before prescribing.
+            </div>
+          )}
           <button
             onClick={handleAddMed}
             disabled={saving || !newMed.drugName.trim() || !newMed.dose.trim()}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+            className={`flex items-center gap-2 px-4 py-2 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors ${allergyMatch ? 'bg-red-600 hover:bg-red-700' : 'bg-violet-600 hover:bg-violet-700'}`}
           >
             <Save className="w-4 h-4" /> {saving ? 'Prescribing…' : 'Prescribe'}
           </button>

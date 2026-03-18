@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Patient, Gender, PacStatus, Ward } from '../types';
+import { Patient, Gender, PacStatus, PatientStatus, Ward } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { parseFhirPatient } from '../services/fhirService';
 import { X, Save, UserPlus, Pencil, Loader2, FileJson, ChevronDown, ChevronUp } from 'lucide-react';
@@ -88,7 +88,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       procedure: '',
       dos: '',
       pacStatus: PacStatus.Pending,
-      patientStatus: 'Admitted',
+      patientStatus: PatientStatus.Review,
     };
   });
 
@@ -174,6 +174,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   const [selectedComorbidities, setSelectedComorbidities] = useState<string[]>([]);
   const [customComorbidity, setCustomComorbidity] = useState('');
+  const [drugAllergies, setDrugAllergies] = useState<string[]>(initialData?.drugAllergies ?? []);
+  const [customAllergyInput, setCustomAllergyInput] = useState('');
 
   // ── Focus trap ──
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -229,6 +231,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         patientStatus: initialData.patientStatus
       });
       setSelectedComorbidities(initialData.comorbidities || []);
+      setDrugAllergies(initialData.drugAllergies ?? []);
     } else if (isOpen && !initialData) {
       // Reset for new patient
       setFormData({
@@ -246,9 +249,10 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         procedure: '',
         dos: '',
         pacStatus: PacStatus.Pending,
-        patientStatus: 'Admitted'
+        patientStatus: PatientStatus.Review,
       });
       setSelectedComorbidities([]);
+      setDrugAllergies([]);
     }
     // Always start at step 1 when modal opens
     setStepRaw(1);
@@ -298,6 +302,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       mobile: formData.mobile,
       diagnosis: formData.diagnosis,
       comorbidities: selectedComorbidities,
+      drugAllergies,
       doa: formData.doa,
       procedure: formData.procedure,
       dos: formData.dos || undefined,
@@ -335,6 +340,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       mobile: formData.mobile,
       diagnosis: formData.diagnosis,
       comorbidities: selectedComorbidities,
+      drugAllergies,
       doa: formData.doa,
       procedure: formData.procedure,
       dos: formData.dos || undefined,
@@ -555,6 +561,41 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   ))}
                 </div>
               </div>
+
+              {/* Drug Allergies */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                  Drug Allergies <span className="normal-case font-normal text-red-500 ml-1">⚠ Safety critical</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Type allergy and press Enter (e.g. Penicillin, NSAIDs)…"
+                  className="w-full text-sm p-2 border border-red-200 rounded-md bg-red-50 focus:bg-white focus:ring-2 focus:ring-red-400 outline-none mb-2"
+                  value={customAllergyInput}
+                  onChange={e => setCustomAllergyInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && customAllergyInput.trim()) {
+                      e.preventDefault();
+                      const val = customAllergyInput.trim();
+                      if (!drugAllergies.includes(val)) setDrugAllergies(prev => [...prev, val]);
+                      setCustomAllergyInput('');
+                    }
+                  }}
+                />
+                {drugAllergies.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {drugAllergies.map(a => (
+                      <span key={a} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 shadow-sm">
+                        {a}
+                        <button type="button" onClick={() => setDrugAllergies(prev => prev.filter(x => x !== a))} aria-label={`Remove ${a}`} className="hover:bg-red-200 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {drugAllergies.length === 0 && (
+                  <p className="text-xs text-slate-400">No known drug allergies recorded.</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -570,7 +611,9 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Patient Status</label>
-                  <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.patientStatus} placeholder="e.g. Fit, Review, Critical" onChange={e => setFormData({...formData, patientStatus: e.target.value})} />
+                  <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white" value={formData.patientStatus} onChange={e => setFormData({...formData, patientStatus: e.target.value as PatientStatus})}>
+                    {Object.values(PatientStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
               </div>
 

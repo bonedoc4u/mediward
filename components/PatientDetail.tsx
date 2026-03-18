@@ -10,6 +10,7 @@ import {
   Pill, ClipboardList, Droplets, Bandage
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import ErrorBoundary from './ErrorBoundary';
 import FHIRExportModal from './FHIRExportModal';
 import VitalsWidget from './VitalsWidget';
 import SpecialtyDataPanel from './SpecialtyDataPanel';
@@ -279,45 +280,55 @@ const PatientDetail: React.FC = () => {
       {/* Medications Tab */}
       {showMedicationChart && activeTab === 'medications' && (
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
-          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
-            <MedicationChart patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
-          </Suspense>
+          <ErrorBoundary fallbackMessage="Medication chart failed to load.">
+            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+              <MedicationChart patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} drugAllergies={patient.drugAllergies ?? []} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 
       {/* Nursing Notes Tab */}
       {showNursingNotes && activeTab === 'nursing' && (
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
-          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
-            <NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
-          </Suspense>
+          <ErrorBoundary fallbackMessage="Nursing notes failed to load.">
+            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+              <NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 
       {/* Intake / Output Tab */}
       {showIntakeOutput && activeTab === 'io' && (
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
-          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
-            <IntakeOutput patientIpNo={patient.ipNo} />
-          </Suspense>
+          <ErrorBoundary fallbackMessage="Intake/Output chart failed to load.">
+            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+              <IntakeOutput patientIpNo={patient.ipNo} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 
       {/* Blood Transfusion Tab */}
       {showBloodTransfusion && activeTab === 'transfusion' && (
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
-          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
-            <BloodTransfusion patientIpNo={patient.ipNo} />
-          </Suspense>
+          <ErrorBoundary fallbackMessage="Blood transfusion records failed to load.">
+            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+              <BloodTransfusion patientIpNo={patient.ipNo} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 
       {/* Wound Care Tab */}
       {showWoundCare && activeTab === 'wound' && (
         <div className="bg-white rounded-b-xl rounded-tr-xl shadow-sm border border-t-0 border-slate-200 p-5">
-          <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
-            <WoundCare patientIpNo={patient.ipNo} />
-          </Suspense>
+          <ErrorBoundary fallbackMessage="Wound care records failed to load.">
+            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+              <WoundCare patientIpNo={patient.ipNo} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 

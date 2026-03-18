@@ -563,10 +563,17 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       saveActiveCache(next, effectiveHospitalId);
       return next;
     });
-    // Persist to normalized rounds table
+    // Persist to normalized rounds table; enqueue for offline retry on failure
     upsertRound(patientIpNo, user?.hospitalId, round).catch(err => {
       console.error('[Patients] saveRound sync failed:', err);
-      toast.error('Round note may not have synced — check your connection.');
+      enqueue('upsert_round', {
+        patient_ip_no: patientIpNo,
+        hospital_id: user?.hospitalId ?? null,
+        date: round.date,
+        note: round.note,
+        todos: round.todos,
+      });
+      toast.error('Round note queued for sync when connection is restored.');
     });
     if (user) {
       logAuditEvent(user.id, user.name, 'CREATE', 'round', patientIpNo,

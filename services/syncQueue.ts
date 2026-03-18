@@ -43,10 +43,19 @@ export interface QueuedOp {
 
 const QUEUE_KEY = 'mediward_sync_queue';
 const SEQ_KEY   = 'mediward_sync_seq';
+const DLQ_KEY   = 'mediward_sync_dlq';
 const MAX_ATTEMPTS = 5;
+const MAX_QUEUE_SIZE = 500;
+
+// ─── Dead-letter queue entry ─────────────────────────────────────────────────
+export interface DeadLetterOp extends QueuedOp {
+  failedAt: string;
+  reason: string;
+}
 
 // ─── In-memory cache (authoritative for synchronous reads) ───────────────────
 let _cache: QueuedOp[] = [];
+let _dlq: DeadLetterOp[] = [];
 let _seq = 0;
 let _initialized = false;
 
@@ -64,13 +73,16 @@ export async function initSyncQueue(): Promise<void> {
     // Try Capacitor Preferences first (survives iOS memory pressure)
     const { value: qRaw } = await Preferences.get({ key: QUEUE_KEY });
     const { value: sRaw } = await Preferences.get({ key: SEQ_KEY });
+    const { value: dRaw } = await Preferences.get({ key: DLQ_KEY });
 
     if (qRaw) {
       _cache = (JSON.parse(qRaw) as QueuedOp[]).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
       _seq = sRaw ? parseInt(sRaw, 10) : (_cache[_cache.length - 1]?.seq ?? 0);
+      _dlq = dRaw ? (JSON.parse(dRaw) as DeadLetterOp[]) : [];
       // Mirror into localStorage for synchronous read-cache
       _lsSet(QUEUE_KEY, qRaw);
       _lsSet(SEQ_KEY, String(_seq));
+      if (dRaw) _lsSet(DLQ_KEY, dRaw);
       return;
     }
   } catch { /* Capacitor not available on web — fall through */ }
@@ -81,8 +93,11 @@ export async function initSyncQueue(): Promise<void> {
     _cache = (JSON.parse(qRaw) as QueuedOp[]).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
     const sRaw = localStorage.getItem(SEQ_KEY);
     _seq = sRaw ? parseInt(sRaw, 10) : (_cache[_cache.length - 1]?.seq ?? 0);
+    const dRaw = localStorage.getItem(DLQ_KEY);
+    _dlq = dRaw ? (JSON.parse(dRaw) as DeadLetterOp[]) : [];
   } catch {
     _cache = [];
+    _dlq = [];
     _seq = 0;
   }
 }
@@ -104,6 +119,13 @@ function _persist(queue: QueuedOp[]): void {
   const serialized = JSON.stringify(queue);
   _lsSet(QUEUE_KEY, serialized);
   Preferences.set({ key: QUEUE_KEY, value: serialized }).catch(() => {});
+}
+
+function _persistDlq(dlq: DeadLetterOp[]): void {
+  _dlq = dlq;
+  const serialized = JSON.stringify(dlq);
+  _lsSet(DLQ_KEY, serialized);
+  Preferences.set({ key: DLQ_KEY, value: serialized }).catch(() => {});
 }
 
 // ─── Public API (synchronous — uses in-memory cache) ─────────────────────────
@@ -142,6 +164,14 @@ export function enqueue(type: QueuedOpType, payload: unknown): void {
         return;
       }
     }
+  }
+
+  // Size cap: if at limit, move oldest non-upsert_patient op to DLQ to make room
+  if (queue.length >= MAX_QUEUE_SIZE) {
+    const evictIdx = queue.findIndex(op => op.type !== 'upsert_patient');
+    const target = evictIdx !== -1 ? queue[evictIdx] : queue[0];
+    _persistDlq([..._dlq, { ...target, failedAt: new Date().toISOString(), reason: 'queue_full' }]);
+    queue.splice(evictIdx !== -1 ? evictIdx : 0, 1);
   }
 
   queue.push({
@@ -184,6 +214,8 @@ export function incrementAttempts(id: string): { dropped: boolean; opType?: Queu
       const p = op.payload as Record<string, unknown> | undefined;
       label = (p?.name as string) ?? (p?.ipNo as string);
     }
+    // Move to dead-letter queue instead of silently dropping
+    _persistDlq([..._dlq, { ...op, failedAt: new Date().toISOString(), reason: `max_attempts_exceeded (${MAX_ATTEMPTS})` }]);
     _persist(q.filter(o => o.id !== id));
     return { dropped: true, opType: op.type, label };
   }
@@ -199,4 +231,24 @@ export function incrementAttempts(id: string): { dropped: boolean; opType?: Queu
 
 export function getQueueSize(): number {
   return _cache.length;
+}
+
+// ─── Dead-letter queue API ────────────────────────────────────────────────────
+
+/** Returns all ops that permanently failed (max retries exceeded or queue full). */
+export function getDeadLetterQueue(): DeadLetterOp[] {
+  return [..._dlq];
+}
+
+/** Clears the dead-letter queue (admin "acknowledge & clear" action). */
+export function clearDeadLetterQueue(): void {
+  _persistDlq([]);
+}
+
+/** Retry a single DLQ op by re-enqueuing it and removing it from the DLQ. */
+export function retryDeadLetterOp(id: string): void {
+  const op = _dlq.find(o => o.id === id);
+  if (!op) return;
+  _persistDlq(_dlq.filter(o => o.id !== id));
+  enqueue(op.type, op.payload);
 }

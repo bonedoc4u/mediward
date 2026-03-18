@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { Patient, PatientStatus, ToDoItem } from '../types';
 import { getStatusColor } from '../utils/calculations';
@@ -69,7 +69,29 @@ const RoundMode: React.FC = () => {
   const navCooldownRef = useRef(false);
   const todoInputRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
-  const today = new Date().toISOString().split('T')[0];
+
+  // Reactive today — updates at midnight so cross-midnight sessions get the correct date
+  const [today, setToday] = useState(() => new Date().toISOString().split('T')[0]);
+  useEffect(() => {
+    const tick = () => {
+      const next = new Date().toISOString().split('T')[0];
+      setToday(prev => prev !== next ? next : prev);
+    };
+    const id = setInterval(tick, 60_000); // check every minute
+    return () => clearInterval(id);
+  }, []);
+
+  // On mount: clean up draft keys older than 2 days to avoid localStorage bloat
+  useEffect(() => {
+    try {
+      const twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      const cutoff = twoDaysAgo.toISOString().split('T')[0];
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('mediward_round_draft_') && k.slice('mediward_round_draft_'.length) < cutoff)
+        .forEach(k => localStorage.removeItem(k));
+    } catch { /* ignore */ }
+  }, []);
 
   // Clamp index when patient list changes (e.g. after ward selection or rotation)
   React.useEffect(() => {

@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, Shiel
 import { anonymizePatient, exportPatientData } from '../services/patientService';
 import { SPECIALTY_DISPLAY_NAMES } from '../services/specialtyTemplates';
 import { createIncident, updateIncidentStatus, deleteIncident, fetchIncidents, StatusIncident, IncidentSeverity, IncidentStatus } from '../services/statusService';
+import { getDeadLetterQueue, clearDeadLetterQueue, retryDeadLetterOp, DeadLetterOp } from '../services/syncQueue';
 
 // ─── Department presets ───
 const DEPARTMENT_PRESETS = [
@@ -405,6 +406,11 @@ const AdminSettings: React.FC = () => {
   const [newUnit, setNewUnit] = useState('');
   const [newPreOpItem, setNewPreOpItem] = useState('');
   const [savingHospital, setSavingHospital] = useState(false);
+
+  // ── Dead-letter queue state ──
+  const [dlqEntries, setDlqEntries] = useState<DeadLetterOp[]>(() => getDeadLetterQueue());
+  const [dlqExpanded, setDlqExpanded] = useState(false);
+  const refreshDlq = () => setDlqEntries(getDeadLetterQueue());
 
   // ── Incident Management state ──
   const [incidents, setIncidents] = useState<StatusIncident[]>([]);
@@ -1485,6 +1491,73 @@ const AdminSettings: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* ── Dead-Letter Queue Viewer ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <button
+          onClick={() => { setDlqExpanded(v => !v); refreshDlq(); }}
+          className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-red-100 p-2 rounded-lg"><XCircle className="w-5 h-5 text-red-600" /></div>
+            <div>
+              <h3 className="font-bold text-slate-800">Failed Sync Queue (Dead-Letter)</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Operations that permanently failed after {5} retries</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {dlqEntries.length > 0 && (
+              <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">{dlqEntries.length}</span>
+            )}
+            {dlqExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+          </div>
+        </button>
+
+        {dlqExpanded && (
+          <div className="border-t border-slate-100 p-5 space-y-3">
+            {dlqEntries.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-3">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                No failed operations — all syncs are healthy.
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => { clearDeadLetterQueue(); refreshDlq(); }}
+                    className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {dlqEntries.map(op => {
+                    const label = op.type === 'upsert_patient'
+                      ? ((op.payload as Record<string,unknown>)?.name as string ?? (op.payload as Record<string,unknown>)?.ipNo as string ?? op.id)
+                      : `${op.type} · ${op.id.slice(0, 8)}`;
+                    return (
+                      <div key={op.id} className="flex items-start justify-between gap-3 p-3 bg-red-50 border border-red-100 rounded-lg text-xs">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-red-800 truncate">{label}</p>
+                          <p className="text-red-600 mt-0.5">Reason: {op.reason}</p>
+                          <p className="text-slate-500 mt-0.5">Failed: {new Date(op.failedAt).toLocaleString()}</p>
+                        </div>
+                        <button
+                          onClick={() => { retryDeadLetterOp(op.id); refreshDlq(); }}
+                          className="shrink-0 flex items-center gap-1 px-2 py-1 text-xs text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Retry
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 };

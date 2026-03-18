@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp, useConfig } from '../contexts/AppContext';
-import { Patient, PatientStatus, DischargeSummary as DS } from '../types';
+import { Patient, PatientStatus, DischargeSummary as DS, DamaSummary, DeathSummary } from '../types';
 import { jsPDF } from 'jspdf';
 import {
   ArrowLeft, FileDown, Save, Search, FileText,
@@ -455,6 +455,142 @@ const MedicationPicker: React.FC<{
   );
 };
 
+// ─── DAMA Form ───────────────────────────────────────────────────────────────
+const DEFAULT_DAMA = (p: Patient): DamaSummary => ({
+  dateTime: new Date().toISOString().slice(0, 16),
+  clinicalCondition: `${p.name} (${p.age}y/${p.gender}), admitted ${p.doa} with ${p.diagnosis}. Current status: ${p.patientStatus}.`,
+  patientReason: '',
+  risksExplained: 'The risks of leaving against medical advice, including deterioration, complications, and potential mortality, were explained to the patient/relative in their preferred language.',
+  witnessName: '',
+  signatureObtained: false,
+  attendingDoctor: '',
+  residentDoctor: '',
+});
+
+const DamaFormComponent: React.FC<{ patient: Patient; onUpdate: (p: Patient) => void }> = ({ patient, onUpdate }) => {
+  const [form, setForm] = useState<DamaSummary>(patient.damaSummary ?? DEFAULT_DAMA(patient));
+  const [saved, setSaved] = useState(false);
+  const upd = <K extends keyof DamaSummary>(k: K, v: DamaSummary[K]) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
+  const handleSave = () => { onUpdate({ ...patient, damaSummary: form }); setSaved(true); };
+  return (
+    <div className="space-y-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <h2 className="font-bold text-amber-900 text-sm mb-1">Discharge Against Medical Advice (DAMA)</h2>
+        <p className="text-xs text-amber-700">Document this DAMA carefully — patient/relative has refused continued in-patient care.</p>
+      </div>
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date & Time of DAMA</label>
+          <input type="datetime-local" value={form.dateTime} onChange={e => upd('dateTime', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+        </div>
+        {([['clinicalCondition','Clinical Condition at Time of DAMA',3],['patientReason','Reason Given by Patient / Relative',2],['risksExplained','Risks Explained (document verbatim)',3],['witnessName','Witness Name',1]] as [keyof DamaSummary, string, number][]).map(([key, label, rows]) => (
+          <div key={key}>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</label>
+            {rows === 1
+              ? <input type="text" value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              : <textarea rows={rows} value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+            }
+          </div>
+        ))}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Attending Doctor</label>
+            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Resident Doctor</label>
+            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          </div>
+        </div>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" checked={form.signatureObtained} onChange={e => upd('signatureObtained', e.target.checked)} className="w-4 h-4 accent-amber-600" />
+          <span className="text-sm font-medium text-slate-700">Patient / Next-of-kin signature obtained on DAMA form</span>
+        </label>
+        <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}>
+          {saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          {saved ? 'Saved!' : 'Save DAMA Record'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Death Summary Form ───────────────────────────────────────────────────────
+const DEFAULT_DEATH = (p: Patient): DeathSummary => ({
+  dateTimeOfDeath: new Date().toISOString().slice(0, 16),
+  immediateCause: '',
+  antecedentCause: p.diagnosis,
+  underlyingCause: p.comorbidities.join(', '),
+  otherConditions: '',
+  clinicalCourse: `${p.name} (${p.age}y/${p.gender}) was admitted on ${p.doa} with ${p.diagnosis}. ${p.procedure ? `Underwent ${p.procedure}${p.dos ? ` on ${p.dos}` : ''}.` : 'Managed conservatively.'}`,
+  unnaturalDeath: false,
+  policeIntimated: false,
+  postMortemDone: false,
+  certificateNo: '',
+  attendingDoctor: '',
+  residentDoctor: '',
+});
+
+const DeathFormComponent: React.FC<{ patient: Patient; onUpdate: (p: Patient) => void }> = ({ patient, onUpdate }) => {
+  const [form, setForm] = useState<DeathSummary>(patient.deathSummary ?? DEFAULT_DEATH(patient));
+  const [saved, setSaved] = useState(false);
+  const upd = <K extends keyof DeathSummary>(k: K, v: DeathSummary[K]) => { setForm(f => ({ ...f, [k]: v })); setSaved(false); };
+  const handleSave = () => { onUpdate({ ...patient, deathSummary: form, patientStatus: PatientStatus.Discharged, dod: form.dateTimeOfDeath.split('T')[0] }); setSaved(true); };
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-800 rounded-xl p-4">
+        <h2 className="font-bold text-white text-sm mb-1">Death Summary</h2>
+        <p className="text-xs text-slate-300">Complete all fields. This document supports the medical death certificate.</p>
+      </div>
+      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date & Time of Death</label>
+          <input type="datetime-local" value={form.dateTimeOfDeath} onChange={e => upd('dateTimeOfDeath', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        </div>
+        <div className="bg-slate-50 rounded-lg p-3 space-y-3">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Cause of Death (Certificate Format)</p>
+          {([['immediateCause','Ia — Immediate cause','e.g. Septic shock'],['antecedentCause','Ib — Antecedent cause','e.g. Postoperative wound infection'],['underlyingCause','Ic — Underlying cause (underlying disease)','e.g. Carcinoma colon'],['otherConditions','II — Other significant conditions','e.g. Hypertension, DM']] as [keyof DeathSummary, string, string][]).map(([key, label, ph]) => (
+            <div key={key}>
+              <label className="text-xs text-slate-500 mb-0.5 block">{label}</label>
+              <input type="text" placeholder={ph} value={form[key] as string} onChange={e => upd(key, e.target.value as DeathSummary[typeof key])} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+            </div>
+          ))}
+        </div>
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Clinical Course Summary</label>
+          <textarea rows={4} value={form.clinicalCourse} onChange={e => upd('clinicalCourse', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none" />
+        </div>
+        <div className="space-y-2">
+          {([['unnaturalDeath','Unnatural / Suspicious death'],['policeIntimated','Police / Medico-legal intimation given'],['postMortemDone','Post-mortem performed / requested']] as [keyof DeathSummary, string][]).map(([key, label]) => (
+            <label key={key} className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={form[key] as boolean} onChange={e => upd(key, e.target.checked as DeathSummary[typeof key])} className="w-4 h-4 accent-slate-700" />
+              <span className="text-sm text-slate-700">{label}</span>
+            </label>
+          ))}
+        </div>
+        <div>
+          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Death Certificate No.</label>
+          <input type="text" value={form.certificateNo} onChange={e => upd('certificateNo', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Attending Doctor</label>
+            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Resident Doctor</label>
+            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+          </div>
+        </div>
+        <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'}`}>
+          {saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          {saved ? 'Saved!' : 'Save Death Summary'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── Discharge Document Form ───
 const DischargeForm: React.FC<{
   patient: Patient;
@@ -468,6 +604,7 @@ const DischargeForm: React.FC<{
   );
   const [saved, setSaved] = useState(false);
   const [confirmReadmit, setConfirmReadmit] = useState(false);
+  const [docMode, setDocMode] = useState<'discharge' | 'dama' | 'death'>('discharge');
 
   // Reset if patient changes
   useEffect(() => {
@@ -699,8 +836,29 @@ const DischargeForm: React.FC<{
         </div>
       </div>
 
+      {/* Document mode tabs */}
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+        {([['discharge','Discharge Summary','bg-blue-600'],['dama','DAMA','bg-amber-500'],['death','Death Summary','bg-slate-700']] as [typeof docMode, string, string][]).map(([mode, label, activeColor]) => (
+          <button
+            key={mode}
+            onClick={() => setDocMode(mode)}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              docMode === mode ? `${activeColor} text-white shadow-sm` : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* DAMA template */}
+      {docMode === 'dama' && <DamaFormComponent patient={patient} onUpdate={onUpdate} />}
+
+      {/* Death Summary template */}
+      {docMode === 'death' && <DeathFormComponent patient={patient} onUpdate={onUpdate} />}
+
       {/* Discharged badge */}
-      {patient.patientStatus === PatientStatus.Discharged && patient.dod && (
+      {docMode === 'discharge' && patient.patientStatus === PatientStatus.Discharged && patient.dod && (
         <div className="flex items-center gap-2 px-4 py-2 bg-teal-50 border border-teal-100 rounded-lg text-sm text-teal-700">
           <CheckCircle className="w-4 h-4 text-teal-500" />
           Patient discharged on <span className="font-bold">{patient.dod}</span>
@@ -708,7 +866,9 @@ const DischargeForm: React.FC<{
         </div>
       )}
 
-      {/* ── Document ── */}
+      {/* ── Document (discharge mode only) ── */}
+      {docMode !== 'discharge' ? null : <>
+      {/* (discharge document rendered below) */}
       <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden max-w-4xl mx-auto">
         {/* Document Header */}
         <div className="bg-slate-800 text-white text-center py-5 px-6">
@@ -847,6 +1007,7 @@ const DischargeForm: React.FC<{
           </div>
         </div>
       </div>
+    </>}
     </div>
   );
 };

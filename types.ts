@@ -369,6 +369,34 @@ export interface DailyRound {
  *  Old data (object format) is auto-migrated in patientService.rowToPatient. */
 export type PreOpChecklist = PacChecklistItem[];
 
+/** Discharge Against Medical Advice documentation template. */
+export interface DamaSummary {
+  dateTime: string;
+  clinicalCondition: string;
+  patientReason: string;
+  risksExplained: string;
+  witnessName: string;
+  signatureObtained: boolean;
+  attendingDoctor: string;
+  residentDoctor: string;
+}
+
+/** In-hospital death documentation template (death certificate support). */
+export interface DeathSummary {
+  dateTimeOfDeath: string;
+  immediateCause: string;
+  antecedentCause: string;
+  underlyingCause: string;
+  otherConditions: string;
+  clinicalCourse: string;
+  unnaturalDeath: boolean;
+  policeIntimated: boolean;
+  postMortemDone: boolean;
+  certificateNo: string;
+  attendingDoctor: string;
+  residentDoctor: string;
+}
+
 export interface DischargeSummary {
   hospitalCourse: string;
   conditionAtDischarge: string;
@@ -401,6 +429,8 @@ export interface Patient {
   gender: Gender;
   diagnosis: string;
   comorbidities: string[];
+  /** Known drug allergies — used as a safety gate in the MAR. e.g. ["Penicillin", "NSAIDs"] */
+  drugAllergies?: string[];
   doa: string;
   procedure?: string;
   dos?: string;
@@ -419,6 +449,8 @@ export interface Patient {
   vitals?: VitalSigns[];
   dod?: string;
   dischargeSummary?: DischargeSummary;
+  damaSummary?: DamaSummary;
+  deathSummary?: DeathSummary;
   /**
    * Specialty key — determines which template is used for specialtyData rendering.
    * Stored in the `specialty` column of the patients table.

@@ -39,8 +39,8 @@ function generateRuleBasedAlerts(patients: Patient[]): AiAlert[] {
 
   for (const p of activePatients) {
     // 1. Diabetic Protocol
-    const hasDM = p.comorbidities.some(c => /dm|diabetes|niddm|iddm/i.test(c)) ||
-                  /diabetes|dm\b|diabetic/i.test(p.diagnosis);
+    const hasDM = p.comorbidities.some(c => /\bdm\b|diabetes|niddm|iddm/i.test(c)) ||
+                  /diabetes|\bdm\b|diabetic/i.test(p.diagnosis);
     if (hasDM) {
       const latestFBS = p.labResults
         .filter(r => r.type === 'FBS')
@@ -59,6 +59,15 @@ function generateRuleBasedAlerts(patients: Patient[]): AiAlert[] {
       // Check for high glucose
       const recentFBS = p.labResults.filter(r => r.type === 'FBS').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
       const recentPPBS = p.labResults.filter(r => r.type === 'PPBS').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+      if (recentFBS && recentFBS.value < 70) {
+        alerts.push({
+          bed: p.bed,
+          patientName: p.name,
+          category: 'Diabetic Care',
+          message: `HYPOGLYCAEMIA: FBS ${recentFBS.value} mg/dL on ${recentFBS.date}. Immediate glucose correction required.`,
+          priority: 'High',
+        });
+      }
       if (recentFBS && recentFBS.value > 200) {
         alerts.push({
           bed: p.bed,

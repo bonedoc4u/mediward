@@ -1,9 +1,10 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Patient, Investigation } from '../types';
-import { useConfig } from '../contexts/AppContext';
+import { useConfig, useAuth } from '../contexts/AppContext';
 import { ImageIcon, Camera, X, Trash2, Calendar, Check, Filter, Users, ArrowUp, Loader2 } from 'lucide-react';
 import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
 import { generateId } from '../utils/sanitize';
+import { Capacitor } from '@capacitor/core';
 
 interface Props {
   patients: Patient[];
@@ -13,6 +14,7 @@ interface Props {
 }
 
 const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, onDeleteInvestigation, initialPatientId }) => {
+  const { user } = useAuth();
   const { wards: configWards } = useConfig();
   const activeConfigWards = useMemo(
     () => configWards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder),
@@ -29,6 +31,36 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+
+  /** On Android, detect when the camera picker closes without returning a file
+   *  (likely due to camera permission denial) and show a help message. */
+  const handleCameraClick = () => {
+    if (!cameraInputRef.current) return;
+    // Reset value so the change event fires even if same file is picked again
+    cameraInputRef.current.value = '';
+
+    // Focus-return detection: if window regains focus but no file was selected,
+    // the camera was cancelled — possibly due to a denied permission.
+    let pickerOpened = false;
+    const onFocus = () => {
+      window.removeEventListener('focus', onFocus);
+      if (pickerOpened && !selectedFile) {
+        // Short delay lets the change event fire first if a file was actually picked
+        setTimeout(() => {
+          if (!selectedFile && !showUploadForm) {
+            setUploadError(
+              'No photo selected. If the camera option was missing, enable Camera permission: Settings → Apps → MediWard → Permissions → Camera.'
+            );
+          }
+        }, 300);
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    pickerOpened = true;
+    cameraInputRef.current.click();
+  };
 
   // Sync prop with state if it changes
   useEffect(() => {
@@ -91,7 +123,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
     setUploadError(null);
 
     try {
-      const imageUrl = await uploadInvestigationImage(selectedFile, selectedPatientId);
+      const imageUrl = await uploadInvestigationImage(selectedFile, user?.hospitalId ?? 'shared', selectedPatientId);
 
       const newInv: Investigation = {
         id: generateId(),
@@ -209,6 +241,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
                 <p className="text-xs text-slate-500 mt-0.5">{investigations.length} images on file</p>
               </div>
               <div className="flex gap-2">
+                {/* Gallery file input (always present) */}
                 <input
                   type="file"
                   accept="image/*"
@@ -216,14 +249,42 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
                   ref={fileInputRef}
                   onChange={handleFileChange}
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span className="hidden md:inline">Take Photo / Upload</span>
-                  <span className="md:hidden">Add Photo</span>
-                </button>
+                {/* Camera-capture input (Android native only) */}
+                {isAndroidNative && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    ref={cameraInputRef}
+                    onChange={handleFileChange}
+                  />
+                )}
+                {isAndroidNative ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCameraClick}
+                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
+                    >
+                      <Camera className="w-4 h-4" /> Camera
+                    </button>
+                    <button
+                      onClick={() => { fileInputRef.current?.value && (fileInputRef.current.value = ''); fileInputRef.current?.click(); }}
+                      className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
+                    >
+                      <ImageIcon className="w-4 h-4" /> Gallery
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span className="hidden md:inline">Take Photo / Upload</span>
+                    <span className="md:hidden">Add Photo</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

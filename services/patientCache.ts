@@ -65,7 +65,10 @@ export function clearPatientCache(hospitalId: string): void {
  */
 export function formatCacheAge(cachedAt: string): string | null {
   const delta = Date.now() - new Date(cachedAt).getTime();
-  if (isNaN(delta) || delta < 0) return null;
+  if (isNaN(delta)) return null;
+  // Tolerate up to 30 s of clock skew (device clock ahead of server)
+  if (delta < 0 && delta > -30_000) return 'just now';
+  if (delta < 0) return null;
 
   const seconds = Math.floor(delta / 1000);
   if (seconds < 60)  return 'just now';

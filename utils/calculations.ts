@@ -280,7 +280,6 @@ export function generateNotifications(patients: Patient[]): AppNotification[] {
 
 // ─── NEWS2 Scoring ──────────────────────────────────────────────────────────
 // Reference: https://www.rcplondon.ac.uk/projects/outputs/national-early-warning-score-news-2
-// Uses Scale 1 SpO2 (standard — not for hypercapnic resp. failure patients)
 
 export function calculateNEWS2(vitals: {
   respiratoryRate?: number;
@@ -290,6 +289,8 @@ export function calculateNEWS2(vitals: {
   bpSystolic?: number;
   heartRate?: number;
   consciousness?: 'A' | 'V' | 'P' | 'U' | 'alert' | 'voice' | 'pain' | 'unresponsive';
+  /** Use SpO2 Scale 2 for hypercapnic/T2RF/COPD patients with SpO2 target 88–92%. */
+  useSpO2Scale2?: boolean;
 }): News2Detail | null {
   // All required parameters must be present
   const { respiratoryRate, spO2, temperature, bpSystolic, heartRate } = vitals;
@@ -306,12 +307,26 @@ export function calculateNEWS2(vitals: {
   else if (respiratoryRate <= 24) rrScore = 2;
   else rrScore = 3;
 
-  // SpO2 Scale 1 score
+  // SpO2 score — Scale 1 (standard) or Scale 2 (COPD/T2RF, target 88–92%)
   let spO2Score = 0;
-  if (spO2 <= 91) spO2Score = 3;
-  else if (spO2 <= 93) spO2Score = 2;
-  else if (spO2 <= 95) spO2Score = 1;
-  else spO2Score = 0;
+  if (vitals.useSpO2Scale2) {
+    if (spO2 <= 83) spO2Score = 3;
+    else if (spO2 <= 85) spO2Score = 2;
+    else if (spO2 <= 87) spO2Score = 1;
+    else if (spO2 <= 92) spO2Score = 0; // target range
+    else if (vitals.supplementalO2) {
+      if (spO2 <= 94) spO2Score = 1;
+      else if (spO2 <= 96) spO2Score = 2;
+      else spO2Score = 3; // over-oxygenation
+    } else {
+      spO2Score = 0;
+    }
+  } else {
+    if (spO2 <= 91) spO2Score = 3;
+    else if (spO2 <= 93) spO2Score = 2;
+    else if (spO2 <= 95) spO2Score = 1;
+    else spO2Score = 0;
+  }
 
   // Supplemental O2 score
   const o2Score = vitals.supplementalO2 ? 2 : 0;
@@ -359,8 +374,8 @@ export function calculateNEWS2(vitals: {
 
   return {
     respiratoryRate: rrScore,
-    spO2Scale1: spO2Score,
-    spO2Scale2: 0,
+    spO2Scale1: vitals.useSpO2Scale2 ? 0 : spO2Score,
+    spO2Scale2: vitals.useSpO2Scale2 ? spO2Score : 0,
     supplementalO2: o2Score,
     temperature: tempScore,
     systolicBP: bpScore,
