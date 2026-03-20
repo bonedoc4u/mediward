@@ -648,105 +648,128 @@ const SuperAdminPanel: React.FC<{
           };
           const selected = expandedTemplate ? SPECIALTY_TEMPLATES[expandedTemplate] : null;
 
-          return (
-            <div className="flex gap-6 items-start">
-              {/* ── Left: department list ── */}
-              <div className="w-64 shrink-0 space-y-1">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-3">
-                  {Object.keys(SPECIALTY_TEMPLATES).length} Departments
-                </p>
-                {Object.values(SPECIALTY_TEMPLATES).map(t => {
-                  const isSelected = expandedTemplate === t.specialty;
-                  const fieldCount = t.fieldGroups.reduce((sum, g) => sum + g.fields.length, 0);
-                  return (
-                    <button
-                      key={t.specialty}
-                      onClick={() => setExpandedTemplate(isSelected ? null : t.specialty)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                        isSelected
-                          ? 'bg-slate-900 text-white'
-                          : 'hover:bg-white text-slate-700 hover:shadow-sm'
-                      }`}
-                    >
-                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorDot[t.color] ?? 'bg-slate-400'}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>{t.displayName}</p>
-                        <p className={`text-[11px] ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
-                          {t.fieldGroups.length} groups · {fieldCount} fields
-                        </p>
-                      </div>
-                      {isSelected && <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* ── Right: full UI preview ── */}
-              <div className="flex-1 min-w-0">
-                {!selected ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                    <LayoutTemplate className="w-10 h-10 mb-3 opacity-30" />
-                    <p className="font-semibold text-slate-500">Select a department</p>
-                    <p className="text-sm mt-1">to preview its clinical template UI</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Header */}
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={`w-3 h-3 rounded-full ${colorDot[selected.color] ?? 'bg-slate-400'}`} />
-                        <h2 className="font-bold text-slate-800 text-lg">{selected.displayName}</h2>
-                        <span className="text-xs text-slate-400 ml-auto">{selected.specialty}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {selected.modules.pac && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200">
-                            <HeartPulse className="w-3 h-3" /> PAC module · <span className="font-normal">{selected.labels.pacModule}</span>
-                          </span>
-                        )}
-                        {selected.modules.otList && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                            <ClipboardList className="w-3 h-3" /> OT List · <span className="font-normal">{selected.labels.procedureList}</span>
-                          </span>
-                        )}
-                        {selected.modules.preOp && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
-                            <Syringe className="w-3 h-3" /> Pre-Op checklist
-                          </span>
-                        )}
-                        {selected.modules.podTracking && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                            <Activity className="w-3 h-3" /> POD tracking
-                          </span>
-                        )}
-                        {!selected.modules.pac && !selected.modules.otList && !selected.modules.preOp && !selected.modules.podTracking && (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                            Medical department — no surgical modules
-                          </span>
-                        )}
-                      </div>
+          const DepartmentList = () => (
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-3">
+                {Object.keys(SPECIALTY_TEMPLATES).length} Departments
+              </p>
+              {Object.values(SPECIALTY_TEMPLATES).map(t => {
+                const isSelected = expandedTemplate === t.specialty;
+                const fieldCount = t.fieldGroups.reduce((sum, g) => sum + g.fields.length, 0);
+                return (
+                  <button
+                    key={t.specialty}
+                    onClick={() => setExpandedTemplate(isSelected ? null : t.specialty)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                      isSelected
+                        ? 'bg-slate-900 text-white'
+                        : 'hover:bg-white text-slate-700 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${colorDot[t.color] ?? 'bg-slate-400'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>{t.displayName}</p>
+                      <p className={`text-[11px] ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
+                        {t.fieldGroups.length} groups · {fieldCount} fields
+                      </p>
                     </div>
-
-                    {/* Live SpecialtyDataPanel preview — read-only, empty data */}
-                    {selected.fieldGroups.length > 0 ? (
-                      <SpecialtyDataPanel
-                        key={selected.specialty}
-                        fieldGroups={selected.fieldGroups}
-                        data={{}}
-                        canEdit={false}
-                        onSave={() => {}}
-                        specialtyLabel={selected.displayName}
-                        color={selected.color}
-                      />
-                    ) : (
-                      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-                        <p className="text-sm">No clinical field groups defined for this department.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                    <ChevronRight className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-slate-300' : 'text-slate-400'}`} />
+                  </button>
+                );
+              })}
             </div>
+          );
+
+          const DetailPanel = () => !selected ? null : (
+            <div className="space-y-4">
+              {/* Back button — mobile only */}
+              <button
+                onClick={() => setExpandedTemplate(null)}
+                className="md:hidden flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 mb-1"
+              >
+                <ChevronRight className="w-4 h-4 rotate-180" /> All Departments
+              </button>
+
+              {/* Header */}
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-3 h-3 rounded-full shrink-0 ${colorDot[selected.color] ?? 'bg-slate-400'}`} />
+                  <h2 className="font-bold text-slate-800 text-lg leading-tight">{selected.displayName}</h2>
+                  <span className="text-xs text-slate-400 ml-auto shrink-0">{selected.specialty}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {selected.modules.pac && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+                      <HeartPulse className="w-3 h-3" /> PAC module · <span className="font-normal">{selected.labels.pacModule}</span>
+                    </span>
+                  )}
+                  {selected.modules.otList && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      <ClipboardList className="w-3 h-3" /> OT List · <span className="font-normal">{selected.labels.procedureList}</span>
+                    </span>
+                  )}
+                  {selected.modules.preOp && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                      <Syringe className="w-3 h-3" /> Pre-Op checklist
+                    </span>
+                  )}
+                  {selected.modules.podTracking && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <Activity className="w-3 h-3" /> POD tracking
+                    </span>
+                  )}
+                  {!selected.modules.pac && !selected.modules.otList && !selected.modules.preOp && !selected.modules.podTracking && (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                      Medical department — no surgical modules
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Live SpecialtyDataPanel preview — read-only, empty data */}
+              {selected.fieldGroups.length > 0 ? (
+                <SpecialtyDataPanel
+                  key={selected.specialty}
+                  fieldGroups={selected.fieldGroups}
+                  data={{}}
+                  canEdit={false}
+                  onSave={() => {}}
+                  specialtyLabel={selected.displayName}
+                  color={selected.color}
+                />
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+                  <p className="text-sm">No clinical field groups defined for this department.</p>
+                </div>
+              )}
+            </div>
+          );
+
+          return (
+            <>
+              {/* ── Mobile: show list OR detail (not side-by-side) ── */}
+              <div className="md:hidden">
+                {selected ? <DetailPanel /> : <DepartmentList />}
+              </div>
+
+              {/* ── Desktop: side-by-side ── */}
+              <div className="hidden md:flex gap-6 items-start">
+                <div className="w-64 shrink-0">
+                  <DepartmentList />
+                </div>
+                <div className="flex-1 min-w-0">
+                  {!selected ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                      <LayoutTemplate className="w-10 h-10 mb-3 opacity-30" />
+                      <p className="font-semibold text-slate-500">Select a department</p>
+                      <p className="text-sm mt-1">to preview its clinical template UI</p>
+                    </div>
+                  ) : (
+                    <DetailPanel />
+                  )}
+                </div>
+              </div>
+            </>
           );
         })()}
 
