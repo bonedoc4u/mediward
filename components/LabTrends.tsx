@@ -6,6 +6,7 @@ import { Activity, Plus, Droplet, Flame } from 'lucide-react';
 interface Props {
   patients: Patient[];
   onAddResult: (patientId: string, result: LabResult) => void;
+  initialPatientId?: string;
 }
 
 // Simple SVG Line Chart Component
@@ -225,9 +226,9 @@ const CategoryPanel: React.FC<{
 };
 
 // ─── Main LabTrends component ───
-const LabTrends: React.FC<Props> = ({ patients, onAddResult }) => {
+const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = '' }) => {
   const { labTypesByCategory } = useConfig();
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(initialPatientId);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [inputs, setInputs] = useState<Record<string, string>>({});
 

@@ -103,8 +103,10 @@ const PacManagement: React.FC<Props> = ({ patients, onUpdatePatient }) => {
                 <div className="p-4 border-b border-slate-100 flex justify-between items-start">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="bg-slate-800 text-white w-6 h-6 rounded flex items-center justify-center text-xs font-bold">{patient.bed}</span>
                             <span className="font-bold text-slate-800">{patient.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap">{patient.ward} · Bed {patient.bed}</span>
                         </div>
                         <p className="text-xs text-slate-500">{patient.age}y / {patient.gender}</p>
                         <p className="text-xs font-medium text-slate-700 mt-1 line-clamp-1">{patient.diagnosis}</p>

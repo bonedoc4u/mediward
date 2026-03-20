@@ -274,7 +274,7 @@ const App: React.FC = () => {
           />
         );
       case 'labs':
-        return <LabTrends patients={patients} onAddResult={addLabResult} />;
+        return <LabTrends patients={patients} onAddResult={addLabResult} initialPatientId={navParams.id || ''} />;
       case 'rounds':
         return <DailyRounds patients={patients} onUpdatePatient={updatePatient} onSaveRound={saveRound} />;
       case 'team':
