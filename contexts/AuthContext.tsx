@@ -9,7 +9,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { AuthUser } from '../types';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '../services/persistence';
 import { logAuditEvent } from '../services/auditLog';
-import { findUserByEmail, createAuthUser } from '../services/userService';
+import { findUserByEmail, createAuthUser, verifyAppUserPassword } from '../services/userService';
 import { hashPassword } from '../utils/crypto';
 import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
@@ -209,12 +209,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    // Legacy path: fetch user record with anonymous key (no Supabase Auth session)
-    const legacyFound = await findUserByEmail(email);
-    if (!legacyFound) return { success: false, error: 'Invalid email or password.' };
-
+    // Legacy path: verify password server-side (hash never leaves the DB)
+    // and fetch the user profile via security-definer RPC (works as anon).
     const hash = await hashPassword(password);
-    if (hash !== legacyFound.passwordHash) return { success: false, error: 'Invalid email or password.' };
+    const [isValid, legacyFound] = await Promise.all([
+      verifyAppUserPassword(email, hash),
+      findUserByEmail(email),
+    ]);
+    if (!legacyFound || !isValid) return { success: false, error: 'Invalid email or password.' };
 
     // Auto-migrate: create Supabase Auth account so future logins skip this branch
     createAuthUser(email, password, legacyFound.name, legacyFound.role, legacyFound.ward, legacyFound.unit).catch(() => {});

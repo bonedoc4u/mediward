@@ -13,7 +13,7 @@ interface UserRow {
   email: string;
   name: string;
   role: string;
-  password_hash: string;
+  password_hash?: string; // excluded from most SELECT queries; only present in upsert writes
   ward: string | null;
   unit: string | null;
   hospital_id: string;
@@ -25,7 +25,7 @@ function rowToUser(row: UserRow): StoredUser {
     email:        row.email,
     name:         row.name,
     role:         row.role as UserRole,
-    passwordHash: row.password_hash,
+    passwordHash: row.password_hash ?? '', // password_hash not fetched by SELECT queries
     ward:         (row.ward ?? undefined) as StoredUser['ward'],
     unit:         row.unit ?? undefined,
     hospitalId:   row.hospital_id ?? '00000000-0000-0000-0000-000000000001',
@@ -34,11 +34,11 @@ function rowToUser(row: UserRow): StoredUser {
 
 // ─── Public API ───
 
-/** Fetch all users ordered by creation time. */
+/** Fetch all users ordered by creation time (excludes password_hash). */
 export async function fetchAllUsers(): Promise<StoredUser[]> {
   const { data, error } = await supabase
     .from('app_users')
-    .select('*')
+    .select('id, email, name, role, ward, unit, hospital_id, created_at, updated_at')
     .order('created_at', { ascending: true });
 
   if (error) throw new Error(`fetchAllUsers: ${error.message}`);
@@ -60,16 +60,31 @@ export async function getUserCount(): Promise<number | null> {
   return count ?? 0;
 }
 
-/** Find a single user by email (returns null if not found). */
+/**
+ * Find a single user by email.
+ * Uses the security-definer RPC which:
+ *   - Works for both anon (legacy login) and authenticated callers
+ *   - Never returns password_hash
+ */
 export async function findUserByEmail(email: string): Promise<StoredUser | null> {
   const { data, error } = await supabase
-    .from('app_users')
-    .select('*')
-    .eq('email', email.toLowerCase())
-    .maybeSingle();
+    .rpc('get_app_user_by_email', { p_email: email.toLowerCase() });
 
-  if (error || !data) return null;
-  return rowToUser(data as UserRow);
+  if (error || !data || (data as unknown[]).length === 0) return null;
+  const row = (data as UserRow[])[0];
+  return rowToUser(row);
+}
+
+/**
+ * Server-side password verification — never exposes the hash to the client.
+ * The hash is computed client-side from the plaintext and sent to a
+ * SECURITY DEFINER function that compares it inside the DB.
+ */
+export async function verifyAppUserPassword(email: string, hash: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .rpc('verify_app_user_password', { p_email: email.toLowerCase(), p_hash: hash });
+  if (error) return false;
+  return data === true;
 }
 
 /** Insert or update a user row. Conflicts on email (the stable unique key). */
