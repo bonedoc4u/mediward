@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { Patient, PatientStatus, DischargeSummary as DS, DamaSummary, DeathSummary } from '../types';
 import { jsPDF } from 'jspdf';
@@ -121,7 +121,7 @@ const Icd10Picker: React.FC<{
   }, [query]);
 
   return (
-    <div className="relative flex-1 min-w-0">
+    <div className="relative w-full">
       <input
         type="text"
         value={value || query}
@@ -217,21 +217,25 @@ const MultiDiagnosisField: React.FC<{
               {idx + 1}
             </span>
 
-            {/* Diagnosis text */}
-            <input
-              type="text"
-              value={entry.text}
-              onChange={e => updateEntry(idx, { text: e.target.value })}
-              placeholder="Diagnosis description…"
-              className="flex-1 min-w-0 text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
-            />
+            {/* Diagnosis text + ICD-10 — stacked on mobile, side-by-side on sm+ */}
+            <div className="flex-1 min-w-0 flex flex-col sm:flex-row gap-1.5">
+              <input
+                type="text"
+                value={entry.text}
+                onChange={e => updateEntry(idx, { text: e.target.value })}
+                placeholder="Diagnosis description…"
+                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
+              />
 
-            {/* ICD-10 picker */}
-            <Icd10Picker
-              value={entry.icd10}
-              onChange={v => updateEntry(idx, { icd10: v })}
-              placeholder="ICD-10…"
-            />
+              {/* ICD-10 picker */}
+              <div className="sm:w-48 shrink-0">
+                <Icd10Picker
+                  value={entry.icd10}
+                  onChange={v => updateEntry(idx, { icd10: v })}
+                  placeholder="ICD-10…"
+                />
+              </div>
+            </div>
 
             {/* Remove row */}
             {entries.length > 1 && (
@@ -270,24 +274,42 @@ const DocField = ({
   label, value, onChange, rows = 3, readOnly = false,
 }: {
   label: string; value: string; onChange?: (v: string) => void; rows?: number; readOnly?: boolean;
-}) => (
-  <div className="mb-5">
-    <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1">
-      {label}
+}) => {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow on mount and whenever value changes
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.style.height = 'auto';
+      ref.current.style.height = ref.current.scrollHeight + 'px';
+    }
+  }, [value]);
+
+  return (
+    <div className="mb-5">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1">
+        {label}
+      </div>
+      {readOnly ? (
+        <p className="text-sm text-slate-800 leading-relaxed min-h-[1.5rem] whitespace-pre-wrap break-words">{value || '—'}</p>
+      ) : (
+        <textarea
+          ref={ref}
+          rows={rows}
+          value={value}
+          onChange={e => {
+            // Auto-grow on user input
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+            onChange?.(e.target.value);
+          }}
+          className="w-full text-sm text-slate-800 leading-relaxed resize-none overflow-hidden border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 placeholder-slate-300"
+          placeholder={`Enter ${label.toLowerCase()}...`}
+        />
+      )}
     </div>
-    {readOnly ? (
-      <p className="text-sm text-slate-800 leading-relaxed min-h-[1.5rem]">{value || '—'}</p>
-    ) : (
-      <textarea
-        rows={rows}
-        value={value}
-        onChange={e => onChange?.(e.target.value)}
-        className="w-full text-sm text-slate-800 leading-relaxed resize-none border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 placeholder-slate-300"
-        placeholder={`Enter ${label.toLowerCase()}...`}
-      />
-    )}
-  </div>
-);
+  );
+};
 
 // ─── Medication Picker (discharge medications with autocomplete) ────────────
 const FREQUENCIES = ['OD', 'BD', 'TDS', 'QID', 'SOS', 'PRN', 'Stat', 'Weekly', 'Alternate day'];
