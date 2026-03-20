@@ -333,7 +333,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   <tr
                     key={patient.ipNo}
                     className={`border-b last:border-0 hover:bg-slate-50 transition-colors ${getTriageBorderClass(patient)} ${
-                      patient.pacStatus === PacStatus.Pending ? 'bg-red-50/30' : ''
+                      !patient.dos && patient.pacStatus === PacStatus.Pending ? 'bg-red-50/30' : ''
                     } ${patient.patientStatus === PatientStatus.Discharged ? 'opacity-60 bg-slate-50' : ''}`}
                   >
                     <td className="px-6 py-4 font-medium text-slate-900">{patient.bed}</td>
@@ -383,12 +383,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                     </td>
                     <td className="px-6 py-4 space-y-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.pacStatus)} flex items-center gap-1 w-fit`}>
-                        {patient.pacStatus === PacStatus.Pending
-                          ? <AlertCircle className="w-3 h-3 shrink-0" aria-label="PAC Pending" />
-                          : <CheckCircle2 className="w-3 h-3 shrink-0" aria-label="PAC Fit" />}
-                        {patient.pacStatus}
-                      </span>
+                      {!patient.dos && (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.pacStatus)} flex items-center gap-1 w-fit`}>
+                          {patient.pacStatus === PacStatus.Pending
+                            ? <AlertCircle className="w-3 h-3 shrink-0" aria-label="PAC Pending" />
+                            : <CheckCircle2 className="w-3 h-3 shrink-0" aria-label="PAC Fit" />}
+                          {patient.pacStatus}
+                        </span>
+                      )}
                       {patient.patientStatus !== PatientStatus.Fit && (
                         <span className={`px-2 py-1 rounded-full text-xs font-medium border ${patient.patientStatus === PatientStatus.Discharged ? 'bg-slate-100 text-slate-600 border-slate-200' : getStatusColor(patient.patientStatus)} block w-fit`}>
                           {patient.patientStatus}
@@ -557,7 +559,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 ) : (
                   <div
                     className={`p-4 space-y-3 bg-white border border-slate-200 rounded-lg mb-2 ${getTriageBorderClass(item.patient)} ${
-                      item.patient.pacStatus === PacStatus.Pending ? 'bg-red-50/20' : ''
+                      !item.patient.dos && item.patient.pacStatus === PacStatus.Pending ? 'bg-red-50/20' : ''
                     }`}
                   >
                     <div className="flex justify-between items-start">
@@ -617,11 +619,13 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     )}
                     <div className="flex items-center justify-between">
                       <div className="flex flex-wrap gap-1.5">
-                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>
-                          {item.patient.pacStatus === 'PAC Pending' && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
-                          {item.patient.pacStatus === 'PAC Fit' && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
-                          {item.patient.pacStatus}
-                        </span>
+                        {!item.patient.dos && (
+                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>
+                            {item.patient.pacStatus === 'PAC Pending' && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
+                            {item.patient.pacStatus === 'PAC Fit' && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
+                            {item.patient.pacStatus}
+                          </span>
+                        )}
                         {item.patient.patientStatus !== PatientStatus.Fit && (
                           <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.patientStatus)}`}>
                             {item.patient.patientStatus === PatientStatus.Critical && <AlertCircle className="w-3 h-3" aria-hidden="true" />}

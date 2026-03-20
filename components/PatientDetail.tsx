@@ -136,9 +136,11 @@ const PatientDetail: React.FC = () => {
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Status</span>
             <div className="flex flex-wrap gap-1 mt-1">
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
-                {patient.pacStatus}
-              </span>
+              {!patient.dos && (
+                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
+                  {patient.pacStatus}
+                </span>
+              )}
               <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.patientStatus)}`}>
                 {patient.patientStatus}
               </span>
