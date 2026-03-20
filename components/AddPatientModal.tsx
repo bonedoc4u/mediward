@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Patient, Gender, PacStatus, PatientStatus, Ward } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { parseFhirPatient } from '../services/fhirService';
-import { X, Save, UserPlus, Pencil, Loader2, FileJson, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Save, UserPlus, Pencil, Loader2, FileJson, ChevronDown, ChevronUp, ScanLine } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
 
 
@@ -176,6 +177,49 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const [customComorbidity, setCustomComorbidity] = useState('');
   const [drugAllergies, setDrugAllergies] = useState<string[]>(initialData?.drugAllergies ?? []);
   const [customAllergyInput, setCustomAllergyInput] = useState('');
+
+  // ── Scan Slip (OCR) ──
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  const handleScanFile = async (file: File) => {
+    setScanError(null);
+    setScanLoading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Strip the data:image/...;base64, prefix
+          resolve(result.split(',')[1] ?? result);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke('parse-admission-slip', {
+        body: { image: base64, mimeType: file.type || 'image/jpeg' },
+      });
+      if (error) throw new Error(error.message ?? 'OCR failed');
+      const r = data as Record<string, unknown>;
+      setFormData(prev => ({
+        ...prev,
+        ...(r.name   && typeof r.name   === 'string' ? { name: r.name }               : {}),
+        ...(r.age    && typeof r.age    === 'number' ? { age: String(r.age) }          : {}),
+        ...(r.gender && typeof r.gender === 'string' ? { gender: r.gender as any }     : {}),
+        ...(r.ipNo   && typeof r.ipNo   === 'string' ? { ipNo: r.ipNo }                : {}),
+        ...(r.doa    && typeof r.doa    === 'string' ? { doa: r.doa }                  : {}),
+        ...(r.mobile && typeof r.mobile === 'string' ? { mobile: r.mobile }            : {}),
+      }));
+      // Jump to step 1 so user can see & verify extracted fields
+      setStepRaw(1);
+    } catch (err: any) {
+      setScanError(err.message ?? 'Scan failed. Please try again.');
+    } finally {
+      setScanLoading(false);
+      if (scanInputRef.current) scanInputRef.current.value = '';
+    }
+  };
 
   // ── Focus trap ──
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -383,6 +427,26 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <h3 className="font-bold text-slate-800">{initialData ? 'Edit Patient Details' : 'Admit New Patient'}</h3>
             </div>
             <div className="flex items-center gap-2">
+              {/* Hidden file input for OCR scan */}
+              <input
+                ref={scanInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleScanFile(f); }}
+              />
+              <button
+                type="button"
+                title="Scan admission slip"
+                onClick={() => scanInputRef.current?.click()}
+                disabled={scanLoading}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+              >
+                {scanLoading
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <ScanLine className="w-3.5 h-3.5" />}
+                {scanLoading ? 'Scanning…' : 'Scan Slip'}
+              </button>
               <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
           </div>
@@ -400,7 +464,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               ))}
             </div>
 
-            {/* Step labels — clickable breadcrumbs in edit mode, static otherwise */}
+            {/* Scan error banner */}
+          {scanError && (
+            <p className="mx-4 mb-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{scanError}</p>
+          )}
+
+          {/* Step labels — clickable breadcrumbs in edit mode, static otherwise */}
             <div className="flex justify-between px-1 mt-0.5 pb-2">
               {STEP_LABELS.map((label, i) => (
                 initialData ? (
