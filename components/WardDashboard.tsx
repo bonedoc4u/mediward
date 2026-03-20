@@ -5,6 +5,9 @@ import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBor
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart } from 'lucide-react';
 
+/** Strip ward-number prefix from bed for display: "10-05" → "05", "1A" → "1A" */
+const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
+
 // ─── NEWS2 Badge ─────────────────────────────────────────────────────────────
 function getNews2Config(score: number): { label: string; badge: string; dot: string } {
   if (score >= 7) return { label: `N2: ${score}`, badge: 'bg-red-100 text-red-800 border-red-300 animate-pulse font-bold', dot: 'bg-red-500' };
@@ -336,7 +339,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       !patient.dos && patient.pacStatus === PacStatus.Pending ? 'bg-red-50/30' : ''
                     } ${patient.patientStatus === PatientStatus.Discharged ? 'opacity-60 bg-slate-50' : ''}`}
                   >
-                    <td className="px-6 py-4 font-medium text-slate-900">{patient.bed}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{shortBed(patient.bed)}</td>
                     <td className="px-6 py-4">
                       <div className="font-semibold text-slate-900 flex items-center gap-2">
                         {onViewPatient ? (
@@ -565,7 +568,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <span className={`text-white text-sm font-bold w-10 h-10 shrink-0 flex items-center justify-center rounded-lg ${item.isIcu ? 'bg-red-700' : 'bg-slate-800'}`}>
-                          {item.patient.bed}
+                          {shortBed(item.patient.bed)}
                         </span>
                         <div>
                           <h3 className="font-bold text-slate-900 flex items-center gap-1.5 max-w-[160px] truncate" title={item.patient.name}>

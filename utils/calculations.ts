@@ -116,13 +116,19 @@ export const getTriageBorderClass = (p: Patient): string => {
 };
 
 // ─── Shared Sorting ───
+/** Extract numeric bed component for sorting — handles "10-05" → 5, "05" → 5, "1A" → NaN */
+const bedNum = (bed: string): number => {
+  const part = bed.includes('-') ? bed.split('-').pop()! : bed;
+  return parseInt(part, 10);
+};
+
 export const sortByBed = (a: Patient, b: Patient): number => {
-  const bedA = parseInt(a.bed);
-  const bedB = parseInt(b.bed);
-  if (isNaN(bedA) && isNaN(bedB)) return a.bed.localeCompare(b.bed);
-  if (isNaN(bedA)) return 1;
-  if (isNaN(bedB)) return -1;
-  return bedA - bedB;
+  const numA = bedNum(a.bed);
+  const numB = bedNum(b.bed);
+  if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+  if (!isNaN(numA)) return -1;
+  if (!isNaN(numB)) return 1;
+  return a.bed.localeCompare(b.bed);
 };
 
 export const groupByWard = (patients: Patient[]): Record<string, Patient[]> => {
