@@ -20,7 +20,13 @@ export const calculatePOD = (dos?: string): number | undefined => {
 export const enrichPatientData = (patients: Patient[]): Patient[] => {
   return patients.map(p => ({
     ...p,
-    pod: calculatePOD(p.dos)
+    pod:            calculatePOD(p.dos),
+    // Normalise arrays — guard against null/undefined from DB or optimistic new-patient objects
+    dailyRounds:   Array.isArray(p.dailyRounds)   ? p.dailyRounds   : [],
+    todos:         Array.isArray(p.todos)          ? p.todos          : [],
+    labResults:    Array.isArray(p.labResults)     ? p.labResults     : [],
+    investigations:Array.isArray(p.investigations) ? p.investigations : [],
+    comorbidities: Array.isArray(p.comorbidities)  ? p.comorbidities  : [],
   }));
 };
 
@@ -149,8 +155,6 @@ export function generateNotifications(patients: Patient[]): AppNotification[] {
   const notifications: AppNotification[] = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
-
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().split('T')[0];

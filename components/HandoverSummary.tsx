@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Patient, PacStatus } from '../types';
 import { Scissors, HeartPulse, AlertTriangle, ListChecks, ClipboardList, FileDown } from 'lucide-react';
-import { jsPDF } from 'jspdf';
 
 interface Props {
   patients: Patient[];
@@ -34,7 +33,8 @@ const HandoverSummary: React.FC<Props> = ({
 }) => {
   const today = new Date().toISOString().split('T')[0];
 
-  const exportShiftPDF = (data: { surgeryToday: Patient[]; pod01: Patient[]; pacPending: Patient[]; overdueTodos: Patient[] }) => {
+  const exportShiftPDF = async (data: { surgeryToday: Patient[]; pod01: Patient[]; pacPending: Patient[]; overdueTodos: Patient[] }) => {
+    const { jsPDF } = await import('jspdf');
     const doc = new jsPDF();
     const dateStr = new Date().toLocaleDateString('en-IN', {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',

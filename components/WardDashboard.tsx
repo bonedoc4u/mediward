@@ -283,6 +283,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       </div>
 
       {/* Patient Tables by Ward — Desktop only; mobile uses virtual list below */}
+      <div className="hidden md:block space-y-6">
       {wardsToDisplay.map(ward => {
         // Sort by clinical urgency first, then bed number as tiebreaker
         const wardPatients = [...patientsByWard[ward]].sort((a, b) => {
@@ -503,6 +504,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         </div>
         );
       })}
+      </div>
 
       {/* ─── Start Rounds CTA — mobile home view only ─── */}
       {viewMode === 'home' && onStartRounds && filteredPatients.length > 0 && (
@@ -753,7 +755,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       {quickLabIp && onAddLab && (
         <div className="md:hidden fixed left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200" style={{ bottom: 'calc(var(--bottom-nav-height, 56px) + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)))' }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="font-semibold text-sm text-slate-800">Quick Lab Entry</p>
+            <div>
+              <p className="font-semibold text-sm text-slate-800">Quick Lab Entry</p>
+              <p className="text-xs text-slate-500">{patients.find(p => p.ipNo === quickLabIp)?.name ?? quickLabIp}</p>
+            </div>
             <button onClick={() => setQuickLabIp(null)} className="text-slate-400 hover:text-slate-600 p-1">
               <X className="w-4 h-4" />
             </button>
