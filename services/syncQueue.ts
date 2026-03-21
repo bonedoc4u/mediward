@@ -168,8 +168,11 @@ export function enqueue(type: QueuedOpType, payload: unknown): void {
 
   // Size cap: if at limit, move oldest non-upsert_patient op to DLQ to make room
   if (queue.length >= MAX_QUEUE_SIZE) {
-    const evictIdx = queue.findIndex(op => op.type !== 'upsert_patient');
-    const target = evictIdx !== -1 ? queue[evictIdx] : queue[0];
+    // Sort non-critical ops by queuedAt to evict the oldest one first
+    const sorted = [...queue].sort((a, b) => new Date(a.queuedAt).getTime() - new Date(b.queuedAt).getTime());
+    const oldest = sorted.find(op => op.type !== 'upsert_patient') ?? queue[0];
+    const evictIdx = queue.indexOf(oldest);
+    const target = oldest;
     _persistDlq([..._dlq, { ...target, failedAt: new Date().toISOString(), reason: 'queue_full' }]);
     queue.splice(evictIdx !== -1 ? evictIdx : 0, 1);
   }

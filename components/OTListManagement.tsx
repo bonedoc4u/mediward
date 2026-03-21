@@ -262,7 +262,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     const maxSeq = Math.max(0, ...existingInCat.map(p => p.sequence));
 
     const newEntry: OTPatient = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       sequence: maxSeq + 1,
       ipNo: patient.ipNo,
       name: patient.name,
@@ -298,7 +298,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     const existingInCat = otList.filter(p => p.category === defaultCategory);
     const maxSeq = Math.max(0, ...existingInCat.map(p => p.sequence));
     const newEntry: OTPatient = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       sequence: maxSeq + 1,
       ipNo: '', name: '', age: '', gender: 'M',
       ward: '', unit: surgeonUnit,

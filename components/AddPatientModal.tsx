@@ -38,8 +38,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const activeWards = wards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
   const defaultWard = activeWards[0]?.name ?? 'Ward 1';
 
-  // Non-admins are locked to their own unit; admins can assign any unit
-  const isAdmin = user?.role === 'admin';
+  // Non-admins are locked to their own unit; admins and superadmins can assign any unit
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const defaultUnit = user?.unit ?? '';
 
   // ── Wizard step ──
@@ -304,7 +304,23 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       setSelectedComorbidities(initialData.comorbidities || []);
       setDrugAllergies(initialData.drugAllergies ?? []);
     } else if (isOpen && !initialData) {
-      // Reset for new patient
+      // Restore sessionStorage draft if present; otherwise reset for a fresh new patient
+      try {
+        const saved = sessionStorage.getItem(STEP_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.formData) {
+            setFormData(parsed.formData);
+            if (parsed.selectedComorbidities) setSelectedComorbidities(parsed.selectedComorbidities);
+            if (parsed.drugAllergies) setDrugAllergies(parsed.drugAllergies);
+            const n = parsed.step ? parseInt(String(parsed.step), 10) : 1;
+            setStepRaw(n >= 1 && n <= 3 ? n : 1);
+            setStepError(null);
+            return; // draft restored — don't overwrite with blank form
+          }
+        }
+      } catch { /* ignore */ }
+      // No draft — blank form for new admission
       setFormData({
         bed: '',
         ward: defaultWard,
@@ -325,7 +341,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       setSelectedComorbidities([]);
       setDrugAllergies([]);
     }
-    // Always start at step 1 when modal opens
     setStepRaw(1);
     setStepError(null);
   }, [isOpen, initialData]);

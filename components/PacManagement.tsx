@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Patient, PacStatus, PacChecklistItem } from '../types';
+import { sortByBed } from '../utils/calculations';
 import { Check, Clock, AlertTriangle, Plus, Trash2, HeartPulse } from 'lucide-react';
 
 interface Props {
@@ -11,7 +12,7 @@ const PacManagement: React.FC<Props> = ({ patients, onUpdatePatient }) => {
   // Only show patients awaiting surgery (No Date of Surgery set yet) and not discharged
   const pendingPatients = patients
     .filter(p => !p.dos && p.patientStatus !== 'Discharged')
-    .sort((a, b) => parseInt(a.bed) - parseInt(b.bed));
+    .sort(sortByBed);
 
   const [checklistInputs, setChecklistInputs] = useState<{[key: string]: string}>({});
 
@@ -33,7 +34,7 @@ const PacManagement: React.FC<Props> = ({ patients, onUpdatePatient }) => {
     if (!text?.trim()) return;
 
     const newItem: PacChecklistItem = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         task: text.trim(),
         isDone: false
     };

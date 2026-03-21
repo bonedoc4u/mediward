@@ -22,6 +22,7 @@ interface VitalRow {
   respiratory_rate: number | null;
   weight: string | null;
   pain_score: number | null;
+  news2_score: number | null;
   notes: string | null;
   created_at: string;
 }
@@ -39,6 +40,7 @@ function rowToVital(r: VitalRow): VitalSigns {
     respiratoryRate: r.respiratory_rate ?? undefined,
     weight:          r.weight != null   ? Number(r.weight)       : undefined,
     painScore:       r.pain_score       ?? undefined,
+    news2Score:      r.news2_score      ?? undefined,
     notes:           r.notes            ?? undefined,
   };
 }
@@ -80,6 +82,7 @@ export async function insertVital(
     respiratory_rate: vital.respiratoryRate ?? null,
     weight:           vital.weight      ?? null,
     pain_score:       vital.painScore   ?? null,
+    news2_score:      vital.news2Score  ?? null,
     notes:            vital.notes       ?? null,
   };
   const { data, error } = await supabase

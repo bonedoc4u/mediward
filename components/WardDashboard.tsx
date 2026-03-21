@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, memo } from 'react';
+import React, { useState, useMemo, useRef, useLayoutEffect, memo } from 'react';
 import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
@@ -144,11 +144,16 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   }, [wardsToDisplay, patientsByWard, icuWardNames]);
 
   const listRef = useRef<HTMLDivElement>(null);
+  // scrollMargin must be measured after mount — listRef.current is null during render
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    if (listRef.current) setScrollMargin(listRef.current.offsetTop);
+  }, []);
   const virtualizer = useWindowVirtualizer({
     count: flatItems.length,
     estimateSize: (i) => flatItems[i].kind === 'ward-header' ? 48 : 140,
     overscan: 6,
-    scrollMargin: listRef.current?.offsetTop ?? 0,
+    scrollMargin,
   });
 
   const WardTab = ({ ward, icon: Icon, count, colorClass, activeClass }: any) => (

@@ -38,7 +38,7 @@ import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
 import { upsertRound } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
-import { enqueue, getRetryableQueue, dequeue, incrementAttempts } from '../services/syncQueue';
+import { enqueue, getRetryableQueue, getQueue, dequeue, incrementAttempts } from '../services/syncQueue';
 import {
   registerServiceWorker,
   requestNotificationPermission,
@@ -212,6 +212,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user?.id, user?.unit, viewingHospitalId]);
 
   // ─── Offline Sync Queue — replay on reconnect ───
+  // Ref so the handler always reads the current user without a stale closure
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   useEffect(() => {
     const handleOnline = async () => {
       // Only replay ops whose backoff window has elapsed
@@ -237,12 +241,15 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             await supabase.from('rounds').upsert(p, { onConflict: 'patient_ip_no,date' });
           } else if (op.type === 'insert_vital') {
             await supabase.from('patient_vitals').insert(op.payload);
+          } else if (op.type === 'insert_nursing_note') {
+            await supabase.from('nursing_notes').insert(op.payload);
+          } else if (op.type === 'record_med_administration') {
+            await supabase.from('medication_administrations').insert(op.payload);
           }
           dequeue(op.id);
         } catch {
           const { dropped, opType, label } = incrementAttempts(op.id);
           if (dropped) {
-            // Surface permanent failure — data could not be saved after max retries
             const what = opType === 'upsert_patient'
               ? `Patient record${label ? ` for ${label}` : ''}`
               : 'An offline change';
@@ -251,15 +258,17 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
 
-      // Count ALL remaining ops (including those still in backoff)
-      const remaining = getRetryableQueue().length;
+      // Use getQueue() (all ops) not getRetryableQueue() (only due ops) so backoff ops are counted
+      const remaining = getQueue().length;
       if (remaining === 0) {
         toast.success('All offline changes synced');
-        fetchActivePatients(user?.unit, hospitalIdRef.current)
+        // Read from ref to avoid stale closure capturing pre-login user
+        const currentUser = userRef.current;
+        fetchActivePatients(currentUser?.unit, hospitalIdRef.current)
           .then(data => {
             const enriched = enrichPatientData(data);
             setPatients(enriched);
-            saveActiveCache(data, effectiveHospitalId);
+            saveActiveCache(data, hospitalIdRef.current ?? '');
             setIsStale(false);
             setCacheTimestamp(null);
           })
@@ -379,7 +388,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const nextPage = currentPage + 1;
       const { patients: data, hasMore: more } = await fetchActivePatientsPage(
-        user?.unit, nextPage, PATIENT_PAGE_SIZE,
+        user?.unit, nextPage, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined,
       );
       const enriched = enrichPatientData(data);
       setPatients(prev => {
@@ -398,7 +407,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       setIsLoadingMore(false);
     }
-  }, [hasMore, isLoadingMore, currentPage, user?.unit]);
+  }, [hasMore, isLoadingMore, currentPage, user?.unit, viewingHospitalId]);
 
   // ─── Load All Patients (lazy — Master/Discharge views) ───
   const loadAllPatients = useCallback(async () => {

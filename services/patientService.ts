@@ -30,6 +30,7 @@ interface VitalRowRead {
   respiratory_rate: number | null;
   weight: string | null;
   pain_score: number | null;
+  news2_score: number | null;
   notes: string | null;
 }
 
@@ -157,6 +158,7 @@ function rowToPatient(row: PatientRow): Patient {
         respiratoryRate: v.respiratory_rate ?? undefined,
         weight:          v.weight != null   ? Number(v.weight)       : undefined,
         painScore:       v.pain_score       ?? undefined,
+        news2Score:      v.news2_score      ?? undefined,
         notes:           v.notes            ?? undefined,
       }))
     : Array.isArray(row.vitals) ? row.vitals : [];
@@ -446,6 +448,8 @@ export async function anonymizePatient(ipNo: string, hospitalId: string): Promis
       pre_op_checklist: null,
       pac_checklist:   null,
       notes:           null,
+      todos:           null,
+      drug_allergies:  null,
       date_of_admission: redactedDate,
       date_of_surgery:   null,
     })
