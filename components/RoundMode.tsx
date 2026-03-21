@@ -62,6 +62,7 @@ const RoundMode: React.FC = () => {
     setIndexRaw(n);
   };
   const [roundNote, setRoundNote] = useState('');
+  const [noteFormat, setNoteFormat] = useState<'free' | 'soap' | 'problem'>('free');
   const [newTodoText, setNewTodoText] = useState('');
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
 
@@ -199,14 +200,15 @@ const RoundMode: React.FC = () => {
     }
   };
 
-  // ─── Bullet-point Enter for note textarea ───
+  // ─── Enter key behaviour depends on note format ───
   const handleNoteKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const el = e.currentTarget;
     const start = el.selectionStart ?? roundNote.length;
-    const end = el.selectionEnd ?? roundNote.length;
-    const insert = '\n• ';
+    const end   = el.selectionEnd   ?? roundNote.length;
+    // free-text → bullet; SOAP/problem → plain newline
+    const insert = noteFormat === 'free' ? '\n• ' : '\n';
     const newNote = roundNote.substring(0, start) + insert + roundNote.substring(end);
     setRoundNote(newNote);
     requestAnimationFrame(() => {
@@ -214,7 +216,7 @@ const RoundMode: React.FC = () => {
         noteRef.current.selectionStart = noteRef.current.selectionEnd = start + insert.length;
       }
     });
-  }, [roundNote]);
+  }, [roundNote, noteFormat]);
 
   // ─── Save round ───
   const handleSave = useCallback((andNext = false) => {
@@ -527,10 +529,32 @@ const RoundMode: React.FC = () => {
 
           {/* Daily Status Notes */}
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-              <ClipboardCheck className="w-4 h-4" /> Daily Status Notes
-              {isSaved && <span className="text-green-600 font-semibold normal-case">· Saved ✓</span>}
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <ClipboardCheck className="w-4 h-4" /> Daily Status Notes
+                {isSaved && <span className="text-green-600 font-semibold normal-case">· Saved ✓</span>}
+              </label>
+              <div className="flex items-center gap-1">
+                {(['free', 'soap', 'problem'] as const).map(fmt => (
+                  <button
+                    key={fmt}
+                    onClick={() => {
+                      setNoteFormat(fmt);
+                      if (fmt === 'soap' && !roundNote.includes('S:')) {
+                        setRoundNote('S: \nO: \nA: \nP: ');
+                      } else if (fmt === 'problem' && !roundNote.includes('Problem 1:')) {
+                        setRoundNote('Problem 1: \n  A: \n  P: \n\nProblem 2: \n  A: \n  P: ');
+                      }
+                    }}
+                    className={`px-2 py-0.5 text-[10px] rounded font-medium transition-colors ${
+                      noteFormat === fmt ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {fmt === 'free' ? 'Free' : fmt === 'soap' ? 'SOAP' : 'Problem'}
+                  </button>
+                ))}
+              </div>
+            </div>
             <textarea
               ref={noteRef}
               className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-yellow-50/40 resize-none"
@@ -654,8 +678,8 @@ const RoundMode: React.FC = () => {
         </button>
       </div>
 
-      {/* Counter */}
-      <p className="text-center text-xs text-slate-500 mt-3">
+      {/* Counter + safe-area bottom padding for iOS home indicator */}
+      <p className="text-center text-xs text-slate-500 mt-3 pb-[env(safe-area-inset-bottom)]">
         {index + 1} of {activePatients.length} patients
         {savedSet.size > 0 && ` · ${savedSet.size} noted`}
       </p>

@@ -48,11 +48,10 @@ export default defineConfig(({ mode }) => {
               {
                 // Cache Supabase API calls with a network-first strategy
                 urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-                handler: 'NetworkFirst',
+                handler: 'StaleWhileRevalidate',
                 options: {
                   cacheName: 'supabase-api-cache',
-                  expiration: { maxEntries: 500, maxAgeSeconds: 300 },
-                  networkTimeoutSeconds: 10,
+                  expiration: { maxEntries: 500 },
                 },
               },
             ],

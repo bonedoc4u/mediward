@@ -520,7 +520,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           >
             <div>
               <p className="font-bold text-sm">Start Ward Rounds</p>
-              <p className="text-teal-200 text-xs mt-0.5">{filteredPatients.length} patients · tap to begin</p>
+              <p className="text-white/75 text-xs mt-0.5">{filteredPatients.length} patients · tap to begin</p>
             </div>
             <ChevronRight className="w-5 h-5 text-teal-300" />
           </button>

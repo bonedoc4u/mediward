@@ -115,6 +115,9 @@ interface ConfigContextType {
   showWoundCare: boolean;
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
+  /** Timestamp (Date.now()) set whenever a background config refresh updates the config.
+   *  Components with open forms can watch this to show a "Settings updated" banner. */
+  configUpdatedAt: number | null;
 
   // Admin CRUD — wards
   addWard:    (name: string, isIcu: boolean, unit?: string[]) => Promise<void>;
@@ -161,6 +164,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
 
+  const [configUpdatedAt, setConfigUpdatedAt] = useState<number | null>(null);
   const [hospitalConfig, setHospitalConfigState] = useState<HospitalConfig>(
     () => loadFromStorage<HospitalConfig>(HOSPITAL_CONFIG_CACHE_KEY) ?? DEFAULT_HOSPITAL_CONFIG,
   );
@@ -188,7 +192,15 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .then(([freshWards, freshLabs, freshHospital, freshMeds]) => {
           setWards(freshWards);
           setLabTypes(freshLabs);
-          setHospitalConfigState(freshHospital);
+          setHospitalConfigState(prev => {
+            // Only stamp configUpdatedAt when the config actually changes (not on first load)
+            if (prev.hospitalName && prev.hospitalName !== freshHospital.hospitalName) {
+              setConfigUpdatedAt(Date.now());
+            } else if (JSON.stringify(prev) !== JSON.stringify(freshHospital)) {
+              setConfigUpdatedAt(Date.now());
+            }
+            return freshHospital;
+          });
           setMedications(freshMeds);
           // Only cache own-hospital config (not viewed hospitals)
           if (!viewingHospitalId) {
@@ -402,6 +414,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     showBloodTransfusion: hospitalConfig.showBloodTransfusion ?? false,
     showWoundCare:        hospitalConfig.showWoundCare        ?? false,
     saveHospitalConfig,
+    configUpdatedAt,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
     medications, addMedication, saveMedication, removeMedication, seedMedications,
@@ -411,7 +424,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     wards, labTypes, isLoadingConfig,
     icuWardNames, labTypesByCategory,
     unitChiefs, setUnitChief,
-    hospitalConfig, saveHospitalConfig,
+    hospitalConfig, saveHospitalConfig, configUpdatedAt,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
     medications, addMedication, saveMedication, removeMedication, seedMedications,

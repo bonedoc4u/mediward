@@ -273,7 +273,7 @@ const PatientDetail: React.FC = () => {
 
       {/* Tab Bar — only show extra tabs when enabled in hospital config */}
       {(showMedicationChart || showNursingNotes || showIntakeOutput || showBloodTransfusion || showWoundCare) && (
-        <div className="flex gap-1 border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2 overflow-x-auto scrollbar-hide">
+        <div role="tablist" aria-label="Patient record tabs" className="flex gap-1 border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2 overflow-x-auto scrollbar-hide">
           {([
             { key: 'overview',     label: 'Overview',    icon: <Activity className="w-4 h-4" />,      always: true },
             { key: 'medications',  label: 'Medications', icon: <Pill className="w-4 h-4" />,          always: false, enabled: showMedicationChart },
@@ -286,6 +286,8 @@ const PatientDetail: React.FC = () => {
             .map(tab => (
               <button
                 key={tab.key}
+                role="tab"
+                aria-selected={activeTab === tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] text-sm font-medium rounded-t-lg transition-colors border-b-2 -mb-px ${
                   activeTab === tab.key
