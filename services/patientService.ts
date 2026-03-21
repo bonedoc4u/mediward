@@ -466,6 +466,16 @@ export async function anonymizePatient(ipNo: string, hospitalId: string): Promis
       .eq('patient_ip_no', ipNo);
     if (error) console.warn(`anonymizePatient ${table} delete: ${error.message}`);
   }
+
+  // 3. Delete clinical administration tables (DPDP §13 complete erasure)
+  const clinicalTables = ['med_administrations', 'medications_prescribed', 'patient_vitals'] as const;
+  for (const table of clinicalTables) {
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('patient_ip_no', ipNo);
+    if (error) console.warn(`anonymizePatient ${table} delete: ${error.message}`);
+  }
 }
 
 /**

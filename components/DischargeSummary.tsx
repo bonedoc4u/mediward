@@ -804,7 +804,7 @@ const DischargeForm: React.FC<{
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
+      <div className="no-print bg-white rounded-lg shadow-sm border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
@@ -859,7 +859,7 @@ const DischargeForm: React.FC<{
       </div>
 
       {/* Document mode tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+      <div className="no-print flex gap-1 p-1 bg-slate-100 rounded-xl">
         {([['discharge','Discharge Summary','bg-blue-600'],['dama','DAMA','bg-amber-500'],['death','Death Summary','bg-slate-700']] as [typeof docMode, string, string][]).map(([mode, label, activeColor]) => (
           <button
             key={mode}
@@ -1222,12 +1222,22 @@ const DischargeSummaryView: React.FC = () => {
 
   if (selectedPatient) {
     return (
-      <DischargeForm
-        patient={selectedPatient}
-        onUpdate={updatePatient}
-        onBack={() => navigateTo('discharge')}
-        onReadmit={handleReadmit}
-      />
+      <div id="discharge-summary-root">
+        <style>{`
+          @media print {
+            body > *:not(#discharge-summary-root) { display: none !important; }
+            #discharge-summary-root { display: block !important; }
+            .no-print { display: none !important; }
+            .print-full { width: 100% !important; max-width: none !important; }
+          }
+        `}</style>
+        <DischargeForm
+          patient={selectedPatient}
+          onUpdate={updatePatient}
+          onBack={() => navigateTo('discharge')}
+          onReadmit={handleReadmit}
+        />
+      </div>
     );
   }
 

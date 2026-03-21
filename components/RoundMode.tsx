@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 const RoundMode: React.FC = () => {
-  const { patients, updatePatient, saveRound, navigateTo, sessionExpired } = useApp();
+  const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
   const { icuWardNames } = useConfig();
 
   // ─── All active patients (unfiltered) ───
@@ -277,7 +277,7 @@ const RoundMode: React.FC = () => {
         </div>
 
         {allActivePatients.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4">
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4">
             <ClipboardCheck className="w-16 h-16 opacity-30" />
             <p className="text-lg font-medium">No active patients to round on</p>
             <button onClick={() => navigateTo('dashboard')} className="text-blue-600 hover:underline text-sm">
@@ -330,7 +330,7 @@ const RoundMode: React.FC = () => {
 
   if (activePatients.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-4">
+      <div className="flex flex-col items-center justify-center py-20 text-slate-500 gap-4">
         <ClipboardCheck className="w-16 h-16 opacity-30" />
         <p className="text-lg font-medium">No active patients in this ward</p>
         <button onClick={() => setSelectedWard(null)} className="text-blue-600 hover:underline text-sm">
@@ -362,7 +362,7 @@ const RoundMode: React.FC = () => {
 
   return (
     <div
-      className="min-h-[80vh] flex flex-col select-none relative"
+      className="min-h-[80vh] flex flex-col select-none relative overscroll-y-none"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -378,10 +378,7 @@ const RoundMode: React.FC = () => {
               Please log in again to continue.
             </p>
             <button
-              onClick={() => {
-                 window.location.hash = '#/dashboard';
-                 window.location.reload();
-              }}
+              onClick={() => { logout(); }}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl transition-colors shadow-sm"
             >
               Log In Again
@@ -658,7 +655,7 @@ const RoundMode: React.FC = () => {
       </div>
 
       {/* Counter */}
-      <p className="text-center text-xs text-slate-400 mt-3">
+      <p className="text-center text-xs text-slate-500 mt-3">
         {index + 1} of {activePatients.length} patients
         {savedSet.size > 0 && ` · ${savedSet.size} noted`}
       </p>

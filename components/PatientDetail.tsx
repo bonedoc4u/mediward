@@ -7,13 +7,15 @@ import {
   ArrowLeft, Calendar, Phone, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2, FileJson, Download,
-  Pill, ClipboardList, Droplets, Bandage
+  Pill, ClipboardList, Droplets, Bandage, Calculator, Send
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBoundary from './ErrorBoundary';
 import FHIRExportModal from './FHIRExportModal';
 import VitalsWidget from './VitalsWidget';
 import SpecialtyDataPanel from './SpecialtyDataPanel';
+import ScoringTools from './ScoringTools';
+import ReferralLetter from './ReferralLetter';
 
 const MedicationChart = lazy(() => import('./MedicationChart'));
 const NursingNotes = lazy(() => import('./NursingNotes'));
@@ -23,10 +25,12 @@ const WoundCare = lazy(() => import('./WoundCare'));
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
-  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare } = useConfig();
+  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, hospitalName } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFhirExport, setShowFhirExport] = useState(false);
+  const [showScoring, setShowScoring] = useState(false);
+  const [showReferral, setShowReferral] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'medications' | 'nursing' | 'io' | 'transfusion' | 'wound'>('overview');
   const canDischarge = can(user, 'patient:discharge');
   const canDelete = can(user, 'patient:delete');
@@ -164,6 +168,22 @@ const PatientDetail: React.FC = () => {
 
       {/* Quick Actions — horizontal scroll on mobile, wrap on larger screens */}
       <div className="flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-x-visible">
+        <button
+          onClick={() => setShowScoring(true)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] shrink-0"
+          aria-label="Open clinical scoring tools"
+        >
+          <Calculator className="w-4 h-4" />
+          <span className="hidden sm:inline">Scores</span>
+        </button>
+        <button
+          onClick={() => setShowReferral(true)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] shrink-0"
+          aria-label="Create referral letter"
+        >
+          <Send className="w-4 h-4" />
+          <span className="hidden sm:inline">Refer</span>
+        </button>
         <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
           <ClipboardCheck className="w-4 h-4 text-blue-500 shrink-0" /> Daily Rounds
         </button>
@@ -463,6 +483,17 @@ const PatientDetail: React.FC = () => {
         </div>
       )}
         </>
+      )}
+
+      {showScoring && <ScoringTools onClose={() => setShowScoring(false)} />}
+
+      {showReferral && (
+        <ReferralLetter
+          patient={patient}
+          hospitalName={hospitalName ?? 'Hospital'}
+          referringDoctor={user?.name ?? 'Doctor'}
+          onClose={() => setShowReferral(false)}
+        />
       )}
     </div>
   );

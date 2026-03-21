@@ -38,6 +38,7 @@ const StatusPage = lazy(() => import('./components/StatusPage'));
 import OfflineBanner from './components/OfflineBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import SwUpdateBanner from './components/SwUpdateBanner';
+import IosInstallModal from './components/IosInstallModal';
 import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/ClinicalDisclaimer';
 import ConcurrentEditModal from './components/ConcurrentEditModal';
 import LegalPage from './components/LegalPage';
@@ -134,6 +135,19 @@ const App: React.FC = () => {
     audit:        { title: 'Audit Log',               description: 'System audit trail — all actions logged by user and time' },
     settings:     { title: 'Configuration',            description: 'Hospital settings, department presets, wards, units and lab types' },
   }), [preOpModuleName, procedureListName]);
+
+  // iOS PWA install prompt
+  const [showIosInstall, setShowIosInstall] = useState(false);
+  useEffect(() => {
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = (window.navigator as any).standalone === true;
+    const dismissed = localStorage.getItem('mediward_ios_install_dismissed');
+    if (isIos && !isStandalone && !dismissed) {
+      // Show after 30 seconds to not be intrusive
+      const t = setTimeout(() => setShowIosInstall(true), 30_000);
+      return () => clearTimeout(t);
+    }
+  }, []);
 
   // Modal State (kept local since it's UI-only)
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
@@ -333,7 +347,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
       <style>{`
         :root {
           --bottom-nav-height: 56px;
@@ -605,6 +619,9 @@ const App: React.FC = () => {
           onResolve={resolveConcurrentEdit}
         />
       )}
+
+      {/* ─── iOS Install Guide ─── */}
+      {showIosInstall && <IosInstallModal onClose={() => { setShowIosInstall(false); localStorage.setItem('mediward_ios_install_dismissed', '1'); }} />}
 
       {/* ─── SW Update Banner ─── */}
       <SwUpdateBanner />

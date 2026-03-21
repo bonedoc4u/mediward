@@ -191,19 +191,19 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   });
   const [customAllergyInput, setCustomAllergyInput] = useState('');
 
-  // Keep sessionStorage in sync whenever formData changes
+  // Keep sessionStorage in sync whenever formData changes (debounced to avoid thrashing on every keystroke)
   useEffect(() => {
     if (!initialData) {
-      try {
-        sessionStorage.setItem(STEP_KEY, JSON.stringify({ 
-          step, 
-          formData, 
-          selectedComorbidities, 
-          drugAllergies 
-        }));
-      } catch { /* ignore */ }
+      const timer = setTimeout(() => {
+        try {
+          sessionStorage.setItem(STEP_KEY, JSON.stringify({
+            step, formData, selectedComorbidities, drugAllergies
+          }));
+        } catch { /* ignore */ }
+      }, 500); // debounce: write after 500ms of inactivity
+      return () => clearTimeout(timer);
     }
-  }, [formData, step, initialData, selectedComorbidities, drugAllergies]);
+  }, [formData, step, selectedComorbidities, drugAllergies, initialData]);
 
   // ── Scan Slip (OCR) ──
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -460,6 +460,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         role="dialog"
         aria-modal="true"
         aria-label={initialData ? 'Edit Patient Details' : 'Admit New Patient'}
+        data-modal="add-patient"
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90svh] overflow-y-auto flex flex-col outline-none"
       >
 
@@ -568,7 +569,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                    Unit{!isAdmin && <span className="ml-1 text-slate-400 normal-case font-normal">(your unit)</span>}
+                    Unit{!isAdmin && <span className="ml-1 text-slate-500 normal-case font-normal">(your unit)</span>}
                   </label>
                   {isAdmin ? (
                     <select
@@ -602,7 +603,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                  ABHA ID <span className="normal-case font-normal text-slate-400">(Ayushman Bharat — optional)</span>
+                  ABHA ID <span className="normal-case font-normal text-slate-500">(Ayushman Bharat — optional)</span>
                 </label>
                 <input type="text" placeholder="14-digit ABHA number" maxLength={17} className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none font-mono tracking-wider" value={formData.abhaId} onChange={e => setFormData({...formData, abhaId: e.target.value})} />
               </div>
@@ -678,7 +679,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   </div>
                 )}
                 {selectedComorbidities.length === 0 && !showComorbidityPicker && (
-                  <p className="text-xs text-slate-400 py-1">None recorded.</p>
+                  <p className="text-xs text-slate-500 py-1">None recorded.</p>
                 )}
                 {showComorbidityPicker && (
                   <div className="border border-slate-200 rounded-lg p-2 bg-white">
@@ -728,7 +729,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400">No known drug allergies recorded.</p>
+                  <p className="text-xs text-slate-500">No known drug allergies recorded.</p>
                 )}
               </div>
 
@@ -750,7 +751,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Admission</label>
-                  <input type="date" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
+                  <input type="date" className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Procedure</label>
@@ -760,8 +761,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Surgery (If completed)</label>
-                <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
-                <p className="text-[10px] text-slate-400 mt-1">Leave blank if surgery is pending.</p>
+                <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
+                <p className="text-[10px] text-slate-500 mt-1">Leave blank if surgery is pending.</p>
               </div>
             </div>
           )}

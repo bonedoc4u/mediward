@@ -181,6 +181,7 @@ const CategoryPanel: React.FC<{
         ))}
         <div className="col-span-2 md:col-span-2">
           <button onClick={() => onAdd(labTypes)}
+            aria-label="Add lab results"
             className={`w-full ${addButtonColor} text-white p-1.5 rounded flex items-center justify-center`}>
             <Plus className="w-4 h-4" />
           </button>

@@ -151,7 +151,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   }, []);
   const virtualizer = useWindowVirtualizer({
     count: flatItems.length,
-    estimateSize: (i) => flatItems[i].kind === 'ward-header' ? 48 : 140,
+    estimateSize: (i) => flatItems[i].kind === 'ward-header' ? 48 : 164,
     overscan: 6,
     scrollMargin,
   });
@@ -373,8 +373,8 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     <td className="px-4 py-4 text-center">
                       <News2Badge vitals={patient.vitals} />
                     </td>
-                    <td className="px-6 py-4 max-w-xs">
-                      <div className="truncate" title={patient.diagnosis}>{patient.diagnosis}</div>
+                    <td className="px-4 py-3 max-w-[200px]">
+                      <span className="block truncate text-sm text-slate-700" title={patient.diagnosis}>{patient.diagnosis}</span>
                       {getSmartAlerts(patient).map((a, i) => (
                         <span key={i} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded mt-1 mr-1 ${
                           a.type === 'critical' ? 'bg-red-100 text-red-700' :
@@ -700,12 +700,12 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       )}
 
       {wardsToDisplay.length === 0 && (
-        <div className="py-16 px-6 flex flex-col items-center justify-center text-slate-400 bg-white rounded-xl border border-slate-200">
+        <div className="py-16 px-6 flex flex-col items-center justify-center text-slate-500 bg-white rounded-xl border border-slate-200">
           {hasActiveFilters ? (
             <>
               <Search className="w-10 h-10 mb-3 text-slate-300" />
               <p className="font-semibold text-slate-600">No patients match your filters</p>
-              <p className="text-sm text-slate-400 mt-1">Try a different search term or ward</p>
+              <p className="text-sm text-slate-500 mt-1">Try a different search term or ward</p>
               <button onClick={clearFilters} className="mt-4 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-semibold rounded-lg transition-colors">
                 Clear all filters
               </button>

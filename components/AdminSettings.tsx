@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { WardConfig, LabTypeConfig, MedicationConfig, SpecialtyFieldGroup, SpecialtyField } from '../types';
+import { toast } from '../utils/toast';
 import { Plus, Pencil, Trash2, Save, X, BedDouble, Activity, FlaskConical, ShieldAlert, UserCheck, Building2, Layers, ClipboardList, Link2, Globe, Server, Radio, CheckCircle2, AlertTriangle, XCircle, Pill, RefreshCw, LayoutTemplate, ChevronDown, ChevronUp, RotateCcw, ToggleRight, UserX, Download } from 'lucide-react';
 import { anonymizePatient, exportPatientData } from '../services/patientService';
 import { SPECIALTY_DISPLAY_NAMES } from '../services/specialtyTemplates';
@@ -26,12 +27,16 @@ const DEPARTMENT_PRESETS = [
 ];
 
 // ─── Inline editable row for a ward ───
-const WardRow: React.FC<{ ward: WardConfig; unitOptions: string[]; onSave: (w: WardConfig) => void; onDelete: (id: string) => void }> = ({ ward, unitOptions, onSave, onDelete }) => {
+const WardRow: React.FC<{ ward: WardConfig; wards: WardConfig[]; unitOptions: string[]; onSave: (w: WardConfig) => void; onDelete: (id: string) => void }> = ({ ward, wards, unitOptions, onSave, onDelete }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(ward);
   const [busy, setBusy] = useState(false);
 
   const handleSave = async () => {
+    if (wards.some(w => w.name.toLowerCase() === draft.name.toLowerCase() && w.id !== draft.id)) {
+      toast.error('A ward with this name already exists');
+      return;
+    }
     setBusy(true);
     try { await onSave(draft); setEditing(false); } finally { setBusy(false); }
   };
@@ -135,12 +140,16 @@ const WardRow: React.FC<{ ward: WardConfig; unitOptions: string[]; onSave: (w: W
 };
 
 // ─── Inline editable row for a lab type ───
-const LabRow: React.FC<{ lab: LabTypeConfig; onSave: (l: LabTypeConfig) => void; onDelete: (id: string) => void }> = ({ lab, onSave, onDelete }) => {
+const LabRow: React.FC<{ lab: LabTypeConfig; labTypes: LabTypeConfig[]; onSave: (l: LabTypeConfig) => void; onDelete: (id: string) => void }> = ({ lab, labTypes, onSave, onDelete }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(lab);
   const [busy, setBusy] = useState(false);
 
   const handleSave = async () => {
+    if (labTypes.some(l => l.name.toLowerCase() === draft.name.toLowerCase() && l.id !== draft.id)) {
+      toast.error('A lab type with this name already exists');
+      return;
+    }
     setBusy(true);
     try { await onSave(draft); setEditing(false); } finally { setBusy(false); }
   };
@@ -897,7 +906,7 @@ const AdminSettings: React.FC = () => {
             </thead>
             <tbody>
               {sortedWards.map(ward => (
-                <WardRow key={ward.id} ward={ward} unitOptions={unitOptions} onSave={saveWard} onDelete={removeWard} />
+                <WardRow key={ward.id} ward={ward} wards={wards} unitOptions={unitOptions} onSave={saveWard} onDelete={removeWard} />
               ))}
             </tbody>
           </table>
@@ -965,7 +974,7 @@ const AdminSettings: React.FC = () => {
             </thead>
             <tbody>
               {sortedLabs.map(lab => (
-                <LabRow key={lab.id} lab={lab} onSave={saveLabType} onDelete={removeLabType} />
+                <LabRow key={lab.id} lab={lab} labTypes={labTypes} onSave={saveLabType} onDelete={removeLabType} />
               ))}
             </tbody>
           </table>

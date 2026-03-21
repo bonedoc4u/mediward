@@ -171,7 +171,7 @@ export function enqueue(type: QueuedOpType, payload: unknown): void {
     // Sort non-critical ops by queuedAt to evict the oldest one first
     const sorted = [...queue].sort((a, b) => new Date(a.queuedAt).getTime() - new Date(b.queuedAt).getTime());
     const oldest = sorted.find(op => op.type !== 'upsert_patient') ?? queue[0];
-    const evictIdx = queue.indexOf(oldest);
+    const evictIdx = queue.findIndex(op => op.id === oldest.id);
     const target = oldest;
     _persistDlq([..._dlq, { ...target, failedAt: new Date().toISOString(), reason: 'queue_full' }]);
     queue.splice(evictIdx !== -1 ? evictIdx : 0, 1);
