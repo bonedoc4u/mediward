@@ -43,8 +43,8 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId, drugAllergi
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      fetchMedications(patientIpNo),
-      fetchAdministrations(patientIpNo, today),
+      fetchMedications(patientIpNo, hospitalId),
+      fetchAdministrations(patientIpNo, today, hospitalId),
     ]).then(([meds, adminRecords]) => {
       setMedications(meds);
       setAdmins(adminRecords);
@@ -80,7 +80,7 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId, drugAllergi
       status,
     });
     // Refresh admins
-    const updated = await fetchAdministrations(patientIpNo, today);
+    const updated = await fetchAdministrations(patientIpNo, today, hospitalId);
     setAdmins(updated);
   };
 

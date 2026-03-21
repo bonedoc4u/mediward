@@ -49,13 +49,16 @@ function rowToVital(r: VitalRow): VitalSigns {
 export async function fetchVitals(
   patientIpNo: string,
   limit = 50,
+  hospitalId?: string,
 ): Promise<VitalSigns[]> {
-  const { data, error } = await supabase
+  let q = supabase
     .from('patient_vitals')
     .select('*')
     .eq('patient_ip_no', patientIpNo)
     .order('timestamp', { ascending: false })
     .limit(limit);
+  if (hospitalId) q = q.eq('hospital_id', hospitalId);
+  const { data, error } = await q;
   if (error) throw new Error(`fetchVitals(${patientIpNo}): ${error.message}`);
   return ((data ?? []) as unknown as VitalRow[]).map(rowToVital);
 }

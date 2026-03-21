@@ -1,13 +1,15 @@
 import { supabase } from '../lib/supabase';
 import { PrescribedMedication, MedAdministration, MedAdminStatus } from '../types';
 
-export async function fetchMedications(patientIpNo: string): Promise<PrescribedMedication[]> {
-  const { data, error } = await supabase
+export async function fetchMedications(patientIpNo: string, hospitalId?: string): Promise<PrescribedMedication[]> {
+  let q = supabase
     .from('medications_prescribed')
     .select('*')
     .eq('patient_ip_no', patientIpNo)
     .eq('active', true)
     .order('prescribed_at', { ascending: false });
+  if (hospitalId) q = q.eq('hospital_id', hospitalId);
+  const { data, error } = await q;
   if (error || !data) return [];
   return data.map(r => ({
     id: r.id, hospitalId: r.hospital_id, patientIpNo: r.patient_ip_no,
@@ -62,15 +64,17 @@ export async function recordAdministration(
   });
 }
 
-export async function fetchAdministrations(patientIpNo: string, date: string): Promise<MedAdministration[]> {
+export async function fetchAdministrations(patientIpNo: string, date: string, hospitalId?: string): Promise<MedAdministration[]> {
   const start = `${date}T00:00:00`;
   const end = `${date}T23:59:59`;
-  const { data } = await supabase
+  let q = supabase
     .from('med_administrations')
     .select('*')
     .eq('patient_ip_no', patientIpNo)
     .gte('administered_at', start)
     .lte('administered_at', end);
+  if (hospitalId) q = q.eq('hospital_id', hospitalId);
+  const { data } = await q;
   if (!data) return [];
   return data.map(r => ({
     id: r.id, hospitalId: r.hospital_id, medicationId: r.medication_id,
