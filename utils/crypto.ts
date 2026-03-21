@@ -1,13 +1,6 @@
 /**
- * Legacy SHA-256 password hashing.
- * Used for accounts not yet migrated to Supabase Auth.
- * TODO: Remove after LEGACY_AUTH_DEADLINE (2026-04-02).
+ * DEPRECATED — SHA-256 legacy auth removed 2026-03-21.
+ * All authentication is now handled exclusively by Supabase Auth.
+ * Password resets use supabase.auth.resetPasswordForEmail().
+ * This file is intentionally empty and will be deleted in a future cleanup.
  */
-export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'mediward_salt_2024');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}

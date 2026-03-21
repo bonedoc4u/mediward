@@ -4,10 +4,12 @@ import { VitalSigns } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { calculateNEWS2 } from '../utils/calculations';
 import { toast } from '../utils/toast';
+import { logAuditEvent } from '../services/auditLog';
 
 interface Props {
   vitals: VitalSigns[];
   onAdd: (v: Omit<VitalSigns, 'id'>) => Promise<void> | void;
+  patientIpNo?: string;
 }
 
 // ── Clinical alert thresholds ──────────────────────────────────────
@@ -291,7 +293,7 @@ const VitalsSparklines: React.FC<{ vitals: VitalSigns[] }> = ({ vitals }) => {
 };
 
 // ── Main Widget ────────────────────────────────────────────────────
-const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
+const VitalsWidget: React.FC<Props> = ({ vitals, onAdd, patientIpNo }) => {
   const { user } = useAuth();
   const [showForm, setShowForm]   = useState(false);
   const [showAll, setShowAll]     = useState(false);
@@ -335,6 +337,15 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
 
       if (news2Score !== undefined && news2Score >= 7) {
         toast.error(`⚠️ CRITICAL: NEWS2 Score is ${news2Score}! Immediate escalation required.`);
+        // Audit log — creates a tamper-evident record of the critical alert (CDSCO MDR requirement)
+        logAuditEvent(
+          user?.id ?? 'system',
+          user?.name ?? 'system',
+          'VIEW',
+          'patient',
+          patientIpNo ?? 'unknown',
+          `CRITICAL NEWS2 alert: score ${news2Score} — escalation triggered`,
+        );
         if ('Notification' in window) {
           if (Notification.permission === 'granted') {
             new Notification('CRITICAL NEWS2 ALERT', {

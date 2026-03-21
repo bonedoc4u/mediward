@@ -891,9 +891,9 @@ const DischargeForm: React.FC<{
       {/* ── Document (discharge mode only) ── */}
       {docMode !== 'discharge' ? null : <>
       {/* (discharge document rendered below) */}
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden max-w-4xl mx-auto">
-        {/* Document Header */}
-        <div className="bg-slate-800 text-white text-center py-5 px-6">
+      <div className="bg-white rounded-xl shadow-md border border-slate-200 max-w-4xl mx-auto">
+        {/* Document Header — overflow-hidden kept here so the dark bg clips to rounded-xl corners */}
+        <div className="bg-slate-800 text-white text-center py-5 px-6 rounded-t-xl overflow-hidden">
           <p className="text-xs font-semibold tracking-widest uppercase text-slate-300 mb-0.5">
             {hospitalName}
           </p>

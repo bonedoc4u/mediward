@@ -340,6 +340,7 @@ const PatientDetail: React.FC = () => {
       <VitalsWidget
         vitals={patient.vitals ?? []}
         onAdd={v => addVitalSign(patient.ipNo, v)}
+        patientIpNo={patient.ipNo}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

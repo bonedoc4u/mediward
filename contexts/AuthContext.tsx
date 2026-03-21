@@ -9,17 +9,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { AuthUser } from '../types';
 import { loadFromStorage, saveToStorage, removeFromStorage } from '../services/persistence';
 import { logAuditEvent } from '../services/auditLog';
-import { findUserByEmail, createAuthUser, verifyAppUserPassword } from '../services/userService';
-import { hashPassword } from '../utils/crypto';
+import { findUserByEmail } from '../services/userService';
 import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
 import { clearDisclaimerAccepted } from '../components/ClinicalDisclaimer';
 import { clearPatientCache } from '../services/patientCache';
-
-// ─── Legacy SHA-256 (fallback for accounts not yet on Supabase Auth) ───
-// TODO: Remove hashPassword import + usage after LEGACY_AUTH_DEADLINE passes.
-// All users should have migrated to Supabase Auth by then via the auto-migration on login.
-const LEGACY_AUTH_DEADLINE = new Date('2027-01-01').getTime(); // Extended: force-migrate by Jan 2027
 
 const SESSION_DURATION    = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
 const WARN_BEFORE_EXPIRY  = 5 * 60 * 1000;        // warn 5 min before expiry
@@ -201,40 +195,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true };
     }
 
-    // Step 2: Legacy SHA-256 fallback — disabled after LEGACY_AUTH_DEADLINE
-    if (Date.now() > LEGACY_AUTH_DEADLINE) {
-      return {
-        success: false,
-        error: 'Your account requires a password reset. Contact your administrator.',
-      };
-    }
-
-    // Legacy path: verify password server-side (hash never leaves the DB)
-    // and fetch the user profile via security-definer RPC (works as anon).
-    const hash = await hashPassword(password);
-    const [isValid, legacyFound] = await Promise.all([
-      verifyAppUserPassword(email, hash),
-      findUserByEmail(email),
-    ]);
-    if (!legacyFound || !isValid) return { success: false, error: 'Invalid email or password.' };
-
-    // Auto-migrate: create Supabase Auth account so future logins skip this branch
-    createAuthUser(email, password, legacyFound.name, legacyFound.role, legacyFound.ward, legacyFound.unit).catch(() => {});
-
-    const session: AuthUser = {
-      id:            legacyFound.id,
-      email:         legacyFound.email,
-      name:          legacyFound.name,
-      role:          legacyFound.role,
-      ward:          legacyFound.ward,
-      unit:          legacyFound.unit,
-      hospitalId:    legacyFound.hospitalId,
-      sessionExpiry: Date.now() + SESSION_DURATION,
-    };
-    setUser(session);
-    saveToStorage('session', session);
-    logAuditEvent(session.id, session.name, 'LOGIN', 'session', session.id, `Login (legacy): ${email}`);
-    return { success: true };
+    // Supabase Auth failed — no legacy fallback.
+    return { success: false, error: authError?.message ?? 'Invalid email or password.' };
   }, []);
 
   // ─── Logout ───
@@ -247,6 +209,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     removeFromStorage('session');
     clearDisclaimerAccepted(); // next user on this device must re-accept
+    // Purge SW caches so the next user on a shared tablet cannot read cached patient data
+    if ('caches' in window) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(() => {});
+    }
     window.location.hash = '#/dashboard';
   }, [user]);
 

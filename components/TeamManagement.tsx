@@ -8,7 +8,8 @@ import { ROLE_LABELS, ROLE_ACCESS_DESC, ROLE_COLORS } from '../utils/permissions
 import {
   fetchAllUsers, upsertAppUser, removeAppUser, createAuthUser
 } from '../services/userService';
-import { hashPassword } from '../utils/crypto';
+import { supabase } from '../lib/supabase';
+import { toast } from '../utils/toast';
 
 const ALL_ROLES = Object.keys(ROLE_LABELS) as UserRole[];
 
@@ -40,8 +41,6 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
   const [editUnit, setEditUnit] = useState<string>('');
 
   const [resetId, setResetId] = useState<string | null>(null);
-  const [resetPw, setResetPw] = useState('');
-  const [showResetPw, setShowResetPw] = useState(false);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
@@ -124,20 +123,18 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
     }
   };
 
-  // ─── Reset Password ───
+  // ─── Reset Password (sends Supabase Auth password-reset email) ───
   const handleResetPassword = async (userId: string) => {
-    if (resetPw.length < 6) return;
     const target = users.find(u => u.id === userId);
     if (!target) return;
     try {
-      const hash = await hashPassword(resetPw);
-      const updated = { ...target, passwordHash: hash };
-      await upsertAppUser(updated);
-      setUsers(prev => prev.map(u => u.id === userId ? updated : u));
+      const { error } = await supabase.auth.resetPasswordForEmail(target.email);
+      if (error) throw error;
       setResetId(null);
-      setResetPw('');
+      toast.success(`Password reset email sent to ${target.email}`);
     } catch (err) {
       console.error('[Supabase] password reset failed:', err);
+      toast.error('Failed to send reset email. Check the user\'s email address.');
     }
   };
 
@@ -389,7 +386,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => { setResetId(resetId === u.id ? null : u.id); setResetPw(''); }}
+                            onClick={() => setResetId(resetId === u.id ? null : u.id)}
                             className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                             title="Reset password"
                           >
@@ -413,29 +410,16 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                       <td colSpan={4} className="px-6 py-3">
                         <div className="flex items-center gap-3">
                           <KeyRound className="w-4 h-4 text-amber-600 shrink-0" />
-                          <span className="text-xs text-amber-700 font-medium">New password for {u.name}:</span>
-                          <div className="relative flex-1 max-w-xs">
-                            <input
-                              type={showResetPw ? 'text' : 'password'}
-                              value={resetPw}
-                              onChange={e => setResetPw(e.target.value)}
-                              placeholder="Min. 6 characters"
-                              className="w-full p-2 border border-amber-300 rounded-lg text-xs pr-8 focus:ring-2 focus:ring-amber-200 outline-none"
-                              autoFocus
-                            />
-                            <button type="button" onClick={() => setShowResetPw(v => !v)}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400">
-                              {showResetPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
+                          <span className="text-xs text-amber-700 font-medium">
+                            Send password reset email to <strong>{u.email}</strong>?
+                          </span>
                           <button
                             onClick={() => handleResetPassword(u.id)}
-                            disabled={resetPw.length < 6}
-                            className="flex items-center gap-1 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 disabled:opacity-40"
+                            className="flex items-center gap-1 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700"
                           >
-                            <Save className="w-3 h-3" /> Set Password
+                            <Save className="w-3 h-3" /> Send Reset Email
                           </button>
-                          <button onClick={() => { setResetId(null); setResetPw(''); }}
+                          <button onClick={() => setResetId(null)}
                             className="text-slate-500 hover:text-slate-700">
                             <X className="w-3.5 h-3.5" />
                           </button>

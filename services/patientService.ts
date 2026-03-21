@@ -480,12 +480,12 @@ export async function exportPatientData(ipNo: string, hospitalId: string): Promi
   if (patErr) throw new Error(`exportPatientData: ${patErr.message}`);
   if (!patient) throw new Error(`Patient ${ipNo} not found.`);
 
-  // 2. Linked tables
+  // 2. Linked tables — hospital_id filter prevents cross-tenant data leakage (DPDP §16)
   const [labsRes, imagingRes, roundsRes, notesRes] = await Promise.all([
-    supabase.from('labs').select('*').eq('patient_ip_no', ipNo),
-    supabase.from('imaging').select('*').eq('patient_ip_no', ipNo),
-    supabase.from('rounds').select('*').eq('patient_ip_no', ipNo),
-    supabase.from('nursing_notes').select('*').eq('patient_ip_no', ipNo),
+    supabase.from('labs').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
+    supabase.from('imaging').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
+    supabase.from('rounds').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
+    supabase.from('nursing_notes').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
   ]);
 
   const exportBundle = {
