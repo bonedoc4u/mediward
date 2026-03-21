@@ -40,6 +40,7 @@ import PwaInstallBanner from './components/PwaInstallBanner';
 import SwUpdateBanner from './components/SwUpdateBanner';
 import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/ClinicalDisclaimer';
 import ConcurrentEditModal from './components/ConcurrentEditModal';
+import LegalPage from './components/LegalPage';
 
 // ─── Navigation Config ───
 interface NavItem {
@@ -82,13 +83,19 @@ const App: React.FC = () => {
   const [showStatus, setShowStatus] = useState(
     () => window.location.hash === '#/status',
   );
+  const [showPrivacy, setShowPrivacy] = useState(
+    () => window.location.hash === '#/privacy',
+  );
+  const [showTerms, setShowTerms] = useState(
+    () => window.location.hash === '#/terms',
+  );
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => hasAcceptedDisclaimer());
   const [superAdminMode, setSuperAdminMode] = useState(false);
   const {
     patients, isLoadingPatients, updatePatient, addPatient,
     addLabResult, addInvestigation, deleteInvestigation,
     hasMore, isLoadingMore, loadMorePatients, saveRound,
-    concurrentEditConflict, resolveConcurrentEdit,
+    concurrentEditConflict, resolveConcurrentEdit, realtimeStatus,
   } = usePatients();
   const {
     currentView, navigateTo, navParams,
@@ -158,6 +165,7 @@ const App: React.FC = () => {
   useEffect(() => {
     // Set status bar to light text on dark background (matches dark header)
     StatusBar.setStyle({ style: StatusBarStyle.Light }).catch(() => {/* web — no-op */});
+    StatusBar.setBackgroundColor({ color: '#1e293b' }).catch(() => {/* web — no-op */}); // Slate 800
 
     // Android hardware back button handler
     const subscription = CapApp.addListener('backButton', () => {
@@ -203,6 +211,12 @@ const App: React.FC = () => {
 
   // ─── Auth Guard ───
   if (!isAuthenticated) {
+    if (showPrivacy) {
+      return <LegalPage type="privacy" onBack={() => { setShowPrivacy(false); window.location.hash = ''; }} />;
+    }
+    if (showTerms) {
+      return <LegalPage type="terms" onBack={() => { setShowTerms(false); window.location.hash = ''; }} />;
+    }
     if (showStatus) {
       return (
         <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>}>
@@ -229,6 +243,14 @@ const App: React.FC = () => {
         onStatus={() => {
           setShowStatus(true);
           window.location.hash = '#/status';
+        }}
+        onPrivacy={() => {
+          setShowPrivacy(true);
+          window.location.hash = '#/privacy';
+        }}
+        onTerms={() => {
+          setShowTerms(true);
+          window.location.hash = '#/terms';
         }}
       />
     );
@@ -355,7 +377,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-1">
             <NotificationCenter />
-            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg">
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}>
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
@@ -444,8 +466,16 @@ const App: React.FC = () => {
         <div className="p-4 shrink-0 border-t border-slate-800/50">
           <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
             <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="font-medium">Synced to Cloud</span>
+              <div className={`w-2 h-2 rounded-full ${
+                realtimeStatus === 'connected' ? 'bg-green-500 animate-pulse' :
+                realtimeStatus === 'reconnecting' ? 'bg-amber-500 animate-pulse' :
+                'bg-red-500'
+              }`}></div>
+              <span className="font-medium">
+                {realtimeStatus === 'connected' ? 'Synced to Cloud' :
+                 realtimeStatus === 'reconnecting' ? 'Reconnecting…' :
+                 'Disconnected'}
+              </span>
             </div>
             <p className="text-[10px] text-slate-500 leading-relaxed">
               Supabase · Real-time sync · Session expires in 8 hours.

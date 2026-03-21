@@ -3,6 +3,7 @@ import { Activity, Plus, ChevronDown, ChevronUp, AlertTriangle, BarChart2, Table
 import { VitalSigns } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { calculateNEWS2 } from '../utils/calculations';
+import { toast } from '../utils/toast';
 
 interface Props {
   vitals: VitalSigns[];
@@ -331,6 +332,28 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
       });
       const news2Score = news2?.total;
       await onAdd({ ...form, recordedBy: user?.name ?? 'Nurse', news2Score });
+
+      if (news2Score !== undefined && news2Score >= 7) {
+        toast.error(`⚠️ CRITICAL: NEWS2 Score is ${news2Score}! Immediate escalation required.`);
+        if ('Notification' in window) {
+          if (Notification.permission === 'granted') {
+            new Notification('CRITICAL NEWS2 ALERT', {
+              body: `NEWS2 score is ${news2Score}. Immediate escalation required.`,
+              icon: '/icon-192.png'
+            });
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(p => {
+              if (p === 'granted') {
+                new Notification('CRITICAL NEWS2 ALERT', {
+                  body: `NEWS2 score is ${news2Score}. Immediate escalation required.`,
+                  icon: '/icon-192.png'
+                });
+              }
+            });
+          }
+        }
+      }
+
       setForm({ ...EMPTY, timestamp: new Date().toISOString().slice(0, 16) });
       setShowForm(false);
     } catch (err) {
@@ -592,7 +615,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd }) => {
             No vitals recorded yet
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scroll-x-fade">
             <table className="w-full text-xs" style={{ minWidth: '560px' }}>
               <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase tracking-wide text-[10px]">

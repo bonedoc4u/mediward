@@ -113,15 +113,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     setStepRaw(s);
   };
 
-  // Keep sessionStorage in sync whenever formData changes
-  useEffect(() => {
-    if (!initialData) {
-      try {
-        sessionStorage.setItem(STEP_KEY, JSON.stringify({ step, formData }));
-      } catch { /* ignore */ }
-    }
-  }, [formData, step, initialData]);
-
   const [stepError, setStepError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
@@ -174,10 +165,45 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     }
   };
 
-  const [selectedComorbidities, setSelectedComorbidities] = useState<string[]>([]);
+  const [selectedComorbidities, setSelectedComorbidities] = useState<string[]>(() => {
+    if (initialData?.comorbidities) return initialData.comorbidities;
+    try {
+      const saved = sessionStorage.getItem(STEP_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.selectedComorbidities) return parsed.selectedComorbidities;
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [customComorbidity, setCustomComorbidity] = useState('');
-  const [drugAllergies, setDrugAllergies] = useState<string[]>(initialData?.drugAllergies ?? []);
+  
+  const [drugAllergies, setDrugAllergies] = useState<string[]>(() => {
+    if (initialData?.drugAllergies) return initialData.drugAllergies;
+    try {
+      const saved = sessionStorage.getItem(STEP_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.drugAllergies) return parsed.drugAllergies;
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [customAllergyInput, setCustomAllergyInput] = useState('');
+
+  // Keep sessionStorage in sync whenever formData changes
+  useEffect(() => {
+    if (!initialData) {
+      try {
+        sessionStorage.setItem(STEP_KEY, JSON.stringify({ 
+          step, 
+          formData, 
+          selectedComorbidities, 
+          drugAllergies 
+        }));
+      } catch { /* ignore */ }
+    }
+  }, [formData, step, initialData, selectedComorbidities, drugAllergies]);
 
   // ── Scan Slip (OCR) ──
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -448,7 +474,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   : <ScanLine className="w-3.5 h-3.5" />}
                 {scanLoading ? 'Scanning…' : 'Scan Slip'}
               </button>
-              <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close modal"><X className="w-5 h-5" /></button>
             </div>
           </div>
 

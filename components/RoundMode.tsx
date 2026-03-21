@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 const RoundMode: React.FC = () => {
-  const { patients, updatePatient, saveRound, navigateTo } = useApp();
+  const { patients, updatePatient, saveRound, navigateTo, sessionExpired } = useApp();
   const { icuWardNames } = useConfig();
 
   // ─── All active patients (unfiltered) ───
@@ -362,10 +362,34 @@ const RoundMode: React.FC = () => {
 
   return (
     <div
-      className="min-h-[80vh] flex flex-col select-none"
+      className="min-h-[80vh] flex flex-col select-none relative"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      {/* ─── Session Expiry Overlay ─── */}
+      {sessionExpired && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
+            <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Session Expired</h3>
+            <p className="text-sm text-slate-600 mb-6 font-medium">
+              Your login session has ended. Your draft note is secure on this device, but cannot be synced yet.
+              <br /><br />
+              Please log in again to continue.
+            </p>
+            <button
+              onClick={() => {
+                 window.location.hash = '#/dashboard';
+                 window.location.reload();
+              }}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl transition-colors shadow-sm"
+            >
+              Log In Again
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── Header ─── */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -392,19 +416,24 @@ const RoundMode: React.FC = () => {
 
       {/* ─── Progress ─── */}
       {/* py-3 gives 44px+ touch target height without affecting the visual bar */}
-      <div className="flex gap-1 mb-3 py-3 -my-3">
+      <div className="flex gap-1 mb-3">
         {activePatients.map((p, i) => (
           <button
             key={p.ipNo}
             onClick={() => goTo(i)}
-            className={`h-1.5 flex-1 rounded-full transition-all ${
+            aria-label={`Go to patient ${i + 1} of ${activePatients.length}`}
+            className={`flex-1 flex items-center justify-center min-h-[44px] rounded-md transition-all ${
+              i === index ? 'bg-blue-100' : ''
+            }`}
+          >
+            <span className={`w-full h-1.5 rounded-full transition-all ${
               i === index
                 ? 'bg-blue-600'
                 : savedSet.has(p.ipNo)
                 ? 'bg-green-400'
                 : 'bg-slate-200'
-            }`}
-          />
+            }`} />
+          </button>
         ))}
       </div>
 

@@ -89,6 +89,10 @@ interface PatientContextType {
   concurrentEditConflict: ConcurrentEditConflict | null;
   /** Resolve a concurrent edit: 'local' force-saves the user's version, 'remote' discards it. */
   resolveConcurrentEdit: (choice: 'local' | 'remote') => void;
+  /** Realtime connection status for UI indicators. */
+  realtimeStatus: 'connected' | 'reconnecting' | 'disconnected';
+  /** True if any operation failed due to JWT expiry. */
+  sessionExpired: boolean;
 }
 
 const PatientContext = createContext<PatientContextType | null>(null);
@@ -131,6 +135,12 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(
     () => loadActiveCache(_initHid)?.cachedAt ?? null,
   );
+
+  // Realtime connection status for the sidebar indicator (Bug #15)
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
+
+  // Track if any operation failed due to session expiry (Bug #10)
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const [hasLoadedAll, setHasLoadedAll] = useState(false);
 
@@ -333,8 +343,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             retryDelay = 2000; // reset backoff on success
+            setRealtimeStatus('connected');
           }
           if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !destroyed) {
+            setRealtimeStatus('reconnecting');
             toast.warning('Realtime connection lost — reconnecting…');
             supabase.removeChannel(ch);
             channelRef.current = null;
@@ -416,41 +428,49 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // ─── Patient CRUD ───
   const updatePatient = useCallback((updatedPatient: Patient) => {
+    // Sanitize user-editable text fields (same protection as addPatient)
+    const sanitized = {
+      ...updatedPatient,
+      name:      sanitizeInput(updatedPatient.name),
+      diagnosis: sanitizeInput(updatedPatient.diagnosis),
+      procedure: updatedPatient.procedure ? sanitizeInput(updatedPatient.procedure) : undefined,
+    };
     setPatients(prev => {
       const next = enrichPatientData(
-        prev.map(p => p.ipNo === updatedPatient.ipNo ? updatedPatient : p),
+        prev.map(p => p.ipNo === sanitized.ipNo ? sanitized : p),
       );
       saveActiveCache(next, effectiveHospitalId);
       return next;
     });
-    const isDischarge = updatedPatient.patientStatus === 'Discharged';
-    upsertPatient(updatedPatient)
-      .then(() => { toast.success(`${updatedPatient.name} updated`); if (isDischarge) hapticSuccess(); })
+    const isDischarge = sanitized.patientStatus === 'Discharged';
+    upsertPatient(sanitized)
+      .then(() => { toast.success(`${sanitized.name} updated`); if (isDischarge) hapticSuccess(); })
       .catch(err => {
         console.error('[Patients] updatePatient failed:', err);
         if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT:')) {
           // Fetch the remote version so the user can compare and decide
-          fetchPatientById(updatedPatient.ipNo, user?.hospitalId).then(remote => {
+          fetchPatientById(sanitized.ipNo, user?.hospitalId).then(remote => {
             if (remote) {
-              setConcurrentEditConflict({ localPatient: updatedPatient, remotePatient: remote });
+              setConcurrentEditConflict({ localPatient: sanitized, remotePatient: remote });
             } else {
-              toast.error(`${updatedPatient.name} was modified by another user. Reload to see latest.`);
+              toast.error(`${sanitized.name} was modified by another user. Reload to see latest.`);
             }
           }).catch(() => {
-            toast.error(`${updatedPatient.name} was modified by another user. Reload to see latest.`);
+            toast.error(`${sanitized.name} was modified by another user. Reload to see latest.`);
           });
           return; // do NOT enqueue a stale overwrite
         }
         if (isAuthError(err)) {
+          setSessionExpired(true);
           toast.error('Session expired — please log in again.');
           return; // do NOT enqueue; op will fail again after re-login when user re-submits
         }
-        enqueue('upsert_patient', updatedPatient);
+        enqueue('upsert_patient', sanitized);
         toast.warning('Saved locally — will sync when online.');
       });
     if (user) {
-      logAuditEvent(user.id, user.name, 'UPDATE', 'patient', updatedPatient.ipNo,
-        `Updated: ${updatedPatient.name} (Bed ${updatedPatient.bed})`);
+      logAuditEvent(user.id, user.name, 'UPDATE', 'patient', sanitized.ipNo,
+        `Updated: ${sanitized.name} (Bed ${sanitized.bed})`);
     }
   }, [user]);
 
@@ -471,6 +491,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .catch(err => {
         console.error('[Patients] addPatient failed:', err);
         if (isAuthError(err)) {
+          setSessionExpired(true);
           toast.error('Session expired — please log in again.');
           return;
         }
@@ -566,6 +587,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Persist to normalized rounds table; enqueue for offline retry on failure
     upsertRound(patientIpNo, user?.hospitalId, round).catch(err => {
       console.error('[Patients] saveRound sync failed:', err);
+      if (isAuthError(err)) {
+        setSessionExpired(true);
+        toast.error('Session expired — please log in again.');
+        return;
+      }
       enqueue('upsert_round', {
         patient_ip_no: patientIpNo,
         hospital_id: user?.hospitalId ?? null,
@@ -582,17 +608,38 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user]);
 
   const addVitalSign = useCallback(async (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => {
-    // Write to normalized table first so we get the server-generated UUID
-    const created = await insertVital(patientIpNo, user?.hospitalId, vital);
-    // Optimistic local update
-    setPatients(prev => {
-      const next = prev.map(p =>
-        p.ipNo !== patientIpNo ? p
-          : { ...p, vitals: [created, ...(p.vitals ?? [])] },
-      );
-      saveActiveCache(next, effectiveHospitalId);
-      return next;
-    });
+    try {
+      // Write to normalized table first so we get the server-generated UUID
+      const created = await insertVital(patientIpNo, user?.hospitalId, vital);
+      // Optimistic local update
+      setPatients(prev => {
+        const next = prev.map(p =>
+          p.ipNo !== patientIpNo ? p
+            : { ...p, vitals: [created, ...(p.vitals ?? [])] },
+        );
+        saveActiveCache(next, effectiveHospitalId);
+        return next;
+      });
+    } catch (err) {
+      console.error('[Patients] addVitalSign sync failed:', err);
+      // Enqueue for offline retry (matches addLabResult pattern)
+      enqueue('insert_vital', {
+        patient_ip_no: patientIpNo,
+        hospital_id: user?.hospitalId ?? null,
+        ...vital,
+      });
+      // Optimistic local update with a temporary ID so the UI isn't blank
+      const tempVital = { ...vital, id: `temp-${Date.now()}` } as VitalSigns;
+      setPatients(prev => {
+        const next = prev.map(p =>
+          p.ipNo !== patientIpNo ? p
+            : { ...p, vitals: [tempVital, ...(p.vitals ?? [])] },
+        );
+        saveActiveCache(next, effectiveHospitalId);
+        return next;
+      });
+      toast.warning('Vitals saved locally — will sync when online.');
+    }
     if (user) {
       logAuditEvent(user.id, user.name, 'CREATE', 'vital', patientIpNo,
         `Vitals recorded at ${vital.timestamp}`);
@@ -612,7 +659,23 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // Force-save: strip updatedAt to bypass the optimistic-lock check
       const forced = { ...localPatient, updatedAt: undefined };
       upsertPatient(forced)
-        .then(() => toast.success(`${forced.name} saved (overwrite).`))
+        .then(async () => {
+          toast.success(`${forced.name} saved (overwrite).`);
+          // Re-fetch to restore the server's updated_at, preventing
+          // subsequent saves from bypassing optimistic locking (Bug #3 fix)
+          try {
+            const refreshed = await fetchPatientById(forced.ipNo, user?.hospitalId);
+            if (refreshed) {
+              setPatients(prev => {
+                const next = enrichPatientData(
+                  prev.map(p => p.ipNo === refreshed.ipNo ? refreshed : p),
+                );
+                saveActiveCache(next, effectiveHospitalId);
+                return next;
+              });
+            }
+          } catch { /* non-blocking — local state will still work */ }
+        })
         .catch(() => toast.error('Force-save failed. Please try again.'));
     } else {
       // Keep remote: update local state to the server's version
@@ -625,7 +688,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
       toast.success(`Showing latest version of ${remotePatient.name}.`);
     }
-  }, [concurrentEditConflict]);
+  }, [concurrentEditConflict, user?.hospitalId]);
 
   const value = useMemo<PatientContextType>(() => ({
     patients,
@@ -648,12 +711,15 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addVitalSign,
     concurrentEditConflict,
     resolveConcurrentEdit,
+    realtimeStatus,
+    sessionExpired,
   }), [
     patients, isLoadingPatients, isStale, cacheTimestamp,
     hasMore, isLoadingMore, loadMorePatients,
     hasLoadedAll, loadAllPatients, updatePatient, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation, getPatient,
     saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
+    realtimeStatus, sessionExpired,
   ]);
 
   return <PatientContext.Provider value={value}>{children}</PatientContext.Provider>;

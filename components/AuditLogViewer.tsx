@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useApp } from '../contexts/AppContext';
 import { AuditEntry } from '../types';
 import { can } from '../utils/permissions';
@@ -45,6 +46,14 @@ const AuditLogViewer: React.FC = () => {
     filter === 'ALL' ? entries : entries.filter(e => e.action === filter),
     [entries, filter]
   );
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useWindowVirtualizer({
+    count: filtered.length,
+    estimateSize: () => 76,
+    overscan: 10,
+    scrollMargin: listRef.current?.offsetTop ?? 0,
+  });
 
   const stats = useMemo(() => {
     const yesterday = Date.now() - 86_400_000;
@@ -246,24 +255,47 @@ const AuditLogViewer: React.FC = () => {
             </table>
           </div>
 
-          {/* Mobile list */}
-          <div className="md:hidden divide-y divide-slate-100">
-            {filtered.map(entry => (
-              <div key={entry.id} className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ACTION_BADGE[entry.action] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                    {entry.action}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {new Date(entry.timestamp).toLocaleString('en-IN', {
-                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-                <p className="text-sm font-medium text-slate-700">{entry.userName}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{entry.details}</p>
-              </div>
-            ))}
+          {/* Mobile list (Virtualized) */}
+          <div className="md:hidden" ref={listRef}>
+            <div
+              style={{
+                height: `${virtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {virtualizer.getVirtualItems().map(vi => {
+                const entry = filtered[vi.index];
+                return (
+                  <div 
+                    key={entry.id} 
+                    data-index={vi.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${vi.start - (virtualizer.options.scrollMargin ?? 0)}px)`,
+                    }}
+                    className="p-4 border-b border-slate-100 bg-white"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ACTION_BADGE[entry.action] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                        {entry.action}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {new Date(entry.timestamp).toLocaleString('en-IN', {
+                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-slate-700">{entry.userName}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{entry.details}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

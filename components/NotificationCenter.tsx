@@ -38,6 +38,7 @@ const NotificationCenter: React.FC = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 hover:bg-white/80 rounded-xl transition-all glass-effect relative"
+        aria-label="Notifications"
       >
         <Bell className="w-5 h-5 text-slate-600" />
         {unreadCount > 0 && (
@@ -67,7 +68,7 @@ const NotificationCenter: React.FC = () => {
                     Mark all read
                   </button>
                 )}
-                <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600" aria-label="Close notifications">
                   <X className="w-4 h-4" />
                 </button>
               </div>

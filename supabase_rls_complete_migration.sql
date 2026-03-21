@@ -25,15 +25,40 @@ $$;
 -- ================================================================
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
 
--- Any authenticated user can read (needed for login role lookup + team management)
+-- ─── SECURITY FIX: Remove dangerous anon read policy ───
+-- The old "app_users_select_anon" USING (true) exposed ALL user data
+-- (emails, names, roles, password_hash, hospital_id) to unauthenticated
+-- callers. Replaced with a SECURITY DEFINER RPC below.
+DROP POLICY IF EXISTS "app_users_select_anon" ON public.app_users;
+DROP POLICY IF EXISTS "app_users_anon_read" ON public.app_users;
+
+-- Authenticated users can read users within their own hospital only
 DROP POLICY IF EXISTS "app_users_select" ON public.app_users;
 CREATE POLICY "app_users_select" ON public.app_users
-  FOR SELECT TO authenticated USING (true);
+  FOR SELECT TO authenticated
+  USING (
+    hospital_id = public.get_my_hospital_id()
+    OR public.is_admin()
+  );
 
--- Also allow anon SELECT so the login flow (before session exists) can look up roles
-DROP POLICY IF EXISTS "app_users_select_anon" ON public.app_users;
-CREATE POLICY "app_users_select_anon" ON public.app_users
-  FOR SELECT TO anon USING (true);
+-- ─── Anon login lookup RPC (SECURITY DEFINER) ───
+-- Returns ONLY {id, role, hospital_id} for a given email.
+-- No direct table SELECT for anon — prevents enumeration attacks.
+CREATE OR REPLACE FUNCTION public.lookup_user_for_login(p_email TEXT)
+RETURNS TABLE(id UUID, role TEXT, hospital_id UUID)
+LANGUAGE SQL
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT au.id, au.role, au.hospital_id
+  FROM public.app_users au
+  WHERE au.email = p_email
+  LIMIT 1
+$$;
+
+-- Grant execute to anon so the login flow can call this RPC
+GRANT EXECUTE ON FUNCTION public.lookup_user_for_login(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.lookup_user_for_login(TEXT) TO authenticated;
 
 -- Only admins can create/update/delete users
 DROP POLICY IF EXISTS "app_users_insert" ON public.app_users;
@@ -119,7 +144,59 @@ CREATE INDEX IF NOT EXISTS app_users_role_idx ON public.app_users(role);
 
 -- ─── Done ───
 -- After this migration:
---   • app_users: anyone can read (for login); only admins can modify
+--   • app_users: authenticated same-hospital read; anon uses lookup_user_for_login() RPC
 --   • ward_config / lab_type_config: authenticated read; admin write
 --   • hospital_config: anon + authenticated read; admin write
 --   • All backed by Supabase Auth (auth.uid())
+
+-- ================================================================
+-- Superadmin cross-hospital viewing (Bug #4 fix)
+-- ================================================================
+-- Allows superadmin to set a session-level hospital context for
+-- viewing another hospital's data through RLS.
+CREATE OR REPLACE FUNCTION public.set_viewing_hospital(p_hospital_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Only admins can switch hospital context
+  IF NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Only admin users can switch hospital context';
+  END IF;
+  PERFORM set_config('app.viewing_hospital_id', p_hospital_id::TEXT, true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.set_viewing_hospital(UUID) TO authenticated;
+
+-- Update get_my_hospital_id to check for superadmin override
+CREATE OR REPLACE FUNCTION public.get_my_hospital_id()
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+AS $$
+DECLARE
+  v_hospital_id UUID;
+  v_viewing TEXT;
+BEGIN
+  -- Check if admin has set a viewing hospital override
+  BEGIN
+    v_viewing := current_setting('app.viewing_hospital_id', true);
+  EXCEPTION WHEN OTHERS THEN
+    v_viewing := NULL;
+  END;
+
+  IF v_viewing IS NOT NULL AND v_viewing != '' AND public.is_admin() THEN
+    RETURN v_viewing::UUID;
+  END IF;
+
+  -- Default: return the user's own hospital_id
+  SELECT hospital_id INTO v_hospital_id
+  FROM public.app_users
+  WHERE id = auth.uid();
+
+  RETURN v_hospital_id;
+END;
+$$;

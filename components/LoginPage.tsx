@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AppContext';
 import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
-const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void }> = ({ onRegister, onStatus }) => {
+const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPrivacy?: () => void; onTerms?: () => void }> = ({ onRegister, onStatus, onPrivacy, onTerms }) => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -177,7 +177,7 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void }> = 
           )}
 
           {onStatus && (
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center pb-4 border-b border-slate-100">
               <button
                 onClick={onStatus}
                 className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
@@ -186,6 +186,15 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void }> = 
               </button>
             </div>
           )}
+
+          <div className="mt-4 flex justify-center gap-6 text-xs text-slate-400">
+            {onPrivacy && (
+              <button onClick={onPrivacy} className="hover:text-slate-600 transition-colors font-medium">Privacy Policy</button>
+            )}
+            {onTerms && (
+              <button onClick={onTerms} className="hover:text-slate-600 transition-colors font-medium">Terms of Service</button>
+            )}
+          </div>
 
         </div>
       </div>

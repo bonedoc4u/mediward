@@ -25,6 +25,7 @@ import {
   type SpecialtyKey,
 } from '../services/specialtyTemplates';
 import { saveToStorage, loadFromStorage } from '../services/persistence';
+import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
 import { useAuth } from './AuthContext';
 
@@ -181,22 +182,39 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Background fetch — re-runs when superadmin switches to a different hospital workspace
   useEffect(() => {
     const hid = viewingHospitalId ?? undefined;
-    Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchHospitalConfig(hid), fetchMedications(hid)])
-      .then(([freshWards, freshLabs, freshHospital, freshMeds]) => {
-        setWards(freshWards);
-        setLabTypes(freshLabs);
-        setHospitalConfigState(freshHospital);
-        setMedications(freshMeds);
-        // Only cache own-hospital config (not viewed hospitals)
-        if (!viewingHospitalId) {
-          saveToStorage(WARD_CACHE_KEY, freshWards);
-          saveToStorage(LAB_CACHE_KEY, freshLabs);
-          saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, freshHospital);
-          saveToStorage(MED_CACHE_KEY, freshMeds);
-        }
-      })
-      .catch(err => console.error('[Config] Failed to load from Supabase — using cache:', err))
-      .finally(() => setIsLoadingConfig(false));
+    
+    const loadAll = () => {
+      Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchHospitalConfig(hid), fetchMedications(hid)])
+        .then(([freshWards, freshLabs, freshHospital, freshMeds]) => {
+          setWards(freshWards);
+          setLabTypes(freshLabs);
+          setHospitalConfigState(freshHospital);
+          setMedications(freshMeds);
+          // Only cache own-hospital config (not viewed hospitals)
+          if (!viewingHospitalId) {
+            saveToStorage(WARD_CACHE_KEY, freshWards);
+            saveToStorage(LAB_CACHE_KEY, freshLabs);
+            saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, freshHospital);
+            saveToStorage(MED_CACHE_KEY, freshMeds);
+          }
+        })
+        .catch(err => console.error('[Config] Failed to load from Supabase — using cache:', err))
+        .finally(() => setIsLoadingConfig(false));
+    };
+
+    loadAll();
+
+    // Bug #8: Add realtime subscription for config tables
+    const channel = supabase.channel('config-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ward_config' }, loadAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_type_config' }, loadAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hospital_config' }, loadAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'medications' }, loadAll)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [viewingHospitalId]);
 
   // Detect specialty from department string
