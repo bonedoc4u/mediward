@@ -2,6 +2,9 @@ import React, { useState, useMemo, useCallback, memo } from 'react';
 import { Patient, ToDoItem, PatientStatus, DailyRound, PacStatus } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard } from '../utils/calculations';
+
+/** Show only the bed suffix, e.g. "24-01" → "01", "1A" → "1A" */
+const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
 import { generateId } from '../utils/sanitize';
 import { CheckSquare, Plus, Trash2, Calendar, Share2, FileDown, ChevronLeft, ChevronRight, Lock, Layout, HeartPulse } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -32,15 +35,21 @@ const PatientRoundCard = memo(({
     : null;
   const displayTodos = historicalTodos ?? patient.todos.filter(t => t.task?.trim());
 
-  const isPending = !patient.dos && patient.patientStatus !== PatientStatus.Discharged;
+  // Pre-op patient: no surgery date yet, not discharged
+  const isPreOp = !patient.dos && patient.patientStatus !== PatientStatus.Discharged;
+  // PAC still needs work (only relevant for pre-op patients)
+  const isPacPending = isPreOp && patient.pacStatus === PacStatus.Pending;
+  // PAC has been cleared but surgery not done yet
+  const isPacCleared = isPreOp && patient.pacStatus !== PacStatus.Pending;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
       {/* Header */}
       <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="bg-slate-900 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-base shrink-0">
-            {patient.bed}
+          {/* Bed square — show only the short bed suffix so it fits in the 40px box */}
+          <div className="bg-slate-900 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm shrink-0">
+            {shortBed(patient.bed)}
           </div>
           <div className="min-w-0">
             <h3 className="font-bold text-slate-800 leading-tight">{patient.name}</h3>
@@ -55,9 +64,12 @@ const PatientRoundCard = memo(({
               <span className="text-xs font-black text-blue-700">POD {patient.pod}</span>
             </div>
           )}
-          <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
-            {patient.pacStatus}
-          </span>
+          {/* PAC badge: only show for pre-op patients — post-op (dos set) means surgery is done */}
+          {!patient.dos && (
+            <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
+              {patient.pacStatus}
+            </span>
+          )}
           <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
             (patient.management ?? 'surgical_fixation') === 'conservative'
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -92,10 +104,17 @@ const PatientRoundCard = memo(({
             </div>
           )}
 
-          {isPending && (
-            <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1.5">
+          {/* PAC status hint — only for pre-op patients */}
+          {isPacPending && (
+            <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
               <HeartPulse className="w-3.5 h-3.5 shrink-0" />
-              Pending clearance — update PAC in Ward Rounds
+              PAC pending — update clearance in Ward Rounds
+            </div>
+          )}
+          {isPacCleared && (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+              <HeartPulse className="w-3.5 h-3.5 shrink-0" />
+              PAC cleared · {patient.pacStatus}
             </div>
           )}
         </div>
