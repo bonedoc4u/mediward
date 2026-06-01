@@ -141,12 +141,13 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   showIntakeOutput: false,
   showBloodTransfusion: false,
   showWoundCare: false,
+  showNews2: true,
 };
 
 export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
   let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care');
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care, show_news2');
   if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
   const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
@@ -167,6 +168,7 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     showIntakeOutput:     Boolean(data.show_intake_output     ?? false),
     showBloodTransfusion: Boolean(data.show_blood_transfusion ?? false),
     showWoundCare:        Boolean(data.show_wound_care        ?? false),
+    showNews2:            data.show_news2 == null ? true : Boolean(data.show_news2),
   };
 }
 
@@ -193,6 +195,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_intake_output:         config.showIntakeOutput,
         show_blood_transfusion:     config.showBloodTransfusion,
         show_wound_care:            config.showWoundCare,
+        show_news2:                 config.showNews2,
         updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
@@ -212,6 +215,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_intake_output:         config.showIntakeOutput,
         show_blood_transfusion:     config.showBloodTransfusion,
         show_wound_care:            config.showWoundCare,
+        show_news2:                 config.showNews2,
       });
     if (error) throw error;
   }

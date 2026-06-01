@@ -51,6 +51,7 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   showIntakeOutput: false,
   showBloodTransfusion: false,
   showWoundCare: false,
+  showNews2: true,
 };
 
 // ─── Fallback defaults (used when DB is unreachable and no cache exists) ───
@@ -113,6 +114,8 @@ interface ConfigContextType {
   showBloodTransfusion: boolean;
   /** Whether the Wound Care documentation tab is enabled. */
   showWoundCare: boolean;
+  /** Whether the NEWS2 Early Warning Score is shown on the dashboard and vitals. */
+  showNews2: boolean;
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
   /** Timestamp (Date.now()) set whenever a background config refresh updates the config.
@@ -413,6 +416,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     showIntakeOutput:     hospitalConfig.showIntakeOutput     ?? false,
     showBloodTransfusion: hospitalConfig.showBloodTransfusion ?? false,
     showWoundCare:        hospitalConfig.showWoundCare        ?? false,
+    showNews2:            hospitalConfig.showNews2            ?? true,
     saveHospitalConfig,
     configUpdatedAt,
     addWard, saveWard, removeWard,

@@ -1,14 +1,15 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp, useConfig } from '../contexts/AppContext';
-import { Patient, PatientStatus, ToDoItem } from '../types';
+import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacFlowData, PacStatus } from '../types';
 import { getStatusColor } from '../utils/calculations';
 import { generateId } from '../utils/sanitize';
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { hapticTap } from '../utils/capacitorInit';
 import {
   ChevronLeft, ChevronRight, X, CheckSquare, Square,
-  AlertTriangle, Calendar, ClipboardCheck, Save, Plus
+  AlertTriangle, Calendar, ClipboardCheck, Save, Plus, Scissors, Leaf, HeartPulse
 } from 'lucide-react';
+import PacFlowChart from './PacFlowChart';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
@@ -61,15 +62,12 @@ const RoundMode: React.FC = () => {
     sessionStorage.setItem(ROUND_IDX_KEY, String(n));
     setIndexRaw(n);
   };
-  const [roundNote, setRoundNote] = useState('');
-  const [noteFormat, setNoteFormat] = useState<'free' | 'soap' | 'problem'>('free');
   const [newTodoText, setNewTodoText] = useState('');
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
 
   const touchStartX = useRef(0);
   const navCooldownRef = useRef(false);
   const todoInputRef = useRef<HTMLInputElement>(null);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
 
   // Reactive today — updates at midnight so cross-midnight sessions get the correct date
   const [today, setToday] = useState(() => new Date().toISOString().split('T')[0]);
@@ -104,57 +102,12 @@ const RoundMode: React.FC = () => {
   // patient must be declared before the useEffect hooks that reference it
   const patient: Patient | undefined = activePatients[index];
 
-  // ─── beforeunload guard — warn if navigating away with an unsaved note ───
-  React.useEffect(() => {
-    if (!roundNote.trim()) return;
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      // Modern browsers show a generic message; returnValue kept for legacy support.
-      e.returnValue = 'You have an unsaved round note. Leave anyway?';
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [roundNote]);
-
-  // ─── Session-expiry guard: persist unsaved note to localStorage ───
-  // If the session expires mid-round, the note survives and is restored on re-login.
-  const DRAFT_KEY = `mediward_round_draft_${today}`;
-  React.useEffect(() => {
-    if (roundNote.trim() && patient) {
-      try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ ipNo: patient.ipNo, note: roundNote }));
-      } catch { /* storage full */ }
-    }
-  }, [roundNote, patient, DRAFT_KEY]);
-
-  // Restore draft on mount (e.g., after session re-login)
-  React.useEffect(() => {
-    try {
-      const saved = localStorage.getItem(DRAFT_KEY);
-      if (saved && patient) {
-        const draft = JSON.parse(saved) as { ipNo: string; note: string };
-        if (draft.ipNo === patient.ipNo && draft.note.trim()) {
-          setRoundNote(draft.note);
-        }
-      }
-    } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patient?.ipNo]);
-
-  // Clear draft after successful save
-  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } };
 
   // ─── Navigate between patients ───
   const goTo = useCallback((next: number) => {
-    // Auto-save any typed note before switching patients
-    if (patient && roundNote.trim()) {
-      saveRound(patient.ipNo, { date: today, note: roundNote.trim(), todos: patient.todos });
-      setSavedSet(prev => new Set(prev).add(patient.ipNo));
-    }
     setIndex(Math.max(0, Math.min(next, activePatients.length - 1)));
-    setRoundNote('');
     setNewTodoText('');
-  }, [activePatients.length, patient, roundNote, today, saveRound]);
+  }, [activePatients.length]);
 
   const goNext = () => {
     if (navCooldownRef.current) return;
@@ -200,43 +153,22 @@ const RoundMode: React.FC = () => {
     }
   };
 
-  // ─── Enter key behaviour depends on note format ───
-  const handleNoteKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    const el = e.currentTarget;
-    const start = el.selectionStart ?? roundNote.length;
-    const end   = el.selectionEnd   ?? roundNote.length;
-    // free-text → bullet; SOAP/problem → plain newline
-    const insert = noteFormat === 'free' ? '\n• ' : '\n';
-    const newNote = roundNote.substring(0, start) + insert + roundNote.substring(end);
-    setRoundNote(newNote);
-    requestAnimationFrame(() => {
-      if (noteRef.current) {
-        noteRef.current.selectionStart = noteRef.current.selectionEnd = start + insert.length;
-      }
-    });
-  }, [roundNote, noteFormat]);
-
-  // ─── Save round ───
+  // ─── Save round (persists todos; diagnosis used as the round note) ───
   const handleSave = useCallback((andNext = false) => {
     if (!patient) return;
-    const note = roundNote.trim();
-
     saveRound(patient.ipNo, {
       date:  today,
-      note:  note || patient.patientStatus,
+      note:  patient.diagnosis,
       todos: patient.todos,
     });
     setSavedSet(prev => new Set(prev).add(patient.ipNo));
-    clearDraft();
 
     if (andNext && index < activePatients.length - 1) {
       goNext();
     } else if (andNext) {
       navigateTo('dashboard');
     }
-  }, [patient, roundNote, today, index, activePatients.length, saveRound, navigateTo, goNext]);
+  }, [patient, today, index, activePatients.length, saveRound, navigateTo, goNext]);
 
   // ─── Toggle todo ───
   const handleToggleTodo = useCallback((todoId: string) => {
@@ -257,6 +189,14 @@ const RoundMode: React.FC = () => {
     setNewTodoText('');
     requestAnimationFrame(() => todoInputRef.current?.focus());
   }, [patient, newTodoText, updatePatient]);
+
+  // ─── Quick-add shortcut (adds a task without typing) ───
+  const handleQuickAdd = useCallback((task: string) => {
+    if (!patient) return;
+    if (patient.todos.some(t => t.task === task)) return; // already exists
+    const newTodo: ToDoItem = { id: generateId(), task, isDone: false };
+    updatePatient({ ...patient, todos: [...patient.todos, newTodo] });
+  }, [patient, updatePatient]);
 
   // ─── Ward selection screen ───
   if (!selectedWard) {
@@ -344,10 +284,24 @@ const RoundMode: React.FC = () => {
 
   if (!patient) return null;
 
-  const alerts = getSmartAlerts(patient);
-  const isSaved = savedSet.has(patient.ipNo);
-  const pendingTodos = patient.todos.filter(t => !t.isDone);
-  const doneTodos    = patient.todos.filter(t => t.isDone);
+  const alerts      = getSmartAlerts(patient);
+  const isSaved     = savedSet.has(patient.ipNo);
+  const pendingTodos = patient.todos.filter(t => !t.isDone && t.task?.trim());
+  const doneTodos    = patient.todos.filter(t =>  t.isDone && t.task?.trim());
+  const isPending    = !patient.dos && patient.patientStatus !== 'Discharged';
+
+  // Context-aware quick-add shortcuts
+  const isDiabetic = patient.comorbidities.some(c => /diabet|dm\b|\bdm$/i.test(c));
+  const isOpenOrInfected = /open|infect|wound|chronic|purulent|discharge/i.test(
+    [patient.diagnosis, patient.procedure ?? ''].join(' ')
+  );
+  const shortcuts: { label: string; task: string }[] = [
+    ...(isDiabetic          ? [{ label: 'FBS/PPBS', task: 'FBS/PPBS' }] : []),
+    ...(isOpenOrInfected    ? [{ label: 'C & D',    task: 'C & D'    }] : []),
+    ...(isOpenOrInfected    ? [{ label: 'ESR/CRP',  task: 'ESR/CRP'  }] : []),
+    { label: '76', task: 'Form 76' },
+    { label: '77', task: 'Form 77' },
+  ];
 
   // Next patient preview
   const nextPatient = activePatients[index + 1];
@@ -413,27 +367,40 @@ const RoundMode: React.FC = () => {
         </button>
       </div>
 
-      {/* ─── Progress ─── */}
-      {/* py-3 gives 44px+ touch target height without affecting the visual bar */}
-      <div className="flex gap-1 mb-3">
-        {activePatients.map((p, i) => (
-          <button
-            key={p.ipNo}
-            onClick={() => goTo(i)}
-            aria-label={`Go to patient ${i + 1} of ${activePatients.length}`}
-            className={`flex-1 flex items-center justify-center min-h-[44px] rounded-md transition-all ${
-              i === index ? 'bg-blue-100' : ''
-            }`}
-          >
-            <span className={`w-full h-1.5 rounded-full transition-all ${
-              i === index
-                ? 'bg-blue-600'
-                : savedSet.has(p.ipNo)
-                ? 'bg-green-400'
-                : 'bg-slate-200'
-            }`} />
-          </button>
-        ))}
+      {/* ─── Patient Navigation Strip ─── */}
+      {/* Scrollable chip list — tap any patient to jump directly to them */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 scroll-smooth snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
+        {activePatients.map((p, i) => {
+          const isActive  = i === index;
+          const isSavedP  = savedSet.has(p.ipNo);
+          const isIcu     = icuWardNames.has(p.ward ?? '');
+          const isConserv = (p.management ?? 'surgical_fixation') === 'conservative';
+          return (
+            <button
+              key={p.ipNo}
+              onClick={() => goTo(i)}
+              aria-label={`Jump to ${p.name}, Bed ${p.bed}`}
+              className={`snap-start shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all min-h-[40px] ${
+                isActive
+                  ? isIcu
+                    ? 'bg-red-800 text-white border-red-900 shadow-sm'
+                    : 'bg-slate-800 text-white border-slate-900 shadow-sm'
+                  : isSavedP
+                  ? 'bg-green-50 text-green-800 border-green-200'
+                  : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300'
+              }`}
+            >
+              <span className={`font-black text-sm ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                {p.bed}
+              </span>
+              <span className="max-w-[80px] truncate">{p.name.split(' ')[0]}</span>
+              {isSavedP && !isActive && <span className="text-green-500 text-xs">✓</span>}
+              {isConserv && (
+                <Leaf className={`w-3 h-3 shrink-0 ${isActive ? 'text-green-300' : 'text-emerald-500'}`} />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ─── Main Card ─── */}
@@ -500,6 +467,33 @@ const RoundMode: React.FC = () => {
             )}
           </div>
 
+          {/* Management Plan — resident selects during rounds */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">Plan</span>
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' as ManagementPlan })}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  (patient.management ?? 'surgical_fixation') === 'surgical_fixation'
+                    ? 'bg-blue-600 text-white border-blue-700'
+                    : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
+                }`}
+              >
+                <Scissors className="w-3 h-3" /> Surgical Fixation
+              </button>
+              <button
+                onClick={() => updatePatient({ ...patient, management: 'conservative' as ManagementPlan })}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  patient.management === 'conservative'
+                    ? 'bg-emerald-600 text-white border-emerald-700'
+                    : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-400'
+                }`}
+              >
+                <Leaf className="w-3 h-3" /> Conservative
+              </button>
+            </div>
+          </div>
+
           {/* Comorbidities */}
           {(patient.comorbidities?.length ?? 0) > 0 && (
             <div className="flex flex-wrap gap-1">
@@ -527,50 +521,61 @@ const RoundMode: React.FC = () => {
             </div>
           )}
 
-          {/* Daily Status Notes */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <ClipboardCheck className="w-4 h-4" /> Daily Status Notes
-                {isSaved && <span className="text-green-600 font-semibold normal-case">· Saved ✓</span>}
-              </label>
-              <div className="flex items-center gap-1">
-                {(['free', 'soap', 'problem'] as const).map(fmt => (
-                  <button
-                    key={fmt}
-                    onClick={() => {
-                      setNoteFormat(fmt);
-                      if (fmt === 'soap' && !roundNote.includes('S:')) {
-                        setRoundNote('S: \nO: \nA: \nP: ');
-                      } else if (fmt === 'problem' && !roundNote.includes('Problem 1:')) {
-                        setRoundNote('Problem 1: \n  A: \n  P: \n\nProblem 2: \n  A: \n  P: ');
-                      }
-                    }}
-                    className={`px-2 py-0.5 text-[10px] rounded font-medium transition-colors ${
-                      noteFormat === fmt ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {fmt === 'free' ? 'Free' : fmt === 'soap' ? 'SOAP' : 'Problem'}
-                  </button>
-                ))}
+          {/* PAC Clearance — shown for all pending (pre-op) patients */}
+          {isPending && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2">
+                <HeartPulse className="w-4 h-4 text-blue-500" />
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  PAC Clearance
+                </p>
+                {isSaved && <span className="text-green-600 text-xs font-semibold">· Saved ✓</span>}
               </div>
+              <PacFlowChart
+                pacFlow={patient.pacFlow}
+                onChange={(updated) => {
+                  let newPacStatus = patient.pacStatus;
+                  if (updated.seenByAnaesthesia) {
+                    const allDone = updated.branches.length > 0 && updated.branches.every(b => b.isDone);
+                    // Only auto-promote to Fit; leave Review/Unfit if manually set
+                    if (allDone) newPacStatus = PacStatus.Fit;
+                    else if (newPacStatus === PacStatus.Fit) newPacStatus = PacStatus.Pending;
+                  }
+                  updatePatient({ ...patient, pacFlow: updated, pacStatus: newPacStatus });
+                }}
+              />
             </div>
-            <textarea
-              ref={noteRef}
-              className="w-full p-3 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-yellow-50/40 resize-none"
-              rows={3}
-              placeholder="• Progress note…"
-              value={roundNote}
-              onChange={e => setRoundNote(e.target.value)}
-              onKeyDown={handleNoteKeyDown}
-            />
-          </div>
+          )}
 
           {/* Orders / To-Do */}
           <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
               Orders / To-Do ({pendingTodos.length} pending)
             </p>
+
+            {/* Context-aware quick-add shortcuts */}
+            {shortcuts.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {shortcuts.map(s => {
+                  const done = patient.todos.some(t => t.task === s.task);
+                  return (
+                    <button
+                      key={s.label}
+                      onClick={() => !done && handleQuickAdd(s.task)}
+                      disabled={done}
+                      className={`px-2.5 py-1 text-xs rounded-lg border font-semibold transition-colors ${
+                        done
+                          ? 'bg-green-50 text-green-600 border-green-200 cursor-default'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 active:scale-95'
+                      }`}
+                    >
+                      {done ? '✓' : '+'} {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="space-y-1.5 mb-2">
               {pendingTodos.map(todo => (
                 <button

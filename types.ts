@@ -5,9 +5,10 @@ export enum Gender {
 }
 
 export enum PacStatus {
-  Fit = "PAC Fit",
+  Fit     = "PAC Fit",
   Pending = "PAC Pending",
-  Unfit = "PAC Unfit"
+  Unfit   = "PAC Unfit",
+  Review  = "PAC Review",
 }
 
 export enum PatientStatus {
@@ -59,6 +60,9 @@ export interface HospitalConfig {
   showBloodTransfusion: boolean;
   /** Show the Wound Care documentation tab. Off by default. */
   showWoundCare: boolean;
+  /** Show the NEWS2 Early Warning Score column and badge. On by default.
+   *  Departments that do not use NEWS2 (e.g. outpatient-only units) can hide it. */
+  showNews2: boolean;
 }
 
 /** A ward row from the ward_config table. */
@@ -415,6 +419,35 @@ export interface DischargeSummary {
   finalDiagnosis?: string;
 }
 
+// ─── Management Plan ─────────────────────────────────────────────────────────
+/** Treatment plan selected during rounds. Default is surgical_fixation.
+ *  Conservative patients are excluded from the pending (pre-op) list. */
+export type ManagementPlan = 'surgical_fixation' | 'conservative';
+
+// ─── PAC Flowchart ───────────────────────────────────────────────────────────
+/** One sub-task within a PAC branch (e.g. "Echocardiogram", "Correct Hb to 10") */
+export interface PacFlowItem {
+  id: string;
+  label: string;
+  isDone: boolean;
+}
+
+/** One clearance branch in the PAC flowchart (e.g. "Medicine Fitness"). */
+export interface PacFlowBranch {
+  id: string;
+  label: string;
+  isDone: boolean;
+  /** Sub-requirements added by the consulting team. */
+  items: PacFlowItem[];
+}
+
+/** Full PAC workflow state stored per patient. */
+export interface PacFlowData {
+  seenByAnaesthesia: boolean;
+  seenDate?: string;
+  branches: PacFlowBranch[];
+}
+
 export interface Patient {
   bed: string;
   ward: Ward;
@@ -438,6 +471,10 @@ export interface Patient {
   pod?: number;
   pacStatus: PacStatus;
   pacChecklist?: PacChecklistItem[];
+  /** PAC clearance flowchart — branches with sub-items per consultation. */
+  pacFlow?: PacFlowData;
+  /** Treatment plan: surgical_fixation (default) shows in pending list; conservative does not. */
+  management?: ManagementPlan;
   /** Fixed to PatientStatus enum — was incorrectly typed as `string` (P0 fix). */
   patientStatus: PatientStatus;
   dailyRounds: DailyRound[];

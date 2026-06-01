@@ -353,6 +353,21 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   <p className="text-[11px] text-slate-400">Comma-separated. Each unit becomes a separate team view.</p>
                 </div>
 
+                {/* Department model explanation */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 space-y-1">
+                  <p className="font-semibold">One registration = one department workspace</p>
+                  <p>
+                    The department you set above applies to <strong>every user</strong> in this workspace —
+                    it is not per-person. Units (OR1, OR2…) are assigned per person inside Team Management
+                    and control which patients each doctor sees.
+                  </p>
+                  <p className="text-amber-700">
+                    If your hospital has multiple surgical departments (e.g. Orthopaedics <em>and</em> General Surgery),
+                    each department should register separately with its own admin account.
+                    Each registration is fully isolated — separate patient lists, separate team, separate data.
+                  </p>
+                </div>
+
                 <button
                   type="submit"
                   disabled={isLoading}

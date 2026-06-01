@@ -58,7 +58,7 @@ interface Props {
 }
 
 const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, hasMore, isLoadingMore, onLoadMore }) => {
-  const { wards: configWards, icuWardNames, labTypes } = useConfig();
+  const { wards: configWards, icuWardNames, labTypes, showNews2 } = useConfig();
   const { user } = useAuth();
 
   // For unit-scoped users: show only wards belonging to their unit + shared wards (no unit) + ICU wards.
@@ -85,6 +85,8 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       } else if (viewMode === 'pending') {
         if (p.patientStatus === PatientStatus.Discharged) return false;
         if (p.dos) return false;
+        // Conservative patients don't need surgery — exclude from the pending/pre-op list
+        if ((p.management ?? 'surgical_fixation') === 'conservative') return false;
       }
 
       const matchesSearch =
@@ -128,12 +130,13 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       const isIcuWard = icuWardNames.has(ward);
       const wps = [...(patientsByWard[ward] ?? [])].sort((a, b) => {
         if (viewMode === 'pending') {
+          // Pending list: earliest planned surgery date first, undated cases last
           if (a.plannedDos && b.plannedDos) return a.plannedDos.localeCompare(b.plannedDos);
           if (a.plannedDos) return -1;
           if (b.plannedDos) return 1;
         }
-        const diff = getTriagePriority(a) - getTriagePriority(b);
-        return diff !== 0 ? diff : sortByBed(a, b);
+        // All views: primary sort is bed number so the list mirrors the physical ward layout
+        return sortByBed(a, b);
       });
       items.push({ kind: 'ward-header', ward, isIcu: isIcuWard, count: wps.length });
       for (const patient of wps) {
@@ -327,7 +330,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 <tr>
                   <th className="px-6 py-3 min-w-[56px]">Bed</th>
                   <th className="px-6 py-3 min-w-[160px]">Patient</th>
-                  <th className="px-4 py-3 min-w-[80px] text-center" title="NEWS2 Early Warning Score">NEWS2</th>
+                  {showNews2 && <th className="px-4 py-3 min-w-[80px] text-center" title="NEWS2 Early Warning Score">NEWS2</th>}
                   <th className="px-6 py-3 min-w-[140px]">Diagnosis</th>
                   <th className="px-6 py-3 min-w-[120px]">Comorbidities</th>
                   <th className="px-6 py-3 min-w-[140px]">Status</th>
@@ -370,9 +373,11 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                       <div className="text-xs text-blue-600">{patient.mobile}</div>
                     </td>
-                    <td className="px-4 py-4 text-center">
-                      <News2Badge vitals={patient.vitals} />
-                    </td>
+                    {showNews2 && (
+                      <td className="px-4 py-4 text-center">
+                        <News2Badge vitals={patient.vitals} />
+                      </td>
+                    )}
                     <td className="px-4 py-3 max-w-[200px]">
                       <span className="block truncate text-sm text-slate-700" title={patient.diagnosis}>{patient.diagnosis}</span>
                       {getSmartAlerts(patient).map((a, i) => (
@@ -592,7 +597,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <News2Badge vitals={item.patient.vitals} compact />
+                        {showNews2 && <News2Badge vitals={item.patient.vitals} compact />}
                         {item.patient.pod !== undefined && (
                           <div className="text-xs font-bold uppercase text-slate-500 border-2 border-green-500 bg-green-50 p-1.5 rounded text-center">
                             <span className="text-green-700 block text-[9px]">POD</span>

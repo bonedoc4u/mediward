@@ -122,6 +122,11 @@ export async function removeAppUser(userId: string): Promise<void> {
  * Create a new user in both Supabase Auth and app_users.
  * Used by TeamManagement when an admin adds a new team member.
  * Returns an error string on failure, or null on success.
+ *
+ * Session-safety note: supabase.auth.signUp() writes the new user's
+ * unconfirmed tokens into the SDK's in-memory store, replacing the calling
+ * admin's active session. We snapshot the admin session before the call and
+ * restore it immediately after so the admin is never logged out.
  */
 export async function createAuthUser(
   email: string,
@@ -132,8 +137,21 @@ export async function createAuthUser(
   unit?: string,
   hospitalId?: string,
 ): Promise<string | null> {
+  // Snapshot the admin's session before signUp overwrites it
+  const { data: { session: adminSession } } = await supabase.auth.getSession();
+
   // Step 1: Create Supabase Auth account
   const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+
+  // Restore admin session immediately — do this before any early return
+  // so the admin stays authenticated even if user creation fails mid-way
+  if (adminSession) {
+    await supabase.auth.setSession({
+      access_token:  adminSession.access_token,
+      refresh_token: adminSession.refresh_token,
+    });
+  }
+
   if (authError) return authError.message;
   if (!authData.user) return 'Failed to create auth account.';
 

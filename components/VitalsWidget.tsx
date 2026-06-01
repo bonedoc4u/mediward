@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Activity, Plus, ChevronDown, ChevronUp, AlertTriangle, BarChart2, Table2 } from 'lucide-react';
 import { VitalSigns } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfig } from '../contexts/AppContext';
 import { calculateNEWS2 } from '../utils/calculations';
 import { toast } from '../utils/toast';
 import { logAuditEvent } from '../services/auditLog';
@@ -295,6 +296,7 @@ const VitalsSparklines: React.FC<{ vitals: VitalSigns[] }> = ({ vitals }) => {
 // ── Main Widget ────────────────────────────────────────────────────
 const VitalsWidget: React.FC<Props> = ({ vitals, onAdd, patientIpNo }) => {
   const { user } = useAuth();
+  const { showNews2 } = useConfig();
   const [showForm, setShowForm]   = useState(false);
   const [showAll, setShowAll]     = useState(false);
   const [viewMode, setViewMode]   = useState<'table' | 'chart'>('table');
@@ -335,7 +337,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd, patientIpNo }) => {
       const news2Score = news2?.total;
       await onAdd({ ...form, recordedBy: user?.name ?? 'Nurse', news2Score });
 
-      if (news2Score !== undefined && news2Score >= 7) {
+      if (showNews2 && news2Score !== undefined && news2Score >= 7) {
         toast.error(`⚠️ CRITICAL: NEWS2 Score is ${news2Score}! Immediate escalation required.`);
         // Audit log — creates a tamper-evident record of the critical alert (CDSCO MDR requirement)
         logAuditEvent(
@@ -594,7 +596,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd, patientIpNo }) => {
       )}
 
       {/* NEWS2 badge */}
-      {latest && !showForm && latest.news2Score != null && (
+      {showNews2 && latest && !showForm && latest.news2Score != null && (
         <div className="px-4 py-2 border-b border-slate-100 bg-white">
           <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
             latest.news2Score === 0   ? 'bg-green-50  text-green-700  border-green-200' :

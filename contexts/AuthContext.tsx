@@ -15,10 +15,24 @@ import { toast } from '../utils/toast';
 import { clearDisclaimerAccepted } from '../components/ClinicalDisclaimer';
 import { clearPatientCache } from '../services/patientCache';
 
-const SESSION_DURATION    = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
-const WARN_BEFORE_EXPIRY  = 5 * 60 * 1000;        // warn 5 min before expiry
-const INACTIVITY_LIMIT    = 30 * 60 * 1000;        // auto-logout after 30 min no interaction
-const INACTIVITY_WARN     = 25 * 60 * 1000;        // warn at 25 min
+const SESSION_DURATION   = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
+const WARN_BEFORE_EXPIRY = 5 * 60 * 1000;        // warn 5 min before absolute expiry
+
+// Clinical roles need long inactivity windows — a ward round on a 30-bed unit
+// takes 90–120 min, and an OT case can run 3–4 hours. The old 30-min timeout
+// caused silent logouts mid-round. Admin roles keep a tighter window because
+// they typically work at a desk rather than carrying a tablet on rounds.
+function getInactivityLimits(role: AuthUser['role'] | undefined): { limit: number; warn: number } {
+  switch (role) {
+    case 'attending':
+    case 'resident':
+      return { limit: 4 * 60 * 60 * 1000, warn: (4 * 60 - 5) * 60 * 1000 };  // 4 h / warn at 3h55m
+    case 'house_surgeon':
+      return { limit: 2 * 60 * 60 * 1000, warn: (2 * 60 - 5) * 60 * 1000 };  // 2 h / warn at 1h55m
+    default:
+      return { limit: 60 * 60 * 1000,     warn: 55 * 60 * 1000 };              // 1 h / warn at 55m
+  }
+}
 
 // ─── Context Shape ───
 interface AuthContextType {
@@ -88,27 +102,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => timers.forEach(clearTimeout);
   }, [user]);
 
-  // ─── Inactivity Timeout (30 min no interaction → auto-logout) ───
+  // ─── Inactivity Timeout (role-based → auto-logout) ───
   useEffect(() => {
     if (!user) return;
 
+    const { limit, warn } = getInactivityLimits(user.role);
     let warnTimer: ReturnType<typeof setTimeout>;
     let logoutTimer: ReturnType<typeof setTimeout>;
+
+    const limitMinutes = Math.round(limit / 60_000);
+    const warnMinutes  = Math.round(warn  / 60_000);
 
     const reset = () => {
       clearTimeout(warnTimer);
       clearTimeout(logoutTimer);
       warnTimer = setTimeout(() => {
-        toast.warning('⚠️ No activity for 25 minutes. You will be logged out in 5 minutes.');
-      }, INACTIVITY_WARN);
+        toast.warning(`⚠️ No activity for ${warnMinutes} minutes. You will be logged out in 5 minutes.`);
+      }, warn);
       logoutTimer = setTimeout(() => {
-        toast.warning('Logged out due to inactivity.');
+        toast.warning(`Logged out after ${limitMinutes} minutes of inactivity.`);
         supabase.auth.signOut().catch(() => {});
         setUser(null);
         removeFromStorage('session');
         clearDisclaimerAccepted();
         window.location.hash = '#/dashboard';
-      }, INACTIVITY_LIMIT);
+      }, limit);
     };
 
     const EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'] as const;

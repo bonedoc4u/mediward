@@ -148,6 +148,13 @@ const PatientDetail: React.FC = () => {
               <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.patientStatus)}`}>
                 {patient.patientStatus}
               </span>
+              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
+                (patient.management ?? 'surgical_fixation') === 'conservative'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-blue-50 text-blue-700 border-blue-200'
+              }`}>
+                {(patient.management ?? 'surgical_fixation') === 'conservative' ? 'Conservative' : 'Surgical Fixation'}
+              </span>
             </div>
           </div>
           <div>

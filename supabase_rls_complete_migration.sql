@@ -16,7 +16,7 @@ STABLE
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.app_users
-    WHERE id = auth.uid() AND role = 'admin'
+    WHERE id = auth.uid() AND role IN ('admin', 'superadmin')
   )
 $$;
 

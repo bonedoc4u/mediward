@@ -66,7 +66,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
     setFormError('');
     if (!form.name.trim()) return setFormError('Full name is required.');
     if (!form.email.trim() || !form.email.includes('@')) return setFormError('Valid email is required.');
-    if (form.password.length < 6) return setFormError('Password must be at least 6 characters.');
+    if (form.password.length < 8) return setFormError('Password must be at least 8 characters.');
     if (users.some(u => u.email.toLowerCase() === form.email.toLowerCase()))
       return setFormError('A user with this email already exists.');
 
@@ -173,6 +173,34 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
         ))}
       </div>
 
+      {/* Department / Unit model explanation */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-800 space-y-2">
+        <p className="font-semibold text-sm text-blue-900">How Department, Unit, and Role work together</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white rounded-lg border border-blue-100 p-3">
+            <p className="font-bold text-blue-700 mb-1">Department</p>
+            <p className="text-blue-600 leading-relaxed">
+              Set once during registration. Applies to the <strong>whole workspace</strong> — every user belongs
+              to the same department. Change it in Admin Settings → Hospital tab.
+            </p>
+          </div>
+          <div className="bg-white rounded-lg border border-blue-100 p-3">
+            <p className="font-bold text-indigo-700 mb-1">Unit (per user)</p>
+            <p className="text-indigo-600 leading-relaxed">
+              Assigned here when you add or edit a user. Controls <strong>which patients</strong> they can see.
+              OR2 doctor sees only OR2 patients. Leave blank for full access (admin / ICU).
+            </p>
+          </div>
+          <div className="bg-white rounded-lg border border-blue-100 p-3">
+            <p className="font-bold text-slate-700 mb-1">Role (per user)</p>
+            <p className="text-slate-600 leading-relaxed">
+              Controls <strong>what they can do</strong> — add patients, discharge, access team settings, etc.
+              Independent of unit. A resident in OR2 has resident permissions, not OR2 permissions.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-slate-500">{users.length} user{users.length !== 1 ? 's' : ''} have access to this system</p>
@@ -230,7 +258,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                   type={showPw ? 'text' : 'password'}
                   value={form.password}
                   onChange={e => setForm(v => ({ ...v, password: e.target.value }))}
-                  placeholder="Min. 6 characters"
+                  placeholder="Min. 8 characters"
                   className="w-full p-2.5 border border-slate-300 rounded-lg text-sm pr-10 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
                 />
                 <button type="button" onClick={() => setShowPw(v => !v)}

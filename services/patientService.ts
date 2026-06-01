@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import {
   Patient, DailyRound, Investigation, LabResult, ToDoItem,
   PacChecklistItem, PreOpChecklist, DischargeSummary, DamaSummary, DeathSummary, VitalSigns,
+  ManagementPlan, PacFlowData,
 } from '../types';
 
 // ─── Joined row shapes from normalized rounds / vitals tables ─────
@@ -78,6 +79,8 @@ interface PatientRow {
   daily_rounds?: DailyRound[] | null;
   todos: ToDoItem[];
   pac_checklist: PacChecklistItem[] | null;
+  pac_flow: PacFlowData | null;
+  management: string | null;
   pre_op_checklist: PreOpChecklist | null;
   discharge_summary: DischargeSummary | null;
   dama_summary: DamaSummary | null;
@@ -187,8 +190,19 @@ function rowToPatient(row: PatientRow): Patient {
     dailyRounds,
     investigations,
     labResults,
-    todos:            Array.isArray(row.todos)            ? row.todos           : [],
+    // Normalize todos: legacy rows stored `text` instead of `task`; filter blanks
+    todos: Array.isArray(row.todos)
+      ? (row.todos as unknown as Record<string, unknown>[])
+          .map(t => ({
+            id:     String(t.id     ?? ''),
+            task:   String(t.task   ?? t.text ?? ''),
+            isDone: Boolean(t.isDone ?? false),
+          }))
+          .filter(t => t.task.trim() !== '')
+      : [],
     pacChecklist:     row.pac_checklist    ?? undefined,
+    pacFlow:          row.pac_flow         ?? undefined,
+    management:       (row.management ?? 'surgical_fixation') as ManagementPlan,
     preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
     damaSummary:      row.dama_summary      ?? undefined,
@@ -231,6 +245,8 @@ function patientToRow(patient: Patient) {
     patient_status:    patient.patientStatus,
     todos:             patient.todos,
     pac_checklist:     patient.pacChecklist     ?? null,
+    pac_flow:          patient.pacFlow          ?? null,
+    management:        patient.management       ?? 'surgical_fixation',
     pre_op_checklist:  patient.preOpChecklist   ?? null,
     discharge_summary: patient.dischargeSummary ?? null,
     dama_summary:      patient.damaSummary      ?? null,
@@ -255,6 +271,7 @@ const PATIENT_LIST_SELECT = [
   'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
+  'management',
   'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
   // Only rounds join for list rendering — labs/imaging fetched on detail view only
   'rounds(date, note, todos)',
@@ -266,12 +283,13 @@ const PATIENT_SELECT = [
   'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
-  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
+  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
+  'management',
   'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url)',
   'rounds(date, note, todos)',
-  'patient_vitals(id, timestamp, recorded_by, bp_systolic, bp_diastolic, heart_rate, temperature, spo2, respiratory_rate, weight, pain_score, notes)',
+  'patient_vitals(id, timestamp, recorded_by, bp_systolic, bp_diastolic, heart_rate, temperature, spo2, respiratory_rate, weight, pain_score, news2_score, notes)',
 ].join(', ');
 
 // ─── Public API ───
@@ -341,12 +359,16 @@ export async function fetchActivePatients(unit?: string, hospitalId?: string): P
 /**
  * Load ALL patients including discharged — used for Master List & Discharge views.
  * Uses paginated batches internally to avoid the 1000-row hard cap.
+ * Hard-capped at MAX_ALL_PAGES batches (25 000 patients) to prevent runaway
+ * queries if the DB returns full pages indefinitely due to a bug or data issue.
  */
+const MAX_ALL_PAGES = 50; // 50 × 500 = 25 000 patients hard ceiling
+
 export async function fetchAllPatients(unit?: string, hospitalId?: string): Promise<Patient[]> {
   const pageSize = 500;
   const results: Patient[] = [];
   let page = 0;
-  while (true) {
+  while (page < MAX_ALL_PAGES) {
     const from = page * pageSize;
     const to   = from + pageSize - 1;
     let query = supabase

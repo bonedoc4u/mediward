@@ -41,6 +41,9 @@ export const getStatusColor = (status: string) => {
     case 'pac fit':
     case 'fit':
       return 'bg-green-100 text-green-800 border-green-300';
+    case 'pac review':
+    case 'review':
+      return 'bg-purple-100 text-purple-800 border-purple-300';
     // Patient statuses
     case 'admitted':
       return 'bg-blue-100 text-blue-800 border-blue-300';
