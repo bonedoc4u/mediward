@@ -38,7 +38,7 @@ import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
 import { upsertRound } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
-import { enqueue, getRetryableQueue, getQueue, dequeue, incrementAttempts } from '../services/syncQueue';
+import { enqueue, getRetryableQueue, getQueue, dequeue, incrementAttempts, getDeadLetterQueue } from '../services/syncQueue';
 import {
   registerServiceWorker,
   requestNotificationPermission,
@@ -157,12 +157,30 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Effective hospitalId for cache scoping: superadmin viewing another hospital uses their target.
   const effectiveHospitalId = viewingHospitalId ?? user?.hospitalId ?? '';
 
-  // Debounced cache write — avoids serialising the full patient array on every realtime event.
+  // Debounced cache write — reduced to 300ms so a backgrounded/killed app loses
+  // at most 300ms of realtime events rather than 2000ms.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSaveActiveCache = useCallback(
-    debounce((pts: Patient[], hid: string) => saveActiveCache(pts, hid), 2000),
+    debounce((pts: Patient[], hid: string) => saveActiveCache(pts, hid), 300),
     [],
   );
+
+  // Flush the cache immediately when the app is backgrounded (visibilitychange)
+  // so Android/iOS process-kill doesn't lose the debounce window.
+  const latestPatientsRef  = useRef<Patient[]>([]);
+  const latestHospitalRef  = useRef<string>('');
+  useEffect(() => { latestPatientsRef.current  = patients;           }, [patients]);
+  useEffect(() => { latestHospitalRef.current  = effectiveHospitalId; }, [effectiveHospitalId]);
+
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === 'hidden' && latestPatientsRef.current.length > 0) {
+        saveActiveCache(latestPatientsRef.current, latestHospitalRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', flush);
+    return () => document.removeEventListener('visibilitychange', flush);
+  }, []);
 
   // Ref so the online-reconnect handler (useEffect with [] deps) always reads
   // the latest hospitalId even if it changed after the effect was registered.
@@ -271,16 +289,61 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             saveActiveCache(data, hospitalIdRef.current ?? '');
             setIsStale(false);
             setCacheTimestamp(null);
+            // Notify other open tabs that a sync just completed
+            try {
+              bc.postMessage({ type: 'SYNC_COMPLETE', hospitalId: hospitalIdRef.current });
+            } catch { /* BroadcastChannel not supported (iOS 14-) */ }
           })
           .catch(() => {/* stay on current state */});
       } else {
         toast.warning(`${remaining} change${remaining > 1 ? 's' : ''} couldn't sync. Will retry later.`);
+      }
+
+      // Persistent alert if any ops permanently failed (dead-letter queue)
+      const dlq = getDeadLetterQueue();
+      if (dlq.length > 0) {
+        toast.error(
+          `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently and need re-entry. Go to Settings → Advanced to review.`,
+          // Keep visible until dismissed — lost clinical data must not be silently ignored
+        );
       }
     };
 
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, []);
+
+  // ─── BroadcastChannel: sync across tabs on the same device ───
+  // When one tab successfully syncs (comes back online), notify other open
+  // tabs so they also re-fetch fresh data instead of showing stale cache.
+  const bc = useMemo(() => {
+    try { return new BroadcastChannel('mediward_patient_sync'); }
+    catch { return null; } // BroadcastChannel not available (some older Safari)
+  }, []);
+
+  useEffect(() => {
+    if (!bc) return;
+    const handler = (e: MessageEvent) => {
+      if (
+        e.data?.type === 'SYNC_COMPLETE' &&
+        e.data?.hospitalId === (hospitalIdRef.current ?? effectiveHospitalId)
+      ) {
+        // Another tab synced — quietly refresh this tab's patient list
+        const currentUser = userRef.current;
+        fetchActivePatients(currentUser?.unit, hospitalIdRef.current)
+          .then(data => {
+            const enriched = enrichPatientData(data);
+            setPatients(enriched);
+            saveActiveCache(data, hospitalIdRef.current ?? '');
+            setIsStale(false);
+            setCacheTimestamp(null);
+          })
+          .catch(() => {}); // silently ignore — this is a best-effort refresh
+      }
+    };
+    bc.addEventListener('message', handler);
+    return () => { bc.removeEventListener('message', handler); bc.close(); };
+  }, [bc]);
 
   // ─── Supabase Realtime with Exponential-Backoff Reconnection ───
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -291,10 +354,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let retryDelay = 2000;
 
     const connect = () => {
-      // hospital_id filter pushes server-side scoping — only events for this
-      // hospital are delivered, preventing cross-tenant realtime leakage.
-      const hospitalFilter = user?.hospitalId
-        ? `hospital_id=eq.${user.hospitalId}`
+      // Use effectiveHospitalId (not user.hospitalId) so superadmin hospital
+      // switches are reflected immediately in the channel filter.
+      const hospitalFilter = effectiveHospitalId
+        ? `hospital_id=eq.${effectiveHospitalId}`
         : undefined;
 
       const ch = supabase
@@ -378,8 +441,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      setRealtimeStatus('disconnected');
     };
-  }, []);
+  // Re-subscribe whenever the effective hospital changes (superadmin hospital switch)
+  }, [effectiveHospitalId]);
 
   // ─── Load More (next page of active patients) ───
   const loadMorePatients = useCallback(async () => {

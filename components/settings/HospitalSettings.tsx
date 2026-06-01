@@ -33,7 +33,7 @@ const HospitalSettings: React.FC = () => {
   const {
     hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate,
     showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, showNews2,
-    saveHospitalConfig, unitChiefs, setUnitChief,
+    saveHospitalConfig, unitChiefs, setUnitChief, configUpdatedAt,
   } = useConfig();
 
   const [localHospitalName, setLocalHospitalName]         = useState(hospitalName);
@@ -51,6 +51,32 @@ const HospitalSettings: React.FC = () => {
   const [newUnit, setNewUnit]                             = useState('');
   const [newPreOpItem, setNewPreOpItem]                   = useState('');
   const [saving, setSaving]                               = useState(false);
+  const [remoteUpdated, setRemoteUpdated]                 = useState(false);
+
+  // Re-sync local form state when config changes via realtime (another admin saved)
+  // configUpdatedAt is set by ConfigContext whenever a background config refresh lands.
+  // We show a banner rather than silently overwriting — the admin can see the conflict.
+  const prevConfigRef = React.useRef(configUpdatedAt);
+  React.useEffect(() => {
+    if (configUpdatedAt && configUpdatedAt !== prevConfigRef.current && !saving) {
+      prevConfigRef.current = configUpdatedAt;
+      setLocalHospitalName(hospitalName);
+      setLocalDepartment(department);
+      setLocalUnits(unitOptions);
+      setLocalPreOpName(preOpModuleName);
+      setLocalProcedureName(procedureListName);
+      setLocalPreOpItems(preOpChecklistTemplate);
+      setLocalShowNursingNotes(showNursingNotes);
+      setLocalShowMedChart(showMedicationChart);
+      setLocalShowIO(showIntakeOutput);
+      setLocalShowBT(showBloodTransfusion);
+      setLocalShowWC(showWoundCare);
+      setLocalShowNews2(showNews2);
+      setRemoteUpdated(true);
+      setTimeout(() => setRemoteUpdated(false), 4000);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configUpdatedAt]);
 
   const featureValues: Record<string, [boolean, (v: boolean) => void]> = {
     'nursing':           [localShowNursingNotes, setLocalShowNursingNotes],
@@ -97,6 +123,13 @@ const HospitalSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
+
+      {/* Remote-update notice — another admin saved while this form was open */}
+      {remoteUpdated && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-medium">
+          <span>⚠️</span> Settings were updated by another admin — this form has been refreshed.
+        </div>
+      )}
 
       {/* Hospital Settings */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

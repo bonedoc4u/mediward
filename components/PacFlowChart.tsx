@@ -14,6 +14,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PacFlowBranch, PacFlowData, PacFlowItem } from '../types';
 import { Check, Plus, Trash2, HeartPulse, X } from 'lucide-react';
+import { useAuth } from '../contexts/AppContext';
+import { logAuditEvent } from '../services/auditLog';
 
 function emptyFlow(): PacFlowData {
   return { seenByAnaesthesia: false, branches: [] };
@@ -23,6 +25,8 @@ interface Props {
   pacFlow?: PacFlowData;
   onChange: (updated: PacFlowData) => void;
   readOnly?: boolean;
+  /** Patient IP number — used for medico-legal audit log entries on PAC clearance. */
+  patientIpNo?: string;
 }
 
 // ─── Sub-item chip ────────────────────────────────────────────────────────────
@@ -185,7 +189,8 @@ const BranchRow: React.FC<{
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const PacFlowChart: React.FC<Props> = ({ pacFlow, onChange, readOnly = false }) => {
+const PacFlowChart: React.FC<Props> = ({ pacFlow, onChange, readOnly = false, patientIpNo }) => {
+  const { user } = useAuth();
   const flow = pacFlow ?? emptyFlow();
   const [newBranchLabel, setNewBranchLabel] = useState('');
   const [addingBranch, setAddingBranch]     = useState(false);
@@ -240,7 +245,7 @@ const PacFlowChart: React.FC<Props> = ({ pacFlow, onChange, readOnly = false }) 
         </div>
       )}
 
-      <div className="flex items-start gap-0 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+      <div data-no-swipe className="flex items-start gap-0 overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
 
         {/* ── PAC Root node ── */}
         <div className="shrink-0 flex items-start gap-0">
@@ -283,7 +288,22 @@ const PacFlowChart: React.FC<Props> = ({ pacFlow, onChange, readOnly = false }) 
                   branch={branch}
                   isLast={idx === flow.branches.length - 1}
                   readOnly={readOnly}
-                  onToggleDone={() => updateBranch(branch.id, { isDone: !branch.isDone })}
+                  onToggleDone={() => {
+                    const nowDone = !branch.isDone;
+                    const now     = new Date().toISOString();
+                    updateBranch(branch.id, {
+                      isDone:    nowDone,
+                      clearedBy: nowDone ? (user?.name ?? 'Unknown') : undefined,
+                      clearedAt: nowDone ? now : undefined,
+                    });
+                    // Medico-legal audit trail — who cleared what and when
+                    if (user && patientIpNo) {
+                      logAuditEvent(
+                        user.id, user.name, 'UPDATE', 'pac_branch', patientIpNo,
+                        `PAC branch '${branch.label}' ${nowDone ? 'cleared' : 'un-cleared'} by ${user.name}`,
+                      );
+                    }
+                  }}
                   onAddItem={label => addItem(branch.id, label)}
                   onToggleItem={itemId => toggleItem(branch.id, itemId)}
                   onDeleteItem={itemId => deleteItem(branch.id, itemId)}

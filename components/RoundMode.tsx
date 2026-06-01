@@ -65,7 +65,8 @@ const RoundMode: React.FC = () => {
   const [newTodoText, setNewTodoText] = useState('');
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
 
-  const touchStartX = useRef(0);
+  const touchStartX  = useRef(0);
+  const swipeBlocked = useRef(false);   // true when touch started inside a no-swipe zone
   const navCooldownRef = useRef(false);
   const todoInputRef = useRef<HTMLInputElement>(null);
 
@@ -139,8 +140,12 @@ const RoundMode: React.FC = () => {
   // ─── Swipe support ───
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    // Block swipe navigation if the touch started inside a horizontally scrollable
+    // child (PAC flowchart, navigation strip) — prevents gesture competition
+    swipeBlocked.current = !!(e.target as HTMLElement).closest('[data-no-swipe]');
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (swipeBlocked.current) return;
     const startX = touchStartX.current;
     const endX = e.changedTouches[0].clientX;
     const diff = startX - endX;
@@ -369,7 +374,7 @@ const RoundMode: React.FC = () => {
 
       {/* ─── Patient Navigation Strip ─── */}
       {/* Scrollable chip list — tap any patient to jump directly to them */}
-      <div className="flex gap-2 overflow-x-auto pb-1 mb-3 scroll-smooth snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
+      <div data-no-swipe className="flex gap-2 overflow-x-auto pb-1 mb-3 scroll-smooth snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
         {activePatients.map((p, i) => {
           const isActive  = i === index;
           const isSavedP  = savedSet.has(p.ipNo);
@@ -523,7 +528,7 @@ const RoundMode: React.FC = () => {
 
           {/* PAC Clearance — shown for all pending (pre-op) patients */}
           {isPending && (
-            <div>
+            <div data-no-swipe>
               <div className="flex items-center gap-1.5 mb-2">
                 <HeartPulse className="w-4 h-4 text-blue-500" />
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -533,6 +538,7 @@ const RoundMode: React.FC = () => {
               </div>
               <PacFlowChart
                 pacFlow={patient.pacFlow}
+                patientIpNo={patient.ipNo}
                 onChange={(updated) => {
                   let newPacStatus = patient.pacStatus;
                   if (updated.seenByAnaesthesia) {

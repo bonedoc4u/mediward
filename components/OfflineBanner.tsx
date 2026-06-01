@@ -3,9 +3,12 @@ import { WifiOff, RefreshCw, DatabaseZap, CloudOff } from 'lucide-react';
 import { usePatients } from '../contexts/AppContext';
 import { formatCacheAge } from '../services/patientCache';
 import { getQueueSize } from '../services/syncQueue';
+import { isOnline as getIsOnline } from '../utils/connectivity';
 
 const OfflineBanner: React.FC = () => {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  // Use the probed state rather than navigator.onLine — avoids false-positive
+  // on captive portals (HMIS login walls that block Supabase)
+  const [isOnline, setIsOnline] = useState(getIsOnline);
   const [showReconnected, setShowReconnected] = useState(false);
   const [pendingCount, setPendingCount] = useState(() => getQueueSize());
   const { isStale, cacheTimestamp } = usePatients();

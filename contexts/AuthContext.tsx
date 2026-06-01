@@ -73,6 +73,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
 
+  // ─── JWT role verification — prevents localStorage role tampering ───
+  // The role in localStorage can be modified by a browser extension or XSS.
+  // On mount, re-derive the role from app_metadata that the DB trigger embeds
+  // into the JWT (sync_role_to_jwt trigger). If they differ, the JWT wins.
+  useEffect(() => {
+    if (!user) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      const jwtRole = session.user.app_metadata?.role as AuthUser['role'] | undefined;
+      if (jwtRole && jwtRole !== user.role) {
+        console.warn('[Auth] Role mismatch: localStorage=%s, JWT=%s — using JWT', user.role, jwtRole);
+        const corrected = { ...user, role: jwtRole };
+        setUser(corrected);
+        saveToStorage('session', corrected);
+      }
+    });
+  // Only run on login (user.id change), not on every render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   // ─── Session Expiry Timers ───
   useEffect(() => {
     if (!user) return;

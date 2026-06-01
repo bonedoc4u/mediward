@@ -95,6 +95,7 @@ const PacManagement: React.FC<Props> = ({ patients, onUpdatePatient }) => {
               <PacFlowChart
                 pacFlow={patient.pacFlow}
                 onChange={updated => handleFlowChange(patient, updated)}
+                patientIpNo={patient.ipNo}
               />
             </div>
 

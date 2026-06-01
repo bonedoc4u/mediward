@@ -46,12 +46,21 @@ export default defineConfig(({ mode }) => {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
             runtimeCaching: [
               {
-                // Cache Supabase API calls with a network-first strategy
+                // NetworkFirst: always try the network first, fall back to cache
+                // after 5s (slow ward Wi-Fi). StaleWhileRevalidate was unsafe —
+                // it could serve 2-hour-old vitals or lab results as current data
+                // after a period of connectivity loss.
                 urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-                handler: 'StaleWhileRevalidate',
+                handler: 'NetworkFirst',
                 options: {
                   cacheName: 'supabase-api-cache',
-                  expiration: { maxEntries: 500 },
+                  networkTimeoutSeconds: 5,
+                  expiration: {
+                    maxEntries: 100,
+                    // 5-minute cap: cached clinical data is only served as fallback
+                    // for up to 5 minutes before it must be re-fetched
+                    maxAgeSeconds: 5 * 60,
+                  },
                 },
               },
             ],

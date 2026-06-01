@@ -437,6 +437,10 @@ export interface PacFlowBranch {
   id: string;
   label: string;
   isDone: boolean;
+  /** Name of the user who marked this branch cleared (for medico-legal audit). */
+  clearedBy?: string;
+  /** ISO timestamp when this branch was cleared. */
+  clearedAt?: string;
   /** Sub-requirements added by the consulting team. */
   items: PacFlowItem[];
 }
