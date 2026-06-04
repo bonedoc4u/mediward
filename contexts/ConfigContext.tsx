@@ -298,7 +298,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // ─── Ward mutations ───
   const addWard = useCallback(async (name: string, isIcu: boolean, unit?: string[]) => {
     const maxOrder = wards.reduce((max, w) => Math.max(max, w.sortOrder), -1);
-    const created = await createWard(name, isIcu, maxOrder + 1, unit);
+    const effectiveHospitalId = viewingHospitalId ?? user?.hospitalId;
+    const created = await createWard(name, isIcu, maxOrder + 1, unit, effectiveHospitalId);
     setWards(prev => {
       const next = [...prev, created];
       saveToStorage(WARD_CACHE_KEY, next);

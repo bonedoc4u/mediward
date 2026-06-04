@@ -36,7 +36,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
   const activeWards = wards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
-  const defaultWard = activeWards[0]?.name ?? 'Ward 1';
+  const defaultWard = activeWards[0]?.name ?? '';
 
   // Non-admins are locked to their own unit; admins and superadmins can assign any unit
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -547,12 +547,20 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           {/* ── Step 1: Location & Identity ── */}
           {step === 1 && (
             <div className="space-y-4">
+              {/* No wards configured — admin must set them up first */}
+              {activeWards.length === 0 && (
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                  <span className="text-amber-500 shrink-0">⚠️</span>
+                  <span>No wards configured yet. Go to <strong>Admin Settings → Wards</strong> and add your wards first.</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ward</label>
                   <select
-                    className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                    className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
                     value={formData.ward}
+                    disabled={activeWards.length === 0}
                     onChange={e => {
                       const selectedWard = activeWards.find(w => w.name === e.target.value);
                       setFormData(prev => ({
@@ -564,7 +572,10 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                       }));
                     }}
                   >
-                    {activeWards.map(w => <option key={w.name} value={w.name}>{w.name}</option>)}
+                    {activeWards.length === 0
+                      ? <option value="">— No wards configured —</option>
+                      : activeWards.map(w => <option key={w.name} value={w.name}>{w.name}</option>)
+                    }
                   </select>
                 </div>
                 <div>

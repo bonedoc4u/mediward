@@ -43,11 +43,19 @@ export async function fetchWards(hospitalId?: string): Promise<WardConfig[]> {
 }
 
 export async function createWard(
-  name: string, isIcu: boolean, sortOrder: number, unit?: string[],
+  name: string, isIcu: boolean, sortOrder: number, unit?: string[], hospitalId?: string,
 ): Promise<WardConfig> {
+  const row: Record<string, unknown> = {
+    name, is_icu: isIcu, sort_order: sortOrder, active: true,
+    unit: unit?.length ? unit : null,
+  };
+  // Explicitly pass hospital_id so superadmin creates wards in the correct
+  // hospital rather than relying on the auto_set_hospital_id trigger which
+  // always resolves to the superadmin's own (Default) hospital.
+  if (hospitalId) row.hospital_id = hospitalId;
   const { data, error } = await supabase
     .from('ward_config')
-    .insert({ name, is_icu: isIcu, sort_order: sortOrder, active: true, unit: unit?.length ? unit : null })
+    .insert(row)
     .select()
     .single();
   if (error) throw error;
