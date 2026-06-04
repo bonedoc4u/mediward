@@ -142,12 +142,13 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   showBloodTransfusion: false,
   showWoundCare: false,
   showNews2: true,
+  customTodoShortcuts: [],
 };
 
 export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
   let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care, show_news2');
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care, show_news2, custom_todo_shortcuts');
   if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
   const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
@@ -169,6 +170,7 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     showBloodTransfusion: Boolean(data.show_blood_transfusion ?? false),
     showWoundCare:        Boolean(data.show_wound_care        ?? false),
     showNews2:            data.show_news2 == null ? true : Boolean(data.show_news2),
+    customTodoShortcuts:  Array.isArray(data.custom_todo_shortcuts) ? data.custom_todo_shortcuts as string[] : [],
   };
 }
 
@@ -196,6 +198,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_blood_transfusion:     config.showBloodTransfusion,
         show_wound_care:            config.showWoundCare,
         show_news2:                 config.showNews2,
+        custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
         updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
@@ -216,6 +219,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_blood_transfusion:     config.showBloodTransfusion,
         show_wound_care:            config.showWoundCare,
         show_news2:                 config.showNews2,
+        custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
       });
     if (error) throw error;
   }

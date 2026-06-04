@@ -63,6 +63,9 @@ export interface HospitalConfig {
   /** Show the NEWS2 Early Warning Score column and badge. On by default.
    *  Departments that do not use NEWS2 (e.g. outpatient-only units) can hide it. */
   showNews2: boolean;
+  /** Admin-defined quick-add shortcuts shown in Ward Rounds to-do section.
+   *  E.g. ["IV Fluids", "NBM", "Pre-op prep", "Bloods"]. */
+  customTodoShortcuts: string[];
 }
 
 /** A ward row from the ward_config table. */

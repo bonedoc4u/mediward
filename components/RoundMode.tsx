@@ -7,13 +7,14 @@ import { getSmartAlerts } from '../utils/smartAlerts';
 import { hapticTap } from '../utils/capacitorInit';
 import {
   ChevronLeft, ChevronRight, X, CheckSquare, Square,
-  AlertTriangle, Calendar, ClipboardCheck, Save, Plus, Scissors, Leaf, HeartPulse
+  AlertTriangle, Calendar, ClipboardCheck, Save, Plus, Scissors, Leaf, HeartPulse,
+  LogOut, Check
 } from 'lucide-react';
 import PacFlowChart from './PacFlowChart';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
-  const { icuWardNames } = useConfig();
+  const { icuWardNames, customTodoShortcuts } = useConfig();
 
   // ─── All active patients (unfiltered) ───
   const allActivePatients = useMemo(
@@ -64,6 +65,7 @@ const RoundMode: React.FC = () => {
   };
   const [newTodoText, setNewTodoText] = useState('');
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
+  const [showDischargeSummary, setShowDischargeSummary] = useState(false);
 
   const touchStartX  = useRef(0);
   const swipeBlocked = useRef(false);   // true when touch started inside a no-swipe zone
@@ -171,7 +173,8 @@ const RoundMode: React.FC = () => {
     if (andNext && index < activePatients.length - 1) {
       goNext();
     } else if (andNext) {
-      navigateTo('dashboard');
+      // Last patient — show discharge summary before going to dashboard
+      setShowDischargeSummary(true);
     }
   }, [patient, today, index, activePatients.length, saveRound, navigateTo, goNext]);
 
@@ -202,6 +205,78 @@ const RoundMode: React.FC = () => {
     const newTodo: ToDoItem = { id: generateId(), task, isDone: false };
     updatePatient({ ...patient, todos: [...patient.todos, newTodo] });
   }, [patient, updatePatient]);
+
+  // ─── Discharge Summary — shown after completing the last patient ───
+  if (showDischargeSummary) {
+    const dischargeReady = allActivePatients.filter(
+      p => p.patientStatus === PatientStatus.DischargeReady,
+    );
+    return (
+      <div className="min-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <Check className="w-5 h-5 text-green-500" /> Round Complete
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}
+              {' · '}{selectedWard}
+            </p>
+          </div>
+          <button
+            onClick={() => navigateTo('dashboard')}
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-slate-100 rounded-xl text-slate-500 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Discharge-ready list */}
+        <div className="bg-white rounded-2xl border border-teal-200 shadow-sm overflow-hidden mb-4">
+          <div className="bg-teal-600 text-white px-5 py-3 flex items-center gap-2">
+            <LogOut className="w-4 h-4" />
+            <span className="font-bold text-sm">Discharge Ready</span>
+            <span className="ml-auto bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              {dischargeReady.length} patient{dischargeReady.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          {dischargeReady.length === 0 ? (
+            <div className="px-5 py-8 text-center text-slate-400 text-sm">
+              No patients marked as discharge ready during this round.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {dischargeReady.map(p => (
+                <div key={p.ipNo} className="flex items-center gap-3 px-5 py-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center font-black text-teal-700 text-sm shrink-0">
+                    {p.bed}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-slate-800 truncate">{p.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{p.age}y · {p.diagnosis}</p>
+                  </div>
+                  {p.pod !== undefined && (
+                    <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full shrink-0">
+                      POD {p.pod}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-auto">
+          <button
+            onClick={() => navigateTo('dashboard')}
+            className="w-full min-h-[50px] bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-colors flex items-center justify-center gap-2"
+          >
+            <Check className="w-5 h-5" /> Finish Rounds
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ─── Ward selection screen ───
   if (!selectedWard) {
@@ -306,6 +381,8 @@ const RoundMode: React.FC = () => {
     ...(isOpenOrInfected    ? [{ label: 'ESR/CRP',  task: 'ESR/CRP'  }] : []),
     { label: '76', task: 'Form 76' },
     { label: '77', task: 'Form 77' },
+    // Admin-configured custom shortcuts (set in Admin Settings → Hospital → Ward Round Shortcuts)
+    ...(customTodoShortcuts ?? []).map(s => ({ label: s, task: s })),
   ];
 
   // Next patient preview
@@ -496,6 +573,22 @@ const RoundMode: React.FC = () => {
               >
                 <Leaf className="w-3 h-3" /> Conservative
               </button>
+              <button
+                onClick={() => updatePatient({
+                  ...patient,
+                  patientStatus: patient.patientStatus === PatientStatus.DischargeReady
+                    ? PatientStatus.Fit
+                    : PatientStatus.DischargeReady,
+                })}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  patient.patientStatus === PatientStatus.DischargeReady
+                    ? 'bg-teal-600 text-white border-teal-700'
+                    : 'bg-white text-slate-600 border-slate-300 hover:border-teal-400 hover:text-teal-700'
+                }`}
+              >
+                <LogOut className="w-3 h-3" />
+                {patient.patientStatus === PatientStatus.DischargeReady ? 'Discharge Ready ✓' : 'Discharge Ready'}
+              </button>
             </div>
           </div>
 
@@ -675,7 +768,7 @@ const RoundMode: React.FC = () => {
             {index < activePatients.length - 1 ? (
               <><Save className="w-3.5 h-3.5 shrink-0" /> Save & Next</>
             ) : (
-              <>Done <X className="w-3.5 h-3.5 shrink-0" /></>
+              <><Check className="w-3.5 h-3.5 shrink-0" /> Round Complete</>
             )}
           </button>
         </div>
