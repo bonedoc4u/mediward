@@ -32,6 +32,15 @@ const COLORS = [
 
 const STEP_LABELS = ['Location & Identity', 'Patient Details', 'Status & Plan'];
 
+/** Shape of the admission wizard form. Declared explicitly so setFormData
+ *  callbacks can type `prev` and avoid implicit-any errors. */
+interface AdmitFormState {
+  bed: string; ward: Ward; unit: string; ipNo: string; abhaId: string;
+  name: string; age: string; gender: Gender; mobile: string;
+  diagnosis: string; doa: string; procedure: string; dos: string;
+  pacStatus: PacStatus; patientStatus: PatientStatus;
+}
+
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
@@ -51,28 +60,30 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const defaultWard = activeWards[0]?.name ?? '';
   const defaultUnit = user?.unit ?? '';
 
-  // Auto-correct the ward selection when wards load from the background fetch.
-  // formData.ward initialises once (useState lazy init). If wards were empty at
-  // open time (stale localStorage cache), ward stays '' even after ConfigContext
-  // refreshes — this effect patches it as soon as valid options are available.
+  // Auto-correct ward + unit when session/wards arrive from the background fetch.
+  // Both formData.ward and formData.unit initialize once (useState lazy init).
+  // If the session profile refresh or ward cache load completes after the modal
+  // opens, this effect patches both fields so the user never sees stale "—".
   useEffect(() => {
     setFormData(prev => {
-      // Only auto-set if the current value is blank or points to a ward the
-      // user no longer has access to (guard against stale assignments too)
-      const stillValid = activeWards.some(w => w.name === prev.ward);
-      if (stillValid) return prev;
-      const first = activeWards[0]?.name ?? '';
-      if (!first) return prev;
-      return { ...prev, ward: first as Ward };
+      const wardStillValid = activeWards.some(w => w.name === prev.ward);
+      const firstWard = activeWards[0]?.name ?? '';
+      // For non-admins always sync unit from the live session
+      const correctUnit = isAdmin ? prev.unit : (user?.unit ?? prev.unit ?? '');
+      return {
+        ...prev,
+        ward: wardStillValid ? prev.ward : (firstWard as Ward) || prev.ward,
+        unit: correctUnit,
+      };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWards.map(w => w.name).join(',')]);
+  }, [activeWards.map(w => w.name).join(','), user?.unit]);
 
   // ── Wizard step ──
   // STEP_KEY sessionStorage stores { step, formData } to survive screen rotation
   const STEP_KEY = 'mediward_admit_step';
 
-  const [formData, setFormData] = useState(() => {
+  const [formData, setFormData] = useState<AdmitFormState>(() => {
     if (initialData) {
       return {
         bed: initialData.bed,
@@ -391,7 +402,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     // New patient: show DPDP consent modal before saving
