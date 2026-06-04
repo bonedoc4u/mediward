@@ -134,7 +134,10 @@ const PatientDetail: React.FC = () => {
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
-            <p className="text-sm text-slate-700 mt-0.5">{patient.procedure || 'Conservative'}</p>
+            {patient.procedure
+              ? <p className="text-sm text-slate-700 mt-0.5">{patient.procedure}</p>
+              : <p className="text-xs text-slate-400 mt-0.5 italic">Not yet performed</p>
+            }
             <div className="flex flex-col gap-1 mt-1.5">
               <div className="flex items-center gap-1.5">
                 <span className="text-[10px] text-slate-400 w-7 shrink-0">DOA</span>

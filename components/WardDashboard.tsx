@@ -424,7 +424,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </td>
                     )}
                     <td className="px-6 py-4">
-                      {patient.procedure || "Conservative"}
+                      {patient.procedure || <span className="text-slate-400 text-xs italic">—</span>}
                       {patient.dos && <div className="text-xs text-slate-500 font-medium">DOS: {patient.dos}</div>}
                     </td>
                     {viewMode === 'pending' && (
