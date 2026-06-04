@@ -73,6 +73,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
 
+  // ─── Profile refresh on every app open ───────────────────────────────────
+  // localStorage session can be stale: unit/role/name may have changed while
+  // the user was offline or logged out. Re-fetch from app_users on every mount
+  // so a newly-assigned unit is always current without requiring a re-login.
+  // Runs silently in the background — the cached session is shown immediately
+  // while this resolves, then patched if anything differs.
+  useEffect(() => {
+    if (!user?.email) return;
+    findUserByEmail(user.email).then(fresh => {
+      if (!fresh) return;
+      const changed =
+        fresh.unit  !== user.unit  ||
+        fresh.role  !== user.role  ||
+        fresh.name  !== user.name  ||
+        fresh.ward  !== user.ward;
+      if (!changed) return;
+      const updated: AuthUser = {
+        ...user,
+        unit:  fresh.unit,
+        role:  fresh.role,
+        name:  fresh.name,
+        ward:  fresh.ward,
+      };
+      setUser(updated);
+      saveToStorage('session', updated);
+    }).catch(() => {}); // silently ignore offline / RLS errors
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run only on mount (app open)
+
   // ─── JWT role verification — prevents localStorage role tampering ───
   // The role in localStorage can be modified by a browser extension or XSS.
   // On mount, re-derive the role from app_metadata that the DB trigger embeds
