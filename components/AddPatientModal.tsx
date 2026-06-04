@@ -35,11 +35,20 @@ const STEP_LABELS = ['Location & Identity', 'Patient Details', 'Status & Plan'];
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
-  const activeWards = wards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
-  const defaultWard = activeWards[0]?.name ?? '';
 
   // Non-admins are locked to their own unit; admins and superadmins can assign any unit
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+  // Unit users only see their own wards + ICU wards (mirrors WardDashboard logic).
+  // Admins see all wards.
+  const activeWards = wards
+    .filter(w => w.active)
+    .filter(w => {
+      if (!user?.unit) return true;                        // admin / no unit → all wards
+      return !w.unit?.length || w.unit.includes(user.unit) || w.isIcu;
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const defaultWard = activeWards[0]?.name ?? '';
   const defaultUnit = user?.unit ?? '';
 
   // ── Wizard step ──
