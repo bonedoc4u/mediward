@@ -160,6 +160,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user]);
 
+  // ─── Live session sync — watch the logged-in user's app_users row ───
+  // When an admin changes unit/role in TeamManagement, Supabase fires a realtime
+  // UPDATE on app_users. We pick it up here and update the session immediately
+  // so the user sees the correct ward filter without having to log out.
+  useEffect(() => {
+    if (!user?.id) return;
+    const ch = supabase
+      .channel(`session_user_${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'app_users', filter: `id=eq.${user.id}` },
+        (payload) => {
+          const row = payload.new as { unit?: string | null; role?: string; name?: string };
+          setUser(prev => {
+            if (!prev) return prev;
+            const updated: AuthUser = {
+              ...prev,
+              unit:  row.unit  ?? undefined,
+              role:  (row.role as AuthUser['role']) ?? prev.role,
+              name:  row.name ?? prev.name,
+            };
+            saveToStorage('session', updated);
+            return updated;
+          });
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id]);
+
   // ─── Supabase auth state listener (catches server-side token expiry / revocation) ───
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
