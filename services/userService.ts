@@ -119,14 +119,16 @@ export async function removeAppUser(userId: string): Promise<void> {
 }
 
 /**
- * Create a new user in both Supabase Auth and app_users.
- * Used by TeamManagement when an admin adds a new team member.
- * Returns an error string on failure, or null on success.
+ * Create a new user via the admin-create-user Edge Function.
  *
- * Session-safety note: supabase.auth.signUp() writes the new user's
- * unconfirmed tokens into the SDK's in-memory store, replacing the calling
- * admin's active session. We snapshot the admin session before the call and
- * restore it immediately after so the admin is never logged out.
+ * Why an Edge Function instead of supabase.auth.signUp():
+ *   - signUp() requires email confirmation by default — the new staff member
+ *     can't login until they click a link they didn't know to expect.
+ *   - The Edge Function uses the service role to call auth.admin.createUser()
+ *     with email_confirm: true, so users are immediately active with the
+ *     password the admin set. No email loop. No session clobbering.
+ *
+ * Returns an error string on failure, or null on success.
  */
 export async function createAuthUser(
   email: string,
@@ -137,39 +139,31 @@ export async function createAuthUser(
   unit?: string,
   hospitalId?: string,
 ): Promise<string | null> {
-  // Snapshot the admin's session before signUp overwrites it
-  const { data: { session: adminSession } } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return 'You must be logged in to create users.';
 
-  // Step 1: Create Supabase Auth account
-  const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const url = `${supabaseUrl}/functions/v1/admin-create-user`;
 
-  // Restore admin session immediately — do this before any early return
-  // so the admin stays authenticated even if user creation fails mid-way
-  if (adminSession) {
-    await supabase.auth.setSession({
-      access_token:  adminSession.access_token,
-      refresh_token: adminSession.refresh_token,
-    });
-  }
-
-  if (authError) return authError.message;
-  if (!authData.user) return 'Failed to create auth account.';
-
-  // Step 2: Store role/name/unit/hospital in app_users (keyed by Supabase Auth UID)
-  const { error: dbError } = await supabase.from('app_users').upsert(
-    {
-      id:            authData.user.id,
-      email:         email.toLowerCase(),
-      name,
-      role,
-      password_hash: '', // Supabase Auth handles passwords now
-      ward:          ward ?? null,
-      unit:          unit ?? null,
-      hospital_id:   hospitalId ?? '00000000-0000-0000-0000-000000000001',
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY as string,
     },
-    { onConflict: 'email' },
-  );
+    body: JSON.stringify({
+      email:      email.trim().toLowerCase(),
+      password,
+      name:       name.trim(),
+      role,
+      ward:       ward  ?? null,
+      unit:       unit  ?? null,
+      hospitalId: hospitalId ?? '00000000-0000-0000-0000-000000000001',
+    }),
+  });
 
-  if (dbError) return dbError.message;
+  const json = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+  if (!res.ok) return (json as { error?: string }).error ?? `HTTP ${res.status}`;
   return null;
 }

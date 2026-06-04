@@ -175,20 +175,12 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </div>
           </div>
           <h2 className="text-2xl font-bold text-slate-800 mb-3">Hospital Registered!</h2>
-          {done.requiresEmailConfirm ? (
-            <>
-              <p className="text-slate-500 text-sm mb-2">
-                A confirmation email has been sent to <strong>{email}</strong>.
-              </p>
-              <p className="text-slate-500 text-sm mb-6">
-                Verify your email address first, then log in with your credentials.
-              </p>
-            </>
-          ) : (
-            <p className="text-slate-500 text-sm mb-6">
-              Your hospital has been set up. You can now log in with your credentials.
-            </p>
-          )}
+          <p className="text-slate-500 text-sm mb-2">
+            Your account is ready. Log in with <strong>{email}</strong> and the password you just set.
+          </p>
+          <p className="text-xs text-slate-400 mb-6">
+            Your registration is pending review. You will be notified once approved.
+          </p>
           <button
             onClick={onBack}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors"

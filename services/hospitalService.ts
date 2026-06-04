@@ -24,57 +24,58 @@ export interface RegisterHospitalResult {
 }
 
 /**
- * Registers a new hospital and its first admin user.
+ * Registers a new hospital and its first admin user via the register-hospital
+ * Edge Function.
  *
- * Steps:
- *   1. Create a Supabase Auth account for the admin
- *   2. Call the register_hospital() DB function to atomically create:
- *      - The hospital row
- *      - The hospital_config row (with initial department/units)
- *      - The admin's app_users row (linked to the new hospital)
+ * Why an Edge Function instead of signUp() + RPC:
+ *   - signUp() may require email confirmation, blocking the admin from logging
+ *     in on day one. The Edge Function uses the service role so the account is
+ *     immediately active — no email loop.
+ *   - The RPC is still called server-side inside the function for atomicity.
  *
- * Returns requiresEmailConfirm=true if Supabase requires email verification
- * before the account can log in.
+ * Always returns requiresEmailConfirm: false because the Edge Function
+ * creates the account with email_confirm: true.
  */
 export async function registerHospital(
   params: RegisterHospitalParams,
 ): Promise<RegisterHospitalResult> {
-  // Step 1: Create Supabase Auth account
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: params.adminEmail,
-    password: params.adminPassword,
-  });
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const url = `${supabaseUrl}/functions/v1/register-hospital`;
 
-  if (authError) {
-    return { hospitalId: '', requiresEmailConfirm: false, error: authError.message };
-  }
-  if (!authData.user) {
-    return { hospitalId: '', requiresEmailConfirm: false, error: 'Failed to create account.' };
-  }
-
-  // Step 2: Call register_hospital RPC to set up hospital + admin
-  const { data: hospitalId, error: rpcError } = await supabase.rpc('register_hospital', {
-    p_hospital_name: params.hospitalName,
-    p_department:    params.department,
-    p_units:         params.units,
-    p_admin_name:    params.adminName,
-    p_admin_email:   params.adminEmail.toLowerCase(),
-    p_auth_user_id:  authData.user.id,
-    p_invite_code:   params.inviteCode.trim().toUpperCase(),
-  });
-
-  if (rpcError) {
-    // Parse known error codes from the RPC
-    const msg = rpcError.message ?? '';
-    if (msg.includes('INVALID_INVITE'))
-      return { hospitalId: '', requiresEmailConfirm: false, error: 'Invite code is invalid, already used, or does not match the selected college and department.' };
-    if (msg.includes('INVITE_REQUIRED'))
-      return { hospitalId: '', requiresEmailConfirm: false, error: 'An invite code is required to register.' };
-    if (msg.includes('DUPLICATE_WORKSPACE'))
-      return { hospitalId: '', requiresEmailConfirm: false, error: 'A workspace for this department already exists at this college.' };
-    return { hospitalId: '', requiresEmailConfirm: false, error: rpcError.message };
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+      },
+      body: JSON.stringify({
+        hospitalName:  params.hospitalName,
+        department:    params.department,
+        units:         params.units,
+        adminName:     params.adminName,
+        adminEmail:    params.adminEmail,
+        adminPassword: params.adminPassword,
+        inviteCode:    params.inviteCode,
+      }),
+    });
+  } catch {
+    return { hospitalId: '', requiresEmailConfirm: false, error: 'Network error. Check your connection.' };
   }
 
-  const requiresEmailConfirm = !authData.session;
-  return { hospitalId: hospitalId as string, requiresEmailConfirm };
+  const json = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as {
+    hospitalId?: string;
+    requiresEmailConfirm?: boolean;
+    error?: string;
+  };
+
+  if (!res.ok || json.error) {
+    return { hospitalId: '', requiresEmailConfirm: false, error: json.error ?? `HTTP ${res.status}` };
+  }
+
+  return {
+    hospitalId:           json.hospitalId ?? '',
+    requiresEmailConfirm: false,  // Edge Function uses email_confirm: true
+  };
 }
