@@ -51,6 +51,23 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const defaultWard = activeWards[0]?.name ?? '';
   const defaultUnit = user?.unit ?? '';
 
+  // Auto-correct the ward selection when wards load from the background fetch.
+  // formData.ward initialises once (useState lazy init). If wards were empty at
+  // open time (stale localStorage cache), ward stays '' even after ConfigContext
+  // refreshes — this effect patches it as soon as valid options are available.
+  useEffect(() => {
+    setFormData(prev => {
+      // Only auto-set if the current value is blank or points to a ward the
+      // user no longer has access to (guard against stale assignments too)
+      const stillValid = activeWards.some(w => w.name === prev.ward);
+      if (stillValid) return prev;
+      const first = activeWards[0]?.name ?? '';
+      if (!first) return prev;
+      return { ...prev, ward: first as Ward };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWards.map(w => w.name).join(',')]);
+
   // ── Wizard step ──
   // STEP_KEY sessionStorage stores { step, formData } to survive screen rotation
   const STEP_KEY = 'mediward_admit_step';
