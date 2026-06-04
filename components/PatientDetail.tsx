@@ -135,7 +135,31 @@ const PatientDetail: React.FC = () => {
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
             <p className="text-sm text-slate-700 mt-0.5">{patient.procedure || 'Conservative'}</p>
-            {patient.dos && <p className="text-xs text-slate-500 mt-0.5">DOS: {patient.dos}</p>}
+            <div className="flex flex-col gap-1 mt-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-slate-400 w-7 shrink-0">DOA</span>
+                <input
+                  type="date"
+                  max={new Date().toISOString().split('T')[0]}
+                  value={patient.doa ?? ''}
+                  onChange={e => updatePatient({ ...patient, doa: e.target.value })}
+                  className="text-xs border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:ring-1 focus:ring-blue-400 outline-none text-slate-700"
+                  title="Date of Admission"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-slate-400 w-7 shrink-0">DOS</span>
+                <input
+                  type="date"
+                  max={new Date().toISOString().split('T')[0]}
+                  value={patient.dos ?? ''}
+                  onChange={e => updatePatient({ ...patient, dos: e.target.value || undefined })}
+                  className="text-xs border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:ring-1 focus:ring-green-400 outline-none text-slate-700"
+                  title="Date of Surgery (leave blank if pending)"
+                />
+                {!patient.dos && <span className="text-[10px] text-slate-400 italic">pending</span>}
+              </div>
+            </div>
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Status</span>

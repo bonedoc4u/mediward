@@ -644,6 +644,10 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.ipNo} disabled={!!initialData} onChange={e => setFormData({...formData, ipNo: e.target.value})} />
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Admission</label>
+                  <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mobile Number</label>
                   <input type="tel" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
                 </div>
