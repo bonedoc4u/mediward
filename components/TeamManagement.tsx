@@ -128,13 +128,17 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
     const target = users.find(u => u.id === userId);
     if (!target) return;
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(target.email);
+      const { error } = await supabase.auth.resetPasswordForEmail(target.email, {
+        // redirectTo must match a URL listed in Supabase → Auth → Redirect URLs
+        redirectTo: `${window.location.origin}`,
+      });
       if (error) throw error;
       setResetId(null);
       toast.success(`Password reset email sent to ${target.email}`);
     } catch (err) {
-      console.error('[Supabase] password reset failed:', err);
-      toast.error('Failed to send reset email. Check the user\'s email address.');
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[Supabase] password reset failed:', msg);
+      toast.error(`Failed to send reset email: ${msg}`);
     }
   };
 
