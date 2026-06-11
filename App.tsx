@@ -5,6 +5,7 @@ import { can } from './utils/permissions';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
 import LoginPage from './components/LoginPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import HospitalRegisterPage from './components/HospitalRegisterPage';
 import SuperAdminPanel from './components/SuperAdminPanel';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -77,7 +78,7 @@ const ViewLoader = () => (
 
 // ─── Main App ───
 const App: React.FC = () => {
-  const { isAuthenticated, user, logout, viewingHospitalId, viewingHospitalName, setViewingHospital } = useAuth();
+  const { isAuthenticated, isRecoveryMode, user, logout, viewingHospitalId, viewingHospitalName, setViewingHospital } = useAuth();
   const [showRegister, setShowRegister] = useState(
     () => window.location.hash === '#/register',
   );
@@ -224,6 +225,16 @@ const App: React.FC = () => {
   }, [user, navItems]);
 
   // ─── Auth Guard ───
+  // Password reset email link — show the reset form regardless of auth state
+  if (isRecoveryMode) {
+    return (
+      <>
+        <ResetPasswordPage onDone={() => { window.location.hash = ''; window.location.reload(); }} />
+        <ToastContainer />
+      </>
+    );
+  }
+
   if (!isAuthenticated) {
     if (showPrivacy) {
       return <LegalPage type="privacy" onBack={() => { setShowPrivacy(false); window.location.hash = ''; }} />;

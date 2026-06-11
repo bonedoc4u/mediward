@@ -40,6 +40,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
+  /** True when the user arrived via a password-reset email link. App should show ResetPasswordPage. */
+  isRecoveryMode: boolean;
   /** Superadmin: ID of the hospital workspace currently being viewed (null = own hospital). */
   viewingHospitalId: string | null;
   /** Superadmin: display name of the hospital being viewed. */
@@ -60,6 +62,7 @@ export function useAuth(): AuthContextType {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [viewingHospitalId, setViewingHospitalId] = useState<string | null>(null);
   const [viewingHospitalName, setViewingHospitalName] = useState<string | null>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   const setViewingHospital = useCallback((id: string | null, name?: string) => {
     setViewingHospitalId(id);
@@ -222,19 +225,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ─── Supabase auth state listener (catches server-side token expiry / revocation) ───
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-        if (event === 'SIGNED_OUT') {
-          // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
-          // clear our local session too so the user is redirected to login.
-          setUser(prev => {
-            if (prev) {
-              removeFromStorage('session');
-              toast.warning('Your session has expired. Please log in again.');
-              window.location.hash = '#/dashboard';
-            }
-            return null;
-          });
-        }
+      if (event === 'PASSWORD_RECOVERY') {
+        // User clicked the password reset link in their email.
+        // Surface the reset form instead of the login page.
+        setIsRecoveryMode(true);
+      } else if (event === 'SIGNED_OUT') {
+        setIsRecoveryMode(false);
+        // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
+        // clear our local session too so the user is redirected to login.
+        setUser(prev => {
+          if (prev) {
+            removeFromStorage('session');
+            toast.warning('Your session has expired. Please log in again.');
+            window.location.hash = '#/dashboard';
+          }
+          return null;
+        });
       }
     });
     return () => subscription.unsubscribe();
@@ -319,6 +325,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       logout,
       isAuthenticated: !!user && user.sessionExpiry > Date.now(),
+      isRecoveryMode,
       viewingHospitalId,
       viewingHospitalName,
       setViewingHospital,
