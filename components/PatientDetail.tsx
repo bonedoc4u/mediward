@@ -127,110 +127,105 @@ const PatientDetail: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 space-y-4">
-          {/* Diagnosis & Procedure */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-3 space-y-2">
+          {/* Diagnosis & Procedure — single line */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
-              <p className="text-sm font-medium text-slate-800 mt-2">{patient.diagnosis}</p>
+              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
+              <p className="text-xs font-medium text-slate-800 mt-0.5 truncate">{patient.diagnosis}</p>
             </div>
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
-              {patient.procedure
-                ? <p className="text-sm text-slate-700 mt-2">{patient.procedure}</p>
-                : <p className="text-sm text-slate-400 mt-2 italic">Not yet performed</p>
-              }
+              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
+              <p className="text-xs text-slate-700 mt-0.5 truncate">
+                {patient.procedure || <span className="text-slate-400 italic">Pending</span>}
+              </p>
             </div>
           </div>
 
-          {/* Clinical Plan Card — Dates + Management */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs uppercase font-bold text-slate-600 tracking-wider">Clinical Plan</h3>
-            </div>
+          {/* Clinical Plan — compact card */}
+          <div className="bg-slate-50 border border-slate-200 rounded p-2.5 space-y-2">
+            <h3 className="text-[9px] uppercase font-bold text-slate-600 tracking-wider">Clinical Plan</h3>
 
-            {/* Dates */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Dates in one row */}
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Date of Admission</label>
+                <label className="text-[9px] font-semibold text-slate-600 block mb-0.5">DOA</label>
                 <input
                   type="date"
                   max={new Date().toISOString().split('T')[0]}
                   value={patient.doa ?? ''}
                   onChange={e => updatePatient({ ...patient, doa: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-slate-700"
+                  className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white focus:ring-1 focus:ring-blue-400 outline-none text-slate-700"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Date of Surgery {!patient.dos && <span className="text-slate-400 font-normal">(pending)</span>}</label>
+                <label className="text-[9px] font-semibold text-slate-600 block mb-0.5">DOS {!patient.dos && <span className="text-slate-400 font-normal">(pending)</span>}</label>
                 <input
                   type="date"
                   max={new Date().toISOString().split('T')[0]}
                   value={patient.dos ?? ''}
                   onChange={e => updatePatient({ ...patient, dos: e.target.value || undefined })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-slate-700"
+                  className="w-full px-2 py-1 border border-slate-300 rounded text-xs bg-white focus:ring-1 focus:ring-green-400 outline-none text-slate-700"
                 />
               </div>
             </div>
 
-            {/* Management Plan Toggle */}
+            {/* Management Toggle — compact */}
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' })}
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                  (patient.management ?? 'surgical_fixation') === 'surgical_fixation'
+                    ? 'bg-blue-600 text-white border border-blue-700'
+                    : 'bg-white text-slate-700 border border-slate-300 hover:border-blue-300'
+                }`}
+              >
+                Surgical
+              </button>
+              <button
+                onClick={() => updatePatient({ ...patient, management: 'conservative' })}
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                  patient.management === 'conservative'
+                    ? 'bg-emerald-600 text-white border border-emerald-700'
+                    : 'bg-white text-slate-700 border border-slate-300 hover:border-emerald-300'
+                }`}
+              >
+                Conservative
+              </button>
+            </div>
+          </div>
+
+          {/* Status & Contact inline */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-2">Management Plan</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' })}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-                    (patient.management ?? 'surgical_fixation') === 'surgical_fixation'
-                      ? 'bg-blue-600 text-white border border-blue-700 shadow-sm'
-                      : 'bg-white text-slate-700 border border-slate-300 hover:border-blue-300'
-                  }`}
-                >
-                  Surgical Fixation
-                </button>
-                <button
-                  onClick={() => updatePatient({ ...patient, management: 'conservative' })}
-                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-                    patient.management === 'conservative'
-                      ? 'bg-emerald-600 text-white border border-emerald-700 shadow-sm'
-                      : 'bg-white text-slate-700 border border-slate-300 hover:border-emerald-300'
-                  }`}
-                >
-                  Conservative
-                </button>
+              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Status</span>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {!patient.dos && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(patient.pacStatus)}`}>
+                    {patient.pacStatus}
+                  </span>
+                )}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(patient.patientStatus)}`}>
+                  {patient.patientStatus}
+                </span>
               </div>
             </div>
-          </div>
-
-          {/* Status Badges */}
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Current Status</span>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {!patient.dos && (
-                <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
-                  {patient.pacStatus}
-                </span>
-              )}
-              <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusColor(patient.patientStatus)}`}>
-                {patient.patientStatus}
-              </span>
-            </div>
-          </div>
-
-          {/* Contact & Comorbidities */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Contact</span>
-              <p className="text-sm text-blue-600 mt-2 flex items-center gap-1">
-                <Phone className="w-4 h-4" /> {patient.mobile}
+              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Contact</span>
+              <p className="text-xs text-blue-600 mt-0.5 flex items-center gap-0.5">
+                <Phone className="w-3 h-3" /> {patient.mobile}
               </p>
             </div>
             {patient.comorbidities.length > 0 && (
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Comorbidities</span>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {patient.comorbidities.map(c => (
-                    <span key={c} className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs font-medium">{c}</span>
+                <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Comorbidities</span>
+                <div className="flex flex-wrap gap-0.5 mt-0.5">
+                  {patient.comorbidities.slice(0, 3).map(c => (
+                    <span key={c} className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-[9px] font-medium">{c}</span>
                   ))}
+                  {patient.comorbidities.length > 3 && (
+                    <span className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-[9px] font-medium">+{patient.comorbidities.length - 3}</span>
+                  )}
                 </div>
               </div>
             )}
