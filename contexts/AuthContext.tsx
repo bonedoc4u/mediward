@@ -62,7 +62,18 @@ export function useAuth(): AuthContextType {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [viewingHospitalId, setViewingHospitalId] = useState<string | null>(null);
   const [viewingHospitalName, setViewingHospitalName] = useState<string | null>(null);
-  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+
+  // Detect password-reset links at initialisation time.
+  // Supabase fires PASSWORD_RECOVERY on onAuthStateChange, but that listener
+  // is registered asynchronously after React mounts — the event can fire
+  // before the listener is ready and gets silently dropped.
+  // Parsing the URL hash synchronously here catches it reliably.
+  const [isRecoveryMode, setIsRecoveryMode] = useState<boolean>(() => {
+    const hash = window.location.hash;         // e.g. #access_token=xxx&type=recovery
+    const search = window.location.search;     // PKCE flow: ?code=xxx (Supabase sets type param too)
+    const combined = hash + search;
+    return combined.includes('type=recovery');
+  });
 
   const setViewingHospital = useCallback((id: string | null, name?: string) => {
     setViewingHospitalId(id);

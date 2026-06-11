@@ -37,8 +37,10 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
       return;
     }
 
+    // Clear the recovery token from the URL so a hard-refresh doesn't re-show
+    // this form after the password has already been updated
+    window.history.replaceState(null, '', window.location.pathname);
     setDone(true);
-    // Give the user a moment to read the success message, then go to login
     setTimeout(onDone, 2500);
   };
 
