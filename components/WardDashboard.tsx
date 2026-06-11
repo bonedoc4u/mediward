@@ -66,7 +66,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   const activeConfigWards = useMemo(() => {
     const all = configWards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
     if (!user?.unit) return all; // admin — all wards
-    return all.filter(w => !w.unit?.length || w.unit.includes(user.unit) || w.isIcu);
+    return all.filter(w => !w.unit?.length || w.unit.includes(user.unit!) || w.isIcu);
   }, [configWards, user?.unit]);
 
   const [searchTerm, setSearchTerm] = useState('');

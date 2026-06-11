@@ -240,6 +240,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       }, 500); // debounce: write after 500ms of inactivity
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [formData, step, selectedComorbidities, drugAllergies, initialData]);
 
   // ── Scan Slip (OCR) ──

@@ -202,7 +202,7 @@ function rowToPatient(row: PatientRow): Patient {
       : [],
     pacChecklist:     row.pac_checklist    ?? undefined,
     pacFlow:          row.pac_flow         ?? undefined,
-    management:       (row.management ?? 'surgical_fixation') as ManagementPlan,
+    management:       (row.management ?? undefined) as ManagementPlan | undefined,
     preOpChecklist:   migratePreOpChecklist(row.pre_op_checklist),
     dischargeSummary: row.discharge_summary ?? undefined,
     damaSummary:      row.dama_summary      ?? undefined,
@@ -246,7 +246,7 @@ function patientToRow(patient: Patient) {
     todos:             patient.todos,
     pac_checklist:     patient.pacChecklist     ?? null,
     pac_flow:          patient.pacFlow          ?? null,
-    management:        patient.management       ?? 'surgical_fixation',
+    management:        patient.management       ?? null,
     pre_op_checklist:  patient.preOpChecklist   ?? null,
     discharge_summary: patient.dischargeSummary ?? null,
     dama_summary:      patient.damaSummary      ?? null,
@@ -320,6 +320,7 @@ export async function fetchActivePatientsPage(
     .from('patients')
     .select(PATIENT_LIST_SELECT)   // lightweight — no vitals JOIN
     .neq('patient_status', 'Discharged')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -345,6 +346,7 @@ export async function fetchActivePatients(unit?: string, hospitalId?: string): P
     .from('patients')
     .select(PATIENT_LIST_SELECT)   // lightweight — no vitals JOIN
     .neq('patient_status', 'Discharged')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(2000);                  // high cap — paginated path is the primary one
 
@@ -374,6 +376,7 @@ export async function fetchAllPatients(unit?: string, hospitalId?: string): Prom
     let query = supabase
       .from('patients')
       .select(PATIENT_LIST_SELECT)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(from, to);
     if (unit)       query = query.eq('unit', unit);
@@ -396,7 +399,8 @@ export async function fetchPatientById(ipNo: string, hospitalId?: string): Promi
   let query = supabase
     .from('patients')
     .select(PATIENT_SELECT)      // full join including vitals
-    .eq('ip_no', ipNo);
+    .eq('ip_no', ipNo)
+    .is('deleted_at', null);
   if (hospitalId) query = query.eq('hospital_id', hospitalId);
   const { data, error } = await query.maybeSingle();
   if (error) throw new Error(`fetchPatientById(${ipNo}): ${error.message}`);
@@ -437,14 +441,32 @@ export async function upsertPatient(patient: Patient): Promise<void> {
   }
 }
 
-/** Permanently delete a patient by IP number. */
+/**
+ * Soft-delete a patient by setting deleted_at to now.
+ * Hard-purge happens automatically after 30 days via purge_old_soft_deletes().
+ * Use anonymizePatient() for DPDP §13 Right to Erasure (immediate PII wipe).
+ */
 export async function removePatient(ipNo: string): Promise<void> {
   const { error } = await supabase
     .from('patients')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('ip_no', ipNo);
 
   if (error) throw new Error(`removePatient (${ipNo}): ${error.message}`);
+}
+
+/**
+ * Restore a soft-deleted patient within the 30-day recovery window.
+ * Clears deleted_at so the patient reappears in all queries.
+ */
+export async function restorePatient(ipNo: string): Promise<void> {
+  const { error } = await supabase
+    .from('patients')
+    .update({ deleted_at: null })
+    .eq('ip_no', ipNo)
+    .not('deleted_at', 'is', null);
+
+  if (error) throw new Error(`restorePatient (${ipNo}): ${error.message}`);
 }
 
 /**

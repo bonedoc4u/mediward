@@ -132,7 +132,7 @@ const CategoryPanel: React.FC<{
       const dayResults = labResults.filter(r => r.date === d);
       const values: Record<string, number | undefined> = {};
       types.forEach(t => { values[t.name] = dayResults.find(r => r.type === t.name)?.value; });
-      return { date: d, ...values };
+      return { date: d, ...values } as { date: string } & Record<string, number | undefined>;
     });
   };
 

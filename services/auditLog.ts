@@ -9,42 +9,44 @@ export function getAuditLog(): AuditEntry[] {
   return loadFromStorage<AuditEntry[]>(AUDIT_KEY) || [];
 }
 
+/**
+ * Write an audit event.
+ * Uses the SECURITY DEFINER RPC `insert_audit_event` so that user_id and
+ * user_name are derived server-side from auth.uid() — the client cannot
+ * forge entries under another user's identity.
+ */
 export function logAuditEvent(
-  userId: string,
-  userName: string,
+  _userId: string,   // kept for call-site compat; server derives from auth.uid()
+  _userName: string, // kept for call-site compat; server derives from app_users
   action: AuditEntry['action'],
   entity: string,
   entityId: string,
   details: string
 ): void {
-  const entry: AuditEntry = {
+  const localEntry: AuditEntry = {
     id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 12),
     timestamp: new Date().toISOString(),
-    userId,
-    userName,
+    userId: _userId,
+    userName: _userName,
     action,
     entity,
     entityId,
     details,
   };
 
-  // Primary: write to Supabase (fire-and-forget — non-blocking)
-  supabase.from('audit_log').insert({
-    id:         entry.id,
-    created_at: entry.timestamp,
-    user_id:    entry.userId,
-    user_name:  entry.userName,
-    action:     entry.action,
-    entity:     entry.entity,
-    entity_id:  entry.entityId,
-    details:    entry.details,
+  // Primary: SECURITY DEFINER RPC (server derives trusted user_id + user_name)
+  supabase.rpc('insert_audit_event', {
+    p_action:    action,
+    p_entity:    entity,
+    p_entity_id: entityId,
+    p_details:   details,
   }).then(({ error }) => {
-    if (error) console.warn('[AuditLog] Supabase write failed, kept in localStorage:', error.message);
+    if (error) console.warn('[AuditLog] RPC write failed, kept in localStorage:', error.message);
   });
 
-  // Backup: also persist in localStorage (capped at MAX_ENTRIES)
+  // Backup: localStorage (capped at MAX_ENTRIES)
   const log = getAuditLog();
-  log.push(entry);
+  log.push(localEntry);
   const trimmed = log.length > MAX_ENTRIES ? log.slice(-MAX_ENTRIES) : log;
   saveToStorage(AUDIT_KEY, trimmed);
 }
@@ -53,7 +55,7 @@ export function getAuditForEntity(entityId: string): AuditEntry[] {
   return getAuditLog().filter(e => e.entityId === entityId);
 }
 
-export function getRecentAudit(count: number = 50): AuditEntry[] {
+export function getRecentAudit(count = 50): AuditEntry[] {
   const log = getAuditLog();
   return log.slice(-count).reverse();
 }

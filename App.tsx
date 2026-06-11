@@ -44,6 +44,72 @@ import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/Clinical
 import ConcurrentEditModal from './components/ConcurrentEditModal';
 import LegalPage from './components/LegalPage';
 
+// ─── Lock Screen ─────────────────────────────────────────────────────────────
+// Shown when the tab/device is hidden for >60 s. Requires password re-entry
+// so the next person who picks up a shared tablet cannot see PHI.
+const LockScreen: React.FC<{
+  userName: string;
+  onUnlock: (password: string) => Promise<{ success: boolean; error?: string }>;
+  onLogout: () => void;
+}> = ({ userName, onUnlock, onLogout }) => {
+  const [password, setPassword] = React.useState('');
+  const [error, setError]       = React.useState('');
+  const [loading, setLoading]   = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) return;
+    setLoading(true);
+    setError('');
+    const result = await onUnlock(password);
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error ?? 'Incorrect password');
+      setPassword('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900 flex items-center justify-center z-[9999] px-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 space-y-6">
+        <div className="text-center space-y-1">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 mb-2">
+            <Shield className="w-7 h-7 text-slate-600" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-800">Session Locked</h2>
+          <p className="text-sm text-slate-500">
+            Enter your password to continue as <span className="font-medium text-slate-700">{userName}</span>
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="password"
+            value={password}
+            onChange={e => { setPassword(e.target.value); setError(''); }}
+            placeholder="Password"
+            autoFocus
+            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {error && <p className="text-xs text-red-600 text-center">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading || !password}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            {loading ? 'Verifying…' : 'Unlock'}
+          </button>
+        </form>
+        <button
+          onClick={onLogout}
+          className="w-full text-center text-xs text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          Not you? Log out and switch user
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── Navigation Config ───
 interface NavItem {
   id: ViewMode;
@@ -78,7 +144,7 @@ const ViewLoader = () => (
 
 // ─── Main App ───
 const App: React.FC = () => {
-  const { isAuthenticated, isRecoveryMode, user, logout, viewingHospitalId, viewingHospitalName, setViewingHospital } = useAuth();
+  const { isAuthenticated, isRecoveryMode, isLocked, unlock, user, login, logout, viewingHospitalId, viewingHospitalName, setViewingHospital } = useAuth();
   const [showRegister, setShowRegister] = useState(
     () => window.location.hash === '#/register',
   );
@@ -148,6 +214,7 @@ const App: React.FC = () => {
       const t = setTimeout(() => setShowIosInstall(true), 30_000);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, []);
 
   // Modal State (kept local since it's UI-only)
@@ -174,7 +241,7 @@ const App: React.FC = () => {
     setIsAddPatientModalOpen(true);
   }, []);
 
-  const meta = viewMeta[currentView] || viewMeta.dashboard;
+  const meta = viewMeta[currentView as keyof typeof viewMeta] ?? viewMeta.dashboard;
 
   // ─── Capacitor native hooks ───
   useEffect(() => {
@@ -232,6 +299,21 @@ const App: React.FC = () => {
         <ResetPasswordPage onDone={() => { window.location.hash = ''; window.location.reload(); }} />
         <ToastContainer />
       </>
+    );
+  }
+
+  // Lock screen — shown when the device was idle/hidden for >60 s on a shared tablet
+  if (isAuthenticated && isLocked) {
+    return (
+      <LockScreen
+        userName={user?.name ?? ''}
+        onUnlock={async (password) => {
+          const result = await login(user?.email ?? '', password);
+          if (result.success) unlock();
+          return result;
+        }}
+        onLogout={logout}
+      />
     );
   }
 

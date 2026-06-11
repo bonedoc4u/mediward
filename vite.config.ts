@@ -57,9 +57,9 @@ export default defineConfig(({ mode }) => {
                   networkTimeoutSeconds: 5,
                   expiration: {
                     maxEntries: 100,
-                    // 5-minute cap: cached clinical data is only served as fallback
-                    // for up to 5 minutes before it must be re-fetched
-                    maxAgeSeconds: 5 * 60,
+                    // 60-second cap: stale clinical data (vitals, labs) must not be
+                    // served for more than 1 minute — patient safety requires freshness
+                    maxAgeSeconds: 60,
                   },
                 },
               },

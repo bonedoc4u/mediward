@@ -87,7 +87,7 @@ const PatientDetail: React.FC = () => {
       {/* Back Navigation */}
       <button
         onClick={() => navigateTo('dashboard')}
-        className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+        className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
       >
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </button>
@@ -115,12 +115,12 @@ const PatientDetail: React.FC = () => {
             <div className="flex items-center gap-2 shrink-0">
               {patient.pod !== undefined && (
                 <div className="bg-green-500/20 border border-green-400/30 rounded-xl px-3 py-1.5 text-center">
-                  <span className="block text-[9px] uppercase font-bold text-green-300 tracking-wider">Post-Op Day</span>
+                  <span className="block text-[11px] uppercase font-bold text-green-300 tracking-wider">Post-Op Day</span>
                   <span className="block text-2xl sm:text-3xl font-black text-green-200 leading-none">{patient.pod}</span>
                 </div>
               )}
               <div className="bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-center">
-                <span className="block text-[9px] uppercase font-bold text-slate-400 tracking-wider">Admitted</span>
+                <span className="block text-[11px] uppercase font-bold text-slate-400 tracking-wider">Admitted</span>
                 <span className="block text-base sm:text-lg font-bold text-white leading-none">{daysSinceAdmission}d</span>
               </div>
             </div>
@@ -131,11 +131,11 @@ const PatientDetail: React.FC = () => {
           {/* Diagnosis & Procedure — single line */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
-              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
+              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
               <p className="text-xs font-medium text-slate-800 mt-0.5 truncate">{patient.diagnosis}</p>
             </div>
             <div>
-              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
+              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
               <p className="text-xs text-slate-700 mt-0.5 truncate">
                 {patient.procedure || <span className="text-slate-400 italic">Pending</span>}
               </p>
@@ -144,12 +144,12 @@ const PatientDetail: React.FC = () => {
 
           {/* Clinical Plan — compact card */}
           <div className="bg-slate-50 border border-slate-200 rounded p-2.5 space-y-2">
-            <h3 className="text-[9px] uppercase font-bold text-slate-600 tracking-wider">Clinical Plan</h3>
+            <h3 className="text-[11px] uppercase font-bold text-slate-600 tracking-wider">Clinical Plan</h3>
 
             {/* Dates in one row */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[9px] font-semibold text-slate-600 block mb-0.5">DOA</label>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">DOA</label>
                 <input
                   type="date"
                   max={new Date().toISOString().split('T')[0]}
@@ -159,7 +159,7 @@ const PatientDetail: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="text-[9px] font-semibold text-slate-600 block mb-0.5">DOS {!patient.dos && <span className="text-slate-400 font-normal">(pending)</span>}</label>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">DOS {!patient.dos && <span className="text-slate-400 font-normal">(pending)</span>}</label>
                 <input
                   type="date"
                   max={new Date().toISOString().split('T')[0]}
@@ -174,7 +174,7 @@ const PatientDetail: React.FC = () => {
             <div className="flex gap-1.5">
               <button
                 onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' })}
-                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 ${
                   (patient.management ?? 'surgical_fixation') === 'surgical_fixation'
                     ? 'bg-blue-600 text-white border border-blue-700'
                     : 'bg-white text-slate-700 border border-slate-300 hover:border-blue-300'
@@ -184,7 +184,7 @@ const PatientDetail: React.FC = () => {
               </button>
               <button
                 onClick={() => updatePatient({ ...patient, management: 'conservative' })}
-                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all ${
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1 ${
                   patient.management === 'conservative'
                     ? 'bg-emerald-600 text-white border border-emerald-700'
                     : 'bg-white text-slate-700 border border-slate-300 hover:border-emerald-300'
@@ -198,33 +198,33 @@ const PatientDetail: React.FC = () => {
           {/* Status & Contact inline */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
-              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Status</span>
+              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Status</span>
               <div className="flex flex-wrap gap-1 mt-0.5">
                 {!patient.dos && (
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(patient.pacStatus)}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
                     {patient.pacStatus}
                   </span>
                 )}
-                <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getStatusColor(patient.patientStatus)}`}>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.patientStatus)}`}>
                   {patient.patientStatus}
                 </span>
               </div>
             </div>
             <div>
-              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Contact</span>
+              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Contact</span>
               <p className="text-xs text-blue-600 mt-0.5 flex items-center gap-0.5">
                 <Phone className="w-3 h-3" /> {patient.mobile}
               </p>
             </div>
             {patient.comorbidities.length > 0 && (
               <div>
-                <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Comorbidities</span>
+                <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Comorbidities</span>
                 <div className="flex flex-wrap gap-0.5 mt-0.5">
                   {patient.comorbidities.slice(0, 3).map(c => (
-                    <span key={c} className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-[9px] font-medium">{c}</span>
+                    <span key={c} className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-[11px] font-medium">{c}</span>
                   ))}
                   {patient.comorbidities.length > 3 && (
-                    <span className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-[9px] font-medium">+{patient.comorbidities.length - 3}</span>
+                    <span className="px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded text-[11px] font-medium">+{patient.comorbidities.length - 3}</span>
                   )}
                 </div>
               </div>
@@ -237,7 +237,7 @@ const PatientDetail: React.FC = () => {
       <div className="flex gap-2 overflow-x-auto pb-1 md:flex-wrap md:overflow-x-visible">
         <button
           onClick={() => setShowScoring(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] shrink-0"
+          className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
           aria-label="Open clinical scoring tools"
         >
           <Calculator className="w-4 h-4" />
@@ -245,27 +245,27 @@ const PatientDetail: React.FC = () => {
         </button>
         <button
           onClick={() => setShowReferral(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] shrink-0"
+          className="flex items-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
           aria-label="Create referral letter"
         >
           <Send className="w-4 h-4" />
           <span className="hidden sm:inline">Refer</span>
         </button>
-        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
+        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
           <ClipboardCheck className="w-4 h-4 text-blue-500 shrink-0" /> Daily Rounds
         </button>
-        <button onClick={() => navigateTo('labs', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
+        <button onClick={() => navigateTo('labs', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
           <Droplet className="w-4 h-4 text-blue-500 shrink-0" /> Lab Trends
         </button>
-        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
+        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
           <FileImage className="w-4 h-4 text-blue-500 shrink-0" /> Radiology
         </button>
-        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap">
+        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-lg shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm font-medium text-slate-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
           <HeartPulse className="w-4 h-4 text-blue-500 shrink-0" /> PAC Status
         </button>
         <button
           onClick={() => setShowFhirExport(true)}
-          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700 whitespace-nowrap"
+          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
         >
           <FileJson className="w-4 h-4 text-teal-600 shrink-0" /> Export FHIR
         </button>
@@ -279,7 +279,7 @@ const PatientDetail: React.FC = () => {
             a.click();
             URL.revokeObjectURL(url);
           }}
-          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-slate-50 rounded-lg shadow-sm border border-slate-200 hover:bg-slate-100 transition-colors text-sm font-medium text-slate-600 whitespace-nowrap"
+          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-slate-50 rounded-lg shadow-sm border border-slate-200 hover:bg-slate-100 transition-colors text-sm font-medium text-slate-600 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
           title="Export patient data (DPDP data portability)"
         >
           <Download className="w-4 h-4 text-slate-500 shrink-0" /> Export JSON
@@ -287,14 +287,14 @@ const PatientDetail: React.FC = () => {
         {isAlreadyDischarged ? (
           <button
             onClick={() => navigateTo('discharge', { id: patient.ipNo })}
-            className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700 whitespace-nowrap"
+            className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-lg shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-sm font-medium text-teal-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
           >
             <FileText className="w-4 h-4 text-teal-600 shrink-0" /> Discharge Summary
           </button>
         ) : canDischarge ? (
           <button
             onClick={() => setShowDischargeConfirm(true)}
-            className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-red-50 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-sm font-medium text-red-700 whitespace-nowrap"
+            className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-red-50 rounded-lg shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-sm font-medium text-red-700 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
           >
             <LogOut className="w-4 h-4 text-red-500 shrink-0" /> Discharge Patient
           </button>
@@ -306,9 +306,9 @@ const PatientDetail: React.FC = () => {
         <div className="flex justify-end">
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
           >
-            <Trash2 className="w-3.5 h-3.5" /> Permanently Delete Record
+            <Trash2 className="w-3.5 h-3.5" /> Delete Record
           </button>
         </div>
       )}
@@ -458,7 +458,7 @@ const PatientDetail: React.FC = () => {
                         </span>
                         <span className="text-xs text-slate-400 ml-1">{lt.unit}</span>
                         {data.latestDate && (
-                          <p className="text-[10px] text-slate-400 mt-0.5">{data.latestDate}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{data.latestDate}</p>
                         )}
                       </>
                     ) : (
@@ -507,8 +507,8 @@ const PatientDetail: React.FC = () => {
               <div key={inv.id} className="group relative aspect-square bg-black rounded-lg overflow-hidden border border-slate-200">
                 <img src={inv.imageUrl} alt={inv.type} className="w-full h-full object-cover" />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                  <p className="text-[10px] text-white font-bold">{inv.type}</p>
-                  <p className="text-[9px] text-white/70">{inv.date}</p>
+                  <p className="text-xs text-white font-bold">{inv.type}</p>
+                  <p className="text-[11px] text-white/70">{inv.date}</p>
                 </div>
               </div>
             ))}
@@ -541,7 +541,7 @@ const PatientDetail: React.FC = () => {
                 <div key={round.date} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold text-blue-600">{round.date}</span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       {round.todos.filter(t => t.isDone).length}/{round.todos.length} tasks done
                     </span>
                   </div>

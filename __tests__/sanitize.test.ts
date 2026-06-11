@@ -111,10 +111,11 @@ describe('sanitizePatientInput', () => {
     const result = sanitizePatientInput({
       tags: ['<script>alert(1)</script>safe', '<img onerror="evil()">safe2'],
     });
-    expect(result.tags[0]).not.toContain('<script>');
-    expect(result.tags[0]).toContain('safe');
-    expect(result.tags[1]).not.toContain('onerror');
-    expect(result.tags[1]).toContain('safe2');
+    const tags = result.tags as string[];
+    expect(tags[0]).not.toContain('<script>');
+    expect(tags[0]).toContain('safe');
+    expect(tags[1]).not.toContain('onerror');
+    expect(tags[1]).toContain('safe2');
   });
 
   it('passes through non-string values unchanged', () => {

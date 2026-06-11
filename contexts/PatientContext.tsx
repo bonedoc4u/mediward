@@ -291,7 +291,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             setCacheTimestamp(null);
             // Notify other open tabs that a sync just completed
             try {
-              bc.postMessage({ type: 'SYNC_COMPLETE', hospitalId: hospitalIdRef.current });
+              bc?.postMessage({ type: 'SYNC_COMPLETE', hospitalId: hospitalIdRef.current });
             } catch { /* BroadcastChannel not supported (iOS 14-) */ }
           })
           .catch(() => {/* stay on current state */});

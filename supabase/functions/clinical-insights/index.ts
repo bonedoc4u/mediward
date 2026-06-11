@@ -22,11 +22,25 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// Restrict CORS to known origins — prevents PHI being sent to Gemini from
+// arbitrary domains using a stolen Bearer token.
+const ALLOWED_ORIGINS = [
+  'https://mediward.vercel.app',
+  'https://mediward.app',
+  // Add capacitor:// for native mobile builds
+  'capacitor://localhost',
+  'http://localhost:3000', // local dev only
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 // ─── Rate limit config ───
 const RATE_LIMIT_WINDOW_MS = 60_000;  // 1 minute window
@@ -188,13 +202,16 @@ async function logAiAudit(userId: string, hospitalId: string | null, patientCoun
 }
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: CORS_HEADERS });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS });
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   }
 
   try {
@@ -202,27 +219,39 @@ serve(async (req: Request) => {
     let userId = 'anonymous';
     let hospitalId: string | null = null;
     const authHeader = req.headers.get('authorization') ?? '';
-    if (authHeader.startsWith('Bearer ')) {
-      try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL');
-        const anonKey     = Deno.env.get('SUPABASE_ANON_KEY');
-        if (supabaseUrl && anonKey) {
-          const sb = createClient(supabaseUrl, anonKey, {
-            global: { headers: { Authorization: authHeader } },
+
+    // Reject unauthenticated requests — this endpoint processes PHI
+    if (!authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const anonKey     = Deno.env.get('SUPABASE_ANON_KEY');
+      if (supabaseUrl && anonKey) {
+        const sb = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) {
+          return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+            status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
-          const { data: { user } } = await sb.auth.getUser();
-          if (user) {
-            userId = user.id;
-            // Fetch hospital_id for audit log
-            const { data: appUser } = await sb
-              .from('app_users')
-              .select('hospital_id')
-              .eq('id', user.id)
-              .maybeSingle();
-            hospitalId = appUser?.hospital_id ?? null;
-          }
         }
-      } catch { /* ignore — rate limit still applies to 'anonymous' */ }
+        userId = user.id;
+        const { data: appUser } = await sb
+          .from('app_users')
+          .select('hospital_id')
+          .eq('id', user.id)
+          .maybeSingle();
+        hospitalId = appUser?.hospital_id ?? null;
+      }
+    } catch {
+      return new Response(JSON.stringify({ error: 'Authentication failed' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // ─── Rate limiting ───
@@ -231,7 +260,7 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Rate limit exceeded. Try again in 1 minute.' }), {
         status: 429,
         headers: {
-          ...CORS_HEADERS,
+          ...corsHeaders,
           'Content-Type': 'application/json',
           'X-RateLimit-Remaining': '0',
           'Retry-After': '60',
@@ -243,7 +272,7 @@ serve(async (req: Request) => {
     const contentLength = req.headers.get('content-length');
     if (contentLength && parseInt(contentLength) > 65_536) {
       return new Response(JSON.stringify({ error: 'Payload too large' }), {
-        status: 413, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -252,14 +281,14 @@ serve(async (req: Request) => {
     // ─── Enforce patient count limit ───
     if (!Array.isArray(body.patients) || body.patients.length > 60) {
       return new Response(JSON.stringify({ error: 'patients must be an array of ≤ 60 entries' }), {
-        status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
     if (!GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: 'AI service not configured' }), {
-        status: 503, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -273,13 +302,11 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.1,       // Low temperature — deterministic clinical output
+          temperature: 0.1,
           maxOutputTokens: 2048,
           responseMimeType: 'application/json',
         },
-        safetySettings: [
-          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-        ],
+        // Removed BLOCK_NONE override — use Gemini's default safety settings
       }),
     });
 
@@ -287,7 +314,7 @@ serve(async (req: Request) => {
       const err = await geminiRes.text();
       console.error('Gemini error:', err);
       return new Response(JSON.stringify({ error: 'AI service error', fallback: true }), {
-        status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -302,7 +329,7 @@ serve(async (req: Request) => {
     } catch {
       console.error('Gemini non-JSON response:', rawText);
       return new Response(JSON.stringify({ error: 'AI parse error', fallback: true }), {
-        status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -312,7 +339,7 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify({ alerts }), {
       status: 200,
       headers: {
-        ...CORS_HEADERS,
+        ...corsHeaders,
         'Content-Type': 'application/json',
         'X-RateLimit-Remaining': String(remaining),
       },
@@ -320,7 +347,7 @@ serve(async (req: Request) => {
   } catch (err) {
     console.error('clinical-insights error:', err);
     return new Response(JSON.stringify({ error: 'Internal error', fallback: true }), {
-      status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...getCorsHeaders(req.headers.get('origin')), 'Content-Type': 'application/json' },
     });
   }
 });

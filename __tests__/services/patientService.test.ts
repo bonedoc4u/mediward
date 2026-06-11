@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // which is hoisted to the top of the file before any imports are evaluated.
 
 const mockState = vi.hoisted(() => ({
-  result: { data: [] as any[], error: null as any },
+  result: { data: [] as any[] | null, error: null as any },
 }));
 
 vi.mock('../../lib/supabase', () => {

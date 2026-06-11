@@ -17,6 +17,8 @@ import { clearPatientCache } from '../services/patientCache';
 
 const SESSION_DURATION   = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
 const WARN_BEFORE_EXPIRY = 5 * 60 * 1000;        // warn 5 min before absolute expiry
+// Require re-auth if the screen/tab was hidden for longer than this on shared devices
+const LOCK_REAUTH_AFTER_MS = 60 * 1000; // 60 seconds
 
 // Clinical roles need long inactivity windows — a ward round on a 30-bed unit
 // takes 90–120 min, and an OT case can run 3–4 hours. The old 30-min timeout
@@ -42,6 +44,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   /** True when the user arrived via a password-reset email link. App should show ResetPasswordPage. */
   isRecoveryMode: boolean;
+  /** True when the screen was locked/hidden and the user must re-authenticate. */
+  isLocked: boolean;
+  /** Dismiss the lock screen (called after successful re-auth). */
+  unlock: () => void;
   /** Superadmin: ID of the hospital workspace currently being viewed (null = own hospital). */
   viewingHospitalId: string | null;
   /** Superadmin: display name of the hospital being viewed. */
@@ -62,6 +68,8 @@ export function useAuth(): AuthContextType {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [viewingHospitalId, setViewingHospitalId] = useState<string | null>(null);
   const [viewingHospitalName, setViewingHospitalName] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const hiddenAtRef = React.useRef<number | null>(null);
 
   // Detect password-reset links at initialisation time.
   // Supabase fires PASSWORD_RECOVERY on onAuthStateChange, but that listener
@@ -203,6 +211,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user]);
 
+  // ─── Screen-lock detection: re-auth required after hidden > 60 s ───────
+  // Shared ward tablets are left unlocked between staff. If the device screen
+  // turns off or the tab is backgrounded and then resumed after >60 seconds,
+  // require the user to re-enter their password before accessing PHI.
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAtRef.current = Date.now();
+      } else if (document.visibilityState === 'visible') {
+        const hiddenAt = hiddenAtRef.current;
+        if (hiddenAt !== null && Date.now() - hiddenAt > LOCK_REAUTH_AFTER_MS) {
+          setIsLocked(true);
+        }
+        hiddenAtRef.current = null;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+
+  const unlock = useCallback(() => setIsLocked(false), []);
+
   // ─── Live session sync — watch the logged-in user's app_users row ───
   // When an admin changes unit/role in TeamManagement, Supabase fires a realtime
   // UPDATE on app_users. We pick it up here and update the session immediately
@@ -321,6 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     supabase.auth.signOut().catch(() => {});
     setUser(null);
+    setIsLocked(false);
     removeFromStorage('session');
     clearDisclaimerAccepted(); // next user on this device must re-accept
     // Purge SW caches so the next user on a shared tablet cannot read cached patient data
@@ -337,6 +371,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout,
       isAuthenticated: !!user && user.sessionExpiry > Date.now(),
       isRecoveryMode,
+      isLocked,
+      unlock,
       viewingHospitalId,
       viewingHospitalName,
       setViewingHospital,
