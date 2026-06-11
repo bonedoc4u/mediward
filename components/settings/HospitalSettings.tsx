@@ -122,6 +122,7 @@ const HospitalSettings: React.FC = () => {
         showIntakeOutput: localShowIO, showBloodTransfusion: localShowBT, showWoundCare: localShowWC,
         showNews2: localShowNews2,
         customTodoShortcuts: localShortcuts,
+        vitalThresholds: { spO2Min: 90, hrMin: 50, hrMax: 120, sbpMin: 90, rrMin: 10, rrMax: 30 },
       });
     } finally { setSaving(false); }
   };

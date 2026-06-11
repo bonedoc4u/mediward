@@ -151,12 +151,20 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   showWoundCare: false,
   showNews2: true,
   customTodoShortcuts: [],
+  vitalThresholds: {
+    spO2Min: 90,   // Alert if SpO2 < 90%
+    hrMin: 50,     // Alert if HR < 50
+    hrMax: 120,    // Alert if HR > 120
+    sbpMin: 90,    // Alert if SBP < 90
+    rrMin: 10,     // Alert if RR < 10
+    rrMax: 30,     // Alert if RR > 30
+  },
 };
 
 export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
   let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care, show_news2, custom_todo_shortcuts');
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care, show_news2, custom_todo_shortcuts, vital_thresholds');
   if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
   const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
@@ -179,6 +187,9 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     showWoundCare:        Boolean(data.show_wound_care        ?? false),
     showNews2:            data.show_news2 == null ? true : Boolean(data.show_news2),
     customTodoShortcuts:  Array.isArray(data.custom_todo_shortcuts) ? data.custom_todo_shortcuts as string[] : [],
+    vitalThresholds: (data.vital_thresholds && typeof data.vital_thresholds === 'object')
+      ? data.vital_thresholds
+      : DEFAULT_HOSPITAL_CONFIG.vitalThresholds,
   };
 }
 
@@ -207,6 +218,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_wound_care:            config.showWoundCare,
         show_news2:                 config.showNews2,
         custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
+        vital_thresholds:           config.vitalThresholds,
         updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
@@ -228,6 +240,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_wound_care:            config.showWoundCare,
         show_news2:                 config.showNews2,
         custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
+        vital_thresholds:           config.vitalThresholds,
       });
     if (error) throw error;
   }

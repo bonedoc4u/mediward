@@ -10,7 +10,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig, DepartmentTemplateOverride, SpecialtyFieldGroup } from '../types';
+import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig, DepartmentTemplateOverride, SpecialtyFieldGroup, VitalThresholds } from '../types';
 import {
   fetchWards, createWard, updateWard, deleteWard,
   fetchLabTypes, createLabType, updateLabType, deleteLabType,
@@ -53,6 +53,14 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   showWoundCare: false,
   showNews2: true,
   customTodoShortcuts: [],
+  vitalThresholds: {
+    spO2Min: 90,
+    hrMin: 50,
+    hrMax: 120,
+    sbpMin: 90,
+    rrMin: 10,
+    rrMax: 30,
+  },
 };
 
 // ─── Fallback defaults (used when DB is unreachable and no cache exists) ───
@@ -119,6 +127,8 @@ interface ConfigContextType {
   showNews2: boolean;
   /** Admin-defined quick-add shortcuts shown in Ward Rounds to-do section. */
   customTodoShortcuts: string[];
+  /** ICU vital sign alert thresholds (SpO2, HR, BP, RR). */
+  vitalThresholds: VitalThresholds;
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
   /** Timestamp (Date.now()) set whenever a background config refresh updates the config.
@@ -422,6 +432,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     showWoundCare:        hospitalConfig.showWoundCare        ?? false,
     showNews2:            hospitalConfig.showNews2            ?? true,
     customTodoShortcuts:  hospitalConfig.customTodoShortcuts  ?? [],
+    vitalThresholds:      hospitalConfig.vitalThresholds      ?? DEFAULT_HOSPITAL_CONFIG.vitalThresholds,
     saveHospitalConfig,
     configUpdatedAt,
     addWard, saveWard, removeWard,

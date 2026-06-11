@@ -19,6 +19,16 @@ export enum PatientStatus {
   Discharged = "Discharged"
 }
 
+/** Alert thresholds for vital signs. Breach triggers alert notification. */
+export interface VitalThresholds {
+  spO2Min: number;           // e.g. 90 — alert if SpO2 < 90%
+  hrMin: number;             // e.g. 50 — alert if HR < 50
+  hrMax: number;             // e.g. 120 — alert if HR > 120
+  sbpMin: number;            // e.g. 90 — alert if SBP < 90
+  rrMin: number;             // e.g. 10 — alert if RR < 10
+  rrMax: number;             // e.g. 30 — alert if RR > 30
+}
+
 /** Ward name — now a plain string fed from the ward_config database table. */
 export type Ward = string;
 
@@ -66,6 +76,9 @@ export interface HospitalConfig {
   /** Admin-defined quick-add shortcuts shown in Ward Rounds to-do section.
    *  E.g. ["IV Fluids", "NBM", "Pre-op prep", "Bloods"]. */
   customTodoShortcuts: string[];
+  /** ICU vital sign alert thresholds. Monitored when bedside monitors are connected.
+   *  Admins can configure these to match department protocols. */
+  vitalThresholds: VitalThresholds;
 }
 
 /** A ward row from the ward_config table. */
