@@ -127,73 +127,111 @@ const PatientDetail: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
-            <p className="text-sm font-medium text-slate-800 mt-0.5">{patient.diagnosis}</p>
+        <div className="p-4 sm:p-5 space-y-4">
+          {/* Diagnosis & Procedure */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
+              <p className="text-sm font-medium text-slate-800 mt-2">{patient.diagnosis}</p>
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
+              {patient.procedure
+                ? <p className="text-sm text-slate-700 mt-2">{patient.procedure}</p>
+                : <p className="text-sm text-slate-400 mt-2 italic">Not yet performed</p>
+              }
+            </div>
           </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
-            {patient.procedure
-              ? <p className="text-sm text-slate-700 mt-0.5">{patient.procedure}</p>
-              : <p className="text-xs text-slate-400 mt-0.5 italic">Not yet performed</p>
-            }
-            <div className="flex flex-col gap-1 mt-1.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-slate-400 w-7 shrink-0">DOA</span>
+
+          {/* Clinical Plan Card — Dates + Management */}
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase font-bold text-slate-600 tracking-wider">Clinical Plan</h3>
+            </div>
+
+            {/* Dates */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Date of Admission</label>
                 <input
                   type="date"
                   max={new Date().toISOString().split('T')[0]}
                   value={patient.doa ?? ''}
                   onChange={e => updatePatient({ ...patient, doa: e.target.value })}
-                  className="text-xs border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:ring-1 focus:ring-blue-400 outline-none text-slate-700"
-                  title="Date of Admission"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-slate-700"
                 />
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-slate-400 w-7 shrink-0">DOS</span>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Date of Surgery {!patient.dos && <span className="text-slate-400 font-normal">(pending)</span>}</label>
                 <input
                   type="date"
                   max={new Date().toISOString().split('T')[0]}
                   value={patient.dos ?? ''}
                   onChange={e => updatePatient({ ...patient, dos: e.target.value || undefined })}
-                  className="text-xs border border-slate-200 rounded px-1.5 py-0.5 bg-white focus:ring-1 focus:ring-green-400 outline-none text-slate-700"
-                  title="Date of Surgery (leave blank if pending)"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-slate-700"
                 />
-                {!patient.dos && <span className="text-[10px] text-slate-400 italic">pending</span>}
+              </div>
+            </div>
+
+            {/* Management Plan Toggle */}
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-2">Management Plan</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' })}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                    (patient.management ?? 'surgical_fixation') === 'surgical_fixation'
+                      ? 'bg-blue-600 text-white border border-blue-700 shadow-sm'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:border-blue-300'
+                  }`}
+                >
+                  Surgical Fixation
+                </button>
+                <button
+                  onClick={() => updatePatient({ ...patient, management: 'conservative' })}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                    patient.management === 'conservative'
+                      ? 'bg-emerald-600 text-white border border-emerald-700 shadow-sm'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:border-emerald-300'
+                  }`}
+                >
+                  Conservative
+                </button>
               </div>
             </div>
           </div>
+
+          {/* Status Badges */}
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Status</span>
-            <div className="flex flex-wrap gap-1 mt-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Current Status</span>
+            <div className="flex flex-wrap gap-2 mt-2">
               {!patient.dos && (
-                <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
+                <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
                   {patient.pacStatus}
                 </span>
               )}
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(patient.patientStatus)}`}>
+              <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusColor(patient.patientStatus)}`}>
                 {patient.patientStatus}
-              </span>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
-                (patient.management ?? 'surgical_fixation') === 'conservative'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-blue-50 text-blue-700 border-blue-200'
-              }`}>
-                {(patient.management ?? 'surgical_fixation') === 'conservative' ? 'Conservative' : 'Surgical Fixation'}
               </span>
             </div>
           </div>
-          <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Contact</span>
-            <p className="text-sm text-blue-600 mt-0.5 flex items-center gap-1">
-              <Phone className="w-3.5 h-3.5" /> {patient.mobile}
-            </p>
+
+          {/* Contact & Comorbidities */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Contact</span>
+              <p className="text-sm text-blue-600 mt-2 flex items-center gap-1">
+                <Phone className="w-4 h-4" /> {patient.mobile}
+              </p>
+            </div>
             {patient.comorbidities.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {patient.comorbidities.map(c => (
-                  <span key={c} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px]">{c}</span>
-                ))}
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Comorbidities</span>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {patient.comorbidities.map(c => (
+                    <span key={c} className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs font-medium">{c}</span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
