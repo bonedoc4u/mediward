@@ -6,6 +6,7 @@ import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart } from 'lucide-react';
 import { calcPod } from './HandoverSummary';
 import TodaySchedule from './TodaySchedule';
+import OTDatePicker from './OTDatePicker';
 
 /** Strip ward-number prefix from bed for display: "10-05" → "05", "1A" → "1A" */
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
@@ -194,9 +195,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   const [assigningDateIp, setAssigningDateIp] = useState<string | null>(null);
   const [assigningDateValue, setAssigningDateValue] = useState('');
 
-  const handleAssignDate = (ipNo: string) => {
-    if (!assigningDateValue || !onAssignDate) return;
-    onAssignDate(ipNo, assigningDateValue);
+  const handleAssignDate = (ipNo: string, date?: string) => {
+    const d = date ?? assigningDateValue;
+    if (!d || !onAssignDate) return;
+    onAssignDate(ipNo, d);
     setAssigningDateIp(null);
     setAssigningDateValue('');
   };
@@ -439,34 +441,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     </td>
                     {viewMode === 'pending' && (
                       <td className="px-6 py-4">
-                        {assigningDateIp === patient.ipNo ? (
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="date"
-                              autoFocus
-                              value={assigningDateValue}
-                              min={today}
-                              onChange={e => setAssigningDateValue(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') handleAssignDate(patient.ipNo); if (e.key === 'Escape') { setAssigningDateIp(null); setAssigningDateValue(''); } }}
-                              className="border border-blue-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
-                            />
-                            <button
-                              onClick={() => handleAssignDate(patient.ipNo)}
-                              disabled={!assigningDateValue}
-                              className="p-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded"
-                              title="Confirm date"
-                            >
-                              <CalendarCheck className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => { setAssigningDateIp(null); setAssigningDateValue(''); }}
-                              className="p-1.5 text-slate-400 hover:text-slate-600 rounded"
-                              title="Cancel"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : patient.plannedDos ? (
+                        {patient.plannedDos ? (
                           <button
                             onClick={() => { setAssigningDateIp(patient.ipNo); setAssigningDateValue(patient.plannedDos ?? ''); }}
                             className="flex items-center gap-1.5 px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded text-xs font-semibold transition-colors"
@@ -739,37 +714,21 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         </div>
       )}
 
-      {/* ─── Assign Date bottom panel — mobile only ─── */}
-      {assigningDateIp && onAssignDate && (
-        <div className="md:hidden fixed left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200" style={{ bottom: 'calc(var(--bottom-nav-height, 56px) + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)))' }}>
-          <div className="flex items-center justify-between mb-3">
-            <p className="font-semibold text-sm text-slate-800 flex items-center gap-2">
-              <CalendarClock className="w-4 h-4 text-violet-600" />
-              Assign Surgery Date
-            </p>
-            <button onClick={() => { setAssigningDateIp(null); setAssigningDateValue(''); }} className="text-slate-400 hover:text-slate-600 p-1">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="date"
-              autoFocus
+      {/* ─── OT Date Picker modal ─── */}
+      {assigningDateIp && onAssignDate && (() => {
+        const pt = patients.find(p => p.ipNo === assigningDateIp);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <OTDatePicker
+              unit={pt?.unit ?? user?.unit ?? undefined}
               value={assigningDateValue}
-              min={today}
-              onChange={e => setAssigningDateValue(e.target.value)}
-              className="flex-1 min-h-[44px] p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-violet-500 outline-none"
+              minDate={today}
+              onSelect={date => handleAssignDate(assigningDateIp, date)}
+              onCancel={() => { setAssigningDateIp(null); setAssigningDateValue(''); }}
             />
-            <button
-              onClick={() => handleAssignDate(assigningDateIp)}
-              disabled={!assigningDateValue}
-              className="px-4 min-h-[44px] bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors flex items-center gap-1.5"
-            >
-              <CalendarCheck className="w-4 h-4" /> Confirm
-            </button>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ─── Quick Lab Entry bottom panel — mobile only ─── */}
       {quickLabIp && onAddLab && (
