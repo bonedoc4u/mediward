@@ -522,13 +522,30 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .catch(err => {
         console.error('[Patients] updatePatient failed:', err);
         if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT:')) {
-          // Fetch the remote version so the user can compare and decide
+          // Fetch remote to compare; if only the timestamp diverged (no real field change)
+          // silently adopt the server's updatedAt and retry — no dialog needed.
+          const MEANINGFUL_KEYS = [
+            'bed', 'ward', 'diagnosis', 'patientStatus', 'pacStatus',
+            'procedure', 'dos', 'dod', 'pod', 'management', 'unit',
+          ] as const;
           fetchPatientById(sanitized.ipNo, user?.hospitalId).then(remote => {
-            if (remote) {
-              setConcurrentEditConflict({ localPatient: sanitized, remotePatient: remote });
-            } else {
+            if (!remote) {
               toast.error(`${sanitized.name} was modified by another user. Reload to see latest.`);
+              return;
             }
+            const hasRealDiff = MEANINGFUL_KEYS.some(
+              k => String(sanitized[k] ?? '') !== String(remote[k] ?? ''),
+            );
+            if (!hasRealDiff) {
+              // Only timestamps diverged (e.g. trigger or background sync touched updated_at).
+              // Re-save with the server's updatedAt so the conditional check passes.
+              upsertPatient({ ...sanitized, updatedAt: remote.updatedAt })
+                .then(() => { toast.success(`${sanitized.name} updated`); if (isDischarge) hapticSuccess(); })
+                .catch(() => { enqueue('upsert_patient', sanitized); toast.warning('Saved locally — will sync when online.'); });
+              return;
+            }
+            // Real conflict — show the dialog so the user can decide
+            setConcurrentEditConflict({ localPatient: sanitized, remotePatient: remote });
           }).catch(() => {
             toast.error(`${sanitized.name} was modified by another user. Reload to see latest.`);
           });

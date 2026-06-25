@@ -38,7 +38,7 @@ const HOSPITAL_CONFIG_CACHE_KEY  = 'config_hospital';
 
 const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   hospitalName: 'MY HOSPITAL',
-  department: 'DEPARTMENT OF MEDICINE',
+  department: 'DEPARTMENT OF ORTHOPAEDICS',
   units: ['Unit 1', 'Unit 2', 'Unit 3'],
   preOpModuleName: 'Pre-op Clearance',
   procedureListName: 'Procedure List',
@@ -199,10 +199,17 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
-  // Background fetch — re-runs when superadmin switches to a different hospital workspace
+  // Background fetch — re-runs when the logged-in user changes OR when a superadmin
+  // switches to a different hospital workspace.
+  // IMPORTANT: also depends on user?.id so the fetch re-runs after Supabase restores
+  // its auth session (which happens async after mount). Without this dependency the
+  // first fetch fires unauthenticated, RLS blocks all rows, and the fallback
+  // DEFAULT_HOSPITAL_CONFIG (DEPARTMENT OF MEDICINE) gets cached and shown forever.
   useEffect(() => {
-    const hid = viewingHospitalId ?? undefined;
-    
+    // Prefer the explicit hospital ID (own user or superadmin override) so the
+    // query filter works even before the Supabase auth session is fully hydrated.
+    const hid = viewingHospitalId ?? user?.hospitalId ?? undefined;
+
     const loadAll = () => {
       Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchHospitalConfig(hid), fetchMedications(hid)])
         .then(([freshWards, freshLabs, freshHospital, freshMeds]) => {
@@ -243,7 +250,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [viewingHospitalId]);
+  }, [viewingHospitalId, user?.id, user?.hospitalId]);
 
   // Detect specialty from department string
   const activeSpecialty = useMemo<SpecialtyKey>(

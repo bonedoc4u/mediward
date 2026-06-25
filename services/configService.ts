@@ -139,7 +139,7 @@ const DEFAULT_PREOP_TEMPLATE = [
 
 const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   hospitalName: 'MY HOSPITAL',
-  department: 'DEPARTMENT OF MEDICINE',
+  department: 'DEPARTMENT OF ORTHOPAEDICS',
   units: ['Unit 1', 'Unit 2', 'Unit 3'],
   preOpModuleName: 'Pre-op Clearance',
   procedureListName: 'Procedure List',
