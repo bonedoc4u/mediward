@@ -4,6 +4,7 @@ import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart } from 'lucide-react';
+import { calcPod } from './HandoverSummary';
 
 /** Strip ward-number prefix from bed for display: "10-05" → "05", "1A" → "1A" */
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
@@ -96,8 +97,8 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         (p.ipNo || '').includes(searchTerm);
 
       const matchesPending = filterPending ? p.pacStatus === PacStatus.Pending : true;
-      const matchesSurgery = filterSurgeryToday ? p.dos === today : true;
-      const matchesPod01 = filterPod01 ? (p.pod === 0 || p.pod === 1) : true;
+      const matchesSurgery = filterSurgeryToday ? (p.dos === today || p.plannedDos === today) : true;
+      const matchesPod01 = filterPod01 ? (() => { const d = calcPod(p.dos, today); return d === 0 || d === 1; })() : true;
       const matchesOverdue = filterOverdueTodos ? p.todos.some(t => !t.isDone) : true;
 
       return matchesSearch && matchesPending && matchesSurgery && matchesPod01 && matchesOverdue;
@@ -367,8 +368,8 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                       <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
                         <span>{patient.age} / {patient.gender} • IP: {patient.ipNo}</span>
-                        {viewMode !== 'pending' && patient.pod !== undefined && (
-                          <span className="font-bold text-green-700 bg-green-100 px-1.5 rounded-sm ml-1">POD {patient.pod}</span>
+                        {viewMode !== 'pending' && calcPod(patient.dos, today) !== undefined && (
+                          <span className="font-bold text-green-700 bg-green-100 px-1.5 rounded-sm ml-1">POD {calcPod(patient.dos, today)}</span>
                         )}
                       </div>
                       <div className="text-xs text-blue-600">{patient.mobile}</div>
@@ -413,10 +414,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     </td>
                     {viewMode !== 'pending' && (
                       <td className="px-6 py-4 text-center">
-                        {patient.pod !== undefined ? (
+                        {calcPod(patient.dos, today) !== undefined ? (
                           <div className="inline-block p-2 rounded-lg border-2 border-green-500 bg-green-50">
                             <span className="block text-[10px] uppercase font-bold text-green-700 leading-none mb-0.5">POD</span>
-                            <span className="font-bold text-lg text-green-800 leading-none">{patient.pod}</span>
+                            <span className="font-bold text-lg text-green-800 leading-none">{calcPod(patient.dos, today)}</span>
                           </div>
                         ) : (
                           <span className="text-slate-500">-</span>
@@ -598,10 +599,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {showNews2 && <News2Badge vitals={item.patient.vitals} compact />}
-                        {item.patient.pod !== undefined && (
+                        {calcPod(item.patient.dos, today) !== undefined && (
                           <div className="text-xs font-bold uppercase text-slate-500 border-2 border-green-500 bg-green-50 p-1.5 rounded text-center">
                             <span className="text-green-700 block text-[9px]">POD</span>
-                            <span className="text-lg text-green-800 block leading-none">{item.patient.pod}</span>
+                            <span className="text-lg text-green-800 block leading-none">{calcPod(item.patient.dos, today)}</span>
                           </div>
                         )}
                       </div>
