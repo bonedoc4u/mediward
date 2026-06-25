@@ -5,6 +5,7 @@ import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBor
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart } from 'lucide-react';
 import { calcPod } from './HandoverSummary';
+import TodaySchedule from './TodaySchedule';
 
 /** Strip ward-number prefix from bed for display: "10-05" → "05", "1A" → "1A" */
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
@@ -221,6 +222,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
   return (
     <div className="space-y-6">
+      {/* Today's Department Schedule — home view only */}
+      {viewMode === 'home' && (
+        <TodaySchedule
+          userUnit={user?.unit ?? null}
+          isAdmin={!user?.unit || user?.role === 'admin' || user?.role === 'superadmin'}
+        />
+      )}
+
       {/* Ward Snapshot Strip — home view only */}
       {viewMode === 'home' && (
         <HandoverSummary
