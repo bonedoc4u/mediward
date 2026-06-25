@@ -25,7 +25,7 @@ const WoundCare = lazy(() => import('./WoundCare'));
 
 const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
-  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, hospitalName } = useConfig();
+  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, showWoundAssessment, showRehabilitation, hospitalName } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFhirExport, setShowFhirExport] = useState(false);
@@ -519,7 +519,10 @@ const PatientDetail: React.FC = () => {
       {/* Specialty Clinical Data */}
       {activeFieldGroups.length > 0 && (
         <SpecialtyDataPanel
-          fieldGroups={activeFieldGroups}
+          fieldGroups={activeFieldGroups.filter(g =>
+            (g.key !== 'wound_assessment' || showWoundAssessment) &&
+            (g.key !== 'rehabilitation'   || showRehabilitation),
+          )}
           data={patient.specialtyData ?? {}}
           specialtyLabel={activeSpecialty.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
           canEdit={can(user, 'patient:edit')}

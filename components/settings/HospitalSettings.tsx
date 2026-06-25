@@ -24,15 +24,17 @@ const FEATURE_FLAGS = [
   { id: 'medication',      label: 'Medication Chart (MAR)',  description: 'Adds a Medications tab in Patient Detail for prescribing and recording drug administration.' },
   { id: 'intake-output',   label: 'Intake / Output',         description: 'Adds a Fluid Balance tab in Patient Detail to document daily intake and output volumes.' },
   { id: 'blood-transfusion', label: 'Blood Transfusion',     description: 'Adds a Transfusion tab in Patient Detail to record blood products given and adverse reactions.' },
-  { id: 'wound-care',      label: 'Wound Care',              description: 'Adds a Wound Care tab in Patient Detail to document dressing changes, wound condition, and healing progress.' },
-  { id: 'news2',           label: 'NEWS2 Score',             description: 'Shows the National Early Warning Score 2 column on the ward dashboard and the NEWS2 badge in Vitals. Disable for departments that do not use NEWS2.' },
+  { id: 'wound-care',        label: 'Wound Care',              description: 'Adds a Wound Care tab in Patient Detail to document dressing changes, wound condition, and healing progress.' },
+  { id: 'wound-assessment',  label: 'Wound Assessment',        description: 'Shows the Wound Assessment section in Patient Detail (wound condition, closure type, suture removal date). Hidden by default.' },
+  { id: 'rehabilitation',    label: 'Rehabilitation',          description: 'Shows the Rehabilitation section in Patient Detail (weight bearing status, physiotherapy, ROM notes, discharge plan). Hidden by default.' },
+  { id: 'news2',             label: 'NEWS2 Score',             description: 'Shows the National Early Warning Score 2 column on the ward dashboard and the NEWS2 badge in Vitals. Disable for departments that do not use NEWS2.' },
 ] as const;
 
 // ─── Hospital Settings panel ───
 const HospitalSettings: React.FC = () => {
   const {
     hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate,
-    showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, showNews2,
+    showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, showWoundAssessment, showRehabilitation, showNews2,
     customTodoShortcuts,
     saveHospitalConfig, unitChiefs, setUnitChief, configUpdatedAt,
   } = useConfig();
@@ -48,6 +50,8 @@ const HospitalSettings: React.FC = () => {
   const [localShowIO, setLocalShowIO]                     = useState(showIntakeOutput);
   const [localShowBT, setLocalShowBT]                     = useState(showBloodTransfusion);
   const [localShowWC, setLocalShowWC]                     = useState(showWoundCare);
+  const [localShowWA, setLocalShowWA]                     = useState(showWoundAssessment);
+  const [localShowRehab, setLocalShowRehab]               = useState(showRehabilitation);
   const [localShowNews2, setLocalShowNews2]               = useState(showNews2);
   const [localShortcuts, setLocalShortcuts]               = useState<string[]>(customTodoShortcuts ?? []);
   const [newShortcut, setNewShortcut]                     = useState('');
@@ -74,6 +78,8 @@ const HospitalSettings: React.FC = () => {
       setLocalShowIO(showIntakeOutput);
       setLocalShowBT(showBloodTransfusion);
       setLocalShowWC(showWoundCare);
+      setLocalShowWA(showWoundAssessment);
+      setLocalShowRehab(showRehabilitation);
       setLocalShowNews2(showNews2);
       setLocalShortcuts(customTodoShortcuts ?? []);
       setRemoteUpdated(true);
@@ -88,6 +94,8 @@ const HospitalSettings: React.FC = () => {
     'intake-output':     [localShowIO,           setLocalShowIO],
     'blood-transfusion': [localShowBT,           setLocalShowBT],
     'wound-care':        [localShowWC,           setLocalShowWC],
+    'wound-assessment':  [localShowWA,           setLocalShowWA],
+    'rehabilitation':    [localShowRehab,        setLocalShowRehab],
     'news2':             [localShowNews2,        setLocalShowNews2],
   };
 
@@ -120,6 +128,7 @@ const HospitalSettings: React.FC = () => {
         procedureListName: localProcedureName, preOpChecklistTemplate: localPreOpItems,
         showNursingNotes: localShowNursingNotes, showMedicationChart: localShowMedChart,
         showIntakeOutput: localShowIO, showBloodTransfusion: localShowBT, showWoundCare: localShowWC,
+        showWoundAssessment: localShowWA, showRehabilitation: localShowRehab,
         showNews2: localShowNews2,
         customTodoShortcuts: localShortcuts,
         vitalThresholds: { spO2Min: 90, hrMin: 50, hrMax: 120, sbpMin: 90, rrMin: 10, rrMax: 30 },

@@ -51,6 +51,8 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   showIntakeOutput: false,
   showBloodTransfusion: false,
   showWoundCare: false,
+  showWoundAssessment: false,
+  showRehabilitation: false,
   showNews2: true,
   customTodoShortcuts: [],
   vitalThresholds: {
@@ -123,6 +125,10 @@ interface ConfigContextType {
   showBloodTransfusion: boolean;
   /** Whether the Wound Care documentation tab is enabled. */
   showWoundCare: boolean;
+  /** Whether the Wound Assessment field group is shown in Patient Detail. */
+  showWoundAssessment: boolean;
+  /** Whether the Rehabilitation field group is shown in Patient Detail. */
+  showRehabilitation: boolean;
   /** Whether the NEWS2 Early Warning Score is shown on the dashboard and vitals. */
   showNews2: boolean;
   /** Admin-defined quick-add shortcuts shown in Ward Rounds to-do section. */
@@ -437,6 +443,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     showIntakeOutput:     hospitalConfig.showIntakeOutput     ?? false,
     showBloodTransfusion: hospitalConfig.showBloodTransfusion ?? false,
     showWoundCare:        hospitalConfig.showWoundCare        ?? false,
+    showWoundAssessment:  hospitalConfig.showWoundAssessment  ?? false,
+    showRehabilitation:   hospitalConfig.showRehabilitation   ?? false,
     showNews2:            hospitalConfig.showNews2            ?? true,
     customTodoShortcuts:  hospitalConfig.customTodoShortcuts  ?? [],
     vitalThresholds:      hospitalConfig.vitalThresholds      ?? DEFAULT_HOSPITAL_CONFIG.vitalThresholds,

@@ -70,6 +70,10 @@ export interface HospitalConfig {
   showBloodTransfusion: boolean;
   /** Show the Wound Care documentation tab. Off by default. */
   showWoundCare: boolean;
+  /** Show the Wound Assessment field group in Patient Detail. Off by default. */
+  showWoundAssessment: boolean;
+  /** Show the Rehabilitation field group in Patient Detail. Off by default. */
+  showRehabilitation: boolean;
   /** Show the NEWS2 Early Warning Score column and badge. On by default.
    *  Departments that do not use NEWS2 (e.g. outpatient-only units) can hide it. */
   showNews2: boolean;
