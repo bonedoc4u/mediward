@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx-js-style';
 import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -91,17 +92,18 @@ const SortableRow = ({ id, children, className }: { id: string, children: React.
 
 const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdatePatient }) => {
   const { unitChiefs, hospitalName, department } = useConfig();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<OTType>('Major');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [otList, setOtList] = useState<OTPatient[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [surgeon, setSurgeon] = useState('DR. JACOB MATHEW');
-  const [surgeonUnit, setSurgeonUnit] = useState('OR 1');
+  const [surgeonUnit, setSurgeonUnit] = useState(user?.unit ?? 'OR1');
+  const [surgeon, setSurgeon] = useState('');
   const [otTime, setOtTime] = useState('8.00AM');
 
-  // Auto-fill surgeon when unit changes — normalize "OR 1" → "OR1" for lookup
+  // Auto-fill surgeon from unit chiefs whenever the unit or chiefs config changes
   useEffect(() => {
     const key = surgeonUnit.replace(/\s+/g, '').toUpperCase();
     const chief = unitChiefs[key];
