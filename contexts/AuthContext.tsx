@@ -17,8 +17,10 @@ import { clearPatientCache } from '../services/patientCache';
 
 const SESSION_DURATION   = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
 const WARN_BEFORE_EXPIRY = 5 * 60 * 1000;        // warn 5 min before absolute expiry
-// Require re-auth if the screen/tab was hidden for longer than this on shared devices
-const LOCK_REAUTH_AFTER_MS = 60 * 1000; // 60 seconds
+// Require re-auth if the screen/tab was hidden for longer than this.
+// 10 minutes: long enough for normal app-switching (calls, messages, checking another app)
+// but short enough to protect PHI if the device is left unattended on a ward.
+const LOCK_REAUTH_AFTER_MS = 10 * 60 * 1000; // 10 minutes
 
 // Clinical roles need long inactivity windows — a ward round on a 30-bed unit
 // takes 90–120 min, and an OT case can run 3–4 hours. The old 30-min timeout
@@ -211,10 +213,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [user]);
 
-  // ─── Screen-lock detection: re-auth required after hidden > 60 s ───────
-  // Shared ward tablets are left unlocked between staff. If the device screen
-  // turns off or the tab is backgrounded and then resumed after >60 seconds,
-  // require the user to re-enter their password before accessing PHI.
+  // ─── Screen-lock detection: re-auth required after hidden > 10 min ─────
+  // Protects PHI on shared ward tablets/phones left unattended.
+  // Only locks after LOCK_REAUTH_AFTER_MS of continuous background time,
+  // so normal app-switching (calls, messages, notifications) doesn't interrupt work.
   useEffect(() => {
     if (!user) return;
 
@@ -223,10 +225,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hiddenAtRef.current = Date.now();
       } else if (document.visibilityState === 'visible') {
         const hiddenAt = hiddenAtRef.current;
+        hiddenAtRef.current = null;
         if (hiddenAt !== null && Date.now() - hiddenAt > LOCK_REAUTH_AFTER_MS) {
           setIsLocked(true);
         }
-        hiddenAtRef.current = null;
       }
     };
 
