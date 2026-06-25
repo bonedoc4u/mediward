@@ -51,9 +51,29 @@ interface OTPatient {
   implants: string;
   remarks: string;
   category?: string; // e.g., "Spinal Table", "Local Table"
+  otType: OTType;    // which OT list this entry belongs to
 }
 
-type OTType = 'Major' | 'Minor';
+type OTType = 'Major' | 'Minor' | 'EOT';
+
+// Department OT schedule — used to auto-assign patients to the correct OT type
+const UNIT_SCHEDULE_OT: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
+  OR1: { admissionDay: 1, majorDay: 4, minorDay: 3 },
+  OR2: { admissionDay: 2, majorDay: 5, minorDay: 4 },
+  OR3: { admissionDay: 3, majorDay: 1, minorDay: 2 },
+  OR4: { admissionDay: 4, majorDay: 2, minorDay: 1 },
+  OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 },
+};
+
+function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
+  const s = UNIT_SCHEDULE_OT[unit?.toUpperCase()];
+  if (!s) return null;
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  if (dow === s.majorDay)     return 'Major';
+  if (dow === s.minorDay)     return 'Minor';
+  if (dow === s.admissionDay) return 'EOT';
+  return null;
+}
 
 // Sortable Row Component
 const SortableRow = ({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) => {
@@ -110,6 +130,41 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     if (chief) setSurgeon(chief);
   }, [surgeonUnit, unitChiefs]);
 
+  // Auto-populate patients whose plannedDos matches the selected date
+  useEffect(() => {
+    const dated = patients.filter(p => p.plannedDos === selectedDate && !p.dos);
+    if (dated.length === 0) return;
+    setOtList(prev => {
+      const existing = new Set(prev.map(p => p.ipNo));
+      const toAdd: OTPatient[] = [];
+      dated.forEach(p => {
+        if (existing.has(p.ipNo)) return;
+        const unit    = (p.unit ?? '').toUpperCase();
+        const otType  = getOTTypeForDate(unit, selectedDate) ?? 'Major';
+        const category = getDefaultCategory(otType);
+        const seqBase  = prev.filter(x => x.otType === otType).length + toAdd.filter(x => x.otType === otType).length;
+        toAdd.push({
+          id: crypto.randomUUID(),
+          sequence: seqBase + 1,
+          ipNo: p.ipNo,
+          name: p.name,
+          age: p.age.toString(),
+          gender: p.gender === 'Male' ? 'M' : p.gender === 'Female' ? 'F' : '',
+          ward: p.ward.replace(/Ward\s*/i, '').trim(),
+          unit: p.unit ?? '',
+          diagnosis: p.diagnosis,
+          procedure: p.procedure ?? '',
+          side: '', anesthesia: '', cArm: 'No', implants: '',
+          remarks: p.comorbidities.join(', '),
+          category,
+          otType,
+        });
+      });
+      return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, patients]);
+
   // Sensors for drag and drop
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -128,10 +183,10 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     })
   );
 
-  // Filter pending patients for import
-  const pendingPatients = patients.filter(p => 
-    !p.dos && // Not operated yet
-    !otList.some(ot => ot.ipNo === p.ipNo) // Not already in the list
+  // Filter pending patients for import (not yet in the current tab's list)
+  const pendingPatients = patients.filter(p =>
+    !p.dos &&
+    !otList.some(ot => ot.ipNo === p.ipNo && ot.otType === activeTab)
   );
 
   const filteredPending = pendingPatients.filter(p => 
@@ -139,33 +194,28 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     p.ipNo.includes(searchTerm)
   );
 
-  const getTableOptions = () => {
-      if (activeTab === 'Major') {
-          return ['TABLE 1', 'TABLE 2'];
-      } else {
-          return ['SPINAL TABLE', 'LOCAL TABLE'];
-      }
+  const getTableOptions = (tab = activeTab) => {
+    if (tab === 'Major') return ['TABLE 1', 'TABLE 2'];
+    if (tab === 'Minor') return ['SPINAL TABLE', 'LOCAL TABLE'];
+    return ['SPINAL TABLE']; // EOT — single table
   };
 
-  // Group items by category for rendering
+  const getDefaultCategory = (tab = activeTab) => getTableOptions(tab)[0];
+
+  // Group items by category for the active tab only
   const groupedItems = useMemo(() => {
-      const groups: Record<string, OTPatient[]> = {};
-      getTableOptions().forEach(opt => groups[opt] = []);
-      
-      // Sort by sequence first
-      const sorted = [...otList].sort((a, b) => a.sequence - b.sequence);
-      
-      sorted.forEach(item => {
-          if (item.category && groups[item.category]) {
-              groups[item.category].push(item);
-          } else {
-              // Fallback for items with invalid/missing category
-              const defaultCat = getTableOptions()[0];
-              if (!groups[defaultCat]) groups[defaultCat] = [];
-              groups[defaultCat].push(item);
-          }
-      });
-      return groups;
+    const opts = getTableOptions();
+    const groups: Record<string, OTPatient[]> = {};
+    opts.forEach(opt => { groups[opt] = []; });
+
+    const tabItems = otList.filter(i => i.otType === activeTab);
+    const sorted   = [...tabItems].sort((a, b) => a.sequence - b.sequence);
+
+    sorted.forEach(item => {
+      const cat = item.category && groups[item.category] !== undefined ? item.category : opts[0];
+      groups[cat].push(item);
+    });
+    return groups;
   }, [otList, activeTab]);
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -188,6 +238,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     // If over a container (category header/empty space) or an item in a different category
     const activeCategory = activeItem.category;
     const overCategory = overItem ? overItem.category : (getTableOptions().includes(overId) ? overId : null);
+
 
     if (activeCategory !== overCategory && overCategory) {
         setOtList((items) => {
@@ -227,42 +278,36 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       setOtList((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over?.id);
+        const newItems = arrayMove(items, oldIndex, newIndex);
 
-        let newItems = arrayMove(items, oldIndex, newIndex);
-
-        // Re-calculate sequences for ALL items based on their new order and category
-        // We need to group them first to assign sequences per category
+        const opts = getTableOptions();
         const groups: Record<string, OTPatient[]> = {};
-        getTableOptions().forEach(opt => groups[opt] = []);
-        
-        newItems.forEach(item => {
-            if (item.category && groups[item.category]) {
-                groups[item.category].push(item);
-            }
+        opts.forEach(opt => { groups[opt] = []; });
+
+        newItems.filter(i => i.otType === activeTab).forEach(item => {
+          const cat = item.category && groups[item.category] !== undefined ? item.category : opts[0];
+          groups[cat].push(item);
         });
 
-        // Flatten back to list with updated sequences
-        const finalItems: OTPatient[] = [];
+        const resequenced: OTPatient[] = [];
         Object.keys(groups).forEach(cat => {
-            groups[cat].forEach((item, index) => {
-                finalItems.push({ ...item, sequence: index + 1 });
-            });
+          groups[cat].forEach((item, index) => {
+            resequenced.push({ ...item, sequence: index + 1 });
+          });
         });
 
-        return finalItems;
+        // Merge back with items from other tabs unchanged
+        const otherTabItems = newItems.filter(i => i.otType !== activeTab);
+        return [...otherTabItems, ...resequenced];
       });
     }
   };
 
   const handleImportPatient = (patient: Patient) => {
-    // Extract just the number from Ward string if possible (e.g. "Ward 24" -> "24")
-    const wardNumber = patient.ward.replace(/Ward\s*/i, '').trim();
-    const defaultCategory = getTableOptions()[0];
-
-    // Calculate next sequence for this category
-    const existingInCat = otList.filter(p => p.category === defaultCategory);
-    const maxSeq = Math.max(0, ...existingInCat.map(p => p.sequence));
-
+    const wardNumber      = patient.ward.replace(/Ward\s*/i, '').trim();
+    const defaultCategory = getDefaultCategory();
+    const existingInTab   = otList.filter(p => p.otType === activeTab && p.category === defaultCategory);
+    const maxSeq          = Math.max(0, ...existingInTab.map(p => p.sequence));
     const newEntry: OTPatient = {
       id: crypto.randomUUID(),
       sequence: maxSeq + 1,
@@ -271,18 +316,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       age: patient.age.toString(),
       gender: patient.gender === 'Male' ? 'M' : patient.gender === 'Female' ? 'F' : '',
       ward: wardNumber,
-      unit: 'OR1', // Default unit
+      unit: patient.unit ?? 'OR1',
       diagnosis: patient.diagnosis,
-      procedure: patient.procedure || '',
-      side: '', 
-      anesthesia: '',
-      cArm: 'No',
-      implants: '',
+      procedure: patient.procedure ?? '',
+      side: '', anesthesia: '', cArm: 'No', implants: '',
       remarks: patient.comorbidities.join(', '),
-      category: defaultCategory
+      category: defaultCategory,
+      otType: activeTab,
     };
     setOtList(prev => [...prev, newEntry]);
-    // Do not close modal automatically
   };
 
   const handleRemove = (id: string) => {
@@ -296,18 +338,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
   };
 
   const handleAddManualEntry = () => {
-    const defaultCategory = getTableOptions()[0];
-    const existingInCat = otList.filter(p => p.category === defaultCategory);
-    const maxSeq = Math.max(0, ...existingInCat.map(p => p.sequence));
+    const defaultCategory = getDefaultCategory();
+    const existingInTab   = otList.filter(p => p.otType === activeTab && p.category === defaultCategory);
+    const maxSeq          = Math.max(0, ...existingInTab.map(p => p.sequence));
     const newEntry: OTPatient = {
       id: crypto.randomUUID(),
       sequence: maxSeq + 1,
       ipNo: '', name: '', age: '', gender: 'M',
       ward: '', unit: surgeonUnit,
       diagnosis: '', procedure: '',
-      side: '', anesthesia: '',
-      cArm: 'No', implants: '', remarks: '',
+      side: '', anesthesia: '', cArm: 'No', implants: '', remarks: '',
       category: defaultCategory,
+      otType: activeTab,
     };
     setOtList(prev => [...prev, newEntry]);
   };
@@ -332,8 +374,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     let lastCategory = '';
     let displaySequence = 1;
 
-    // Use the sorted list logic
-    const exportList = [...otList].sort((a, b) => {
+    const exportList = [...otList].filter(p => p.otType === activeTab).sort((a, b) => {
         if (a.category === b.category) return a.sequence - b.sequence;
         return (a.category || '').localeCompare(b.category || '');
     });
@@ -485,8 +526,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     let lastCategory = '';
     let displaySequence = 1;
 
-    // Sort list by category then sequence
-    const sortedList = [...otList].sort((a, b) => {
+    const sortedList = [...otList].filter(p => p.otType === activeTab).sort((a, b) => {
         if (a.category === b.category) return a.sequence - b.sequence;
         return (a.category || '').localeCompare(b.category || '');
     });
@@ -588,7 +628,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">OT List Management</h1>
-          <p className="text-slate-500">Plan and manage surgical lists for Major and Minor OT</p>
+          <p className="text-slate-500">Plan and manage surgical lists for Major, Minor and Emergency OT</p>
         </div>
         <div className="flex items-center gap-3 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
           <Calendar className="w-5 h-5 text-slate-400" />
@@ -637,17 +677,19 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
 
       {/* Tabs */}
       <div className="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
-        {(['Major', 'Minor'] as OTType[]).map((tab) => (
+        {(['Major', 'Minor', 'EOT'] as OTType[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+            className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
               activeTab === tab
-                ? 'bg-white text-blue-600 shadow-sm'
+                ? tab === 'EOT'
+                  ? 'bg-white text-red-600 shadow-sm'
+                  : 'bg-white text-blue-600 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
             }`}
           >
-            {tab} OT List
+            {tab === 'EOT' ? 'EOT List' : `${tab} OT List`}
           </button>
         ))}
       </div>
