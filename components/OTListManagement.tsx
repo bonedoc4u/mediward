@@ -65,6 +65,15 @@ const UNIT_SCHEDULE_OT: Record<string, { admissionDay: number; majorDay: number;
   OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 },
 };
 
+/** Returns the next date (YYYY-MM-DD) on which targetDow occurs, same day if today matches. */
+function nextOccurrence(targetDow: number): string {
+  const today = new Date();
+  const diff = (targetDow - today.getDay() + 7) % 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + diff);
+  return next.toISOString().split('T')[0];
+}
+
 function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
   const s = UNIT_SCHEDULE_OT[unit?.toUpperCase()];
   if (!s) return null;
@@ -114,7 +123,16 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
   const { unitChiefs, hospitalName, department } = useConfig();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<OTType>('Major');
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Per-tab date state: each tab defaults to its next scheduled OT day for the user's unit
+  const unitKey = (user?.unit ?? 'OR1').toUpperCase();
+  const unitSched = UNIT_SCHEDULE_OT[unitKey] ?? UNIT_SCHEDULE_OT['OR1'];
+  const [majorDate, setMajorDate] = useState<string>(() => nextOccurrence(unitSched.majorDay));
+  const [minorDate, setMinorDate] = useState<string>(() => nextOccurrence(unitSched.minorDay));
+  const [eotDate,   setEotDate]   = useState<string>(() => nextOccurrence(unitSched.admissionDay));
+
+  const selectedDate    = activeTab === 'Major' ? majorDate : activeTab === 'Minor' ? minorDate : eotDate;
+  const setSelectedDate = activeTab === 'Major' ? setMajorDate : activeTab === 'Minor' ? setMinorDate : setEotDate;
   const [otList, setOtList] = useState<OTPatient[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -130,40 +148,46 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
     if (chief) setSurgeon(chief);
   }, [surgeonUnit, unitChiefs]);
 
-  // Auto-populate patients whose plannedDos matches the selected date
+  // Auto-populate patients whose plannedDos matches any of the three tab dates
   useEffect(() => {
-    const dated = patients.filter(p => p.plannedDos === selectedDate && !p.dos);
-    if (dated.length === 0) return;
+    const tabDates: Array<{ date: string; fallbackType: OTType }> = [
+      { date: majorDate, fallbackType: 'Major' },
+      { date: minorDate, fallbackType: 'Minor' },
+      { date: eotDate,   fallbackType: 'EOT'   },
+    ];
     setOtList(prev => {
       const existing = new Set(prev.map(p => p.ipNo));
       const toAdd: OTPatient[] = [];
-      dated.forEach(p => {
-        if (existing.has(p.ipNo)) return;
-        const unit    = (p.unit ?? '').toUpperCase();
-        const otType  = getOTTypeForDate(unit, selectedDate) ?? 'Major';
-        const category = getDefaultCategory(otType);
-        const seqBase  = prev.filter(x => x.otType === otType).length + toAdd.filter(x => x.otType === otType).length;
-        toAdd.push({
-          id: crypto.randomUUID(),
-          sequence: seqBase + 1,
-          ipNo: p.ipNo,
-          name: p.name,
-          age: p.age.toString(),
-          gender: p.gender === 'Male' ? 'M' : p.gender === 'Female' ? 'F' : '',
-          ward: p.ward.replace(/Ward\s*/i, '').trim(),
-          unit: p.unit ?? '',
-          diagnosis: p.diagnosis,
-          procedure: p.procedure ?? '',
-          side: '', anesthesia: '', cArm: 'No', implants: '',
-          remarks: p.comorbidities.join(', '),
-          category,
-          otType,
+      for (const { date, fallbackType } of tabDates) {
+        const dated = patients.filter(p => p.plannedDos === date && !p.dos);
+        dated.forEach(p => {
+          if (existing.has(p.ipNo) || toAdd.some(x => x.ipNo === p.ipNo)) return;
+          const unit     = (p.unit ?? '').toUpperCase();
+          const otType   = getOTTypeForDate(unit, date) ?? fallbackType;
+          const category = getDefaultCategory(otType);
+          const seqBase  = prev.filter(x => x.otType === otType).length + toAdd.filter(x => x.otType === otType).length;
+          toAdd.push({
+            id: crypto.randomUUID(),
+            sequence: seqBase + 1,
+            ipNo: p.ipNo,
+            name: p.name,
+            age: p.age.toString(),
+            gender: p.gender === 'Male' ? 'M' : p.gender === 'Female' ? 'F' : '',
+            ward: p.ward.replace(/Ward\s*/i, '').trim(),
+            unit: p.unit ?? '',
+            diagnosis: p.diagnosis,
+            procedure: p.procedure ?? '',
+            side: '', anesthesia: '', cArm: 'No', implants: '',
+            remarks: p.comorbidities.join(', '),
+            category,
+            otType,
+          });
         });
-      });
+      }
       return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, patients]);
+  }, [majorDate, minorDate, eotDate, patients]);
 
   // Sensors for drag and drop
   const sensors = useSensors(

@@ -150,6 +150,8 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
   showBloodTransfusion: false,
   showWoundCare: false,
   showNews2: true,
+  showWoundAssessment: false,
+  showRehabilitation: false,
   customTodoShortcuts: [],
   vitalThresholds: {
     spO2Min: 90,   // Alert if SpO2 < 90%
@@ -186,6 +188,8 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     showBloodTransfusion: Boolean(data.show_blood_transfusion ?? false),
     showWoundCare:        Boolean(data.show_wound_care        ?? false),
     showNews2:            data.show_news2 == null ? true : Boolean(data.show_news2),
+    showWoundAssessment:  Boolean(data.show_wound_assessment  ?? false),
+    showRehabilitation:   Boolean(data.show_rehabilitation    ?? false),
     customTodoShortcuts:  Array.isArray(data.custom_todo_shortcuts) ? data.custom_todo_shortcuts as string[] : [],
     vitalThresholds: (data.vital_thresholds && typeof data.vital_thresholds === 'object')
       ? data.vital_thresholds
