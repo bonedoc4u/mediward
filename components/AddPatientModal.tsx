@@ -321,6 +321,11 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   // Effect to populate form when editing
   useEffect(() => {
+    // Always reset submitting flag when the modal opens or closes.
+    // Without this, a previous successful submit leaves isSubmitting=true,
+    // and the next open silently ignores the Admit button click.
+    setIsSubmitting(false);
+    setStepError(null);
     if (isOpen && initialData) {
       setFormData({
         bed: initialData.bed,
@@ -348,12 +353,16 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed.formData) {
-            setFormData(parsed.formData);
+            // Non-admins: always override unit from live session, not stale draft
+            const restoredForm = {
+              ...parsed.formData,
+              unit: !isAdmin && user?.unit ? user.unit : parsed.formData.unit,
+            };
+            setFormData(restoredForm);
             if (parsed.selectedComorbidities) setSelectedComorbidities(parsed.selectedComorbidities);
             if (parsed.drugAllergies) setDrugAllergies(parsed.drugAllergies);
             const n = parsed.step ? parseInt(String(parsed.step), 10) : 1;
             setStepRaw(n >= 1 && n <= 3 ? n : 1);
-            setStepError(null);
             return; // draft restored — don't overwrite with blank form
           }
         }
@@ -417,7 +426,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ...((initialData || {}) as any),
       bed: formData.bed,
       ward: formData.ward,
-      unit: formData.unit || undefined,
+      unit: (!isAdmin && user?.unit) ? user.unit : (formData.unit || undefined),
       ipNo: formData.ipNo,
       abhaId: formData.abhaId.trim() || undefined,
       name: formData.name,
@@ -456,7 +465,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ...({} as any),
       bed: formData.bed,
       ward: formData.ward,
-      unit: formData.unit || undefined,
+      unit: (!isAdmin && user?.unit) ? user.unit : (formData.unit || undefined),
       ipNo: formData.ipNo,
       abhaId: formData.abhaId.trim() || undefined,
       name: formData.name,
