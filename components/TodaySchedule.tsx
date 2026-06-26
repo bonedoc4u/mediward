@@ -161,19 +161,40 @@ function AdminSchedule({ date }: { date: Date }) {
         <p className="text-sm text-slate-400 italic">No scheduled OT or admissions today.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-          {rows.map(({ unit, events }) => (
-            <div key={unit}
-              className={`rounded-lg border p-2.5 ${events.length > 0 ? 'border-slate-300 bg-slate-50' : 'border-slate-100 bg-slate-50/40'}`}>
-              <div className="text-xs font-bold text-slate-600 mb-1.5">{unit}</div>
-              {events.length > 0 ? (
-                <div className="flex flex-col gap-1">
-                  {events.map(e => <EventBadge key={e} type={e} size="compact" />)}
-                </div>
-              ) : (
-                <span className="text-[10px] text-slate-400">—</span>
-              )}
-            </div>
-          ))}
+          {rows.map(({ unit, events }) => {
+            const s = UNIT_SCHEDULE[unit];
+            // Build "next" label for units with nothing today
+            let nextLabel = '';
+            if (events.length === 0 && s) {
+              const dMaj  = daysUntilNext(s.majorDay,     date);
+              const dMin  = daysUntilNext(s.minorDay,     date);
+              const dAdm  = daysUntilNext(s.admissionDay, date);
+              const least = Math.min(dMaj, dMin, dAdm);
+              if (least === dAdm) nextLabel = `Admit ${nextEventDate(s.admissionDay, date)}`;
+              else if (least === dMaj) nextLabel = `Maj OT ${nextEventDate(s.majorDay, date)}`;
+              else nextLabel = `Min OT ${nextEventDate(s.minorDay, date)}`;
+            }
+            return (
+              <div key={unit}
+                className={`rounded-lg border p-2.5 ${events.length > 0 ? 'border-slate-300 bg-slate-50' : 'border-slate-100 bg-slate-50/40'}`}>
+                <div className="text-xs font-bold text-slate-600 mb-1.5">{unit}</div>
+                {events.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {events.map(e => <EventBadge key={e} type={e} size="compact" />)}
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-[10px] text-slate-400 block">No events today</span>
+                    {nextLabel && (
+                      <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                        Next: {nextLabel}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
