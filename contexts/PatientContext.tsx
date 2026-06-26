@@ -234,8 +234,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
+  // Keep a ref so the visibilitychange and startup handlers always call the
+  // latest version without stale closures (the effect deps array stays []).
+  const handleOnlineRef = useRef<() => Promise<void>>(async () => {});
+
   useEffect(() => {
     const handleOnline = async () => {
+      if (!navigator.onLine) return;
       // Only replay ops whose backoff window has elapsed
       const queue = getRetryableQueue();
       if (queue.length === 0) return;
@@ -309,8 +314,27 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     };
 
+    handleOnlineRef.current = handleOnline;
+
+    // Also sync when app returns to foreground (covers the case where the
+    // device was already online — the 'online' event never fires then).
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleOnlineRef.current();
+      }
+    };
+
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Attempt sync immediately on mount in case ops were queued in a prior
+    // session while the device was online (e.g. a transient Supabase error).
+    handleOnline();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // ─── BroadcastChannel: sync across tabs on the same device ───
