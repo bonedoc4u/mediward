@@ -13,7 +13,6 @@ interface UserRow {
   email: string;
   name: string;
   role: string;
-  password_hash?: string; // excluded from most SELECT queries; only present in upsert writes
   ward: string | null;
   unit: string | null;
   hospital_id: string;
@@ -21,14 +20,13 @@ interface UserRow {
 
 function rowToUser(row: UserRow): StoredUser {
   return {
-    id:           row.id,
-    email:        row.email,
-    name:         row.name,
-    role:         row.role as UserRole,
-    passwordHash: row.password_hash ?? '', // password_hash not fetched by SELECT queries
-    ward:         (row.ward ?? undefined) as StoredUser['ward'],
-    unit:         row.unit ?? undefined,
-    hospitalId:   row.hospital_id ?? '00000000-0000-0000-0000-000000000001',
+    id:         row.id,
+    email:      row.email,
+    name:       row.name,
+    role:       row.role as UserRole,
+    ward:       (row.ward ?? undefined) as StoredUser['ward'],
+    unit:       row.unit ?? undefined,
+    hospitalId: row.hospital_id ?? '00000000-0000-0000-0000-000000000001',
   };
 }
 
@@ -75,32 +73,19 @@ export async function findUserByEmail(email: string): Promise<StoredUser | null>
   return rowToUser(row);
 }
 
-/**
- * Server-side password verification — never exposes the hash to the client.
- * The hash is computed client-side from the plaintext and sent to a
- * SECURITY DEFINER function that compares it inside the DB.
- */
-export async function verifyAppUserPassword(email: string, hash: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .rpc('verify_app_user_password', { p_email: email.toLowerCase(), p_hash: hash });
-  if (error) return false;
-  return data === true;
-}
-
 /** Insert or update a user row. Conflicts on email (the stable unique key). */
 export async function upsertAppUser(user: StoredUser): Promise<void> {
   const { error } = await supabase
     .from('app_users')
     .upsert(
       {
-        id:            user.id,
-        email:         user.email.toLowerCase(),
-        name:          user.name,
-        role:          user.role,
-        password_hash: user.passwordHash,
-        ward:          user.ward ?? null,
-        unit:          user.unit ?? null,
-        hospital_id:   user.hospitalId,
+        id:          user.id,
+        email:       user.email.toLowerCase(),
+        name:        user.name,
+        role:        user.role,
+        ward:        user.ward ?? null,
+        unit:        user.unit ?? null,
+        hospital_id: user.hospitalId,
       },
       { onConflict: 'email' }
     );

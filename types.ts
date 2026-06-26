@@ -557,7 +557,6 @@ export interface StoredUser {
   unit?: string;
   /** Hospital this user belongs to. */
   hospitalId: string;
-  passwordHash: string;
 }
 
 // ─── Audit Types ──────────────────────────────────────────────────────────────

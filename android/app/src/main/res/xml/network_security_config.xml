@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Config for MediWard.
+  - Blocks all cleartext (HTTP) traffic — all connections must be TLS.
+  - Restricts trust anchors to the system CA store (no user-installed CAs
+    can MITM the app, which matters on hospital guest WiFi networks).
+  - TODO: Add <pin-set> entries for Supabase and ABDM domains once the
+    production leaf certificate SHA-256 pins are confirmed. Wrong pins
+    permanently break connectivity, so verify with:
+      openssl s_client -connect mnyjpxkopiktsrqmjilb.supabase.co:443 2>/dev/null \
+        | openssl x509 -pubkey -noout \
+        | openssl pkey -pubin -outform der \
+        | openssl dgst -sha256 -binary | base64
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <!-- Only trust system CAs — user-installed CAs (e.g. proxy certs on
+           hospital WiFi) cannot intercept MediWard traffic. -->
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">supabase.co</domain>
+    <domain includeSubdomains="true">healthid.ndhm.gov.in</domain>
+    <domain includeSubdomains="true">abdm.gov.in</domain>
+    <domain includeSubdomains="true">ndhm.gov.in</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </domain-config>
+</network-security-config>

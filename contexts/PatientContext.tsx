@@ -378,17 +378,18 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let retryDelay = 2000;
 
     const connect = () => {
-      // Use effectiveHospitalId (not user.hospitalId) so superadmin hospital
-      // switches are reflected immediately in the channel filter.
-      const hospitalFilter = effectiveHospitalId
-        ? `hospital_id=eq.${effectiveHospitalId}`
-        : undefined;
+      // Refuse to open an unscoped realtime channel — without a hospital_id
+      // filter, every patient INSERT/UPDATE across ALL hospitals would be
+      // broadcast to this subscriber, breaking tenant isolation.
+      if (!effectiveHospitalId) return;
+
+      const hospitalFilter = `hospital_id=eq.${effectiveHospitalId}`;
 
       const ch = supabase
         .channel(`patients-realtime-${Date.now()}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'patients', ...(hospitalFilter ? { filter: hospitalFilter } : {}) },
+          { event: '*', schema: 'public', table: 'patients', filter: hospitalFilter },
           async (payload) => {
             // Secondary unit-scoped client-side filter (belt-and-suspenders)
             const userUnit = user?.unit;
