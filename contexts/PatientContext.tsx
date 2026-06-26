@@ -252,11 +252,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (op.type === 'upsert_patient') {
             await upsertPatient(op.payload as Patient);
           } else if (op.type === 'insert_lab') {
-            const { patientId, result } = op.payload as { patientId: string; result: LabResult };
-            await insertLab(patientId, result);
+            const { patientId, hospitalId: labHid, result } = op.payload as { patientId: string; hospitalId?: string; result: LabResult };
+            await insertLab(patientId, result, labHid);
           } else if (op.type === 'insert_imaging') {
-            const { patientId, inv } = op.payload as { patientId: string; inv: Investigation };
-            await insertImaging(patientId, inv);
+            const { patientId, hospitalId: imgHid, inv } = op.payload as { patientId: string; hospitalId?: string; inv: Investigation };
+            await insertImaging(patientId, inv, imgHid);
           } else if (op.type === 'delete_imaging') {
             await deleteImaging(op.payload as string);
           } else if (op.type === 'upsert_round') {
@@ -645,9 +645,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       saveActiveCache(next, effectiveHospitalId);
       return next;
     });
-    insertLab(patientId, result).catch(err => {
+    insertLab(patientId, result, user?.hospitalId).catch(err => {
       console.error('[Patients] addLabResult sync failed:', err);
-      enqueue('insert_lab', { patientId, result });
+      enqueue('insert_lab', { patientId, hospitalId: user?.hospitalId, result });
     });
     if (user) {
       logAuditEvent(user.id, user.name, 'CREATE', 'lab_result', patientId,
@@ -663,9 +663,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       saveActiveCache(next, effectiveHospitalId);
       return next;
     });
-    insertImaging(patientId, inv).catch(err => {
+    insertImaging(patientId, inv, user?.hospitalId).catch(err => {
       console.error('[Patients] addInvestigation sync failed:', err);
-      enqueue('insert_imaging', { patientId, inv });
+      enqueue('insert_imaging', { patientId, hospitalId: user?.hospitalId, inv });
     });
     if (user) {
       logAuditEvent(user.id, user.name, 'CREATE', 'investigation', patientId,

@@ -326,6 +326,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     // and the next open silently ignores the Admit button click.
     setIsSubmitting(false);
     setStepError(null);
+    setShowConsent(false);
+    setShowComorbidityPicker(false);
+    setShowFhirImport(false);
+    setFhirJson('');
+    setScanError(null);
+    setScanLoading(false);
     if (isOpen && initialData) {
       setFormData({
         bed: initialData.bed,
