@@ -7,7 +7,7 @@ import { Scissors, CalendarCheck, Zap, ShieldAlert, BedDouble } from 'lucide-rea
 const UNIT_SCHEDULE: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
   OR1: { admissionDay: 1, majorDay: 4, minorDay: 3 }, // Mon admit · Thu major · Wed minor
   OR2: { admissionDay: 2, majorDay: 5, minorDay: 4 }, // Tue admit · Fri major · Thu minor
-  OR3: { admissionDay: 3, majorDay: 1, minorDay: 2 }, // Wed admit · Mon major · Tue minor
+  OR3: { admissionDay: 3, majorDay: 1, minorDay: 5 }, // Wed admit · Mon major · Fri minor
   OR4: { admissionDay: 4, majorDay: 2, minorDay: 1 }, // Thu admit · Tue major · Mon minor
   OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 }, // Fri admit · Wed major · Tue minor
 };

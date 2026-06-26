@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
 const UNIT_SCHEDULE: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
   OR1: { admissionDay: 1, majorDay: 4, minorDay: 3 },
   OR2: { admissionDay: 2, majorDay: 5, minorDay: 4 },
-  OR3: { admissionDay: 3, majorDay: 1, minorDay: 2 },
+  OR3: { admissionDay: 3, majorDay: 1, minorDay: 5 }, // Fri minor
   OR4: { admissionDay: 4, majorDay: 2, minorDay: 1 },
   OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 },
 };
