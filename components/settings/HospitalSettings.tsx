@@ -36,7 +36,7 @@ const HospitalSettings: React.FC = () => {
     hospitalName, department, unitOptions, preOpModuleName, procedureListName, preOpChecklistTemplate,
     showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, showWoundAssessment, showRehabilitation, showNews2,
     customTodoShortcuts,
-    saveHospitalConfig, unitChiefs, setUnitChief, configUpdatedAt,
+    saveHospitalConfig, unitChiefs, setUnitChief, configUpdatedAt, isLoadingConfig,
   } = useConfig();
 
   const [localHospitalName, setLocalHospitalName]         = useState(hospitalName);
@@ -63,6 +63,31 @@ const HospitalSettings: React.FC = () => {
   // Re-sync local form state when config changes via realtime (another admin saved)
   // configUpdatedAt is set by ConfigContext whenever a background config refresh lands.
   // We show a banner rather than silently overwriting — the admin can see the conflict.
+  // Reinitialize local state once the initial DB fetch completes (isLoadingConfig: true → false).
+  // This prevents saving stale defaults if the component mounted before the config was fetched.
+  const dbLoadedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!isLoadingConfig && !dbLoadedRef.current && !saving) {
+      dbLoadedRef.current = true;
+      setLocalHospitalName(hospitalName);
+      setLocalDepartment(department);
+      setLocalUnits(unitOptions);
+      setLocalPreOpName(preOpModuleName);
+      setLocalProcedureName(procedureListName);
+      setLocalPreOpItems(preOpChecklistTemplate);
+      setLocalShowNursingNotes(showNursingNotes);
+      setLocalShowMedChart(showMedicationChart);
+      setLocalShowIO(showIntakeOutput);
+      setLocalShowBT(showBloodTransfusion);
+      setLocalShowWC(showWoundCare);
+      setLocalShowWA(showWoundAssessment);
+      setLocalShowRehab(showRehabilitation);
+      setLocalShowNews2(showNews2);
+      setLocalShortcuts(customTodoShortcuts ?? []);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingConfig]);
+
   const prevConfigRef = React.useRef(configUpdatedAt);
   React.useEffect(() => {
     if (configUpdatedAt && configUpdatedAt !== prevConfigRef.current && !saving) {
@@ -232,7 +257,7 @@ const HospitalSettings: React.FC = () => {
           </div>
 
           <div className="flex justify-end">
-            <button onClick={handleSave} disabled={saving}
+            <button onClick={handleSave} disabled={saving || isLoadingConfig}
               className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors">
               <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Settings'}
             </button>
@@ -355,7 +380,7 @@ const HospitalSettings: React.FC = () => {
             </button>
           </div>
           <div className="flex justify-end pt-1">
-            <button onClick={handleSave} disabled={saving}
+            <button onClick={handleSave} disabled={saving || isLoadingConfig}
               className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors">
               <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Shortcuts'}
             </button>
