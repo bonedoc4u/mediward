@@ -32,6 +32,13 @@ const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string }> = 
 };
 const DEFAULT_STATUS = { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' };
 
+const PAC_BADGE: Record<string, { bg: string; text: string; border: string; dot: string; icon: string }> = {
+  'PAC Fit':     { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', icon: '✓' },
+  'PAC Pending': { bg: 'bg-slate-50',   text: 'text-slate-600',   border: 'border-slate-200',   dot: 'bg-slate-400',   icon: '…' },
+  'PAC Unfit':   { bg: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-200',     dot: 'bg-red-500',     icon: '✕' },
+  'PAC Review':  { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-500',   icon: '?' },
+};
+
 function formatDateChip(iso: string | undefined): string {
   if (!iso) return 'Pending';
   const d = new Date(iso);
@@ -124,6 +131,7 @@ const PatientDetail: React.FC = () => {
   const daysSinceAdmission = Math.floor((Date.now() - new Date(patient.doa).getTime()) / 86_400_000);
   const isAlreadyDischarged = patient.patientStatus === PatientStatus.Discharged;
   const statusBadge        = STATUS_BADGE[patient.patientStatus] ?? DEFAULT_STATUS;
+  const pacBadge           = PAC_BADGE[patient.pacStatus] ?? PAC_BADGE['PAC Pending'];
   const isDiagCode         = /^[#A-Z]\w{2,}$/.test(editDiagnosis.trim());
 
   const handleDischarge = () => {
@@ -164,7 +172,7 @@ const PatientDetail: React.FC = () => {
           <ArrowLeft className="w-4 h-4" /> Dashboard
         </button>
 
-        {/* Name row + Status badge */}
+        {/* Name row + Status badges */}
         <div className="flex items-start justify-between gap-3 mb-1.5">
           <div className="flex items-center gap-3 min-w-0">
             <div className="bg-white/10 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold text-white border border-white/20">
@@ -177,11 +185,17 @@ const PatientDetail: React.FC = () => {
               </p>
             </div>
           </div>
-          {/* Prominent status badge */}
-          <span className={`shrink-0 mt-1 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold ${statusBadge.bg} ${statusBadge.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
-            {patient.patientStatus}
-          </span>
+          {/* Patient status + PAC status stacked */}
+          <div className="shrink-0 flex flex-col items-end gap-1.5 mt-1">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold ${statusBadge.bg} ${statusBadge.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
+              {patient.patientStatus}
+            </span>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border ${pacBadge.bg} ${pacBadge.text} ${pacBadge.border}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${pacBadge.dot}`} />
+              {patient.pacStatus}
+            </span>
+          </div>
         </div>
 
         {/* POD + Admitted metric chips */}
@@ -346,6 +360,26 @@ const PatientDetail: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ─── PAC STATUS CARD ───────────────────────────────────────────── */}
+      <button
+        onClick={() => navigateTo('pac')}
+        className={`w-full text-left bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3 flex items-center gap-4 hover:border-slate-200 active:scale-[0.99] transition-all`}
+      >
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl font-black border-2 ${pacBadge.bg} ${pacBadge.border} ${pacBadge.text} shrink-0`}>
+          {pacBadge.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">PAC / Pre-Op Clearance</p>
+          <p className={`text-base font-bold mt-0.5 ${pacBadge.text}`}>{patient.pacStatus}</p>
+          {patient.pacChecklist && (
+            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+              {Object.values(patient.pacChecklist).filter(Boolean).length} items completed
+            </p>
+          )}
+        </div>
+        <HeartPulse className="w-5 h-5 text-slate-300 shrink-0" />
+      </button>
 
       {/* ─── COMORBIDITIES ─────────────────────────────────────────────── */}
       {patient.comorbidities.length > 0 && (
