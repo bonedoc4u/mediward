@@ -434,7 +434,7 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
       </div>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-[70] flex justify-end">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
 
           <div className="relative w-full max-w-md bg-white flex flex-col shadow-2xl" style={{ height: '100dvh', paddingTop: 'var(--safe-area-top, env(safe-area-inset-top, 0px))', paddingBottom: 'var(--safe-area-bottom, env(safe-area-inset-bottom, 0px))' }}>

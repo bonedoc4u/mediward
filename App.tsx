@@ -235,11 +235,13 @@ const App: React.FC = () => {
   const openAddModal = useCallback(() => {
     setEditingPatient(null);
     setIsAddPatientModalOpen(true);
+    setIsMobileMenuOpen(false);
   }, []);
 
   const openEditModal = useCallback((patient: Patient) => {
     setEditingPatient(patient);
     setIsAddPatientModalOpen(true);
+    setIsMobileMenuOpen(false);
   }, []);
 
   const meta = viewMeta[currentView as keyof typeof viewMeta] ?? viewMeta.dashboard;
