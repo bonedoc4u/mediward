@@ -8,6 +8,8 @@ import LoginPage from './components/LoginPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
 import HospitalRegisterPage from './components/HospitalRegisterPage';
 import SuperAdminPanel from './components/SuperAdminPanel';
+import DepartmentPicker from './components/DepartmentPicker';
+import UnitPicker from './components/UnitPicker';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationCenter from './components/NotificationCenter';
 import GlobalSearch from './components/GlobalSearch';
@@ -145,7 +147,11 @@ const ViewLoader = () => (
 
 // ─── Main App ───
 const App: React.FC = () => {
-  const { isAuthenticated, isRecoveryMode, isLocked, unlock, user, login, logout, viewingHospitalId, viewingHospitalName, setViewingHospital } = useAuth();
+  const {
+    isAuthenticated, isRecoveryMode, isLocked, unlock, user, login, logout,
+    viewingHospitalId, viewingHospitalName, setViewingHospital,
+    selectedDepartment, selectedUnit, setSelectedDepartment, setSelectedUnit, clearWorkspaceSelection,
+  } = useAuth();
   const [showRegister, setShowRegister] = useState(
     () => window.location.hash === '#/register',
   );
@@ -170,7 +176,7 @@ const App: React.FC = () => {
     currentView, navigateTo, navParams,
     isMobileMenuOpen, setIsMobileMenuOpen, isTransitioning,
   } = useUI();
-  const { preOpModuleName, procedureListName, department } = useConfig();
+  const { preOpModuleName, procedureListName, department, hospitalName, unitOptions } = useConfig();
 
   const mobileTabs = useMemo(() => [
     { id: 'dashboard' as ViewMode, label: 'Ward',                icon: LayoutDashboard },
@@ -371,6 +377,37 @@ const App: React.FC = () => {
     return <ClinicalDisclaimer onAccept={() => setDisclaimerAccepted(true)} />;
   }
 
+  // ─── Department Picker (superadmin must choose a department on every fresh login) ───
+  if (user?.role === 'superadmin' && !selectedDepartment) {
+    return (
+      <>
+        <DepartmentPicker
+          userName={user.name}
+          hospitalName={hospitalName || 'Kozhikode Medical College'}
+          onSelect={(dept) => setSelectedDepartment(dept)}
+        />
+        <ToastContainer />
+      </>
+    );
+  }
+
+  // ─── Unit Picker (admin must choose a unit on every fresh login) ───
+  if (user?.role === 'admin' && !selectedUnit) {
+    const deptLabel = department || 'Dept. of Orthopaedics';
+    return (
+      <>
+        <UnitPicker
+          userName={user.name}
+          hospitalName={hospitalName || 'Kozhikode Medical College'}
+          departmentName={deptLabel}
+          units={unitOptions.length > 0 ? unitOptions : ['OR1', 'OR2', 'OR3', 'OR4', 'OR5']}
+          onSelect={(unit) => setSelectedUnit(unit)}
+        />
+        <ToastContainer />
+      </>
+    );
+  }
+
   // ─── Super Admin ───
   if (user?.role === 'superadmin' && superAdminMode) {
     return (
@@ -517,9 +554,41 @@ const App: React.FC = () => {
 
         {/* User Badge */}
         {user && (
-          <div className="mx-4 mb-4 px-3 py-2 bg-slate-800/60 rounded-lg border border-slate-700/50">
+          <div className="mx-4 mb-2 px-3 py-2 bg-slate-800/60 rounded-lg border border-slate-700/50">
             <p className="text-xs font-semibold text-white truncate">{user.name}</p>
             <p className="text-[10px] text-slate-400 capitalize">{user.role}</p>
+          </div>
+        )}
+
+        {/* Workspace selector — shows chosen department/unit with a "Change" button */}
+        {user?.role === 'superadmin' && selectedDepartment && (
+          <div className="mx-4 mb-4 px-3 py-2 bg-blue-900/30 rounded-lg border border-blue-700/30 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">Department</p>
+              <p className="text-xs text-blue-200 capitalize truncate">{selectedDepartment}</p>
+            </div>
+            <button
+              onClick={() => clearWorkspaceSelection()}
+              className="text-[10px] text-blue-400 hover:text-blue-200 font-semibold shrink-0 px-2 py-1 bg-blue-800/40 hover:bg-blue-700/50 rounded transition-colors"
+            >
+              Change
+            </button>
+          </div>
+        )}
+        {user?.role === 'admin' && selectedUnit && (
+          <div className="mx-4 mb-4 px-3 py-2 bg-blue-900/30 rounded-lg border border-blue-700/30 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">Unit</p>
+              <p className="text-xs text-blue-200 truncate">
+                {selectedUnit === 'all' ? 'All Units' : `Unit ${selectedUnit}`}
+              </p>
+            </div>
+            <button
+              onClick={() => clearWorkspaceSelection()}
+              className="text-[10px] text-blue-400 hover:text-blue-200 font-semibold shrink-0 px-2 py-1 bg-blue-800/40 hover:bg-blue-700/50 rounded transition-colors"
+            >
+              Change
+            </button>
           </div>
         )}
 

@@ -56,6 +56,14 @@ interface AuthContextType {
   viewingHospitalName: string | null;
   /** Set the hospital workspace the superadmin is viewing. Pass null to exit. */
   setViewingHospital: (id: string | null, name?: string) => void;
+  /** Department chosen by superadmin after login. Null = picker not yet shown. */
+  selectedDepartment: string | null;
+  /** Unit chosen by admin after login. 'all' = no filter. Null = picker not yet shown. */
+  selectedUnit: string | null;
+  setSelectedDepartment: (dept: string) => void;
+  setSelectedUnit: (unit: string) => void;
+  /** Reset workspace selection so the picker shows again on next render. */
+  clearWorkspaceSelection: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -72,6 +80,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [viewingHospitalName, setViewingHospitalName] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const hiddenAtRef = React.useRef<number | null>(null);
+
+  // Workspace selection: persisted across page reloads but cleared on logout.
+  const [selectedDepartment, setSelectedDepartmentState] = useState<string | null>(
+    () => localStorage.getItem('mw_dept'),
+  );
+  const [selectedUnit, setSelectedUnitState] = useState<string | null>(
+    () => localStorage.getItem('mw_unit'),
+  );
+
+  const setSelectedDepartment = useCallback((dept: string) => {
+    setSelectedDepartmentState(dept);
+    localStorage.setItem('mw_dept', dept);
+  }, []);
+
+  const setSelectedUnit = useCallback((unit: string) => {
+    setSelectedUnitState(unit);
+    localStorage.setItem('mw_unit', unit);
+  }, []);
+
+  const clearWorkspaceSelection = useCallback(() => {
+    setSelectedDepartmentState(null);
+    setSelectedUnitState(null);
+    localStorage.removeItem('mw_dept');
+    localStorage.removeItem('mw_unit');
+  }, []);
 
   // Detect password-reset links at initialisation time.
   // Supabase fires PASSWORD_RECOVERY on onAuthStateChange, but that listener
@@ -306,28 +339,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const found = await findUserByEmail(email);
       if (!found) return { success: false, error: 'User role not configured. Contact admin.' };
 
-      // Check hospital approval status (superadmin bypasses this check)
-      if (found.role !== 'superadmin') {
-        const { data: hosp } = await supabase
-          .from('hospitals')
-          .select('status')
-          .eq('id', found.hospitalId)
-          .maybeSingle();
-
-        if (hosp?.status === 'pending') {
-          await supabase.auth.signOut().catch(() => {});
-          return { success: false, error: 'Your hospital registration is pending approval. You will be notified once approved.' };
-        }
-        if (hosp?.status === 'rejected') {
-          await supabase.auth.signOut().catch(() => {});
-          return { success: false, error: 'Your hospital registration was not approved. Contact support.' };
-        }
-        if (hosp?.status === 'suspended') {
-          await supabase.auth.signOut().catch(() => {});
-          return { success: false, error: 'Your hospital account has been suspended. Contact support.' };
-        }
-      }
-
       const session: AuthUser = {
         id:            authData.user.id,
         email:         found.email,
@@ -358,6 +369,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setIsLocked(false);
     removeFromStorage('session');
+    clearWorkspaceSelection();
     clearDisclaimerAccepted(); // next user on this device must re-accept
     // Purge SW caches so the next user on a shared tablet cannot read cached patient data
     if ('caches' in window) {
@@ -378,6 +390,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       viewingHospitalId,
       viewingHospitalName,
       setViewingHospital,
+      selectedDepartment,
+      selectedUnit,
+      setSelectedDepartment,
+      setSelectedUnit,
+      clearWorkspaceSelection,
     }}>
       {children}
     </AuthContext.Provider>

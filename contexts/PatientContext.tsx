@@ -154,10 +154,17 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const { viewingHospitalId } = useAuth();
+  const { viewingHospitalId, selectedUnit } = useAuth();
 
   // Effective hospitalId for cache scoping: superadmin viewing another hospital uses their target.
   const effectiveHospitalId = viewingHospitalId ?? user?.hospitalId ?? '';
+
+  // For admins, the unit picker result overrides user.unit (which is null for admin = all units).
+  // 'all' → no filter; a specific unit string → filter to that unit.
+  const effectiveUnit: string | undefined =
+    user?.role === 'admin' && selectedUnit && selectedUnit !== 'all'
+      ? selectedUnit
+      : user?.unit ?? undefined;
 
   // Debounced cache write — reduced to 300ms so a backgrounded/killed app loses
   // at most 300ms of realtime events rather than 2000ms.
@@ -189,6 +196,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const hospitalIdRef = useRef<string | undefined>(viewingHospitalId ?? undefined);
   useEffect(() => { hospitalIdRef.current = viewingHospitalId ?? undefined; }, [viewingHospitalId]);
 
+  // Track the effective unit in a ref so the realtime handler (which runs inside
+  // the channel effect with [] deps) can always read the latest value.
+  const effectiveUnitRef = useRef<string | undefined>(effectiveUnit);
+  useEffect(() => { effectiveUnitRef.current = effectiveUnit; }, [effectiveUnit]);
+
   // ─── Background Fetch — paginated (cache-first then network) ───
   // user.unit filters patients to only this unit; admins (no unit) see all.
   // user?.id is intentionally in the dep array so the fetch re-runs after login
@@ -208,7 +220,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsLoadingPatients(true);
     }
 
-    fetchActivePatientsPage(user?.unit, 0, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined)
+    fetchActivePatientsPage(effectiveUnit, 0, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined)
       .then(({ patients: data, hasMore: more }) => {
         const enriched = enrichPatientData(data);
         setPatients(enriched);
@@ -229,7 +241,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // become false showing an empty (but not broken) dashboard.
       })
       .finally(() => setIsLoadingPatients(false));
-  }, [user?.id, user?.unit, viewingHospitalId]);
+  }, [user?.id, user?.unit, viewingHospitalId, selectedUnit]);
 
   // ─── Offline Sync Queue — replay on reconnect ───
   // Ref so the handler always reads the current user without a stale closure
@@ -418,15 +430,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             // decide what to do, then fetch the full row via SELECT which is
             // RLS-protected. This prevents PHI leakage even if the realtime
             // channel were misconfigured or Supabase Realtime auth is bypassed.
-            const userUnit = user?.unit;
-
             if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
               const ipNo    = (payload.new as { ip_no?: string })?.ip_no;
               const rowUnit = (payload.new as { unit?: string })?.unit;
               if (!ipNo) return;
 
               // Client-side unit filter (belt-and-suspenders — DB filter is primary)
-              if (userUnit && rowUnit && rowUnit !== userUnit) return;
+              const activeUnit = effectiveUnitRef.current;
+              if (activeUnit && rowUnit && rowUnit !== activeUnit) return;
 
               // Fetch full row through RLS — ensures we can only see authorised data
               const fresh = await fetchPatientById(ipNo, hospitalIdRef.current ?? undefined);
@@ -512,7 +523,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const nextPage = currentPage + 1;
       const { patients: data, hasMore: more } = await fetchActivePatientsPage(
-        user?.unit, nextPage, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined,
+        effectiveUnit, nextPage, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined,
       );
       const enriched = enrichPatientData(data);
       setPatients(prev => {
@@ -531,7 +542,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       setIsLoadingMore(false);
     }
-  }, [hasMore, isLoadingMore, currentPage, user?.unit, viewingHospitalId]);
+  }, [hasMore, isLoadingMore, currentPage, effectiveUnit, viewingHospitalId]);
 
   // ─── Load All Patients (lazy — Master/Discharge views) ───
   const loadAllPatients = useCallback(async () => {
