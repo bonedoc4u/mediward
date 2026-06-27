@@ -28,11 +28,7 @@ const REQUIRED_VARS: RequiredVar[] = [
     validate: v => v.length > 100 && v.startsWith('eyJ'),
     hint:     'Must be a JWT token (starts with eyJ)',
   },
-  {
-    name:     'VITE_ABDM_BASE_URL',
-    validate: v => v.startsWith('https://'),
-    hint:     'Must be a valid HTTPS URL',
-  },
+  // VITE_ABDM_BASE_URL is optional — env.ts provides a default fallback value.
 ];
 
 export function envCheckPlugin(): Plugin {
