@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { KeyboardAwareView } from './ui/KeyboardAwareView';
 import { Patient, Gender, PacStatus, PatientStatus, Ward } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { parseFhirPatient } from '../services/fhirService';
-import { X, Save, UserPlus, Pencil, Loader2, FileJson, ChevronDown, ChevronUp, ScanLine } from 'lucide-react';
+import { X, Save, UserPlus, Pencil, Loader2, ChevronDown, ChevronUp, ScanLine } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
 
@@ -36,7 +35,7 @@ const STEP_LABELS = ['Location & Identity', 'Patient Details', 'Status & Plan'];
 /** Shape of the admission wizard form. Declared explicitly so setFormData
  *  callbacks can type `prev` and avoid implicit-any errors. */
 interface AdmitFormState {
-  bed: string; ward: Ward; unit: string; ipNo: string; abhaId: string;
+  bed: string; ward: Ward; unit: string; ipNo: string;
   name: string; age: string; gender: Gender; mobile: string;
   diagnosis: string; doa: string; procedure: string; dos: string;
   pacStatus: PacStatus; patientStatus: PatientStatus;
@@ -91,7 +90,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         ward: (initialData.ward || defaultWard) as Ward,
         unit: initialData.unit ?? defaultUnit,
         ipNo: initialData.ipNo,
-        abhaId: initialData.abhaId ?? '',
         name: initialData.name,
         age: initialData.age.toString(),
         gender: initialData.gender,
@@ -117,7 +115,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ward: defaultWard as Ward,
       unit: defaultUnit,
       ipNo: '',
-      abhaId: '',
       name: '',
       age: '',
       gender: Gender.Male,
@@ -160,9 +157,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     if (s === 1) {
       if (!formData.ipNo.trim()) return 'IP Number is required.';
       if (!formData.ward) return 'Ward is required.';
-      if (formData.abhaId && !/^\d{14}$|^\d{2}-\d{4}-\d{4}-\d{4}$/.test(formData.abhaId.trim())) {
-        return 'ABHA ID must be 14 digits (e.g. 12345678901234 or 12-3456-7890-1234).';
-      }
       if (formData.mobile && !/^[6-9]\d{9}$/.test(formData.mobile.replace(/\s/g, ''))) {
         return 'Mobile number must be a valid 10-digit Indian number.';
       }
@@ -172,35 +166,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       if (!formData.diagnosis.trim()) return 'Diagnosis is required.';
     }
     return null;
-  };
-
-  // ── FHIR import ──
-  const [showFhirImport, setShowFhirImport] = useState(false);
-  const [fhirJson, setFhirJson] = useState('');
-  const [fhirImportError, setFhirImportError] = useState<string | null>(null);
-
-  const handleFhirImport = () => {
-    setFhirImportError(null);
-    if (fhirJson.length > 50_000) {
-      setFhirImportError('JSON too large (max 50 KB). Paste only the Patient resource.');
-      return;
-    }
-    try {
-      const partial = parseFhirPatient(fhirJson);
-      setFormData(prev => ({
-        ...prev,
-        ...(partial.name    ? { name: partial.name }                           : {}),
-        ...(partial.age     ? { age: String(partial.age) }                     : {}),
-        ...(partial.gender  ? { gender: partial.gender }                       : {}),
-        ...(partial.mobile  ? { mobile: partial.mobile }                       : {}),
-        ...(partial.ipNo    ? { ipNo: partial.ipNo }                           : {}),
-        ...(partial.abhaId  ? { abhaId: partial.abhaId }                       : {}),
-      }));
-      setFhirJson('');
-      setShowFhirImport(false);
-    } catch (err: any) {
-      setFhirImportError(err.message ?? 'Failed to parse FHIR JSON');
-    }
   };
 
   const [selectedComorbidities, setSelectedComorbidities] = useState<string[]>(() => {
@@ -329,8 +294,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     setStepError(null);
     setShowConsent(false);
     setShowComorbidityPicker(false);
-    setShowFhirImport(false);
-    setFhirJson('');
     setScanError(null);
     setScanLoading(false);
     if (isOpen && initialData) {
@@ -339,7 +302,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         ward: initialData.ward || defaultWard,
         unit: initialData.unit ?? defaultUnit,
         ipNo: initialData.ipNo,
-        abhaId: initialData.abhaId ?? '',
         name: initialData.name,
         age: initialData.age.toString(),
         gender: initialData.gender,
@@ -380,8 +342,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         ward: defaultWard,
         unit: defaultUnit,
         ipNo: '',
-        abhaId: '',
-        name: '',
+          name: '',
         age: '',
         gender: Gender.Male,
         mobile: '',
@@ -435,7 +396,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ward: formData.ward,
       unit: (!isAdmin && user?.unit) ? user.unit : (formData.unit || undefined),
       ipNo: formData.ipNo,
-      abhaId: formData.abhaId.trim() || undefined,
       name: formData.name,
       age: parseInt(formData.age) || 0,
       gender: formData.gender,
@@ -474,7 +434,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ward: formData.ward,
       unit: (!isAdmin && user?.unit) ? user.unit : (formData.unit || undefined),
       ipNo: formData.ipNo,
-      abhaId: formData.abhaId.trim() || undefined,
       name: formData.name,
       age: parseInt(formData.age) || 0,
       gender: formData.gender,
@@ -671,29 +630,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                  ABHA ID <span className="normal-case font-normal text-slate-500">(Ayushman Bharat — optional)</span>
-                </label>
-                <input type="text" placeholder="14-digit ABHA number" maxLength={17} className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none font-mono tracking-wider" value={formData.abhaId} onChange={e => setFormData({...formData, abhaId: e.target.value})} />
-              </div>
-
-              {/* FHIR Import */}
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
-                <button type="button" onClick={() => { setShowFhirImport(v => !v); setFhirImportError(null); }}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors text-xs font-semibold text-slate-600">
-                  <span className="flex items-center gap-1.5"><FileJson className="w-3.5 h-3.5 text-teal-600" />Import from FHIR JSON</span>
-                  {showFhirImport ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
-                {showFhirImport && (
-                  <div className="p-3 space-y-2 border-t border-slate-200">
-                    <p className="text-[11px] text-slate-500">Paste a FHIR R4 Patient resource or Document Bundle. Matched fields will pre-fill this form.</p>
-                    <textarea rows={4} placeholder='{"resourceType":"Patient", ...}' className="w-full p-2 border border-slate-300 rounded text-xs font-mono focus:ring-2 focus:ring-teal-500 outline-none resize-none" value={fhirJson} onChange={e => setFhirJson(e.target.value)} />
-                    {fhirImportError && <p className="text-xs text-red-600 flex items-center gap-1"><X className="w-3.5 h-3.5 shrink-0" /> {fhirImportError}</p>}
-                    <button type="button" onClick={handleFhirImport} disabled={!fhirJson.trim()} className="w-full py-1.5 bg-teal-700 hover:bg-teal-800 disabled:opacity-40 text-white text-xs font-semibold rounded transition-colors">Parse &amp; Fill Form</button>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
