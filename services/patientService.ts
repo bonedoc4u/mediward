@@ -420,8 +420,15 @@ export async function fetchPatientById(ipNo: string, hospitalId?: string): Promi
  * we use a conditional update. If another user saved between our load and save,
  * the condition fails (0 rows updated) and we throw a CONCURRENT_EDIT error.
  */
-export async function upsertPatient(patient: Patient): Promise<void> {
-  if (patient.updatedAt) {
+export async function upsertPatient(patient: Patient, forceUpdate = false): Promise<void> {
+  if (forceUpdate) {
+    // Unconditional UPDATE — bypasses optimistic lock for conflict resolution
+    const { error } = await supabase
+      .from('patients')
+      .update(patientToRow(patient))
+      .eq('ip_no', patient.ipNo);
+    if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
+  } else if (patient.updatedAt) {
     // Existing patient: conditional update to detect concurrent edits
     const { data, error } = await supabase
       .from('patients')

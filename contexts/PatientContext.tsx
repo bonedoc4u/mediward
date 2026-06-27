@@ -810,9 +810,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setConcurrentEditConflict(null);
 
     if (choice === 'local') {
-      // Force-save: strip updatedAt to bypass the optimistic-lock check
-      const forced = { ...localPatient, updatedAt: undefined };
-      upsertPatient(forced)
+      // Force-save: unconditional UPDATE (forceUpdate=true bypasses the updated_at match)
+      const forced = localPatient;
+      upsertPatient(forced, true)
         .then(async () => {
           toast.success(`${forced.name} saved (overwrite).`);
           // Re-fetch to restore the server's updated_at, preventing
