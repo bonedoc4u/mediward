@@ -252,7 +252,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       for (const op of queue) {
         try {
           if (op.type === 'upsert_patient') {
-            await upsertPatient(op.payload as Patient);
+            const qp = op.payload as Patient;
+            // Patch hospitalId in case the op was queued before this fix landed
+            // (pre-fix ops have hospitalId = undefined, causing the re-insert to fail again).
+            const withHid: Patient = qp.hospitalId
+              ? qp
+              : { ...qp, hospitalId: userRef.current?.hospitalId };
+            await upsertPatient(withHid);
           } else if (op.type === 'insert_lab') {
             const { patientId, hospitalId: labHid, result } = op.payload as { patientId: string; hospitalId?: string; result: LabResult };
             await insertLab(patientId, result, labHid);
@@ -621,6 +627,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addPatient = useCallback((patient: Patient) => {
     const p = {
       ...patient,
+      // Always stamp the current user's hospitalId so the row reaches Supabase
+      // with the correct tenant — without this, the insert has hospital_id = NULL
+      // and the patient is invisible to every user (admin's fetch filters by hospitalId).
+      hospitalId: patient.hospitalId ?? user?.hospitalId,
       name:      sanitizeInput(patient.name),
       diagnosis: sanitizeInput(patient.diagnosis),
       procedure: patient.procedure ? sanitizeInput(patient.procedure) : undefined,

@@ -54,6 +54,7 @@ interface ImagingRowRead {
 // ─── DB row shape (mirrors the Supabase table exactly) ───
 interface PatientRow {
   ip_no: string;
+  hospital_id: string;
   abha_id: string | null;
   name: string;
   mobile: string;
@@ -211,6 +212,7 @@ function rowToPatient(row: PatientRow): Patient {
     specialty:        row.specialty        ?? undefined,
     specialtyData:    row.specialty_data   ?? undefined,
     updatedAt:       row.updated_at,
+    hospitalId:      row.hospital_id,
     consentGivenAt:  row.consent_given_at ?? undefined,
     consentVersion:  row.consent_version  ?? undefined,
   };
@@ -222,6 +224,7 @@ function rowToPatient(row: PatientRow): Patient {
 function patientToRow(patient: Patient) {
   return {
     ip_no:             patient.ipNo,
+    hospital_id:       patient.hospitalId ?? null,
     abha_id:           patient.abhaId ?? null,
     name:              patient.name,
     mobile:            patient.mobile,
@@ -267,7 +270,7 @@ function patientToRow(patient: Patient) {
 //   Fetches all labs, imaging, rounds, and vitals for a single patient.
 //
 const PATIENT_LIST_SELECT = [
-  'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
+  'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
@@ -280,7 +283,7 @@ const PATIENT_LIST_SELECT = [
 
 // Full select (all vitals) — used only when a single patient's detail is loaded
 const PATIENT_SELECT = [
-  'ip_no', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
+  'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
   'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
