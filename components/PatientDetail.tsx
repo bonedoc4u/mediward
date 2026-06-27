@@ -1,4 +1,4 @@
-import React, { useMemo, useState, lazy, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { PatientStatus } from '../types';
 import { can } from '../utils/permissions';
@@ -12,8 +12,6 @@ import {
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBoundary from './ErrorBoundary';
 import FHIRExportModal from './FHIRExportModal';
-import VitalsWidget from './VitalsWidget';
-import SpecialtyDataPanel from './SpecialtyDataPanel';
 import ScoringTools from './ScoringTools';
 import ReferralLetter from './ReferralLetter';
 
@@ -24,8 +22,8 @@ const BloodTransfusion = lazy(() => import('./BloodTransfusion'));
 const WoundCare = lazy(() => import('./WoundCare'));
 
 const PatientDetail: React.FC = () => {
-  const { navParams, navigateTo, patients, updatePatient, deletePatient, addVitalSign, user } = useApp();
-  const { labTypes, activeFieldGroups, activeSpecialty, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, showWoundAssessment, showRehabilitation, hospitalName } = useConfig();
+  const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
+  const { labTypes, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, hospitalName } = useConfig();
   const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFhirExport, setShowFhirExport] = useState(false);
@@ -34,7 +32,18 @@ const PatientDetail: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'medications' | 'nursing' | 'io' | 'transfusion' | 'wound'>('overview');
   const canDischarge = can(user, 'patient:discharge');
   const canDelete = can(user, 'patient:delete');
+  const canEdit = can(user, 'patient:edit');
   const patient = useMemo(() => patients.find(p => p.ipNo === navParams.id), [patients, navParams.id]);
+
+  // Local edit state for inline-editable fields; synced when patient changes externally.
+  const [editDiagnosis, setEditDiagnosis] = useState('');
+  const [editProcedure, setEditProcedure] = useState('');
+  useEffect(() => {
+    if (patient) {
+      setEditDiagnosis(patient.diagnosis);
+      setEditProcedure(patient.procedure ?? '');
+    }
+  }, [patient?.ipNo]); // reset when navigating to a different patient
 
   if (!patient) {
     return (
@@ -128,17 +137,49 @@ const PatientDetail: React.FC = () => {
         </div>
 
         <div className="p-3 space-y-2">
-          {/* Diagnosis & Procedure — single line */}
+          {/* Diagnosis & Procedure — inline editable */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>
-              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Diagnosis</span>
-              <p className="text-xs font-medium text-slate-800 mt-0.5 truncate">{patient.diagnosis}</p>
+              <label className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">Diagnosis</label>
+              {canEdit ? (
+                <input
+                  value={editDiagnosis}
+                  onChange={e => setEditDiagnosis(e.target.value)}
+                  onBlur={() => {
+                    if (editDiagnosis.trim() && editDiagnosis !== patient.diagnosis) {
+                      updatePatient({ ...patient, diagnosis: editDiagnosis.trim() });
+                    } else {
+                      setEditDiagnosis(patient.diagnosis);
+                    }
+                  }}
+                  className="w-full text-xs font-medium text-slate-800 mt-0.5 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-400 focus:bg-blue-50/30 outline-none rounded-sm px-0.5 -mx-0.5 py-0.5 transition-colors"
+                  placeholder="Enter diagnosis"
+                />
+              ) : (
+                <p className="text-xs font-medium text-slate-800 mt-0.5 truncate">{patient.diagnosis}</p>
+              )}
             </div>
             <div>
-              <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Procedure</span>
-              <p className="text-xs text-slate-700 mt-0.5 truncate">
-                {patient.procedure || <span className="text-slate-400 italic">Pending</span>}
-              </p>
+              <label className="text-[11px] uppercase font-bold text-slate-400 tracking-wider block">Procedure</label>
+              {canEdit ? (
+                <input
+                  value={editProcedure}
+                  onChange={e => setEditProcedure(e.target.value)}
+                  onBlur={() => {
+                    const trimmed = editProcedure.trim();
+                    const current = patient.procedure ?? '';
+                    if (trimmed !== current) {
+                      updatePatient({ ...patient, procedure: trimmed || undefined });
+                    }
+                  }}
+                  className="w-full text-xs text-slate-700 mt-0.5 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-400 focus:bg-blue-50/30 outline-none rounded-sm px-0.5 -mx-0.5 py-0.5 transition-colors"
+                  placeholder="Enter procedure (optional)"
+                />
+              ) : (
+                <p className="text-xs text-slate-700 mt-0.5 truncate">
+                  {patient.procedure || <span className="text-slate-400 italic">Pending</span>}
+                </p>
+              )}
             </div>
           </div>
 
@@ -423,15 +464,9 @@ const PatientDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Overview Tab — Vital Signs */}
+      {/* Overview Tab */}
       {activeTab === 'overview' && (
         <>
-      <VitalsWidget
-        vitals={patient.vitals ?? []}
-        onAdd={v => addVitalSign(patient.ipNo, v)}
-        patientIpNo={patient.ipNo}
-      />
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Lab Trends Summary */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
@@ -514,20 +549,6 @@ const PatientDetail: React.FC = () => {
             ))}
           </div>
         </div>
-      )}
-
-      {/* Specialty Clinical Data */}
-      {activeFieldGroups.length > 0 && (
-        <SpecialtyDataPanel
-          fieldGroups={activeFieldGroups.filter(g =>
-            (g.key !== 'wound_assessment' || showWoundAssessment) &&
-            (g.key !== 'rehabilitation'   || showRehabilitation),
-          )}
-          data={patient.specialtyData ?? {}}
-          specialtyLabel={activeSpecialty.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-          canEdit={can(user, 'patient:edit')}
-          onSave={updatedData => updatePatient({ ...patient, specialtyData: updatedData })}
-        />
       )}
 
       {/* Daily Rounds History */}
