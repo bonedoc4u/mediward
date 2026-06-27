@@ -460,8 +460,8 @@ const App: React.FC = () => {
         .content-slide-in { animation: slideInRight 0.25s ease-out; }
         /* Horizontal scroll fade indicator */
         .scroll-x-hint { -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%); mask-image: linear-gradient(to right, black 85%, transparent 100%); }
-        /* WKWebView: prevent position:fixed jitter during momentum scroll on iOS */
-        .fixed, .sticky { -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform; }
+        /* WKWebView: prevent sidebar jitter during momentum scroll on iOS — scoped to aside only */
+        aside.sticky { -webkit-transform: translateZ(0); transform: translateZ(0); will-change: transform; }
         /* Print: hide chrome, expand content */
         @media print {
           nav, header, aside, .md\\:hidden, [data-no-print] { display: none !important; }
