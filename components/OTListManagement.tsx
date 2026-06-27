@@ -121,11 +121,18 @@ const SortableRow = ({ id, children, className }: { id: string, children: React.
 
 const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdatePatient }) => {
   const { unitChiefs, hospitalName, department } = useConfig();
-  const { user } = useAuth();
+  const { user, selectedUnit } = useAuth();
   const [activeTab, setActiveTab] = useState<OTType>('Major');
 
-  // Per-tab date state: each tab defaults to its next scheduled OT day for the user's unit
-  const unitKey = (user?.unit ?? 'OR1').toUpperCase();
+  // Resolve the effective unit: admin's picker selection takes priority over profile unit
+  const effectiveUnit = (
+    user?.role === 'admin' && selectedUnit && selectedUnit !== 'all'
+      ? selectedUnit
+      : user?.unit ?? 'OR1'
+  ).toUpperCase();
+
+  // Per-tab date state: each tab defaults to its next scheduled OT day for the effective unit
+  const unitKey = effectiveUnit;
   const unitSched = UNIT_SCHEDULE_OT[unitKey] ?? UNIT_SCHEDULE_OT['OR1'];
   const [majorDate, setMajorDate] = useState<string>(() => nextOccurrence(unitSched.majorDay));
   const [minorDate, setMinorDate] = useState<string>(() => nextOccurrence(unitSched.minorDay));
@@ -137,7 +144,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [surgeonUnit, setSurgeonUnit] = useState(user?.unit ?? 'OR1');
+  const [surgeonUnit, setSurgeonUnit] = useState(effectiveUnit);
   const [surgeon, setSurgeon] = useState('');
   const [otTime, setOtTime] = useState('8.00AM');
 
