@@ -245,16 +245,37 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     loadAll();
 
-    // Bug #8: Add realtime subscription for config tables
-    const channel = supabase.channel('config-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ward_config' }, loadAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_type_config' }, loadAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hospital_config' }, loadAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'medications' }, loadAll)
-      .subscribe();
+    // Realtime subscription for config tables with exponential-backoff reconnect.
+    let destroyed = false;
+    let retryTimer: ReturnType<typeof setTimeout>;
+    let retryDelay = 2000;
+    let ch: ReturnType<typeof supabase.channel>;
+
+    const connectConfig = () => {
+      if (destroyed) return;
+      ch = supabase.channel(`config-changes-${Date.now()}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ward_config' }, loadAll)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_type_config' }, loadAll)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'hospital_config' }, loadAll)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'medications' }, loadAll)
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            retryDelay = 2000;
+          }
+          if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !destroyed) {
+            supabase.removeChannel(ch);
+            retryTimer = setTimeout(() => { if (!destroyed) connectConfig(); }, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, 30_000);
+          }
+        });
+    };
+
+    connectConfig();
 
     return () => {
-      supabase.removeChannel(channel);
+      destroyed = true;
+      clearTimeout(retryTimer);
+      supabase.removeChannel(ch);
     };
   }, [viewingHospitalId, user?.id, user?.hospitalId]);
 

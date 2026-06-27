@@ -1,0 +1,114 @@
+# .github/workflows/pr-checks.yml
+# Runs on every pull request. Fails if lint, types, or test coverage < 60%.
+# Coverage summary is posted as a PR comment.
+
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint · Types · Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Lint ────────────────────────────────────────────────────────────────
+      - name: ESLint
+        run: pnpm lint
+        # If you don't have a lint script yet: npx eslint . --ext .ts,.tsx
+
+      # ── Type check ──────────────────────────────────────────────────────────
+      - name: TypeScript check
+        run: pnpm typecheck
+
+      # ── Tests with coverage ─────────────────────────────────────────────────
+      - name: Vitest (coverage)
+        run: pnpm test:coverage
+        env:
+          # Point tests at a dummy Supabase so nothing calls the real DB
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+          VITE_ABDM_BASE_URL: https://placeholder.abdm.gov.in
+
+      # ── Coverage gate: fail PR if total < 60% ────────────────────────────
+      - name: Coverage gate
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json \
+            | node -e "process.stdin.pipe(require('stream').pipeline([
+                require('stream').PassThrough()],()=>{}));
+                let d=''; process.stdin.on('data',c=>d+=c);
+                process.stdin.on('end',()=>{
+                  const s=JSON.parse(d).total.statements.pct;
+                  console.log(s);
+                  if(s<60){process.stderr.write('Coverage '+s+'% is below 60% threshold\n');process.exit(1);}
+                });")
+          echo "Statement coverage: $COVERAGE%"
+
+      # ── Post coverage summary to PR ──────────────────────────────────────
+      - name: Post coverage comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## Test Coverage\n\n';
+            try {
+              const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              const t = summary.total;
+              const pct = (k) => `${t[k].pct.toFixed(1)}%`;
+              const icon = (p) => p >= 80 ? '🟢' : p >= 60 ? '🟡' : '🔴';
+              body += `| Metric | Coverage |\n|--------|----------|\n`;
+              body += `| ${icon(t.statements.pct)} Statements | ${pct('statements')} |\n`;
+              body += `| ${icon(t.branches.pct)} Branches   | ${pct('branches')} |\n`;
+              body += `| ${icon(t.functions.pct)} Functions  | ${pct('functions')} |\n`;
+              body += `| ${icon(t.lines.pct)} Lines      | ${pct('lines')} |\n\n`;
+              if (t.statements.pct < 60) {
+                body += '> ⛔ Coverage is below the **60% minimum**. Add tests before merging.\n';
+              }
+            } catch (e) {
+              body += '_Coverage report not available — tests may have failed._\n';
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.user.login === 'github-actions[bot]' && c.body.startsWith('## Test Coverage')
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body,
+              });
+            }

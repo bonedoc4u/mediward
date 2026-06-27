@@ -1,0 +1,186 @@
+# .github/workflows/deploy-staging.yml
+# Triggers: push to main (after a feature PR merges).
+# Order: migrate DB → build → deploy Vercel → smoke tests → notify Slack.
+# Migration runs BEFORE frontend deploy so the new schema is always present
+# when the new code starts serving requests.
+
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false   # never cancel a running deploy mid-way
+
+env:
+  PNPM_VERSION: '9'
+  NODE_VERSION: '20'
+
+jobs:
+  # ─── 1. Migrate staging DB ──────────────────────────────────────────────────
+  migrate:
+    name: Run DB migrations (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Push migrations to staging
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase db push \
+            --project-ref ${{ secrets.STAGING_PROJECT_REF }} \
+            --password "${{ secrets.STAGING_DB_PASSWORD }}"
+
+  # ─── 2. Build frontend ──────────────────────────────────────────────────────
+  build:
+    name: Build Vite PWA
+    runs-on: ubuntu-latest
+    needs: migrate
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL:     ${{ secrets.STAGING_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          VITE_ABDM_BASE_URL:    ${{ secrets.STAGING_ABDM_BASE_URL }}
+          VITE_ENVIRONMENT:      staging
+        run: pnpm build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-staging
+          path: dist/
+          retention-days: 1
+
+  # ─── 3. Deploy to Vercel (staging) ──────────────────────────────────────────
+  deploy:
+    name: Deploy to Vercel staging
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    outputs:
+      preview-url: ${{ steps.deploy.outputs.preview-url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-staging
+          path: dist/
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel environment
+        env:
+          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          URL=$(vercel deploy --prebuilt \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --env VITE_SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}" \
+            --env VITE_SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}")
+          echo "preview-url=$URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $URL"
+
+  # ─── 4. Playwright smoke tests ──────────────────────────────────────────────
+  smoke-tests:
+    name: Playwright smoke tests
+    runs-on: ubuntu-latest
+    needs: deploy
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install (including Playwright)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run smoke tests
+        env:
+          PLAYWRIGHT_BASE_URL:    ${{ needs.deploy.outputs.preview-url }}
+          TEST_USER_EMAIL:        ${{ secrets.STAGING_TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD:     ${{ secrets.STAGING_TEST_USER_PASSWORD }}
+          TEST_ADMIN_EMAIL:       admin@staging.mediward.test
+          TEST_ADMIN_PASSWORD:    ${{ secrets.STAGING_TEST_ADMIN_PASSWORD }}
+        run: pnpm exec playwright test e2e/smoke.spec.ts --reporter=github
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-staging
+          path: playwright-report/
+          retention-days: 7
+
+  # ─── 5. Notify Slack ────────────────────────────────────────────────────────
+  notify:
+    name: Slack notification
+    runs-on: ubuntu-latest
+    needs: [deploy, smoke-tests]
+    if: always()
+    steps:
+      - name: Post to Slack
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook:      ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "${{ needs.smoke-tests.result == 'success' && '✅' || '❌' }} Staging deploy *${{ needs.smoke-tests.result }}*",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ needs.smoke-tests.result == 'success' && '✅' || '❌' }} *MediWard staging deploy — ${{ needs.smoke-tests.result }}*\n<${{ needs.deploy.outputs.preview-url }}|Open preview> · <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>\nCommit: `${{ github.sha }}` by @${{ github.actor }}"
+                  }
+                }
+              ]
+            }

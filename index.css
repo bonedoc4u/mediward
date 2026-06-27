@@ -82,6 +82,20 @@ textarea {
 /* ── Active state ripple for mobile buttons ───────────────────── */
 button:active, a:active { opacity: 0.85; }
 
+/* ── WCAG 2.1 AA minimum touch target (44×44 dp) ─────────────── */
+/*
+ * Applied to interactive elements that are smaller than 44px by default.
+ * Use the .min-touch utility class on any tappable element that is
+ * visually smaller than 44px (icon-only buttons, small badges, etc.)
+ */
+.min-touch {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ── Capacitor / native WebView safe-area enforcement ─────────── */
 /*
  * On Capacitor Android the WKWebView/ChromeCustomTab doesn't always propagate

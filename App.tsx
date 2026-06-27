@@ -37,6 +37,7 @@ const AuditLogViewer = lazy(() => import('./components/AuditLogViewer'));
 const AdminSettings = lazy(() => import('./components/AdminSettings'));
 const StatusPage = lazy(() => import('./components/StatusPage'));
 import OfflineBanner from './components/OfflineBanner';
+import { NetworkBanner } from './components/NetworkBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import SwUpdateBanner from './components/SwUpdateBanner';
 import IosInstallModal from './components/IosInstallModal';
@@ -467,6 +468,7 @@ const App: React.FC = () => {
           .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
         }
       `}</style>
+      <NetworkBanner />
       <OfflineBanner />
 
       {/* ─── Mobile Header ─── */}

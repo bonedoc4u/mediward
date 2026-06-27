@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { KeyboardAwareView } from './ui/KeyboardAwareView';
 import { Patient, Gender, PacStatus, PatientStatus, Ward } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { parseFhirPatient } from '../services/fhirService';
@@ -594,6 +595,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           </div>
         </div>
 
+        <KeyboardAwareView>
         <form onSubmit={handleSubmit} autoComplete="off" className="p-4 sm:p-6 space-y-4 sm:space-y-5">
 
 
@@ -885,6 +887,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
             )}
           </div>
         </form>
+        </KeyboardAwareView>
       </div>
     </div>
 

@@ -28,5 +28,13 @@
     "strict": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "android",
+    "ios",
+    "e2e",              // Playwright tests use their own tsconfig
+    "playwright.config.ts"
+  ]
 }

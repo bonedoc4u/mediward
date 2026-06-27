@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 // @ts-ignore -- install with: npm install
 import { VitePWA } from 'vite-plugin-pwa';
+import { envCheckPlugin } from './plugins/vite-plugin-env-check';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
@@ -16,7 +17,13 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         tailwindcss(),
+        envCheckPlugin(),   // fails CI build if env vars are missing/invalid
         VitePWA({
+          // injectManifest: use our custom sw.ts instead of generateSW so we
+          // can add Workbox BackgroundSync for offline round note mutations.
+          strategies: 'injectManifest',
+          srcDir: '.',
+          filename: 'sw.ts',
           registerType: 'autoUpdate',
           includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
           manifest: {
@@ -42,28 +49,9 @@ export default defineConfig(({ mode }) => {
               { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
             ],
           },
-          workbox: {
+          injectManifest: {
+            // Precache all static assets; runtime caching is handled in sw.ts.
             globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-            runtimeCaching: [
-              {
-                // NetworkFirst: always try the network first, fall back to cache
-                // after 5s (slow ward Wi-Fi). StaleWhileRevalidate was unsafe —
-                // it could serve 2-hour-old vitals or lab results as current data
-                // after a period of connectivity loss.
-                urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-                handler: 'NetworkFirst',
-                options: {
-                  cacheName: 'supabase-api-cache',
-                  networkTimeoutSeconds: 5,
-                  expiration: {
-                    maxEntries: 100,
-                    // 60-second cap: stale clinical data (vitals, labs) must not be
-                    // served for more than 1 minute — patient safety requires freshness
-                    maxAgeSeconds: 60,
-                  },
-                },
-              },
-            ],
           },
         }),
       ],
@@ -94,6 +82,23 @@ export default defineConfig(({ mode }) => {
         globals: true,
         environment: 'jsdom',
         setupFiles: ['./__tests__/setup.ts'],
+        coverage: {
+          provider:        'v8',
+          reporter:        ['text', 'json-summary', 'html'],
+          reportsDirectory: './coverage',
+          // Only count real source files — not auto-generated or config files
+          include: ['**/*.{ts,tsx}'],
+          exclude: [
+            '**/*.d.ts',
+            '**/*.config.*',
+            '**/node_modules/**',
+            '**/dist/**',
+            '**/android/**',
+            '**/ios/**',
+            '**/e2e/**',
+            '**/__tests__/setup.ts',
+          ],
+        },
       },
     };
 });

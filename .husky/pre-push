@@ -1,0 +1,55 @@
+#!/usr/bin/env sh
+# .husky/pre-push
+# Runs before every `git push`. Blocks the push if:
+#   1. There are unapplied local schema changes (you edited Supabase tables
+#      in the dashboard but forgot to create a migration file), OR
+#   2. TypeScript has type errors.
+#
+# Setup: pnpm add -D husky && npx husky init
+# Make executable: chmod +x .husky/pre-push
+
+set -e
+
+echo "🔍 Pre-push checks..."
+
+# ── 1. TypeScript gate ───────────────────────────────────────────────────────
+echo "  ▸ TypeScript..."
+pnpm typecheck
+echo "  ✓ No type errors"
+
+# ── 2. Supabase schema diff gate ────────────────────────────────────────────
+# Generates a diff between the local migration history and the linked project.
+# If the diff is non-empty, you have schema changes in the dashboard that are
+# NOT captured in a migration file. Create one before pushing.
+echo "  ▸ Checking for unapplied schema changes..."
+
+if ! command -v supabase &> /dev/null; then
+  echo "  ⚠ supabase CLI not found — skipping schema diff check"
+  echo "  Install: npm install -g @supabase/cli"
+else
+  DIFF=$(supabase db diff 2>&1 || true)
+
+  # supabase db diff outputs SQL if there are differences, empty string if clean
+  if echo "$DIFF" | grep -qE "^(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)"; then
+    echo ""
+    echo "  ❌ PUSH BLOCKED: unapplied database schema changes detected."
+    echo ""
+    echo "  The following schema changes exist in your Supabase project but are"
+    echo "  NOT captured in a migration file:"
+    echo ""
+    echo "$DIFF" | head -40
+    echo ""
+    echo "  Fix: create a migration file, then push:"
+    echo "    supabase migration new <description>"
+    echo "    # paste the diff SQL into the new file"
+    echo "    git add supabase/migrations/ && git commit -m 'feat: add migration'"
+    echo "    git push"
+    echo ""
+    exit 1
+  fi
+
+  echo "  ✓ Schema is in sync with migration history"
+fi
+
+echo ""
+echo "✅ All pre-push checks passed."

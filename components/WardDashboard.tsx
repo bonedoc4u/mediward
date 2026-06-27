@@ -4,6 +4,7 @@ import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart } from 'lucide-react';
+import { NoPatients, NoSearchResults } from './ui/EmptyState';
 import { calcPod } from './HandoverSummary';
 import TodaySchedule from './TodaySchedule';
 import OTDatePicker from './OTDatePicker';
@@ -690,26 +691,11 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       )}
 
       {wardsToDisplay.length === 0 && (
-        <div className="py-16 px-6 flex flex-col items-center justify-center text-slate-500 bg-white rounded-xl border border-slate-200">
+        <div className="bg-white rounded-xl border border-slate-200">
           {hasActiveFilters ? (
-            <>
-              <Search className="w-10 h-10 mb-3 text-slate-300" />
-              <p className="font-semibold text-slate-600">No patients match your filters</p>
-              <p className="text-sm text-slate-500 mt-1">Try a different search term or ward</p>
-              <button onClick={clearFilters} className="mt-4 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-semibold rounded-lg transition-colors">
-                Clear all filters
-              </button>
-            </>
+            <NoSearchResults query={searchTerm || 'current filters'} />
           ) : (
-            <>
-              <BedSingle className="w-12 h-12 mb-3 opacity-20" />
-              <p className="font-semibold text-slate-600">No patients in this view</p>
-              {onAddPatient && (
-                <button onClick={onAddPatient} className="mt-3 flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
-                  <UserPlus className="w-4 h-4" /> Admit first patient
-                </button>
-              )}
-            </>
+            <NoPatients onAdd={onAddPatient} />
           )}
         </div>
       )}

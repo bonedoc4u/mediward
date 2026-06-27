@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { useApp, useConfig } from '../contexts/AppContext';
+import { useApp, useConfig, usePatients } from '../contexts/AppContext';
 import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacFlowData, PacStatus } from '../types';
 import { getStatusColor } from '../utils/calculations';
 import { generateId } from '../utils/sanitize';
@@ -11,10 +11,17 @@ import {
   LogOut, Check
 } from 'lucide-react';
 import PacFlowChart from './PacFlowChart';
+import { RoundModeOfflineBanner } from './RoundModeOfflineBanner';
+import { useSaveRoundNote } from '../hooks/useSaveRoundNote';
+import { RoundConflictModal } from './RoundConflictModal';
+import { useNetworkQuality } from '../hooks/useNetworkQuality';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
+  const { forceReconnect } = usePatients();
   const { icuWardNames, customTodoShortcuts } = useConfig();
+  const { conflict: roundConflict, resolveConflict, dismissConflict } = useSaveRoundNote();
+  const { quality: networkQuality } = useNetworkQuality();
 
   // ─── All active patients (unfiltered) ───
   const allActivePatients = useMemo(
@@ -423,6 +430,18 @@ const RoundMode: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ─── Realtime connection status (Task 6) ─── */}
+      <RoundModeOfflineBanner onRetry={forceReconnect} networkQuality={networkQuality} />
+
+      {/* ─── Round note conflict modal (Task 2) ─── */}
+      {roundConflict && (
+        <RoundConflictModal
+          conflict={roundConflict}
+          onResolve={(choice) => resolveConflict(choice, undefined)}
+          onDismiss={dismissConflict}
+        />
       )}
 
       {/* ─── Header ─── */}

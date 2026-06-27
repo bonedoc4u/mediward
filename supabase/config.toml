@@ -1,0 +1,97 @@
+# supabase/config.toml
+# Local dev + CI config. Production settings are set in the Supabase dashboard.
+# Run `supabase start` to boot local Postgres, Auth, Storage, and Edge Functions.
+
+[api]
+enabled      = true
+port         = 54321
+schemas      = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows     = 1000
+
+[api.tls]
+enabled = false
+
+[db]
+port         = 54322
+shadow_port  = 54320
+major_version = 15
+
+[db.pooler]
+enabled          = false
+port             = 54329
+pool_mode        = "transaction"
+default_pool_size = 20
+
+[realtime]
+enabled = true
+ip_version = "IPv4"
+
+[studio]
+enabled  = true
+port     = 54323
+api_url  = "http://127.0.0.1"
+openai_api_key = "env(OPENAI_API_KEY)"
+
+[inbucket]
+enabled      = true
+port         = 54324
+smtp_port    = 54325
+pop3_port    = 54326
+
+[storage]
+enabled      = true
+file_size_limit = "50MiB"
+
+[storage.image_transformation]
+enabled = true
+
+[auth]
+enabled      = true
+# Local and staging both redirect here; prod sets this in dashboard
+site_url     = "http://localhost:3000"
+additional_redirect_urls = [
+  "https://mediward.app",
+  "https://staging.mediward.app",
+  "http://localhost:3000",
+  "capacitor://localhost",     # Capacitor Android/iOS deep link
+  "http://localhost"
+]
+jwt_expiry              = 28800   # 8 hours — matches session TTL in AuthContext
+enable_signup           = false   # Invite-only: users created by admin only
+enable_anonymous_sign_ins = false
+minimum_password_length = 10
+
+[auth.email]
+enable_signup         = false
+double_confirm_changes = true
+enable_confirmations  = true
+
+[auth.email.smtp]
+host     = "inbucket"
+port     = 2500
+user     = "fake"
+pass     = "fake"
+admin_email = "admin@mediward.app"
+sender_name = "MediWard"
+
+[auth.sms]
+enable_signup         = false
+enable_confirmations  = false
+
+[edge_runtime]
+enabled = true
+policy  = "oneshot"
+
+[analytics]
+enabled  = false
+
+# ─── Staging branch overrides ────────────────────────────────────────────────
+# When using `supabase branches`, the staging branch inherits these settings
+# but the site_url is automatically overridden to the Vercel preview URL.
+# No manual change needed here for staging.
+
+# ─── Branching (Pro plan required) ───────────────────────────────────────────
+# After running `supabase branches create staging --project-ref $PROD_REF`,
+# the branch DB URL is available in the Supabase dashboard → Branches.
+# Link the staging Vercel environment to that branch URL.

@@ -91,6 +91,8 @@ interface PatientContextType {
   resolveConcurrentEdit: (choice: 'local' | 'remote') => void;
   /** Realtime connection status for UI indicators. */
   realtimeStatus: 'connected' | 'reconnecting' | 'disconnected';
+  /** Force an immediate reconnect — useful for the manual Retry button in RoundMode. */
+  forceReconnect: () => void;
   /** True if any operation failed due to JWT expiry. */
   sessionExpired: boolean;
 }
@@ -263,11 +265,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const p = op.payload as { patient_ip_no: string; hospital_id: string | null; date: string; note: string; todos: unknown[] };
             await supabase.from('rounds').upsert(p, { onConflict: 'patient_ip_no,date' });
           } else if (op.type === 'insert_vital') {
-            await supabase.from('patient_vitals').insert(op.payload);
+            await supabase.from('patient_vitals').insert(op.payload as Record<string, unknown>);
           } else if (op.type === 'insert_nursing_note') {
-            await supabase.from('nursing_notes').insert(op.payload);
+            await supabase.from('nursing_notes').insert(op.payload as Record<string, unknown>);
           } else if (op.type === 'record_med_administration') {
-            await supabase.from('medication_administrations').insert(op.payload);
+            await supabase.from('medication_administrations').insert(op.payload as Record<string, unknown>);
           }
           dequeue(op.id);
         } catch {
@@ -370,12 +372,26 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [bc]);
 
   // ─── Supabase Realtime with Exponential-Backoff Reconnection ───
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelRef    = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const connectRef    = useRef<(() => void) | null>(null);
+  const clearTimerRef = useRef<(() => void) | null>(null);
+
+  const forceReconnect = useCallback(() => {
+    // Tear down existing channel + cancel pending retry timer, then reconnect now.
+    clearTimerRef.current?.();
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    connectRef.current?.();
+  }, []);
 
   useEffect(() => {
     let destroyed = false;
     let retryTimer: ReturnType<typeof setTimeout>;
     let retryDelay = 2000;
+
+    clearTimerRef.current = () => clearTimeout(retryTimer);
 
     const connect = () => {
       // Refuse to open an unscoped realtime channel — without a hospital_id
@@ -391,29 +407,40 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           'postgres_changes',
           { event: '*', schema: 'public', table: 'patients', filter: hospitalFilter },
           async (payload) => {
-            // Secondary unit-scoped client-side filter (belt-and-suspenders)
+            // PHI-safe realtime (Task 5):
+            // We only read non-PHI fields (ip_no, unit) from the payload to
+            // decide what to do, then fetch the full row via SELECT which is
+            // RLS-protected. This prevents PHI leakage even if the realtime
+            // channel were misconfigured or Supabase Realtime auth is bypassed.
             const userUnit = user?.unit;
-            if (payload.eventType === 'INSERT') {
-              const newPatient = parsePatientRow(payload.new);
-              if (userUnit && newPatient.unit !== userUnit) return;
-              setPatients(prev => {
-                if (prev.some(p => p.ipNo === newPatient.ipNo)) return prev;
-                const next = enrichPatientData([newPatient, ...prev]);
-                debouncedSaveActiveCache(next, effectiveHospitalId);
-                return next;
-              });
-            } else if (payload.eventType === 'UPDATE') {
-              const ipNo = (payload.new as { ip_no?: string })?.ip_no;
+
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              const ipNo    = (payload.new as { ip_no?: string })?.ip_no;
               const rowUnit = (payload.new as { unit?: string })?.unit;
+              if (!ipNo) return;
+
+              // Client-side unit filter (belt-and-suspenders — DB filter is primary)
               if (userUnit && rowUnit && rowUnit !== userUnit) return;
-              if (ipNo) {
-                const fromPayload = parsePatientRow(payload.new);
+
+              // Fetch full row through RLS — ensures we can only see authorised data
+              const fresh = await fetchPatientById(ipNo, hospitalIdRef.current ?? undefined);
+              if (!fresh) return; // RLS blocked it (wrong hospital or unit)
+
+              if (payload.eventType === 'INSERT') {
+                setPatients(prev => {
+                  if (prev.some(p => p.ipNo === fresh.ipNo)) return prev;
+                  const next = enrichPatientData([fresh, ...prev]);
+                  debouncedSaveActiveCache(next, effectiveHospitalId);
+                  return next;
+                });
+              } else {
                 setPatients(prev => {
                   const next = enrichPatientData(
                     prev.map(p => {
-                      if (p.ipNo !== fromPayload.ipNo) return p;
+                      if (p.ipNo !== fresh.ipNo) return p;
+                      // Merge: keep locally-loaded sub-records (labs, imaging, rounds)
                       return {
-                        ...fromPayload,
+                        ...fresh,
                         labResults:     p.labResults,
                         investigations: p.investigations,
                         dailyRounds:    p.dailyRounds,
@@ -457,6 +484,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       channelRef.current = ch;
     };
 
+    connectRef.current = connect;
     connect();
 
     return () => {
@@ -828,6 +856,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     concurrentEditConflict,
     resolveConcurrentEdit,
     realtimeStatus,
+    forceReconnect,
     sessionExpired,
   }), [
     patients, isLoadingPatients, isStale, cacheTimestamp,
@@ -835,7 +864,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     hasLoadedAll, loadAllPatients, updatePatient, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation, getPatient,
     saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
-    realtimeStatus, sessionExpired,
+    realtimeStatus, forceReconnect, sessionExpired,
   ]);
 
   return <PatientContext.Provider value={value}>{children}</PatientContext.Provider>;
