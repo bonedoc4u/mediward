@@ -35,7 +35,7 @@ export function EmptyState({
           {primaryLabel && onPrimary && (
             <button
               onClick={onPrimary}
-              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors min-h-[44px]"
+              className="px-5 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors min-h-[44px]"
             >
               {primaryLabel}
             </button>

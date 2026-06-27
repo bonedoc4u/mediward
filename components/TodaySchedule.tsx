@@ -67,7 +67,7 @@ function nextEventDate(targetDow: number, from: Date): string {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 const EVENT_PILL: Record<EventType, { label: string; color: string; Icon: React.ComponentType<{className?: string}> }> = {
-  admission:      { label: 'Admission + EOT', color: 'bg-blue-600 text-white',    Icon: BedDouble  },
+  admission:      { label: 'Admission + EOT', color: 'bg-teal-600 text-white',    Icon: BedDouble  },
   major:          { label: 'Major OT',        color: 'bg-red-600 text-white',     Icon: Scissors   },
   minor:          { label: 'Minor OT',        color: 'bg-orange-500 text-white',  Icon: Zap        },
   'weekend-duty': { label: 'Weekend Duty',    color: 'bg-violet-600 text-white',  Icon: ShieldAlert },

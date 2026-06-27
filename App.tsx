@@ -91,13 +91,13 @@ const LockScreen: React.FC<{
             onChange={e => { setPassword(e.target.value); setError(''); }}
             placeholder="Password"
             autoFocus
-            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
           {error && <p className="text-xs text-red-600 text-center">{error}</p>}
           <button
             type="submit"
             disabled={loading || !password}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+            className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
           >
             {loading ? 'Verifying…' : 'Unlock'}
           </button>
@@ -141,7 +141,7 @@ const BASE_NAV_ITEMS_RIGHT: NavItem[] = [
 // ─── Loading Fallback ───
 const ViewLoader = () => (
   <div className="flex items-center justify-center py-20">
-    <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+    <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
   </div>
 );
 
@@ -335,7 +335,7 @@ const App: React.FC = () => {
     }
     if (showStatus) {
       return (
-        <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>}>
+        <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-teal-500" /></div>}>
           <StatusPage onBack={() => { setShowStatus(false); window.location.hash = ''; }} />
         </Suspense>
       );
@@ -517,7 +517,7 @@ const App: React.FC = () => {
         <div style={{ height: 'env(safe-area-inset-top)' }} />
         <div className="px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <Stethoscope className="w-5 h-5 text-blue-400 shrink-0" />
+            <Stethoscope className="w-5 h-5 text-teal-400 shrink-0" />
             <div className="min-w-0">
               <span className="font-bold block leading-none">MediWard</span>
               <span className="text-[10px] text-slate-400 truncate block leading-none mt-0.5">{meta.title}</span>
@@ -542,7 +542,7 @@ const App: React.FC = () => {
         {/* Logo */}
         <div className="p-6 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-2.5 rounded-xl shadow-lg shadow-blue-900/40">
+            <div className="bg-gradient-to-br from-teal-500 to-teal-700 p-2.5 rounded-xl shadow-lg shadow-teal-900/40">
               <Stethoscope className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -562,30 +562,30 @@ const App: React.FC = () => {
 
         {/* Workspace selector — shows chosen department/unit with a "Change" button */}
         {user?.role === 'superadmin' && selectedDepartment && (
-          <div className="mx-4 mb-4 px-3 py-2 bg-blue-900/30 rounded-lg border border-blue-700/30 flex items-center justify-between gap-2">
+          <div className="mx-4 mb-4 px-3 py-2 bg-teal-900/30 rounded-lg border border-teal-700/30 flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">Department</p>
-              <p className="text-xs text-blue-200 capitalize truncate">{selectedDepartment}</p>
+              <p className="text-[10px] text-teal-400 uppercase tracking-wider font-semibold">Department</p>
+              <p className="text-xs text-teal-200 capitalize truncate">{selectedDepartment}</p>
             </div>
             <button
               onClick={() => clearWorkspaceSelection()}
-              className="text-[10px] text-blue-400 hover:text-blue-200 font-semibold shrink-0 px-2 py-1 bg-blue-800/40 hover:bg-blue-700/50 rounded transition-colors"
+              className="text-[10px] text-teal-400 hover:text-teal-200 font-semibold shrink-0 px-2 py-1 bg-teal-800/40 hover:bg-teal-700/50 rounded transition-colors"
             >
               Change
             </button>
           </div>
         )}
         {user?.role === 'admin' && selectedUnit && (
-          <div className="mx-4 mb-4 px-3 py-2 bg-blue-900/30 rounded-lg border border-blue-700/30 flex items-center justify-between gap-2">
+          <div className="mx-4 mb-4 px-3 py-2 bg-teal-900/30 rounded-lg border border-teal-700/30 flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">Unit</p>
-              <p className="text-xs text-blue-200 truncate">
+              <p className="text-[10px] text-teal-400 uppercase tracking-wider font-semibold">Unit</p>
+              <p className="text-xs text-teal-200 truncate">
                 {selectedUnit === 'all' ? 'All Units' : `Unit ${selectedUnit}`}
               </p>
             </div>
             <button
               onClick={() => clearWorkspaceSelection()}
-              className="text-[10px] text-blue-400 hover:text-blue-200 font-semibold shrink-0 px-2 py-1 bg-blue-800/40 hover:bg-blue-700/50 rounded transition-colors"
+              className="text-[10px] text-teal-400 hover:text-teal-200 font-semibold shrink-0 px-2 py-1 bg-teal-800/40 hover:bg-teal-700/50 rounded transition-colors"
             >
               Change
             </button>
@@ -607,14 +607,14 @@ const App: React.FC = () => {
                   onClick={() => { navigateTo(item.id); setIsMobileMenuOpen(false); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
                     currentView === item.id
-                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-900/50'
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                      ? 'bg-teal-600/10 border border-teal-500/20 text-teal-400 border-l-2 border-l-teal-500'
+                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent'
                   }`}
                 >
                   <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
                   <span className="font-medium text-sm">{item.label}</span>
                   {currentView === item.id && (
-                    <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full"></div>
+                    <div className="ml-auto w-1.5 h-1.5 bg-teal-400 rounded-full"></div>
                   )}
                 </button>
               ))}
@@ -701,7 +701,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <Home className="w-4 h-4" />
               <span>/</span>
-              <span className="text-blue-600 font-medium">{meta.title}</span>
+              <span className="text-teal-600 font-medium">{meta.title}</span>
             </div>
           </header>
 
@@ -753,11 +753,11 @@ const App: React.FC = () => {
               key={tab.id}
               onClick={() => { navigateTo(tab.id); setIsMobileMenuOpen(false); }}
               className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
-                currentView === tab.id ? 'text-blue-600' : 'text-slate-400 active:text-slate-600'
+                currentView === tab.id ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
               }`}
             >
               {currentView === tab.id && (
-                <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-blue-600 rounded-full" />
+                <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-teal-600 rounded-full" />
               )}
               <tab.icon className="w-5 h-5" />
               <span className="text-[10px] font-semibold leading-none">{tab.label}</span>
@@ -766,11 +766,11 @@ const App: React.FC = () => {
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
-              isMobileMenuOpen ? 'text-blue-600' : 'text-slate-400 active:text-slate-600'
+              isMobileMenuOpen ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
             }`}
           >
             {isMobileMenuOpen && (
-              <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-blue-600 rounded-full" />
+              <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-teal-600 rounded-full" />
             )}
             <Menu className="w-5 h-5" />
             <span className="text-[10px] font-semibold leading-none">More</span>

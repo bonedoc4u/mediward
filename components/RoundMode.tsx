@@ -309,7 +309,7 @@ const RoundMode: React.FC = () => {
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4">
             <ClipboardCheck className="w-16 h-16 opacity-30" />
             <p className="text-lg font-medium">No active patients to round on</p>
-            <button onClick={() => navigateTo('dashboard')} className="text-blue-600 hover:underline text-sm">
+            <button onClick={() => navigateTo('dashboard')} className="text-teal-600 hover:underline text-sm">
               Back to Dashboard
             </button>
           </div>
@@ -362,7 +362,7 @@ const RoundMode: React.FC = () => {
       <div className="flex flex-col items-center justify-center py-20 text-slate-500 gap-4">
         <ClipboardCheck className="w-16 h-16 opacity-30" />
         <p className="text-lg font-medium">No active patients in this ward</p>
-        <button onClick={() => setSelectedWard(null)} className="text-blue-600 hover:underline text-sm">
+        <button onClick={() => setSelectedWard(null)} className="text-teal-600 hover:underline text-sm">
           ← Change ward
         </button>
       </div>
@@ -424,7 +424,7 @@ const RoundMode: React.FC = () => {
             </p>
             <button
               onClick={() => { logout(); }}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded-xl transition-colors shadow-sm"
+              className="w-full py-3 bg-teal-600 hover:bg-teal-700 active:bg-blue-800 text-white font-bold rounded-xl transition-colors shadow-sm"
             >
               Log In Again
             </button>
@@ -453,7 +453,7 @@ const RoundMode: React.FC = () => {
             {' · '}
             <button
               onClick={() => { setSelectedWard(null); setIndex(0); setSavedSet(new Set()); }}
-              className="text-blue-600 hover:underline"
+              className="text-teal-600 hover:underline"
             >
               {selectedWard === '__all__' ? 'All Wards' : selectedWard}
             </button>
@@ -576,7 +576,7 @@ const RoundMode: React.FC = () => {
                 onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' as ManagementPlan })}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                   (patient.management ?? 'surgical_fixation') === 'surgical_fixation'
-                    ? 'bg-blue-600 text-white border-blue-700'
+                    ? 'bg-teal-600 text-white border-blue-700'
                     : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
                 }`}
               >
@@ -722,7 +722,7 @@ const RoundMode: React.FC = () => {
                 ref={todoInputRef}
                 type="text"
                 placeholder="New order / task…"
-                className="flex-1 text-sm p-2.5 min-h-[44px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                className="flex-1 text-sm p-2.5 min-h-[44px] border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white"
                 value={newTodoText}
                 onChange={e => setNewTodoText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTodo(); } }}
@@ -782,7 +782,7 @@ const RoundMode: React.FC = () => {
           </button>
           <button
             onClick={() => handleSave(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-xs sm:text-sm shadow-sm"
+            className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition-colors text-xs sm:text-sm shadow-sm"
           >
             {index < activePatients.length - 1 ? (
               <><Save className="w-3.5 h-3.5 shrink-0" /> Save & Next</>

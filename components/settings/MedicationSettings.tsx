@@ -38,7 +38,7 @@ const MedRow: React.FC<{
       </td>
       <td className="px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-1">
-          <button onClick={() => { setDraft(med); setEditing(true); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600"><Pencil className="w-3.5 h-3.5" /></button>
+          <button onClick={() => { setDraft(med); setEditing(true); }} className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-teal-600"><Pencil className="w-3.5 h-3.5" /></button>
           <button onClick={() => onDelete(med.id)} className="p-1.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       </td>

@@ -25,7 +25,7 @@ function getOTType(unit: string | undefined, dow: number): OTType {
 const OT_STYLES: Record<Exclude<OTType, null>, { label: string; cell: string; badge: string }> = {
   major: { label: 'MAJ', cell: 'bg-red-50 hover:bg-red-100 border-red-200',    badge: 'bg-red-600 text-white'     },
   minor: { label: 'MIN', cell: 'bg-orange-50 hover:bg-orange-100 border-orange-200', badge: 'bg-orange-500 text-white' },
-  eot:   { label: 'EOT', cell: 'bg-blue-50 hover:bg-blue-100 border-blue-200', badge: 'bg-blue-600 text-white'    },
+  eot:   { label: 'EOT', cell: 'bg-blue-50 hover:bg-blue-100 border-blue-200', badge: 'bg-teal-600 text-white'    },
 };
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];

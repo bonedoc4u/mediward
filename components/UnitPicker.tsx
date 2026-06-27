@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronRight, LayoutGrid } from 'lucide-react';
 
 const UNIT_GRADIENTS = [
-  'from-blue-500 to-blue-700',
+  'from-teal-500 to-teal-700',
   'from-emerald-500 to-emerald-700',
   'from-purple-500 to-purple-700',
   'from-orange-500 to-orange-700',
@@ -28,7 +28,7 @@ const UnitPicker: React.FC<Props> = ({
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 overflow-y-auto">
       {/* Logo */}
       <div className="mb-8 flex flex-col items-center gap-3">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 rounded-2xl shadow-xl shadow-blue-900/40">
+        <div className="bg-gradient-to-br from-teal-500 to-teal-700 p-4 rounded-2xl shadow-xl shadow-teal-900/40">
           <LayoutGrid className="w-10 h-10 text-white" />
         </div>
         <div className="text-center">

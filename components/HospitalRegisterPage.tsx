@@ -183,7 +183,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </p>
           <button
             onClick={onBack}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors"
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg transition-colors"
           >
             Go to Login
           </button>
@@ -199,12 +199,12 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
         {/* Left Side — Brand */}
         <div className="md:w-2/5 bg-slate-900 p-8 text-white flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute top-0 left-0 w-64 h-64 bg-teal-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2" />
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 translate-y-1/2" />
 
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-8">
-              <div className="bg-blue-600 p-2 rounded-lg">
+              <div className="bg-teal-600 p-2 rounded-lg">
                 <Stethoscope className="w-6 h-6" />
               </div>
               <h1 className="font-bold text-2xl tracking-tight">MediWard</h1>
@@ -270,7 +270,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       placeholder="XXXX-XXXX-XXXX"
                       value={inviteCode}
                       onChange={e => setInviteCode(e.target.value.toUpperCase())}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm font-mono tracking-widest"
+                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm font-mono tracking-widest"
                     />
                   </div>
                   <p className="text-[11px] text-slate-400">Contact the MediWard admin to receive an invite code for your college and department.</p>
@@ -288,7 +288,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       placeholder="Type or select your college…"
                       value={hospitalName}
                       onChange={e => setHospitalName(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                      className="w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
                     />
                     <datalist id="kerala-colleges">
                       {KERALA_COLLEGES.map(c => <option key={c} value={c} />)}
@@ -308,8 +308,8 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         onClick={() => applyPreset(p)}
                         className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                           selectedPreset === p.label
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                            ? 'bg-teal-600 text-white border-blue-600'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-teal-600'
                         }`}
                       >
                         {p.label}
@@ -328,7 +328,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     placeholder="e.g. DEPARTMENT OF MEDICINE"
                     value={department}
                     onChange={e => setDepartment(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
                   />
                 </div>
 
@@ -340,7 +340,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     placeholder="e.g. Unit 1, Unit 2, Unit 3"
                     value={units}
                     onChange={e => setUnits(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
                   />
                   <p className="text-[11px] text-slate-400">Comma-separated. Each unit becomes a separate team view.</p>
                 </div>
@@ -363,7 +363,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Next <ArrowRight className="w-4 h-4" /></>}
                 </button>
@@ -417,7 +417,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       placeholder="Dr. Your Name"
                       value={adminName}
                       onChange={e => setAdminName(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
                     />
                   </div>
                 </div>
@@ -434,7 +434,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       placeholder="admin@yourhospital.com"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                      className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
                     />
                   </div>
                 </div>
@@ -452,7 +452,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       placeholder="Minimum 8 characters"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                      className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" tabIndex={-1}>
@@ -474,7 +474,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       placeholder="Re-enter password"
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
-                      className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                      className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
                     />
                     <button type="button" onClick={() => setShowConfirm(!showConfirm)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" tabIndex={-1}>
@@ -486,7 +486,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-2"
                 >
                   {isLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />

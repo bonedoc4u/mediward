@@ -46,7 +46,7 @@ const LabRow: React.FC<{
         <td className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-1">
             <button onClick={() => { setDraft(lab); setEditing(true); }}
-              className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600 transition-colors">
+              className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-teal-600 transition-colors">
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button onClick={() => onDelete(lab.id)}
@@ -63,25 +63,25 @@ const LabRow: React.FC<{
     <tr className="border-b bg-blue-50/40">
       <td className="px-4 py-2">
         <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
-          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-teal-400" />
       </td>
       <td className="px-4 py-2">
         <input value={draft.unit} onChange={e => setDraft(d => ({ ...d, unit: e.target.value }))}
-          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-teal-400" />
       </td>
       <td className="px-4 py-2">
         <input type="number" value={draft.alertHigh ?? ''}
           onChange={e => setDraft(d => ({ ...d, alertHigh: e.target.value ? parseFloat(e.target.value) : null }))}
-          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-teal-400" />
       </td>
       <td className="px-4 py-2">
         <input value={draft.category} onChange={e => setDraft(d => ({ ...d, category: e.target.value }))}
-          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-teal-400" />
       </td>
       <td className="px-4 py-2">
         <input type="number" value={draft.sortOrder}
           onChange={e => setDraft(d => ({ ...d, sortOrder: parseInt(e.target.value) || 0 }))}
-          className="w-16 p-1 border border-blue-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-16 p-1 border border-blue-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-teal-400" />
       </td>
       <td className="px-4 py-2 text-center">
         <input type="checkbox" checked={draft.active} onChange={e => setDraft(d => ({ ...d, active: e.target.checked }))}
@@ -91,7 +91,7 @@ const LabRow: React.FC<{
       <td className="px-4 py-2 text-right">
         <div className="flex items-center justify-end gap-1">
           <button onClick={handleSave} disabled={busy}
-            className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors disabled:opacity-50">
+            className="p-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded transition-colors disabled:opacity-50">
             <Save className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => setEditing(false)}
@@ -165,16 +165,16 @@ const LabSettings: React.FC = () => {
       <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 flex flex-wrap items-center gap-2">
         <input value={newLabName} onChange={e => setNewLabName(e.target.value)}
           placeholder="Test name, e.g. Haemoglobin"
-          className="flex-1 min-w-36 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          className="flex-1 min-w-36 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
         <input value={newLabUnit} onChange={e => setNewLabUnit(e.target.value)}
           placeholder="Unit, e.g. g/dL"
-          className="w-28 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          className="w-28 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
         <input type="number" value={newLabAlertHigh} onChange={e => setNewLabAlertHigh(e.target.value)}
           placeholder="Alert > (optional)"
-          className="w-32 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          className="w-32 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
         <input value={newLabCategory} onChange={e => setNewLabCategory(e.target.value)}
           placeholder="Category, e.g. Haematology"
-          className="w-40 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          className="w-40 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
           onKeyDown={e => { if (e.key === 'Enter') handleAddLab(); }}
         />
         <button onClick={handleAddLab} disabled={addingLab || !newLabName.trim() || !newLabCategory.trim()}
@@ -184,7 +184,7 @@ const LabSettings: React.FC = () => {
       </div>
 
       <div className="px-4 py-2.5 bg-blue-50 border-t border-blue-100 flex items-start gap-2 text-xs text-blue-800">
-        <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-600" />
+        <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0 text-teal-600" />
         New lab types appear immediately in Lab Trends and Patient Detail. The alert threshold highlights values in red when exceeded.
       </div>
     </div>

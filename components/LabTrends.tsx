@@ -139,7 +139,7 @@ const CategoryPanel: React.FC<{
   const allGrouped = getGroupedData(labTypes);
   const grouped = showAll ? allGrouped : allGrouped.slice(0, ROW_LIMIT);
   const chartLines = labTypes.map((t, i) => ({ key: t.name, color: LINE_COLORS[i % LINE_COLORS.length] }));
-  const addButtonColor = getCategoryStyle(category).headerClass.includes('blue') ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700';
+  const addButtonColor = getCategoryStyle(category).headerClass.includes('blue') ? 'bg-teal-600 hover:bg-teal-700' : 'bg-orange-600 hover:bg-orange-700';
 
   const renderValueCell = (value: number | undefined, labType: LabTypeConfig) => {
     if (value === undefined) return <span className="text-slate-300">—</span>;
@@ -217,7 +217,7 @@ const CategoryPanel: React.FC<{
       {allGrouped.length > ROW_LIMIT && (
         <button
           onClick={() => setShowAll(s => !s)}
-          className="w-full py-2 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-t border-slate-100 transition-colors"
+          className="w-full py-2 text-xs text-teal-600 hover:text-blue-800 hover:bg-blue-50 border-t border-slate-100 transition-colors"
         >
           {showAll ? `Show recent ${ROW_LIMIT}` : `Show all ${allGrouped.length} dates`}
         </button>

@@ -75,7 +75,7 @@ const OfflineBanner: React.FC = () => {
     if (!isOld) return null;
 
     return (
-      <div role="status" aria-live="polite" className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-1.5 px-4 text-xs font-medium shadow-md bg-blue-600 text-white transition-all duration-300">
+      <div role="status" aria-live="polite" className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center gap-2 py-1.5 px-4 text-xs font-medium shadow-md bg-teal-600 text-white transition-all duration-300">
         <DatabaseZap className="w-3.5 h-3.5 animate-pulse" />
         Showing cached data from {age} · Syncing in background…
       </div>

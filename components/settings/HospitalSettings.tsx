@@ -205,13 +205,13 @@ const HospitalSettings: React.FC = () => {
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Hospital Name</label>
               <input value={localHospitalName} onChange={e => setLocalHospitalName(e.target.value)}
-                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                 placeholder="e.g. GOVT MEDICAL COLLEGE, KOZHIKODE" />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Department</label>
               <input value={localDepartment} onChange={e => setLocalDepartment(e.target.value)}
-                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                 placeholder="e.g. DEPARTMENT OF ORTHOPAEDICS" />
             </div>
           </div>
@@ -220,14 +220,14 @@ const HospitalSettings: React.FC = () => {
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Pre-op Module Name</label>
               <input value={localPreOpName} onChange={e => setLocalPreOpName(e.target.value)}
-                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                 placeholder="e.g. PAC Status / Pre-admission" />
               <p className="text-xs text-slate-400 mt-1">Shown in navigation and tabs</p>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Procedure List Name</label>
               <input value={localProcedureName} onChange={e => setLocalProcedureName(e.target.value)}
-                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                 placeholder="e.g. OT List / Procedure List" />
               <p className="text-xs text-slate-400 mt-1">Shown in navigation and tabs</p>
             </div>
@@ -248,7 +248,7 @@ const HospitalSettings: React.FC = () => {
               <input value={newUnit} onChange={e => setNewUnit(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleAddUnit(); }}
                 placeholder="Add unit, e.g. OR6"
-                className="flex-1 min-w-32 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                className="flex-1 min-w-32 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
               <button onClick={handleAddUnit} disabled={!newUnit.trim()}
                 className="flex items-center gap-1 px-3 py-2 min-h-[38px] bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg disabled:opacity-50 transition-colors">
                 <Plus className="w-3.5 h-3.5" /> Add

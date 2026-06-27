@@ -89,7 +89,7 @@ const AuditLogViewer: React.FC = () => {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Clock className="w-3.5 h-3.5 text-blue-500" />
-                <p className="text-xs text-blue-600 font-semibold uppercase">Last 24 h</p>
+                <p className="text-xs text-teal-600 font-semibold uppercase">Last 24 h</p>
               </div>
               <p className="text-3xl font-bold text-blue-700">{stats.todayCount}</p>
               <p className="text-xs text-blue-400 mt-0.5">events</p>

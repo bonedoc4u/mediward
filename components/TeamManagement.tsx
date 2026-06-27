@@ -183,7 +183,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-white rounded-lg border border-blue-100 p-3">
             <p className="font-bold text-blue-700 mb-1">Department</p>
-            <p className="text-blue-600 leading-relaxed">
+            <p className="text-teal-600 leading-relaxed">
               Set once during registration. Applies to the <strong>whole workspace</strong> — every user belongs
               to the same department. Change it in Admin Settings → Hospital tab.
             </p>
@@ -232,7 +232,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
       {showAddForm && (
         <div className="bg-white border border-blue-200 rounded-xl p-6 shadow-sm">
           <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-blue-600" /> New User
+            <UserPlus className="w-4 h-4 text-teal-600" /> New User
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -242,7 +242,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                 value={form.name}
                 onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
                 placeholder="Dr. Jane Smith"
-                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
               />
             </div>
             <div>
@@ -252,7 +252,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                 value={form.email}
                 onChange={e => setForm(v => ({ ...v, email: e.target.value }))}
                 placeholder="jane.smith@hospital.com"
-                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
               />
             </div>
             <div>
@@ -263,7 +263,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                   value={form.password}
                   onChange={e => setForm(v => ({ ...v, password: e.target.value }))}
                   placeholder="Min. 8 characters"
-                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm pr-10 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm pr-10 focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
                 />
                 <button type="button" onClick={() => setShowPw(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -276,7 +276,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
               <select
                 value={form.role}
                 onChange={e => setForm(v => ({ ...v, role: e.target.value as UserRole }))}
-                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
               >
                 {ALL_ROLES.map(r => (
                   <option key={r} value={r}>{ROLE_LABELS[r]} — {ROLE_ACCESS_DESC[r]}</option>
@@ -288,7 +288,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
               <select
                 value={form.unit}
                 onChange={e => setForm(v => ({ ...v, unit: e.target.value }))}
-                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
               >
                 <option value="">— No unit (Admin / ICU — sees all) —</option>
                 {unitOptions.map(u => (
@@ -309,7 +309,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
               Cancel
             </button>
             <button onClick={handleAdd} disabled={saving}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+              className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? 'Creating…' : 'Create User'}
             </button>
@@ -400,7 +400,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                       ) : editingId === u.id ? (
                         <div className="flex items-center gap-2 justify-end">
                           <button onClick={() => handleSaveRole(u.id)}
-                            className="flex items-center gap-1 text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg hover:bg-blue-700">
+                            className="flex items-center gap-1 text-xs bg-teal-600 text-white px-2.5 py-1 rounded-lg hover:bg-teal-700">
                             <Save className="w-3 h-3" /> Save
                           </button>
                           <button onClick={() => setEditingId(null)}
@@ -412,7 +412,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                         <div className="flex items-center gap-2 justify-end">
                           <button
                             onClick={() => { setEditingId(u.id); setEditRole(u.role); setEditUnit(u.unit ?? ''); }}
-                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Change role / unit"
                           >
                             <Edit2 className="w-3.5 h-3.5" />

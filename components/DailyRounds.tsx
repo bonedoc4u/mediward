@@ -60,7 +60,7 @@ const PatientRoundCard = memo(({
         <div className="flex items-center gap-2 flex-wrap">
           {patient.pod !== undefined && (
             <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">
-              <Calendar className="w-4 h-4 text-blue-600" />
+              <Calendar className="w-4 h-4 text-teal-600" />
               <span className="text-xs font-black text-blue-700">POD {patient.pod}</span>
             </div>
           )}
@@ -132,7 +132,7 @@ const PatientRoundCard = memo(({
             </h4>
             <button
               onClick={onGeneratePdf}
-              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-teal-600 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors"
             >
               <Share2 className="w-3 h-3" /> Share
             </button>
@@ -149,7 +149,7 @@ const PatientRoundCard = memo(({
                     checked={todo.isDone}
                     onChange={() => isToday && onToggleTodo(todo.id)}
                     disabled={!isToday}
-                    className="w-3.5 h-3.5 text-blue-600 rounded cursor-pointer disabled:opacity-50"
+                    className="w-3.5 h-3.5 text-teal-600 rounded cursor-pointer disabled:opacity-50"
                   />
                   <span className={`text-sm ${todo.isDone ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
                     {todo.task}
@@ -175,7 +175,7 @@ const PatientRoundCard = memo(({
               <input
                 type="text"
                 placeholder="Add task…"
-                className="flex-1 text-xs p-2 border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                className="flex-1 text-xs p-2 border border-slate-300 rounded focus:ring-1 focus:ring-teal-500 outline-none bg-white"
                 value={todoInput}
                 onChange={e => onTodoInputChange(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && onAddTodo()}
@@ -366,7 +366,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
             value={selectedDate}
             max={todayStr}
             onChange={e => { if (e.target.value <= todayStr) setSelectedDate(e.target.value); }}
-            className="bg-slate-50 border border-slate-300 text-sm rounded-lg px-3 py-2 font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+            className="bg-slate-50 border border-slate-300 text-sm rounded-lg px-3 py-2 font-bold focus:ring-2 focus:ring-teal-500 outline-none"
           />
           <button onClick={() => {
             if (isToday) return;
@@ -376,7 +376,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
             <ChevronRight className="w-5 h-5" />
           </button>
           {isToday
-            ? <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">TODAY</span>
+            ? <span className="text-xs font-bold text-teal-600 bg-blue-50 px-2 py-1 rounded">TODAY</span>
             : <span title="Read-only for past dates"><Lock className="w-4 h-4 text-slate-400" /></span>}
         </div>
 

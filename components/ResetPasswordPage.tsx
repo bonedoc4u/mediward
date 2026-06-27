@@ -50,7 +50,7 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
         {/* Header */}
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="bg-blue-600 p-3 rounded-xl">
+            <div className="bg-teal-600 p-3 rounded-xl">
               <Stethoscope className="w-7 h-7 text-white" />
             </div>
           </div>
@@ -77,7 +77,7 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
-                  className="w-full pl-9 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full pl-9 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                   autoFocus
                   autoComplete="new-password"
                 />
@@ -99,7 +99,7 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
                   placeholder="Repeat password"
-                  className="w-full pl-9 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full pl-9 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                   autoComplete="new-password"
                 />
                 <button type="button" onClick={() => setShowConfirm(v => !v)}
@@ -118,7 +118,7 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
             <button
               type="submit"
               disabled={loading || !password || !confirm}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
               {loading ? 'Updating…' : 'Update Password'}

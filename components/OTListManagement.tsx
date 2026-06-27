@@ -674,7 +674,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
             value={surgeon}
             onChange={e => setSurgeon(e.target.value)}
             placeholder="e.g. DR. JACOB MATHEW"
-            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
           />
         </div>
         <div>
@@ -684,7 +684,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
             value={surgeonUnit}
             onChange={e => setSurgeonUnit(e.target.value)}
             placeholder="e.g. OR 1"
-            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
           />
         </div>
         <div>
@@ -694,7 +694,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
             value={otTime}
             onChange={e => setOtTime(e.target.value)}
             placeholder="e.g. 8.00AM"
-            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
           />
         </div>
       </div>
@@ -709,7 +709,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
               activeTab === tab
                 ? tab === 'EOT'
                   ? 'bg-white text-red-600 shadow-sm'
-                  : 'bg-white text-blue-600 shadow-sm'
+                  : 'bg-white text-teal-600 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
             }`}
           >
@@ -722,7 +722,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       <div className="flex flex-wrap gap-3">
         <button
           onClick={() => setIsImportModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
         >
           <UserPlus className="w-4 h-4" />
           Add from Pending
@@ -973,7 +973,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
                         placeholder="Search by Name or IP Number..." 
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                 </div>
             </div>
@@ -994,7 +994,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
                       </div>
                       <button 
                         onClick={() => handleImportPatient(patient)}
-                        className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+                        className="p-2 bg-blue-100 text-teal-600 rounded-lg hover:bg-blue-200"
                       >
                         <Plus className="w-4 h-4" />
                       </button>

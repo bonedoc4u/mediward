@@ -679,7 +679,7 @@ const VitalsWidget: React.FC<Props> = ({ vitals, onAdd, patientIpNo }) => {
       {viewMode === 'table' && vitals.length > 3 && (
         <button
           onClick={() => setShowAll(v => !v)}
-          className="w-full py-2 text-xs text-blue-600 hover:bg-slate-50 flex items-center justify-center gap-1 border-t border-slate-100 transition-colors"
+          className="w-full py-2 text-xs text-teal-600 hover:bg-slate-50 flex items-center justify-center gap-1 border-t border-slate-100 transition-colors"
         >
           {showAll ? <><ChevronUp className="w-3.5 h-3.5" />Show less</> : <><ChevronDown className="w-3.5 h-3.5" />Show {vitals.length - 3} more</>}
         </button>

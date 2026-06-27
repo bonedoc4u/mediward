@@ -161,7 +161,7 @@ const LegalPage: React.FC<Props> = ({ type, onBack }) => {
           </p>
           <button 
             onClick={onBack}
-            className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+            className="text-sm font-semibold text-teal-600 hover:text-blue-800 transition-colors"
           >
             Return to application
           </button>

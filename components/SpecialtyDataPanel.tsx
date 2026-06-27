@@ -89,7 +89,7 @@ const FieldView: React.FC<FieldProps> = ({ field, value, editing, onChange }) =>
   }
 
   // Edit mode
-  const baseInput = 'w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 bg-white';
+  const baseInput = 'w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-teal-400 bg-white';
 
   if (field.type === 'boolean') {
     return (
@@ -267,7 +267,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, data, canEdit, onSave }) =
         onClick={() => { if (!editing) setOpen(o => !o); }}
       >
         <div className="bg-blue-50 p-1.5 rounded-lg shrink-0">
-          <Icon className="w-4 h-4 text-blue-600" />
+          <Icon className="w-4 h-4 text-teal-600" />
         </div>
         <span className="font-semibold text-slate-800 text-sm flex-1">{group.label}</span>
 
@@ -280,7 +280,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, data, canEdit, onSave }) =
         {canEdit && !editing && (
           <button
             onClick={e => { e.stopPropagation(); startEdit(); }}
-            className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-blue-600 transition-colors"
+            className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-teal-600 transition-colors"
             title="Edit"
           >
             <Edit2 className="w-3.5 h-3.5" />
@@ -312,7 +312,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, data, canEdit, onSave }) =
               <div className="flex gap-2 pt-2 border-t border-slate-100">
                 <button
                   onClick={handleSave}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   <Save className="w-3.5 h-3.5" /> Save
                 </button>

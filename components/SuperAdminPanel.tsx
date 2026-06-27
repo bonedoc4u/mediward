@@ -199,7 +199,7 @@ const SuperAdminPanel: React.FC<{
       {/* ── Header ── */}
       <header className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-lg">
+          <div className="bg-teal-600 p-2 rounded-lg">
             <Stethoscope className="w-5 h-5" />
           </div>
           <div>
@@ -219,7 +219,7 @@ const SuperAdminPanel: React.FC<{
           {onSwitchToApp && (
             <button
               onClick={onSwitchToApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-blue-500 rounded-lg text-sm transition-colors"
             >
               <LayoutDashboard className="w-4 h-4" /> Clinical App
             </button>
@@ -238,7 +238,7 @@ const SuperAdminPanel: React.FC<{
         {/* ── Stats ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Hospitals', value: hospitals.length,  icon: Building2,   cls: 'text-blue-600  bg-blue-50'   },
+            { label: 'Total Hospitals', value: hospitals.length,  icon: Building2,   cls: 'text-teal-600  bg-blue-50'   },
             { label: 'Pending Approval', value: pending,          icon: Clock,        cls: 'text-amber-600 bg-amber-50'  },
             { label: 'Active',           value: active,           icon: CheckCircle,  cls: 'text-green-600 bg-green-50'  },
             { label: 'Open Invites',     value: pendingInvites,   icon: KeyRound,     cls: 'text-purple-600 bg-purple-50'},

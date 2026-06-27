@@ -129,7 +129,7 @@ const Icd10Picker: React.FC<{
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder={placeholder ?? 'ICD-10 code or search…'}
-        className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-teal-400"
       />
       {open && matches.length > 0 && (
         <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -203,7 +203,7 @@ const MultiDiagnosisField: React.FC<{
         <button
           type="button"
           onClick={addEntry}
-          className="flex items-center gap-1 text-[10px] normal-case font-semibold text-blue-600 hover:text-blue-800 px-2 py-0.5 rounded-md hover:bg-blue-50 transition-colors"
+          className="flex items-center gap-1 text-[10px] normal-case font-semibold text-teal-600 hover:text-blue-800 px-2 py-0.5 rounded-md hover:bg-blue-50 transition-colors"
         >
           <Plus className="w-3 h-3" /> Add Diagnosis
         </button>
@@ -224,7 +224,7 @@ const MultiDiagnosisField: React.FC<{
                 value={entry.text}
                 onChange={e => updateEntry(idx, { text: e.target.value })}
                 placeholder="Diagnosis description…"
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
               />
 
               {/* ICD-10 picker */}
@@ -262,7 +262,7 @@ const MultiDiagnosisField: React.FC<{
           value={icd10Secondary}
           onChange={e => onChange({ finalDiagnosis, icd10Code, icd10Secondary: e.target.value })}
           placeholder="e.g. I10 — Hypertension, E11.9 — Type 2 DM"
-          className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
+          className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
         />
       </div>
     </div>
@@ -303,7 +303,7 @@ const DocField = ({
             e.target.style.height = e.target.scrollHeight + 'px';
             onChange?.(e.target.value);
           }}
-          className="w-full text-sm text-slate-800 leading-relaxed resize-none overflow-hidden border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 placeholder-slate-300"
+          className="w-full text-sm text-slate-800 leading-relaxed resize-none overflow-hidden border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 placeholder-slate-300"
           placeholder={`Enter ${label.toLowerCase()}...`}
         />
       )}
@@ -436,7 +436,7 @@ const MedicationPicker: React.FC<{
 
       {/* Search box */}
       <div className="relative">
-        <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus-within:ring-1 focus-within:ring-blue-400 focus-within:border-blue-400">
+        <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus-within:ring-1 focus-within:ring-teal-400 focus-within:border-blue-400">
           <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <input
             type="text"
@@ -449,7 +449,7 @@ const MedicationPicker: React.FC<{
           />
           <button type="button" onClick={() => { setShowDrop(false); setSearch(''); setAddForm({ name: search.trim(), dose: '', freq: 'OD', duration: '5 days' }); }}
             disabled={!search.trim()}
-            className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-30">
+            className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-teal-600 hover:text-blue-800 disabled:opacity-30">
             <Plus className="w-3 h-3" /> Custom
           </button>
         </div>
@@ -807,7 +807,7 @@ const DischargeForm: React.FC<{
       <div className="no-print bg-white rounded-lg shadow-sm border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-teal-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> All Discharged Patients
         </button>
@@ -851,7 +851,7 @@ const DischargeForm: React.FC<{
           </button>
           <button
             onClick={handleExportPdf}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors"
           >
             <FileDown className="w-4 h-4" /> Export PDF
           </button>
@@ -860,7 +860,7 @@ const DischargeForm: React.FC<{
 
       {/* Document mode tabs */}
       <div className="no-print flex gap-1 p-1 bg-slate-100 rounded-xl">
-        {([['discharge','Discharge Summary','bg-blue-600'],['dama','DAMA','bg-amber-500'],['death','Death Summary','bg-slate-700']] as [typeof docMode, string, string][]).map(([mode, label, activeColor]) => (
+        {([['discharge','Discharge Summary','bg-teal-600'],['dama','DAMA','bg-amber-500'],['death','Death Summary','bg-slate-700']] as [typeof docMode, string, string][]).map(([mode, label, activeColor]) => (
           <button
             key={mode}
             onClick={() => setDocMode(mode)}
@@ -930,7 +930,7 @@ const DischargeForm: React.FC<{
                 value={summary.attendingDoctor}
                 onChange={e => update('attendingDoctor', e.target.value)}
                 placeholder="Dr. ..."
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
               />
             </div>
             <div>
@@ -940,7 +940,7 @@ const DischargeForm: React.FC<{
                 value={summary.residentDoctor}
                 onChange={e => update('residentDoctor', e.target.value)}
                 placeholder="Dr. ..."
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
               />
             </div>
           </div>
@@ -1006,7 +1006,7 @@ const DischargeForm: React.FC<{
               type="date"
               value={summary.followUpDate}
               onChange={e => update('followUpDate', e.target.value)}
-              className="text-sm border-0 border-b border-dashed border-slate-300 focus:border-blue-400 focus:outline-none bg-transparent py-1 text-slate-800"
+              className="text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
             />
           </div>
 
@@ -1062,7 +1062,7 @@ const DischargedList: React.FC<{
             placeholder="Search by name, IP No, diagnosis..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
           />
         </div>
       </div>
@@ -1113,7 +1113,7 @@ const DischargedList: React.FC<{
                     </button>
                     <button
                       onClick={() => onSelect(patient.ipNo)}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] text-xs font-semibold bg-slate-800 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] text-xs font-semibold bg-slate-800 hover:bg-teal-700 text-white rounded-lg transition-colors"
                     >
                       <FileText className="w-3.5 h-3.5 shrink-0" /> {hasSummary ? 'Edit Summary' : 'Create Summary'}
                     </button>
@@ -1180,7 +1180,7 @@ const DischargedList: React.FC<{
                             </button>
                             <button
                               onClick={() => onSelect(patient.ipNo)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-teal-700 text-white rounded-lg transition-colors"
                             >
                               <FileText className="w-3.5 h-3.5" /> {hasSummary ? 'Edit Summary' : 'Create Summary'}
                             </button>

@@ -46,10 +46,10 @@ const PacManagement: React.FC<Props> = ({ patients, onUpdatePatient }) => {
   return (
     <div className="space-y-6">
       <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex items-start gap-3">
-        <HeartPulse className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+        <HeartPulse className="w-5 h-5 text-teal-600 mt-0.5 shrink-0" />
         <div>
           <h3 className="text-sm font-bold text-blue-800">Anaesthesia Clearance Dashboard</h3>
-          <p className="text-xs text-blue-600 mt-0.5">
+          <p className="text-xs text-teal-600 mt-0.5">
             Click "Anaesthesia Seen" to activate the flowchart, then mark each clearance branch as done.
             All branches cleared → status auto-updates to PAC Fit.
             Add consultation branches (e.g. Cardiology, Nephrology) with the + button.

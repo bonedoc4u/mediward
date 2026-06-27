@@ -522,7 +522,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         <div className="sticky top-0 z-10 bg-slate-50 rounded-t-lg border-b border-slate-200">
           <div className="p-4 flex justify-between items-center">
             <div className="flex items-center gap-2">
-              {initialData ? <Pencil className="w-5 h-5 text-blue-600" /> : <UserPlus className="w-5 h-5 text-blue-600" />}
+              {initialData ? <Pencil className="w-5 h-5 text-teal-600" /> : <UserPlus className="w-5 h-5 text-teal-600" />}
               <h3 className="font-bold text-slate-800">{initialData ? 'Edit Patient Details' : 'Admit New Patient'}</h3>
             </div>
             <div className="flex items-center gap-2">
@@ -557,7 +557,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 <div
                   key={s}
                   className={`flex-1 h-1.5 rounded-full transition-colors duration-200 ${
-                    s < step ? 'bg-blue-600' : s === step ? 'bg-blue-400' : 'bg-slate-200'
+                    s < step ? 'bg-teal-600' : s === step ? 'bg-blue-400' : 'bg-slate-200'
                   }`}
                 />
               ))}
@@ -577,7 +577,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                     type="button"
                     onClick={() => { setStepError(null); setStepRaw(i + 1); }}
                     className={`text-[10px] font-medium transition-colors ${
-                      step === i + 1 ? 'text-blue-600' : 'text-slate-400 hover:text-blue-400'
+                      step === i + 1 ? 'text-teal-600' : 'text-slate-400 hover:text-blue-400'
                     }`}
                   >
                     {label}
@@ -585,7 +585,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 ) : (
                   <span
                     key={i}
-                    className={`text-[10px] font-medium ${step === i + 1 ? 'text-blue-600' : 'text-slate-400'}`}
+                    className={`text-[10px] font-medium ${step === i + 1 ? 'text-teal-600' : 'text-slate-400'}`}
                   >
                     {label}
                   </span>
@@ -613,7 +613,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ward</label>
                   <select
-                    className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                    className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
                     value={formData.ward}
                     disabled={activeWards.length === 0}
                     onChange={e => {
@@ -639,7 +639,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   </label>
                   {isAdmin ? (
                     <select
-                      className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                      className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white"
                       value={formData.unit}
                       onChange={e => setFormData({...formData, unit: e.target.value})}
                     >
@@ -655,19 +655,19 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bed No.</label>
-                  <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.bed} onChange={e => setFormData({...formData, bed: e.target.value})} />
+                  <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.bed} onChange={e => setFormData({...formData, bed: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">IP Number</label>
-                  <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.ipNo} disabled={!!initialData} onChange={e => setFormData({...formData, ipNo: e.target.value})} />
+                  <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.ipNo} disabled={!!initialData} onChange={e => setFormData({...formData, ipNo: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Admission</label>
-                  <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
+                  <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mobile Number</label>
-                  <input type="tel" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
+                  <input type="tel" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
                 </div>
               </div>
 
@@ -703,16 +703,16 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Patient Name</label>
-                  <input required type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                  <input required type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Age</label>
-                    <input required type="number" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} />
+                    <input required type="number" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
-                    <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
+                    <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
                       <option value={Gender.Male}>Male</option>
                       <option value={Gender.Female}>Female</option>
                       <option value={Gender.Other}>Other</option>
@@ -723,7 +723,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Diagnosis</label>
-                <textarea required rows={2} className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.diagnosis} onChange={e => setFormData({...formData, diagnosis: e.target.value})} />
+                <textarea required rows={2} className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.diagnosis} onChange={e => setFormData({...formData, diagnosis: e.target.value})} />
               </div>
 
               {/* Comorbidities — collapsed by default to keep step height mobile-friendly */}
@@ -733,7 +733,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   <button
                     type="button"
                     onClick={() => setShowComorbidityPicker(v => !v)}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    className="text-xs text-teal-600 hover:text-blue-800 font-medium"
                   >
                     {showComorbidityPicker ? 'Hide list' : '+ Add'}
                   </button>
@@ -753,10 +753,10 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 )}
                 {showComorbidityPicker && (
                   <div className="border border-slate-200 rounded-lg p-2 bg-white">
-                    <input type="text" placeholder="Type custom and press Enter…" className="w-full text-sm p-2 border border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none mb-2" value={customComorbidity} onChange={e => setCustomComorbidity(e.target.value)} onKeyDown={addCustomComorbidity} />
+                    <input type="text" placeholder="Type custom and press Enter…" className="w-full text-sm p-2 border border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none mb-2" value={customComorbidity} onChange={e => setCustomComorbidity(e.target.value)} onKeyDown={addCustomComorbidity} />
                     <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-0.5">
                       {COMORBIDITY_OPTIONS.filter(opt => !selectedComorbidities.includes(opt)).map(opt => (
-                        <button key={opt} type="button" onClick={() => toggleComorbidity(opt)} className="px-2 py-1 rounded-md text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-all">+ {opt}</button>
+                        <button key={opt} type="button" onClick={() => toggleComorbidity(opt)} className="px-2 py-1 rounded-md text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-teal-600 hover:bg-blue-50 transition-all">+ {opt}</button>
                       ))}
                     </div>
                   </div>
@@ -806,13 +806,13 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">PAC Status</label>
-                  <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white" value={formData.pacStatus} onChange={e => setFormData({...formData, pacStatus: e.target.value as PacStatus})}>
+                  <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white" value={formData.pacStatus} onChange={e => setFormData({...formData, pacStatus: e.target.value as PacStatus})}>
                     {Object.values(PacStatus).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Patient Status</label>
-                  <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white" value={formData.patientStatus} onChange={e => setFormData({...formData, patientStatus: e.target.value as PatientStatus})}>
+                  <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white" value={formData.patientStatus} onChange={e => setFormData({...formData, patientStatus: e.target.value as PatientStatus})}>
                     {Object.values(PatientStatus).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
@@ -821,17 +821,17 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Admission</label>
-                  <input type="date" className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
+                  <input type="date" className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Procedure</label>
-                  <input type="text" placeholder="Planned or Completed Procedure" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.procedure} onChange={e => setFormData({...formData, procedure: e.target.value})} />
+                  <input type="text" placeholder="Planned or Completed Procedure" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.procedure} onChange={e => setFormData({...formData, procedure: e.target.value})} />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Surgery (If completed)</label>
-                <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
+                <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
                 <p className="text-[10px] text-slate-500 mt-1">Leave blank if surgery is pending.</p>
               </div>
             </div>
@@ -866,7 +866,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                     setStepError(null);
                     setStep(step + 1);
                   }}
-                  className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded transition-colors"
+                  className="flex-1 min-h-[44px] bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded transition-colors"
                 >
                   Next →
                 </button>
@@ -874,7 +874,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2.5 rounded flex items-center justify-center gap-2"
+                  className="flex-1 min-h-[44px] bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-bold py-2.5 rounded flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   {initialData ? 'Update Patient' : 'Admit Patient'}

@@ -57,12 +57,12 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPr
 
         {/* Left Side - Brand */}
         <div className="hidden md:flex md:w-1/2 bg-slate-900 p-8 text-white flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute top-0 left-0 w-64 h-64 bg-teal-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 translate-y-1/2"></div>
 
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-8">
-              <div className="bg-blue-600 p-2 rounded-lg">
+              <div className="bg-teal-600 p-2 rounded-lg">
                 <Stethoscope className="w-6 h-6" />
               </div>
               <h1 className="font-bold text-2xl tracking-tight">MediWard</h1>
@@ -91,7 +91,7 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPr
         <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-12 flex flex-col justify-center">
           {/* Mobile-only brand header */}
           <div className="flex md:hidden items-center gap-2 mb-8">
-            <div className="bg-blue-600 p-2 rounded-lg">
+            <div className="bg-teal-600 p-2 rounded-lg">
               <Stethoscope className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-xl tracking-tight text-slate-800">MediWard</span>
@@ -118,7 +118,7 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPr
                   type="email"
                   required
                   autoComplete="email"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                   placeholder="doctor@hospital.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -135,7 +135,7 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPr
                   required
                   autoComplete="current-password"
                   minLength={6}
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -154,7 +154,7 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPr
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
             >
               {isLoading ? (
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -169,7 +169,7 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPr
               <p className="text-slate-500 text-sm">New to MediWard?</p>
               <button
                 onClick={onRegister}
-                className="mt-1 text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors"
+                className="mt-1 text-teal-600 hover:text-blue-700 font-semibold text-sm transition-colors"
               >
                 Register your hospital →
               </button>

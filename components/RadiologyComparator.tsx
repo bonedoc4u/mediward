@@ -171,7 +171,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
             <Filter className="w-3 h-3" /> Filter by Ward
           </label>
           <select
-            className="w-full p-2 border border-slate-300 rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full p-2 border border-slate-300 rounded-md bg-white text-sm focus:ring-2 focus:ring-teal-500 outline-none"
             value={selectedWard}
             onChange={(e) => {
               setSelectedWard(e.target.value);
@@ -191,7 +191,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
             <Users className="w-3 h-3" /> Select Patient
           </label>
           <select
-            className={`w-full p-2 border rounded-md bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all ${!selectedPatientId ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-300'}`}
+            className={`w-full p-2 border rounded-md bg-white text-sm focus:ring-2 focus:ring-teal-500 outline-none transition-all ${!selectedPatientId ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-300'}`}
             value={selectedPatientId}
             onChange={(e) => {
               setSelectedPatientId(e.target.value);
@@ -207,7 +207,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
             ))}
           </select>
           {!selectedPatientId && filteredPatients.length > 0 && (
-            <div className="absolute right-4 top-16 md:top-4 text-blue-600 animate-bounce hidden md:block">
+            <div className="absolute right-4 top-16 md:top-4 text-teal-600 animate-bounce hidden md:block">
               <ArrowUp className="w-5 h-5" />
             </div>
           )}
@@ -224,7 +224,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
           <div className="flex gap-2 text-xs font-mono bg-slate-100 p-2 rounded text-slate-500 border border-slate-200">
             <span className="flex items-center gap-1"><Filter className="w-3 h-3" /> Filter by Ward</span>
             <span className="text-slate-300">→</span>
-            <span className="flex items-center gap-1 font-bold text-blue-600"><Users className="w-3 h-3" /> Select Patient</span>
+            <span className="flex items-center gap-1 font-bold text-teal-600"><Users className="w-3 h-3" /> Select Patient</span>
           </div>
         </div>
       ) : (
@@ -264,7 +264,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
                   <div className="flex gap-2">
                     <button
                       onClick={handleCameraClick}
-                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
+                      className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
                     >
                       <Camera className="w-4 h-4" /> Camera
                     </button>
@@ -278,7 +278,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
                 ) : (
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
+                    className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
                   >
                     <Camera className="w-4 h-4" />
                     <span className="hidden md:inline">Take Photo / Upload</span>
@@ -313,7 +313,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
                     value={invType}
                     onChange={(e) => setInvType(e.target.value)}
                     disabled={isUploading}
-                    className="w-full p-2 text-sm border border-blue-200 rounded outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-60"
+                    className="w-full p-2 text-sm border border-blue-200 rounded outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-60"
                   >
                     <option value="X-Ray">X-Ray</option>
                     <option value="Pre-Op X-Ray">Pre-Op X-Ray</option>
@@ -340,7 +340,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
                   <button
                     onClick={handleSave}
                     disabled={isUploading}
-                    className="flex-1 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-70"
+                    className="flex-1 py-2 bg-teal-600 text-white rounded font-bold hover:bg-teal-700 flex items-center justify-center gap-2 disabled:opacity-70"
                   >
                     {isUploading ? (
                       <>

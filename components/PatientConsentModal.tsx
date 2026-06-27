@@ -58,7 +58,7 @@ const PatientConsentModal: React.FC<Props> = ({ patientName, onAccept, onCancel 
         {/* Header */}
         <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-slate-100">
           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5 text-blue-600" />
+            <ShieldCheck className="w-5 h-5 text-teal-600" />
           </div>
           <div>
             <h3 id="consent-title" className="font-bold text-slate-900">Patient Data Consent</h3>
@@ -121,7 +121,7 @@ const PatientConsentModal: React.FC<Props> = ({ patientName, onAccept, onCancel 
           </button>
           <button
             onClick={onAccept}
-            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" />
             Consent obtained — proceed

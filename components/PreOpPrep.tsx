@@ -83,7 +83,7 @@ const PreOpPrep: React.FC<Props> = ({ patients, onUpdatePatient }) => {
               type="date"
               value={filterDate}
               onChange={e => setFilterDate(e.target.value)}
-              className="bg-white border border-slate-300 text-slate-800 text-sm rounded px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500"
+              className="bg-white border border-slate-300 text-slate-800 text-sm rounded px-2 py-1 outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
         </div>
@@ -92,7 +92,7 @@ const PreOpPrep: React.FC<Props> = ({ patients, onUpdatePatient }) => {
       {/* Unscheduled pool */}
       <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-3">
-          <AlertCircle className="w-4 h-4 text-blue-600" />
+          <AlertCircle className="w-4 h-4 text-teal-600" />
           <h4 className="font-bold text-blue-900 text-sm">
             Unscheduled Patients ({getUnscheduledPatients().length})
           </h4>
@@ -108,7 +108,7 @@ const PreOpPrep: React.FC<Props> = ({ patients, onUpdatePatient }) => {
                 <p className="text-xs text-slate-500 truncate">{p.diagnosis}</p>
                 <button
                   onClick={() => handleDateAssignment(p, filterDate)}
-                  className="mt-1 w-full bg-blue-600 hover:bg-blue-700 text-white text-xs py-1.5 rounded font-medium transition-colors"
+                  className="mt-1 w-full bg-teal-600 hover:bg-teal-700 text-white text-xs py-1.5 rounded font-medium transition-colors"
                 >
                   Add to List for {filterDate}
                 </button>

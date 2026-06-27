@@ -166,7 +166,7 @@ const StatusPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="bg-blue-600 p-1.5 rounded-lg">
+          <div className="bg-teal-600 p-1.5 rounded-lg">
             <Stethoscope className="w-4 h-4" />
           </div>
           <div>

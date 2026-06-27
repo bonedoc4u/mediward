@@ -171,7 +171,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       className={`shrink-0 w-[90px] md:w-auto md:flex-1 flex flex-col items-center justify-center p-2 md:p-4 rounded-xl border transition-all duration-200 ${
         selectedWard === ward
           ? `${activeClass} shadow-md scale-[1.02]`
-          : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+          : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-sm'
       }`}
     >
       <div className={`p-1.5 md:p-2 rounded-full mb-1 md:mb-2 ${selectedWard === ward ? 'bg-white/20' : 'bg-slate-100'}`}>
@@ -250,7 +250,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         <WardTab ward="All" icon={Layers} count={counts.All} colorClass="text-slate-600" activeClass="bg-slate-800 border-slate-900 text-white" />
         {activeConfigWards.map((w, i) => {
           const NON_ICU_STYLES = [
-            { icon: BedDouble,   colorClass: 'text-blue-600',   activeClass: 'bg-blue-600 border-blue-700 text-white' },
+            { icon: BedDouble,   colorClass: 'text-teal-600',   activeClass: 'bg-teal-600 border-blue-700 text-white' },
             { icon: Stethoscope, colorClass: 'text-indigo-600', activeClass: 'bg-indigo-600 border-indigo-700 text-white' },
             { icon: BedDouble,   colorClass: 'text-teal-600',   activeClass: 'bg-teal-600 border-teal-700 text-white' },
           ];
@@ -274,14 +274,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             <input
               type="text"
               placeholder="Search Name, Bed, IP No, Diagnosis..."
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="flex flex-wrap gap-2 w-full xl:w-auto">
             {(viewMode === 'home' || viewMode === 'master') && onAddPatient && (
-              <button onClick={onAddPatient} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+              <button onClick={onAddPatient} className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
                 <UserPlus className="w-4 h-4" /> Add Patient
               </button>
             )}
@@ -365,7 +365,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     <td className="px-6 py-4">
                       <div className="font-semibold text-slate-900 flex items-center gap-2">
                         {onViewPatient ? (
-                          <button onClick={() => onViewPatient(patient.ipNo)} className="text-blue-600 hover:text-blue-800 hover:underline font-semibold text-left">
+                          <button onClick={() => onViewPatient(patient.ipNo)} className="text-teal-600 hover:text-blue-800 hover:underline font-semibold text-left">
                             {patient.name}
                           </button>
                         ) : patient.name}
@@ -384,7 +384,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           <span className="font-bold text-green-700 bg-green-100 px-1.5 rounded-sm ml-1">POD {calcPod(patient.dos, today)}</span>
                         )}
                       </div>
-                      <div className="text-xs text-blue-600">{patient.mobile}</div>
+                      <div className="text-xs text-teal-600">{patient.mobile}</div>
                     </td>
                     {showNews2 && (
                       <td className="px-4 py-4 text-center">
@@ -454,7 +454,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         ) : onAssignDate ? (
                           <button
                             onClick={() => { setAssigningDateIp(patient.ipNo); setAssigningDateValue(''); }}
-                            className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-dashed border-slate-300 hover:border-blue-300 rounded text-xs transition-colors"
+                            className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-teal-50 text-slate-500 hover:text-teal-600 border border-dashed border-slate-300 hover:border-teal-300 rounded text-xs transition-colors"
                             title="Assign surgery date"
                           >
                             <CalendarClock className="w-3.5 h-3.5" />
@@ -471,7 +471,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           {onViewPatient && (
                             <button
                               onClick={() => onViewPatient(patient.ipNo)}
-                              className="p-2 hover:bg-blue-100 rounded-full text-slate-400 hover:text-blue-600 transition-colors"
+                              className="p-2 hover:bg-blue-100 rounded-full text-slate-400 hover:text-teal-600 transition-colors"
                               title="View Details"
                               aria-label={`View details for ${patient.name}`}
                             >
@@ -481,7 +481,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           {onEditPatient && (
                             <button
                               onClick={() => onEditPatient(patient)}
-                              className="p-2 hover:bg-slate-200 rounded-full text-slate-500 hover:text-blue-600 transition-colors"
+                              className="p-2 hover:bg-slate-200 rounded-full text-slate-500 hover:text-teal-600 transition-colors"
                               title="Edit"
                               aria-label={`Edit ${patient.name}`}
                             >
@@ -659,7 +659,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {onViewPatient && (
                           <button
                             onClick={() => onViewPatient(item.patient.ipNo)}
-                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors"
+                            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors"
                             aria-label={`View details for ${item.patient.name}`}
                           >
                             <ExternalLink className="w-3.5 h-3.5" /> View

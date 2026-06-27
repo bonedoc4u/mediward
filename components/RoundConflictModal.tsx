@@ -78,7 +78,7 @@ export const RoundConflictModal: React.FC<Props> = ({
               onClick={() => onResolve('mine')}
               disabled={isSaving}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
-                         bg-blue-600 hover:bg-blue-700 text-white
+                         bg-teal-600 hover:bg-teal-700 text-white
                          disabled:opacity-50 transition-colors"
             >
               {isSaving

@@ -118,7 +118,7 @@ const PatientDetail: React.FC = () => {
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <AlertCircle className="w-12 h-12 mb-3 opacity-50" />
         <p className="text-lg font-medium">Patient not found</p>
-        <button onClick={() => navigateTo('dashboard')} className="mt-4 text-blue-600 hover:underline text-sm flex items-center gap-1">
+        <button onClick={() => navigateTo('dashboard')} className="mt-4 text-teal-600 hover:underline text-sm flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> Back to Dashboard
         </button>
       </div>
@@ -346,7 +346,7 @@ const PatientDetail: React.FC = () => {
               className="flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shrink-0"
               aria-label="Call"
             >
-              <Phone className="w-4.5 h-4.5 text-blue-600" />
+              <Phone className="w-4.5 h-4.5 text-teal-600" />
             </a>
             <a
               href={`https://wa.me/${mobileNumber.startsWith('91') ? mobileNumber : '91' + mobileNumber}`}

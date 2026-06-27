@@ -101,7 +101,7 @@ const ReferralLetter: React.FC<Props> = ({ patient, hospitalName, referringDocto
                   className={`flex-1 py-2 rounded-lg text-sm font-medium capitalize border transition-colors min-h-[44px] ${urgency === u
                     ? u === 'emergency' ? 'bg-red-600 text-white border-red-600'
                       : u === 'urgent' ? 'bg-amber-500 text-white border-amber-500'
-                      : 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-teal-600 text-white border-blue-600'
                     : 'bg-white text-slate-600 border-slate-200'}`}>{u}</button>
               ))}
             </div>

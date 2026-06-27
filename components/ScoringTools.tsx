@@ -41,7 +41,7 @@ function GCSCalculator() {
           <div className="flex flex-wrap gap-2">
             {opts.map(o => (
               <button key={o.v} onClick={() => set(o.v)}
-                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${val === o.v ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'}`}>
+                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${val === o.v ? 'bg-teal-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'}`}>
                 {o.v} — {o.label}
               </button>
             ))}
@@ -82,7 +82,7 @@ function CHA2DS2VAScCalculator() {
         <label key={f.key} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-blue-300">
           <input type="checkbox" checked={!!checked[f.key]}
             onChange={e => setChecked(p => ({ ...p, [f.key]: e.target.checked }))}
-            className="w-4 h-4 rounded text-blue-600" />
+            className="w-4 h-4 rounded text-teal-600" />
           <span className="flex-1 text-sm text-slate-700">{f.label}</span>
           <span className="text-xs font-bold text-slate-500">+{f.points}</span>
         </label>
@@ -118,7 +118,7 @@ function CURB65Calculator() {
         <label key={c.key} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-blue-300">
           <input type="checkbox" checked={!!checked[c.key]}
             onChange={e => setChecked(p => ({ ...p, [c.key]: e.target.checked }))}
-            className="w-4 h-4 rounded text-blue-600" />
+            className="w-4 h-4 rounded text-teal-600" />
           <span className="text-sm text-slate-700">{c.label}</span>
         </label>
       ))}
@@ -203,7 +203,7 @@ function ChildPughCalculator() {
       <div className="flex gap-2 flex-wrap">
         {opts.map(o => (
           <button key={o.v} onClick={() => set(o.v)}
-            className={`px-3 py-1.5 rounded-lg text-sm border ${val === o.v ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200'}`}>
+            className={`px-3 py-1.5 rounded-lg text-sm border ${val === o.v ? 'bg-teal-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200'}`}>
             {o.l} ({o.v}pt)
           </button>
         ))}
@@ -456,7 +456,7 @@ function APACHE2Calculator() {
       <div className="flex gap-2 flex-wrap">
         {[{ v: 0, l: 'None' }, { v: 2, l: 'Elective post-op (+2)' }, { v: 5, l: 'Non-op / Emergency post-op (+5)' }].map(o => (
           <button key={o.v} onClick={() => setChronicPoints(o.v)}
-            className={`px-3 py-1.5 rounded-lg text-sm border ${chronicPoints === o.v ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200'}`}>
+            className={`px-3 py-1.5 rounded-lg text-sm border ${chronicPoints === o.v ? 'bg-teal-600 text-white border-blue-600' : 'bg-white text-slate-700 border-slate-200'}`}>
             {o.l}
           </button>
         ))}
@@ -589,7 +589,7 @@ function GRACECalculator() {
         { label: 'Elevated Cardiac Markers (+15)', val: markers, set: setMarkers },
       ].map(({ label, val, set }) => (
         <label key={label} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-blue-300">
-          <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} className="w-4 h-4 rounded text-blue-600" />
+          <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} className="w-4 h-4 rounded text-teal-600" />
           <span className="text-sm text-slate-700">{label}</span>
         </label>
       ))}
@@ -815,7 +815,7 @@ function BlatchfordCalculator() {
         { label: 'Cardiac failure (+2)', val: cardiac, set: setCardiac },
       ].map(({ label, val, set }) => (
         <label key={label} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-blue-300">
-          <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} className="w-4 h-4 rounded text-blue-600" />
+          <input type="checkbox" checked={val} onChange={e => set(e.target.checked)} className="w-4 h-4 rounded text-teal-600" />
           <span className="text-sm text-slate-700">{label}</span>
         </label>
       ))}
@@ -867,7 +867,7 @@ const ScoringTools: React.FC<Props> = ({ onClose, initialTool }) => {
                 <ChevronRight className="w-4 h-4 rotate-180 text-slate-500" />
               </button>
             )}
-            <Calculator className="w-5 h-5 text-blue-600" />
+            <Calculator className="w-5 h-5 text-teal-600" />
             <h2 className="font-bold text-slate-900">
               {active ? TOOLS.find(t => t.key === active)?.label : 'Clinical Scoring Tools'}
             </h2>
@@ -886,7 +886,7 @@ const ScoringTools: React.FC<Props> = ({ onClose, initialTool }) => {
                   <div>
                     <p className="font-bold text-slate-900">{t.label}</p>
                     <p className="text-sm text-slate-500">{t.subtitle}</p>
-                    <p className="text-xs text-blue-600 mt-0.5">{t.dept}</p>
+                    <p className="text-xs text-teal-600 mt-0.5">{t.dept}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400" />
                 </button>

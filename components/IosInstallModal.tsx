@@ -34,19 +34,19 @@ const IosInstallModal: React.FC<Props> = ({ onClose }) => {
           <div className="space-y-4">
             {[
               {
-                icon: <Share className="w-5 h-5 text-blue-600" />,
+                icon: <Share className="w-5 h-5 text-teal-600" />,
                 step: '1',
                 title: 'Tap Share',
                 desc: 'Tap the Share button at the bottom of Safari (the box with an arrow pointing up)',
               },
               {
-                icon: <Plus className="w-5 h-5 text-blue-600" />,
+                icon: <Plus className="w-5 h-5 text-teal-600" />,
                 step: '2',
                 title: 'Add to Home Screen',
                 desc: 'Scroll down in the share menu and tap "Add to Home Screen"',
               },
               {
-                icon: <LayoutGrid className="w-5 h-5 text-blue-600" />,
+                icon: <LayoutGrid className="w-5 h-5 text-teal-600" />,
                 step: '3',
                 title: 'Open MediWard',
                 desc: 'Tap Add, then open MediWard from your home screen — it works offline',

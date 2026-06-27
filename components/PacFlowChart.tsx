@@ -165,7 +165,7 @@ const BranchRow: React.FC<{
                     placeholder="Add requirement…"
                     className="text-[11px] w-36 focus:outline-none bg-transparent"
                   />
-                  <button onClick={handleAddItem} disabled={!newItem.trim()} className="text-blue-600 disabled:opacity-30">
+                  <button onClick={handleAddItem} disabled={!newItem.trim()} className="text-teal-600 disabled:opacity-30">
                     <Check className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => { setAddingItem(false); setNewItem(''); }} className="text-slate-400">
@@ -175,7 +175,7 @@ const BranchRow: React.FC<{
               ) : (
                 <button
                   onClick={() => setAddingItem(true)}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-400 hover:text-blue-600 border border-dashed border-slate-200 hover:border-blue-300 rounded-lg transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-400 hover:text-teal-600 border border-dashed border-slate-200 hover:border-blue-300 rounded-lg transition-colors"
                 >
                   <Plus className="w-3 h-3" /> Add requirement
                 </button>
@@ -254,7 +254,7 @@ const PacFlowChart: React.FC<Props> = ({ pacFlow, onChange, readOnly = false, pa
             disabled={readOnly}
             className={`shrink-0 w-28 rounded-xl border-2 p-3 text-center transition-colors self-center ${
               flow.seenByAnaesthesia
-                ? 'bg-blue-600 border-blue-700 text-white'
+                ? 'bg-teal-600 border-blue-700 text-white'
                 : 'bg-white border-slate-300 text-slate-700 hover:border-blue-400'
             } ${readOnly ? 'cursor-default' : 'cursor-pointer'}`}
           >
@@ -328,7 +328,7 @@ const PacFlowChart: React.FC<Props> = ({ pacFlow, onChange, readOnly = false, pa
                         placeholder="e.g. Medicine Fitness…"
                         className="text-xs w-48 focus:outline-none bg-transparent"
                       />
-                      <button onClick={addBranch} disabled={!newBranchLabel.trim()} className="text-blue-600 hover:text-blue-800 disabled:opacity-30">
+                      <button onClick={addBranch} disabled={!newBranchLabel.trim()} className="text-teal-600 hover:text-blue-800 disabled:opacity-30">
                         <Check className="w-4 h-4" />
                       </button>
                       <button onClick={() => { setAddingBranch(false); setNewBranchLabel(''); }} className="text-slate-400 hover:text-slate-600">
@@ -338,7 +338,7 @@ const PacFlowChart: React.FC<Props> = ({ pacFlow, onChange, readOnly = false, pa
                   ) : (
                     <button
                       onClick={() => setAddingBranch(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-500 hover:text-blue-600 border border-dashed border-slate-300 hover:border-blue-300 rounded-xl transition-colors font-medium"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-500 hover:text-teal-600 border border-dashed border-slate-300 hover:border-blue-300 rounded-xl transition-colors font-medium"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       {flow.branches.length === 0 ? 'Add PAC requirement' : 'Add branch'}

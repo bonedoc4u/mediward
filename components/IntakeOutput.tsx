@@ -108,12 +108,12 @@ const IntakeOutput: React.FC<Props> = ({ patientIpNo }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Droplets className="w-5 h-5 text-blue-600" />
+          <Droplets className="w-5 h-5 text-teal-600" />
           <h3 className="font-semibold text-slate-800">Fluid Balance</h3>
         </div>
         <button
           onClick={() => setShowAdd(v => !v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700"
         >
           <Plus className="w-4 h-4" />
           Add Entry
@@ -195,7 +195,7 @@ const IntakeOutput: React.FC<Props> = ({ patientIpNo }) => {
             <button
               onClick={handleAdd}
               disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-teal-600 text-white text-sm rounded-lg hover:bg-teal-700 disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save Entry'}
             </button>

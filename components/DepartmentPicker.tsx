@@ -14,7 +14,7 @@ const DEPARTMENTS: Department[] = [
     id: 'orthopaedics',
     displayName: 'Orthopaedics',
     description: 'Fractures, joint replacements, and musculoskeletal surgery',
-    color: 'from-blue-500 to-blue-700',
+    color: 'from-teal-500 to-teal-700',
   },
 ];
 
@@ -29,7 +29,7 @@ const DepartmentPicker: React.FC<Props> = ({ userName, hospitalName, onSelect })
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6">
       {/* Logo */}
       <div className="mb-8 flex flex-col items-center gap-3">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 rounded-2xl shadow-xl shadow-blue-900/40">
+        <div className="bg-gradient-to-br from-teal-500 to-teal-700 p-4 rounded-2xl shadow-xl shadow-teal-900/40">
           <Stethoscope className="w-10 h-10 text-white" />
         </div>
         <div className="text-center">

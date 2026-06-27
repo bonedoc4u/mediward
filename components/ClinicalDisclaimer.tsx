@@ -144,7 +144,7 @@ const ClinicalDisclaimer: React.FC<Props> = ({ onAccept }) => {
             onClick={handleAccept}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all
               disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed
-              enabled:bg-blue-600 enabled:hover:bg-blue-700 enabled:text-white"
+              enabled:bg-teal-600 enabled:hover:bg-teal-700 enabled:text-white"
           >
             <ShieldCheck className="w-4 h-4" />
             {loading ? 'Recording acceptance…' : 'Accept & Continue'}

@@ -154,7 +154,7 @@ const WardRow: React.FC<{
         <td className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-1">
             <button onClick={() => { setDraft(ward); setEditing(true); }}
-              className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-blue-600 transition-colors">
+              className="p-1.5 hover:bg-slate-200 rounded text-slate-500 hover:text-teal-600 transition-colors">
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button onClick={() => onDelete(ward.id)}
@@ -171,7 +171,7 @@ const WardRow: React.FC<{
     <tr className="border-b bg-blue-50/40">
       <td className="px-4 py-2">
         <input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
-          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-full p-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-teal-400" />
       </td>
       <td className="px-4 py-2">
         {draft.isIcu
@@ -196,7 +196,7 @@ const WardRow: React.FC<{
       </td>
       <td className="px-4 py-2">
         <input type="number" value={draft.sortOrder} onChange={e => setDraft(d => ({ ...d, sortOrder: parseInt(e.target.value) || 0 }))}
-          className="w-16 p-1 border border-blue-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          className="w-16 p-1 border border-blue-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-teal-400" />
       </td>
       <td className="px-4 py-2 text-center">
         <input type="checkbox" checked={draft.isIcu} onChange={e => setDraft(d => ({ ...d, isIcu: e.target.checked }))}
@@ -211,7 +211,7 @@ const WardRow: React.FC<{
       <td className="px-4 py-2 text-right">
         <div className="flex items-center justify-end gap-1">
           <button onClick={handleSave} disabled={busy}
-            className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors disabled:opacity-50">
+            className="p-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded transition-colors disabled:opacity-50">
             <Save className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => setEditing(false)}
@@ -323,7 +323,7 @@ const WardSettings: React.FC = () => {
               value={newWardName}
               onChange={e => setNewWardName(e.target.value)}
               placeholder="e.g. Ward 42"
-              className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"
               onKeyDown={e => { if (e.key === 'Enter') handleAddWard(); }}
             />
           </div>
@@ -358,7 +358,7 @@ const WardSettings: React.FC = () => {
           <button
             onClick={handleAddWard}
             disabled={addingWard || !newWardName.trim()}
-            className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             <Plus className="w-4 h-4" /> {addingWard ? 'Adding…' : 'Add Ward'}
           </button>

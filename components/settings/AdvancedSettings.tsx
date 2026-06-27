@@ -80,7 +80,7 @@ const DpdpPortabilityPanel: React.FC<{ hospitalId: string }> = ({ hospitalId }) 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <Download className="w-4 h-4 text-blue-600" />
+        <Download className="w-4 h-4 text-teal-600" />
         <h2 className="font-bold text-slate-800">Patient Data Export (DPDP §16)</h2>
       </div>
       <div className="p-4 space-y-3 text-sm text-slate-700">
@@ -89,9 +89,9 @@ const DpdpPortabilityPanel: React.FC<{ hospitalId: string }> = ({ hospitalId }) 
           <input type="text" value={ipNo} onChange={e => setIpNo(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleExport()}
             placeholder="IP Number (e.g. IP/2024/1234)"
-            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-400 outline-none" />
           <button onClick={handleExport} disabled={busy || !ipNo.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
+            className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
             <Download className="w-4 h-4" />
             {busy ? 'Exporting…' : 'Export JSON'}
           </button>
@@ -223,7 +223,7 @@ const AdvancedSettings: React.FC = () => {
       {/* HIS Integration */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-          <Link2 className="w-4 h-4 text-blue-600" />
+          <Link2 className="w-4 h-4 text-teal-600" />
           <h2 className="font-bold text-slate-800">HIS / FHIR Integration</h2>
         </div>
         <div className="p-4 space-y-4">
@@ -237,7 +237,7 @@ const AdvancedSettings: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Server className="w-4 h-4 text-slate-400 shrink-0" />
                 <input type="url" placeholder="https://fhir.yourhospital.in/R4"
-                  className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-teal-500 outline-none"
                   onChange={() => {/* Future: wire to hospitalConfig */}} />
               </div>
               <p className="text-xs text-slate-400 mt-1">HL7 FHIR R4 compatible endpoint. Used for patient import and ABHA linking.</p>
@@ -247,7 +247,7 @@ const AdvancedSettings: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Globe className="w-4 h-4 text-slate-400 shrink-0" />
                 <input type="text" placeholder="IN0000000"
-                  className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-teal-500 outline-none"
                   onChange={() => {/* Future: wire to hospitalConfig */}} />
               </div>
               <p className="text-xs text-slate-400 mt-1">Your NHA Health Facility Registry identifier for ABHA / NDHM linkage.</p>
