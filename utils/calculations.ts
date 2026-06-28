@@ -128,13 +128,23 @@ export const getTriageBorderClass = (p: Patient): string => {
 };
 
 // ─── Shared Sorting ───
-/** Extract numeric bed component for sorting — handles "10-05" → 5, "05" → 5, "1A" → NaN */
+/** True for Varanda Bed labels: VB, VB1, VB-2, vb 3, etc. */
+const isVaranda = (bed: string) => /^vb/i.test(bed.trim());
+
+/** Extract numeric bed component — handles "10-05" → 5, "05" → 5, "1A" → NaN */
 const bedNum = (bed: string): number => {
   const part = bed.includes('-') ? bed.split('-').pop()! : bed;
   return parseInt(part, 10);
 };
 
 export const sortByBed = (a: Patient, b: Patient): number => {
+  const va = isVaranda(a.bed);
+  const vb = isVaranda(b.bed);
+  // Varanda beds always float to the end of their ward
+  if (va && vb) return a.bed.localeCompare(b.bed, undefined, { numeric: true });
+  if (va) return 1;
+  if (vb) return -1;
+  // Regular beds: sort numerically, fall back to locale string
   const numA = bedNum(a.bed);
   const numB = bedNum(b.bed);
   if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
