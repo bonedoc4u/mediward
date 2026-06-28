@@ -1,10 +1,17 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Patient, Investigation } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { ImageIcon, Camera, X, Trash2, Calendar, Check, Filter, Users, ArrowUp, Loader2 } from 'lucide-react';
+import {
+  ImageIcon, Camera, X, Trash2, FileText,
+  CloudUpload, FileDown, Loader2, Search, ChevronDown,
+  Bone, ScanLine, Waves,
+} from 'lucide-react';
 import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
 import { generateId } from '../utils/sanitize';
 import { Capacitor } from '@capacitor/core';
+import { exportRadiologyPDF } from '../utils/exportRadiologyPDF';
+
+type RadPhase = 'preop' | 'postop';
 
 interface Props {
   patients: Patient[];
@@ -13,46 +20,431 @@ interface Props {
   initialPatientId?: string;
 }
 
-const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, onDeleteInvestigation, initialPatientId }) => {
-  const { user } = useAuth();
-  const { wards: configWards } = useConfig();
-  const activeConfigWards = useMemo(
-    () => configWards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder),
-    [configWards],
-  );
-  const [selectedWard, setSelectedWard] = useState<string>('All');
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(initialPatientId || '');
+// ─── Modality config ──────────────────────────────────────────────────────────
+const MODALITY: Record<string, {
+  bg: string; badge: string; Icon: React.FC<{ className?: string }>;
+}> = {
+  'X-Ray'  : { bg: 'bg-slate-900',   badge: 'bg-slate-700 text-slate-200',    Icon: Bone      },
+  'CT'     : { bg: 'bg-indigo-950',  badge: 'bg-indigo-800 text-indigo-200',  Icon: ScanLine  },
+  'MRI'    : { bg: 'bg-violet-950',  badge: 'bg-violet-800 text-violet-200',  Icon: ScanLine  },
+  'USG'    : { bg: 'bg-cyan-950',    badge: 'bg-cyan-800 text-cyan-200',      Icon: Waves     },
+  'Report' : { bg: 'bg-amber-950',   badge: 'bg-amber-800 text-amber-200',    Icon: FileText  },
+};
 
-  // Upload State
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+const getModality = (type: string) =>
+  MODALITY[type] ?? { bg: 'bg-slate-900', badge: 'bg-slate-700 text-slate-200', Icon: ImageIcon };
+
+// ─── ImageCard ────────────────────────────────────────────────────────────────
+const ImageCard: React.FC<{
+  inv: Investigation;
+  onDelete?: () => void;
+}> = ({ inv, onDelete }) => {
+  const cfg  = getModality(inv.type);
+  const Icon = cfg.Icon;
+  const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: '2-digit',
+  });
+
+  return (
+    <div className="group rounded-xl border border-slate-200 overflow-hidden cursor-pointer
+                    hover:border-teal-300 hover:-translate-y-0.5 hover:shadow-sm
+                    transition-all active:scale-[0.98]">
+      <div className={`h-[72px] flex items-center justify-center relative ${cfg.bg}`}>
+        {inv.imageUrl
+          ? <img src={inv.imageUrl} alt={inv.type} className="w-full h-full object-cover" />
+          : <Icon className="w-7 h-7 text-white/25" />
+        }
+        {onDelete && (
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(); }}
+            className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white
+                       p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      <div className="p-2 bg-white">
+        <span className={`text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${cfg.badge}`}>
+          {inv.type}
+        </span>
+        <p className="text-[11px] font-semibold text-slate-700 mt-1 leading-tight truncate">
+          {inv.findings || inv.type}
+        </p>
+        <p className="text-[10px] text-slate-400">{fmtDate}</p>
+      </div>
+    </div>
+  );
+};
+
+// ─── UploadCard ───────────────────────────────────────────────────────────────
+const UploadCard: React.FC<{
+  phase: RadPhase;
+  onClick: () => void;
+}> = ({ phase, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`rounded-xl border-2 border-dashed min-h-[116px] w-full
+                flex flex-col items-center justify-center gap-1.5
+                cursor-pointer transition-all ${
+      phase === 'preop'
+        ? 'border-blue-200 bg-blue-50/30 hover:border-blue-400 hover:bg-blue-50'
+        : 'border-teal-200 bg-teal-50/30 hover:border-teal-400 hover:bg-teal-50'
+    }`}
+  >
+    <CloudUpload className={`w-5 h-5 ${phase === 'preop' ? 'text-blue-400' : 'text-teal-400'}`} />
+    <span className="text-[10px] font-semibold text-slate-500">
+      Add {phase === 'preop' ? 'pre-op' : 'post-op'}
+    </span>
+    <span className="text-[9px] text-slate-400">JPEG · PNG · PDF</span>
+  </button>
+);
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+const SectionHeader: React.FC<{
+  phase: RadPhase;
+  count: number;
+  patient: Patient;
+  scans: Investigation[];
+}> = ({ phase, count, patient, scans }) => {
+  const [progress, setProgress] = useState<number | null>(null);
+  const isPreOp = phase === 'preop';
+  const label   = isPreOp ? 'PRE-OP' : 'POST-OP';
+
+  const handleExport = async () => {
+    setProgress(0);
+    try {
+      await exportRadiologyPDF(
+        {
+          name: patient.name,
+          age: patient.age,
+          gender: patient.gender,
+          ipNo: patient.ipNo,
+          ward: patient.ward,
+          diagnosis: patient.diagnosis,
+          dos: patient.dos,
+        },
+        scans.map(s => ({
+          type: s.type,
+          region: s.findings,
+          date: s.date,
+          imageUrl: s.imageUrl,
+        })),
+        isPreOp ? 'PreOp' : 'PostOp',
+        setProgress,
+      );
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    } finally {
+      setProgress(null);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${
+        isPreOp
+          ? 'bg-blue-100 text-blue-700 border border-blue-200'
+          : 'bg-teal-100 text-teal-700 border border-teal-200'
+      }`}>
+        {label}
+      </span>
+      <span className="text-sm font-bold text-slate-700">Investigations</span>
+      <span className="text-xs text-slate-400">({count})</span>
+      <div className="flex-1" />
+      <button
+        onClick={handleExport}
+        disabled={count === 0 || progress !== null}
+        className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg
+                    border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+          isPreOp
+            ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600'
+            : 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-600 hover:text-white hover:border-teal-600'
+        }`}
+      >
+        {progress !== null ? (
+          <><Loader2 className="w-3.5 h-3.5 animate-spin" />{progress}%</>
+        ) : (
+          <><FileDown className="w-3.5 h-3.5" />Export PDF</>
+        )}
+      </button>
+    </div>
+  );
+};
+
+// ─── Patient Picker ───────────────────────────────────────────────────────────
+const PatientPicker: React.FC<{
+  patients: Patient[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}> = ({ patients, selectedId, onSelect }) => {
+  const [search, setSearch] = useState('');
+  const [open, setOpen]     = useState(false);
+
+  const filtered = useMemo(() =>
+    patients.filter(p =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.ipNo.includes(search) || p.bed.includes(search),
+    ), [patients, search]);
+
+  const selected = patients.find(p => p.ipNo === selectedId);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-xl
+                   px-4 py-3 text-left hover:border-teal-400 transition-colors"
+      >
+        {selected ? (
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-900 truncate">{selected.name}</p>
+            <p className="text-[11px] text-slate-400">Bed {selected.bed} · IP: {selected.ipNo}</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-1">
+            <Search className="w-4 h-4 text-slate-400" />
+            <span className="text-sm text-slate-400">Search patient…</span>
+          </div>
+        )}
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-slate-200
+                        rounded-xl shadow-xl z-30 max-h-64 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                autoFocus
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Name, bed or IP no."
+                className="flex-1 text-sm bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {filtered.length === 0 ? (
+              <p className="text-center text-xs text-slate-400 py-6">No patients found</p>
+            ) : filtered.map(p => (
+              <button
+                key={p.ipNo}
+                onClick={() => { onSelect(p.ipNo); setOpen(false); setSearch(''); }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left
+                            hover:bg-teal-50 transition-colors ${p.ipNo === selectedId ? 'bg-teal-50' : ''}`}
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-bold text-slate-500">{p.bed}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
+                  <p className="text-[10px] text-slate-400">IP: {p.ipNo} · {p.ward}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Upload Bottom Sheet ──────────────────────────────────────────────────────
+const UploadSheet: React.FC<{
+  isOpen: boolean;
+  file: File | null;
+  previewUrl: string | null;
+  patient: Patient;
+  isUploading: boolean;
+  uploadError: string | null;
+  onPhaseChange: (p: RadPhase) => void;
+  onTypeChange: (t: string) => void;
+  phase: RadPhase;
+  invType: string;
+  onSave: () => void;
+  onCancel: () => void;
+}> = ({ isOpen, file, previewUrl, patient, isUploading, uploadError,
+        onPhaseChange, onTypeChange, phase, invType, onSave, onCancel }) => {
+  if (!isOpen) return null;
+  const isImage = file?.type.startsWith('image/');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-2xl
+                      animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+        </div>
+
+        {/* Preview */}
+        {isImage && previewUrl && (
+          <div className="relative bg-black h-48 mx-4 rounded-xl overflow-hidden mb-4">
+            <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+            {!isUploading && (
+              <button
+                onClick={onCancel}
+                className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="px-5 pb-8 space-y-4">
+          <h3 className="text-base font-semibold text-slate-900">Upload investigation</h3>
+          <p className="text-xs text-slate-400">{patient.name} · Bed {patient.bed}</p>
+
+          {/* Phase toggle */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+              Investigation type
+            </label>
+            <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+              <button
+                onClick={() => onPhaseChange('preop')}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  phase === 'preop'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Pre-Op
+              </button>
+              <button
+                onClick={() => onPhaseChange('postop')}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  phase === 'postop'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Post-Op
+              </button>
+            </div>
+          </div>
+
+          {/* Modality */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+              Modality
+            </label>
+            <select
+              value={invType}
+              onChange={e => onTypeChange(e.target.value)}
+              disabled={isUploading}
+              className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold
+                         text-slate-700 bg-white focus:outline-none focus:ring-2
+                         focus:ring-teal-500/20 focus:border-teal-400 disabled:opacity-60"
+            >
+              <option value="X-Ray">X-Ray</option>
+              <option value="CT">CT Scan</option>
+              <option value="MRI">MRI</option>
+              <option value="USG">Ultrasound (USG)</option>
+              <option value="Report">Report / Document</option>
+            </select>
+          </div>
+
+          {uploadError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
+              {uploadError}
+            </p>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              disabled={isUploading}
+              className="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-semibold
+                         text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSave}
+              disabled={isUploading}
+              className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-60
+                         text-white font-semibold rounded-xl transition-colors
+                         flex items-center justify-center gap-2"
+            >
+              {isUploading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+                : 'Save'
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+const RadiologyComparator: React.FC<Props> = ({
+  patients, onAddInvestigation, onDeleteInvestigation, initialPatientId,
+}) => {
+  const { user } = useAuth();
+
+  const [selectedPatientId, setSelectedPatientId] = useState(initialPatientId || '');
+
+  // Upload state
+  const [selectedFile, setSelectedFile]   = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl]       = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [invType, setInvType] = useState('X-Ray');
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [invType, setInvType]             = useState('X-Ray');
+  const [uploadPhase, setUploadPhase]     = useState<RadPhase>('preop');
+  const [isUploading, setIsUploading]     = useState(false);
+  const [uploadError, setUploadError]     = useState<string | null>(null);
+
+  const fileInputRef   = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
-  /** On Android, detect when the camera picker closes without returning a file
-   *  (likely due to camera permission denial) and show a help message. */
+  useEffect(() => {
+    if (initialPatientId) setSelectedPatientId(initialPatientId);
+  }, [initialPatientId]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
+  const investigations  = selectedPatient?.investigations ?? [];
+
+  // Phase from DOS vs today
+  const defaultPhase = useMemo((): RadPhase => {
+    if (!selectedPatient?.dos) return 'preop';
+    return new Date() < new Date(selectedPatient.dos) ? 'preop' : 'postop';
+  }, [selectedPatient]);
+
+  // Split into pre/post — legacy scans without phase: compare date to DOS
+  const { preOpScans, postOpScans } = useMemo(() => {
+    const dos = selectedPatient?.dos;
+    const preOpScans:  Investigation[] = [];
+    const postOpScans: Investigation[] = [];
+    for (const inv of investigations) {
+      const phase = inv.phase ?? (dos && inv.date >= dos ? 'postop' : 'preop');
+      if (phase === 'postop') postOpScans.push(inv);
+      else preOpScans.push(inv);
+    }
+    return { preOpScans, postOpScans };
+  }, [investigations, selectedPatient]);
+
   const handleCameraClick = () => {
     if (!cameraInputRef.current) return;
-    // Reset value so the change event fires even if same file is picked again
     cameraInputRef.current.value = '';
-
-    // Focus-return detection: if window regains focus but no file was selected,
-    // the camera was cancelled — possibly due to a denied permission.
     let pickerOpened = false;
     const onFocus = () => {
       window.removeEventListener('focus', onFocus);
       if (pickerOpened && !selectedFile) {
-        // Short delay lets the change event fire first if a file was actually picked
         setTimeout(() => {
           if (!selectedFile && !showUploadForm) {
-            setUploadError(
-              'No photo selected. If the camera option was missing, enable Camera permission: Settings → Apps → MediWard → Permissions → Camera.'
-            );
+            setUploadError('No photo selected. Enable Camera permission: Settings → Apps → MediWard → Permissions → Camera.');
           }
         }, 300);
       }
@@ -62,77 +454,40 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
     cameraInputRef.current.click();
   };
 
-  // Sync prop with state if it changes
-  useEffect(() => {
-    if (initialPatientId) {
-      setSelectedPatientId(initialPatientId);
-      const patient = patients.find(p => p.ipNo === initialPatientId);
-      if (patient) setSelectedWard('All');
-    }
-  }, [initialPatientId, patients]);
-
-  // Revoke object URL on unmount to avoid memory leaks
-  useEffect(() => {
-    return () => {
-      if (previewUrl && previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
-
-  const filteredPatients = useMemo(() => {
-    let filtered = patients;
-    if (selectedWard !== 'All') {
-      filtered = filtered.filter(p => p.ward === selectedWard);
-    }
-    return filtered.sort((a, b) => (parseInt(a.bed) || 0) - (parseInt(b.bed) || 0));
-  }, [patients, selectedWard]);
-
-  const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
-  const investigations = selectedPatient?.investigations || [];
+  const openUpload = (phase: RadPhase) => {
+    setUploadPhase(phase);
+    fileInputRef.current?.click();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate MIME type and size before creating a preview
-    try {
-      validateImageFile(file);
-    } catch (err) {
+    try { validateImageFile(file); } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Invalid file');
       e.target.value = '';
       return;
     }
-
-    // Revoke previous blob URL
-    if (previewUrl && previewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
     setShowUploadForm(true);
-    setInvType('X-Ray');
     setUploadError(null);
   };
 
   const handleSave = async () => {
     if (!selectedPatientId || !selectedFile) return;
-
     setIsUploading(true);
     setUploadError(null);
-
     try {
       const imageUrl = await uploadInvestigationImage(selectedFile, user?.hospitalId ?? 'shared', selectedPatientId);
-
       const newInv: Investigation = {
         id: generateId(),
         date: new Date().toISOString().split('T')[0],
         type: invType,
         findings: '',
         imageUrl,
+        phase: uploadPhase,
       };
-
       onAddInvestigation(selectedPatientId, newInv);
       handleCancelUpload();
     } catch (err) {
@@ -143,9 +498,7 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
   };
 
   const handleCancelUpload = () => {
-    if (previewUrl && previewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(previewUrl);
-    }
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
     setSelectedFile(null);
     setPreviewUrl(null);
     setShowUploadForm(false);
@@ -153,254 +506,142 @@ const RadiologyComparator: React.FC<Props> = ({ patients, onAddInvestigation, on
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleDelete = async (invId: string, imageUrl: string) => {
+  const handleDelete = (invId: string, imageUrl: string) => {
     if (!onDeleteInvestigation) return;
+    if (!confirm('Delete this image?')) return;
     onDeleteInvestigation(selectedPatientId, invId);
-    // Fire-and-forget storage deletion
-    deleteInvestigationImage(imageUrl).catch(err =>
-      console.error('[Storage] Delete failed:', err)
-    );
+    deleteInvestigationImage(imageUrl).catch(console.error);
   };
 
-  return (
-    <div className="flex flex-col space-y-6">
-      {/* Selection Area */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4 relative z-20">
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Filter className="w-3 h-3" /> Filter by Ward
-          </label>
-          <select
-            className="w-full p-2 border border-slate-300 rounded-md bg-white text-sm focus:ring-2 focus:ring-teal-500 outline-none"
-            value={selectedWard}
-            onChange={(e) => {
-              setSelectedWard(e.target.value);
-              setSelectedPatientId('');
-              handleCancelUpload();
-            }}
-          >
-            <option value="All">All Wards</option>
-            {activeConfigWards.map(w => (
-              <option key={w.name} value={w.name}>{w.name}</option>
-            ))}
-          </select>
-        </div>
+  const onPatientSelect = (id: string) => {
+    setSelectedPatientId(id);
+    handleCancelUpload();
+  };
 
-        <div>
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Users className="w-3 h-3" /> Select Patient
-          </label>
-          <select
-            className={`w-full p-2 border rounded-md bg-white text-sm focus:ring-2 focus:ring-teal-500 outline-none transition-all ${!selectedPatientId ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-300'}`}
-            value={selectedPatientId}
-            onChange={(e) => {
-              setSelectedPatientId(e.target.value);
-              handleCancelUpload();
-            }}
-            disabled={filteredPatients.length === 0}
-          >
-            <option value="">-- {filteredPatients.length === 0 ? 'No Patients in Ward' : 'Select Patient to Upload/View'} --</option>
-            {filteredPatients.map(p => (
-              <option key={p.ipNo} value={p.ipNo}>
-                Bed {p.bed}: {p.name} ({p.investigations.length})
-              </option>
-            ))}
-          </select>
-          {!selectedPatientId && filteredPatients.length > 0 && (
-            <div className="absolute right-4 top-16 md:top-4 text-teal-600 animate-bounce hidden md:block">
-              <ArrowUp className="w-5 h-5" />
-            </div>
-          )}
-        </div>
+  const sortedPatients = useMemo(() =>
+    [...patients].sort((a, b) => (parseInt(a.bed) || 0) - (parseInt(b.bed) || 0)),
+    [patients],
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Hidden file inputs */}
+      <input type="file" accept="image/*,.pdf" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+      {isAndroidNative && (
+        <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileChange} />
+      )}
+
+      {/* Patient picker */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+          Select Patient
+        </p>
+        <PatientPicker patients={sortedPatients} selectedId={selectedPatientId} onSelect={onPatientSelect} />
       </div>
 
       {!selectedPatient ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 text-slate-400 p-12 text-center animate-in fade-in duration-500">
-          <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-            <ImageIcon className="w-12 h-12 text-blue-500 opacity-80" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-700 mb-1">Radiology & Imaging Gallery</h3>
-          <p className="max-w-md mx-auto mb-6 text-sm">Select a patient from the dropdown above to view their history or upload new X-Rays, CT Scans, and MRI reports.</p>
-          <div className="flex gap-2 text-xs font-mono bg-slate-100 p-2 rounded text-slate-500 border border-slate-200">
-            <span className="flex items-center gap-1"><Filter className="w-3 h-3" /> Filter by Ward</span>
-            <span className="text-slate-300">→</span>
-            <span className="flex items-center gap-1 font-bold text-teal-600"><Users className="w-3 h-3" /> Select Patient</span>
-          </div>
+        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50
+                        rounded-xl border-2 border-dashed border-slate-200 p-16 text-center">
+          <ImageIcon className="w-10 h-10 text-slate-200 mb-3" />
+          <p className="text-sm font-semibold text-slate-500">Select a patient above</p>
+          <p className="text-xs text-slate-400 mt-1">X-Rays, CT, MRI and reports will appear here</p>
         </div>
       ) : (
-        <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-
-          {/* Action Bar */}
-          {!showUploadForm && (
-            <div className="flex justify-between items-center bg-slate-100 p-3 rounded-lg border border-slate-200">
-              <div>
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                  {selectedPatient.name}
-                  <span className="text-sm font-normal text-slate-500">({selectedPatient.ward}, Bed {selectedPatient.bed})</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{investigations.length} images on file</p>
+        <>
+          {/* Patient header */}
+          <div className="bg-slate-900 rounded-xl p-4 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">{selectedPatient.name}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {selectedPatient.diagnosis} · Bed {selectedPatient.bed}
+              </p>
+            </div>
+            {selectedPatient.dos && (
+              <div className="shrink-0 text-right">
+                <p className="text-[9px] text-slate-500 uppercase tracking-wide">DOS</p>
+                <p className="text-xs font-semibold text-teal-400">
+                  {new Date(selectedPatient.dos).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                </p>
               </div>
-              <div className="flex gap-2">
-                {/* Gallery file input (always present) */}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
+            )}
+            {isAndroidNative && (
+              <button
+                onClick={handleCameraClick}
+                className="shrink-0 flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700
+                           text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+              >
+                <Camera className="w-3.5 h-3.5" /> Camera
+              </button>
+            )}
+          </div>
+
+          {/* ── PRE-OP ──────────────────────────────────────────────── */}
+          <div className="bg-white rounded-xl border border-blue-100 p-4">
+            <SectionHeader phase="preop" count={preOpScans.length} patient={selectedPatient} scans={preOpScans} />
+            <div className="grid grid-cols-3 gap-2">
+              {preOpScans.map(inv => (
+                <ImageCard
+                  key={inv.id}
+                  inv={inv}
+                  onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                 />
-                {/* Camera-capture input (Android native only) */}
-                {isAndroidNative && (
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    ref={cameraInputRef}
-                    onChange={handleFileChange}
-                  />
-                )}
-                {isAndroidNative ? (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleCameraClick}
-                      className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
-                    >
-                      <Camera className="w-4 h-4" /> Camera
-                    </button>
-                    <button
-                      onClick={() => { fileInputRef.current?.value && (fileInputRef.current.value = ''); fileInputRef.current?.click(); }}
-                      className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition-colors text-sm"
-                    >
-                      <ImageIcon className="w-4 h-4" /> Gallery
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span className="hidden md:inline">Take Photo / Upload</span>
-                    <span className="md:hidden">Add Photo</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Upload Form */}
-          {showUploadForm && (
-            <div className="bg-white rounded-lg shadow-xl border border-blue-100 overflow-hidden animate-in slide-in-from-top-4 duration-200 max-w-md mx-auto md:mx-0">
-              <div className="relative bg-black h-64 flex items-center justify-center">
-                {previewUrl && (
-                  <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain" />
-                )}
-                {!isUploading && (
-                  <button
-                    onClick={handleCancelUpload}
-                    className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-
-              <div className="p-4 bg-blue-50/50 space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-blue-800 uppercase mb-1">Investigation Type</label>
-                  <select
-                    value={invType}
-                    onChange={(e) => setInvType(e.target.value)}
-                    disabled={isUploading}
-                    className="w-full p-2 text-sm border border-blue-200 rounded outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-60"
-                  >
-                    <option value="X-Ray">X-Ray</option>
-                    <option value="Pre-Op X-Ray">Pre-Op X-Ray</option>
-                    <option value="CT Scan">CT Scan</option>
-                    <option value="MRI">MRI</option>
-                    <option value="Ultrasound">Ultrasound</option>
-                    <option value="Lab Report">Lab Report</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                {uploadError && (
-                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{uploadError}</p>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCancelUpload}
-                    disabled={isUploading}
-                    className="flex-1 py-2 border border-slate-300 bg-white rounded text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={isUploading}
-                    className="flex-1 py-2 bg-teal-600 text-white rounded font-bold hover:bg-teal-700 flex items-center justify-center gap-2 disabled:opacity-70"
-                  >
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Uploading…
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-4 h-4" />
-                        Save
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Gallery Grid */}
-          {investigations.length === 0 ? (
-            <div className="text-center py-12 bg-slate-50 border border-slate-200 rounded-lg text-slate-400">
-              <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>No investigations uploaded for this patient yet.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {investigations.map((inv) => (
-                <div key={inv.id} className="group bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden relative">
-                  <div className="aspect-[4/3] bg-black relative flex items-center justify-center overflow-hidden">
-                    <img
-                      src={inv.imageUrl}
-                      alt={inv.type}
-                      className="max-h-full max-w-full object-cover"
-                    />
-                    <div className="absolute top-0 left-0 right-0 p-2 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-start">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-white drop-shadow-sm">{inv.type}</span>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-2.5 h-2.5 text-white/80" />
-                          <span className="text-[9px] font-medium text-white/90">{inv.date}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {onDeleteInvestigation && (
-                      <button
-                        onClick={() => handleDelete(inv.id, inv.imageUrl)}
-                        className="absolute top-2 right-2 bg-red-600/80 hover:bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Delete Image"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
               ))}
+              <UploadCard phase="preop" onClick={() => { setUploadPhase('preop'); fileInputRef.current?.click(); }} />
+            </div>
+          </div>
+
+          {/* ── POST-OP ─────────────────────────────────────────────── */}
+          <div className="bg-white rounded-xl border border-teal-100 p-4">
+            <SectionHeader phase="postop" count={postOpScans.length} patient={selectedPatient} scans={postOpScans} />
+            <div className="grid grid-cols-3 gap-2">
+              {postOpScans.map(inv => (
+                <ImageCard
+                  key={inv.id}
+                  inv={inv}
+                  onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
+                />
+              ))}
+              <UploadCard phase="postop" onClick={() => { setUploadPhase('postop'); fileInputRef.current?.click(); }} />
+            </div>
+          </div>
+
+          {/* ── WhatsApp Share Bar ───────────────────────────────────── */}
+          {(preOpScans.length + postOpScans.length) > 0 && (
+            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl p-3">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                   style={{ backgroundColor: '#25D366' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                  <path d="M11.997 2C6.477 2 2 6.484 2 12.017c0 1.99.52 3.85 1.43 5.456L2 22l4.616-1.43A9.96 9.96 0 0011.997 22C17.52 22 17.516 22 22 12.017 22 6.484 17.52 2 11.997 2z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-green-800">Share via WhatsApp</p>
+                <p className="text-[10px] text-green-600 truncate font-mono">
+                  {selectedPatient.name.replace(/\s+/g, '_')}_PreOp.pdf
+                  {postOpScans.length > 0 && ` · ${selectedPatient.name.replace(/\s+/g, '_')}_PostOp.pdf`}
+                </p>
+              </div>
             </div>
           )}
-        </div>
+        </>
       )}
+
+      {/* Upload bottom sheet */}
+      <UploadSheet
+        isOpen={showUploadForm}
+        file={selectedFile}
+        previewUrl={previewUrl}
+        patient={selectedPatient!}
+        isUploading={isUploading}
+        uploadError={uploadError}
+        phase={uploadPhase}
+        invType={invType}
+        onPhaseChange={setUploadPhase}
+        onTypeChange={setInvType}
+        onSave={handleSave}
+        onCancel={handleCancelUpload}
+      />
     </div>
   );
 };

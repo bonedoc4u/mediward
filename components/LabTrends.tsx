@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, LabResult, LabTypeConfig } from '../types';
-import { useConfig } from '../contexts/AppContext';
-import { Activity, Plus, Droplet, Flame } from 'lucide-react';
+import { Patient, LabResult } from '../types';
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip,
+  ReferenceArea, ResponsiveContainer,
+} from 'recharts';
+import { Activity, Plus, TrendingDown, TrendingUp, Minus, Search, ChevronDown } from 'lucide-react';
 
 interface Props {
   patients: Patient[];
@@ -9,298 +12,440 @@ interface Props {
   initialPatientId?: string;
 }
 
-// Simple SVG Line Chart Component
-const SimpleLineChart = ({ data, lines, height = 200 }: { data: any[], lines: { key: string, color: string }[], height?: number }) => {
-    if (!data || data.length < 2) return <div className="h-48 flex items-center justify-center text-slate-400 text-xs">Not enough data to graph</div>;
-
-    const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    let allValues: number[] = [];
-    lines.forEach(line => {
-        sortedData.forEach(d => {
-            if (d[line.key] !== undefined) allValues.push(d[line.key]);
-        });
-    });
-
-    if (allValues.length === 0) return <div className="h-48 flex items-center justify-center text-slate-400 text-xs">No values</div>;
-
-    const minVal = Math.min(...allValues) * 0.9;
-    const maxVal = Math.max(...allValues) * 1.1;
-    const range = maxVal - minVal;
-
-    return (
-        <div className="w-full mt-4 bg-white rounded border border-slate-100 p-2">
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full" style={{ height: `${height}px` }}>
-                <line x1="0" y1="0" x2="100" y2="0" stroke="#f1f5f9" strokeWidth="0.5" />
-                <line x1="0" y1="50" x2="100" y2="50" stroke="#f1f5f9" strokeWidth="0.5" />
-                <line x1="0" y1="100" x2="100" y2="100" stroke="#f1f5f9" strokeWidth="0.5" />
-
-                {lines.map((line) => {
-                    const points = sortedData.map((d, i) => {
-                        const val = d[line.key];
-                        if (val === undefined) return null;
-                        const x = (i / (sortedData.length - 1)) * 100;
-                        const y = 100 - (((val - minVal) / range) * 100);
-                        return `${x},${y}`;
-                    }).filter(p => p !== null);
-
-                    if (points.length < 1) return null;
-
-                    return (
-                        <g key={line.key}>
-                            <polyline points={points.join(' ')} fill="none" stroke={line.color}
-                                strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                            {sortedData.map((d, i) => {
-                                const val = d[line.key];
-                                if (val === undefined) return null;
-                                const x = (i / (sortedData.length - 1)) * 100;
-                                const y = 100 - (((val - minVal) / range) * 100);
-                                return (
-                                    <circle key={i} cx={x} cy={y} r="2" fill={line.color}
-                                        stroke="white" strokeWidth="0.5">
-                                        <title>{d.date}: {val}</title>
-                                    </circle>
-                                );
-                            })}
-                        </g>
-                    );
-                })}
-            </svg>
-            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                <span>{sortedData[0].date}</span>
-                <span>{sortedData[sortedData.length - 1].date}</span>
-            </div>
-            <div className="flex gap-4 justify-center mt-2">
-                {lines.map(l => (
-                    <div key={l.key} className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
-                        <span className="text-xs text-slate-600">{l.key}</span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-
-// Cycle of colors for chart lines within a category
-const LINE_COLORS = ['#3b82f6', '#93c5fd', '#ea580c', '#fdba74', '#10b981', '#6ee7b7', '#8b5cf6', '#c4b5fd'];
-
-// Category header styling — well-known categories get themed icons/colors, others fall back to a neutral style
-function getCategoryStyle(category: string): { icon: React.ReactNode; headerClass: string } {
-  const cat = category.toLowerCase();
-  if (cat === 'diabetes' || cat === 'glycemic') {
-    return {
-      icon: <Droplet className="w-5 h-5 text-blue-500" />,
-      headerClass: 'bg-blue-50/50',
-    };
-  }
-  if (cat === 'infection' || cat === 'inflammation') {
-    return {
-      icon: <Flame className="w-5 h-5 text-orange-500" />,
-      headerClass: 'bg-orange-50/50',
-    };
-  }
-  return {
-    icon: <Activity className="w-5 h-5 text-slate-500" />,
-    headerClass: 'bg-slate-50',
-  };
+// ─── Lab Parameters ───────────────────────────────────────────────────────────
+interface LabParam {
+  id: string;
+  name: string;
+  unit: string;
+  refMin: number | null;
+  refMax: number;
 }
 
-// ─── Category Panel ───
-const ROW_LIMIT = 20;
+const LAB_PARAMS: LabParam[] = [
+  { id: 'fbs',  name: 'FBS',  unit: 'mg/dL', refMin: 70,   refMax: 100 },
+  { id: 'ppbs', name: 'PPBS', unit: 'mg/dL', refMin: null, refMax: 140 },
+  { id: 'esr',  name: 'ESR',  unit: 'mm/hr', refMin: 0,    refMax: 20  },
+  { id: 'crp',  name: 'CRP',  unit: 'mg/L',  refMin: 0,    refMax: 5   },
+];
 
-const CategoryPanel: React.FC<{
-  category: string;
-  labTypes: LabTypeConfig[];
-  labResults: LabResult[];
-  date: string;
-  onDateChange: (d: string) => void;
-  inputs: Record<string, string>;
-  onInputChange: (name: string, val: string) => void;
-  onAdd: (labTypes: LabTypeConfig[]) => void;
-}> = ({ category, labTypes, labResults, date, onDateChange, inputs, onInputChange, onAdd }) => {
-  const [showAll, setShowAll] = useState(false);
-  const { icon, headerClass } = getCategoryStyle(category);
+interface LabEntry { id: string; date: string; value: number; }
 
-  const getGroupedData = (types: LabTypeConfig[]) => {
-    const typeNames = types.map(t => t.name);
-    const dates = Array.from(new Set(
-      labResults.filter(r => typeNames.includes(r.type)).map(r => r.date)
-    )).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+// ─── BottomSheet ──────────────────────────────────────────────────────────────
+const BottomSheet: React.FC<{ isOpen: boolean; onClose: () => void; children: React.ReactNode }> = ({
+  isOpen, onClose, children,
+}) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-2xl
+                      animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
 
-    return dates.map(d => {
-      const dayResults = labResults.filter(r => r.date === d);
-      const values: Record<string, number | undefined> = {};
-      types.forEach(t => { values[t.name] = dayResults.find(r => r.type === t.name)?.value; });
-      return { date: d, ...values } as { date: string } & Record<string, number | undefined>;
-    });
+// ─── Add Entry Sheet ──────────────────────────────────────────────────────────
+const AddEntrySheet: React.FC<{
+  isOpen: boolean;
+  param: LabParam | null;
+  onClose: () => void;
+  onSave: (paramId: string, entry: LabEntry) => void;
+}> = ({ isOpen, param, onClose, onSave }) => {
+  const [value, setValue] = useState('');
+  const [date, setDate]   = useState(new Date().toISOString().split('T')[0]);
+
+  const numVal  = parseFloat(value);
+  const isHigh  = !isNaN(numVal) && !!param && numVal > param.refMax;
+  const isLow   = !isNaN(numVal) && !!param && param.refMin != null && numVal < param.refMin;
+  const isValid = value !== '' && !isNaN(numVal) && !!date;
+
+  const handleSave = () => {
+    if (!isValid || !param) return;
+    onSave(param.id, { id: crypto.randomUUID(), date, value: numVal });
+    setValue('');
+    setDate(new Date().toISOString().split('T')[0]);
+    onClose();
   };
 
-  const allGrouped = getGroupedData(labTypes);
-  const grouped = showAll ? allGrouped : allGrouped.slice(0, ROW_LIMIT);
-  const chartLines = labTypes.map((t, i) => ({ key: t.name, color: LINE_COLORS[i % LINE_COLORS.length] }));
-  const addButtonColor = getCategoryStyle(category).headerClass.includes('blue') ? 'bg-teal-600 hover:bg-teal-700' : 'bg-orange-600 hover:bg-orange-700';
+  const borderClass = isHigh
+    ? 'border-red-300 focus-within:border-red-400'
+    : isLow
+    ? 'border-blue-300 focus-within:border-blue-400'
+    : 'border-slate-200 focus-within:border-teal-400';
 
-  const renderValueCell = (value: number | undefined, labType: LabTypeConfig) => {
-    if (value === undefined) return <span className="text-slate-300">—</span>;
-    const isHigh = labType.alertHigh !== null && value > labType.alertHigh;
-    return <span className={isHigh ? 'text-red-600 font-bold' : 'text-slate-700 font-medium'}>{value}</span>;
-  };
+  const hintClass = isHigh ? 'text-red-500' : isLow ? 'text-blue-500' : 'text-slate-400';
+
+  const hintText = isHigh
+    ? `↑ Above normal (>${param?.refMax})`
+    : isLow
+    ? `↓ Below normal (<${param?.refMin})`
+    : param
+    ? `Normal range: ${param.refMin != null ? `${param.refMin}–` : '<'}${param.refMax} ${param.unit}`
+    : '';
 
   return (
-    <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden flex flex-col">
-      <div className={`p-4 border-b border-slate-100 ${headerClass} flex items-center gap-2`}>
-        {icon}
-        <h3 className="font-bold text-slate-800">{category}</h3>
-        <span className="text-xs text-slate-500 ml-1">
-          ({labTypes.map(t => `${t.name}${t.unit ? ` / ${t.unit}` : ''}`).join(', ')})
-        </span>
-      </div>
+    <BottomSheet isOpen={isOpen} onClose={onClose}>
+      <div className="p-5 space-y-4 pb-8">
+        <h3 className="text-base font-semibold text-slate-900">Add {param?.name} entry</h3>
 
-      <div className="px-4">
-        {/* Cap chart at 30 most recent dates to prevent SVG DOM bloat with large datasets */}
-        <SimpleLineChart data={allGrouped.slice(0, 30)} lines={chartLines} />
-      </div>
-
-      {/* Input row */}
-      <div className="p-4 bg-slate-50 border-t border-b border-slate-100 grid grid-cols-12 gap-2 items-end mt-4">
-        <div className="col-span-12 md:col-span-4">
-          <label className="text-[10px] uppercase font-bold text-slate-500">Date</label>
-          <input type="date" value={date} onChange={e => onDateChange(e.target.value)}
-            className="w-full p-1.5 text-sm border rounded" />
-        </div>
-        {labTypes.map((lt, i) => (
-          <div key={lt.name} className={`col-span-${Math.floor(8 / labTypes.length)} md:col-span-${Math.floor(6 / labTypes.length) || 2}`}>
-            <label className="text-[10px] uppercase font-bold text-slate-500">
-              {lt.name}{lt.unit ? ` (${lt.unit})` : ''}
-            </label>
-            <input type="number" placeholder="Value" value={inputs[lt.name] ?? ''}
-              onChange={e => onInputChange(lt.name, e.target.value)}
-              className="w-full p-1.5 text-sm border rounded" />
+        <div className="space-y-1">
+          <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+            Value ({param?.unit})
+          </label>
+          <div className={`flex items-center bg-white border rounded-xl overflow-hidden
+                           focus-within:ring-2 focus-within:ring-teal-500/20 transition-all ${borderClass}`}>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              placeholder="0.0"
+              autoFocus
+              className="flex-1 px-4 py-3 text-2xl font-bold outline-none bg-transparent text-slate-900"
+            />
+            <span className="px-4 text-sm text-slate-400 font-medium">{param?.unit}</span>
           </div>
-        ))}
-        <div className="col-span-2 md:col-span-2">
-          <button onClick={() => onAdd(labTypes)}
-            aria-label="Add lab results"
-            className={`w-full ${addButtonColor} text-white p-1.5 rounded flex items-center justify-center`}>
-            <Plus className="w-4 h-4" />
-          </button>
+          <p className={`text-[10px] font-medium ${hintClass}`}>{hintText}</p>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+            Date of test
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            max={new Date().toISOString().split('T')[0]}
+            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5
+                       text-sm font-semibold text-slate-700 focus:outline-none
+                       focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+          />
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={!isValid}
+          className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-40
+                     text-white font-semibold rounded-xl transition-colors"
+        >
+          Save entry
+        </button>
+      </div>
+    </BottomSheet>
+  );
+};
+
+// ─── Lab Chart Card ───────────────────────────────────────────────────────────
+const LabChartCard: React.FC<{
+  param: LabParam;
+  entries: LabEntry[];
+  onAddEntry: (paramId: string) => void;
+}> = ({ param, entries, onAddEntry }) => {
+  const latest = entries[entries.length - 1];
+  const prev   = entries[entries.length - 2];
+
+  const isHigh   = !!latest && latest.value > param.refMax;
+  const isLow    = !!latest && param.refMin != null && latest.value < param.refMin;
+  const isNormal = !!latest && !isHigh && !isLow;
+
+  const trendDir = prev && latest
+    ? latest.value < prev.value ? 'down'
+    : latest.value > prev.value ? 'up'
+    : 'flat'
+    : null;
+
+  const strokeColor = isHigh ? '#DC2626' : isLow ? '#2563EB' : '#0D9488';
+  const borderClass = isHigh ? 'border-red-200' : isLow ? 'border-blue-200' : 'border-slate-200';
+  const valueClass  = isHigh ? 'text-red-600'  : isLow ? 'text-blue-600'   : 'text-slate-900';
+
+  const refAreaY1 = param.refMin ?? 0;
+  const refAreaY2 = param.refMax;
+
+  const TrendIcon = trendDir === 'down' ? TrendingDown : trendDir === 'up' ? TrendingUp : Minus;
+  const trendColor = trendDir === 'down' ? 'text-teal-600' : trendDir === 'up' ? 'text-red-500' : 'text-slate-400';
+
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+  return (
+    <div className={`bg-white rounded-xl border p-3 flex flex-col gap-1 ${borderClass}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+          {param.name}
+        </span>
+        <div className="flex items-center gap-1">
+          {isHigh   && <span className="text-[9px] font-bold bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-full">HIGH</span>}
+          {isLow    && <span className="text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full">LOW</span>}
+          {isNormal && <span className="text-[9px] font-bold bg-green-50 text-green-600 border border-green-200 px-1.5 py-0.5 rounded-full">NL</span>}
+          {!latest  && <span className="text-[9px] font-bold bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full">No data</span>}
         </div>
       </div>
 
-      {/* Table — horizontally scrollable when many columns */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left" style={{ minWidth: `${(labTypes.length + 1) * 80}px` }}>
-          <thead className="text-xs text-slate-500 uppercase bg-slate-50">
-            <tr>
-              <th className="px-4 py-2 whitespace-nowrap sticky left-0 bg-slate-50 z-10">Date</th>
-              {labTypes.map(lt => <th key={lt.name} className="px-4 py-2 whitespace-nowrap">{lt.name}</th>)}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {grouped.map(row => (
-              <tr key={row.date} className="hover:bg-slate-50">
-                <td className="px-4 py-2 text-slate-500 whitespace-nowrap sticky left-0 bg-white">{row.date}</td>
-                {labTypes.map(lt => (
-                  <td key={lt.name} className="px-4 py-2">
-                    {renderValueCell(row[lt.name] as number | undefined, lt)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {grouped.length === 0 && (
-              <tr><td colSpan={labTypes.length + 1} className="p-4 text-center text-slate-400 text-xs">No records found</td></tr>
-            )}
-          </tbody>
-        </table>
+      {/* Value row */}
+      <div className="flex items-baseline gap-1">
+        <span className={`text-2xl font-bold leading-none ${valueClass}`}>
+          {latest ? latest.value : '—'}
+        </span>
+        <span className="text-[10px] text-slate-400">{param.unit}</span>
+        {trendDir && (
+          <span className={`ml-1 ${trendColor}`}>
+            <TrendIcon className="w-3.5 h-3.5 inline" />
+          </span>
+        )}
       </div>
-      {allGrouped.length > ROW_LIMIT && (
+
+      {/* Chart */}
+      <div className="h-[72px] -mx-1">
+        {entries.length >= 2 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={entries} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={`grad-${param.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.25} />
+                  <stop offset="95%" stopColor={strokeColor} stopOpacity={0}    />
+                </linearGradient>
+              </defs>
+              <ReferenceArea y1={refAreaY1} y2={refAreaY2} fill="#D1FAE5" fillOpacity={0.5} strokeOpacity={0} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 8, fill: '#94A3B8' }}
+                tickFormatter={fmtDate}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis hide domain={['auto', 'auto']} />
+              <Tooltip
+                contentStyle={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '0.5px solid #E2E8F0' }}
+                formatter={(v) => [`${v} ${param.unit}`, param.name]}
+                labelFormatter={(d) => fmtDate(String(d))}
+              />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={strokeColor}
+                strokeWidth={1.5}
+                fill={`url(#grad-${param.id})`}
+                dot={{ r: 3, fill: strokeColor, strokeWidth: 0 }}
+                activeDot={{ r: 5 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-300">
+            <Activity className="w-5 h-5" />
+            <p className="text-[10px] text-slate-400">
+              {entries.length === 0 ? 'No entries yet' : 'Need 2+ entries for chart'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-[9px] text-slate-400 font-mono">
+          Ref: {param.refMin != null ? `${param.refMin}–` : '<'}{param.refMax} {param.unit}
+        </span>
         <button
-          onClick={() => setShowAll(s => !s)}
-          className="w-full py-2 text-xs text-teal-600 hover:text-blue-800 hover:bg-blue-50 border-t border-slate-100 transition-colors"
+          onClick={() => onAddEntry(param.id)}
+          className="flex items-center gap-1 text-[10px] font-semibold text-teal-600
+                     hover:text-teal-800 transition-colors"
         >
-          {showAll ? `Show recent ${ROW_LIMIT}` : `Show all ${allGrouped.length} dates`}
+          <Plus className="w-3 h-3" /> Add entry
         </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Patient Picker ───────────────────────────────────────────────────────────
+const PatientPicker: React.FC<{
+  patients: Patient[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}> = ({ patients, selectedId, onSelect }) => {
+  const [search, setSearch] = useState('');
+  const [open, setOpen]     = useState(false);
+
+  const filtered = useMemo(() =>
+    patients.filter(p =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.ipNo.includes(search) ||
+      p.bed.includes(search),
+    ), [patients, search]);
+
+  const selected = patients.find(p => p.ipNo === selectedId);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-xl
+                   px-4 py-3 text-left hover:border-teal-400 transition-colors"
+      >
+        {selected ? (
+          <>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-900 truncate">{selected.name}</p>
+              <p className="text-[11px] text-slate-400">Bed {selected.bed} · IP: {selected.ipNo}</p>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 flex-1">
+            <Search className="w-4 h-4 text-slate-400" />
+            <span className="text-sm text-slate-400">Search patient…</span>
+          </div>
+        )}
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-slate-200
+                        rounded-xl shadow-xl z-30 max-h-64 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                autoFocus
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Name, bed or IP no."
+                className="flex-1 text-sm bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {filtered.length === 0 ? (
+              <p className="text-center text-xs text-slate-400 py-6">No patients found</p>
+            ) : (
+              filtered.map(p => (
+                <button
+                  key={p.ipNo}
+                  onClick={() => { onSelect(p.ipNo); setOpen(false); setSearch(''); }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left
+                              hover:bg-teal-50 transition-colors ${p.ipNo === selectedId ? 'bg-teal-50' : ''}`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-slate-500">{p.bed}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
+                    <p className="text-[10px] text-slate-400">IP: {p.ipNo} · {p.ward}</p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
-// ─── Main LabTrends component ───
+// ─── Main ─────────────────────────────────────────────────────────────────────
 const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = '' }) => {
-  const { labTypesByCategory } = useConfig();
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(initialPatientId);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [selectedId, setSelectedId] = useState(initialPatientId);
+  const [sheetParam, setSheetParam] = useState<LabParam | null>(null);
 
-  const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
-  const labResults = selectedPatient?.labResults ?? [];
+  const selectedPatient = patients.find(p => p.ipNo === selectedId);
 
-  const handleInputChange = (name: string, val: string) => {
-    setInputs(prev => ({ ...prev, [name]: val }));
-  };
+  const entriesByParam = useMemo(() => {
+    const results = selectedPatient?.labResults ?? [];
+    const map: Record<string, LabEntry[]> = {};
+    for (const param of LAB_PARAMS) {
+      map[param.id] = results
+        .filter(r => r.type.toUpperCase() === param.name)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(r => ({ id: r.id, date: r.date, value: r.value }));
+    }
+    return map;
+  }, [selectedPatient]);
 
-  const handleAdd = (labTypes: LabTypeConfig[]) => {
-    if (!selectedPatientId) return;
-    labTypes.forEach(lt => {
-      const val = inputs[lt.name];
-      if (!val) return;
-      const num = parseFloat(val);
-      if (isNaN(num)) return;
-      const newResult: LabResult = {
-        id: crypto.randomUUID(),
-        date,
-        type: lt.name,
-        value: num,
-      };
-      onAddResult(selectedPatientId, newResult);
+  const handleSaveEntry = (paramId: string, entry: LabEntry) => {
+    if (!selectedPatient) return;
+    const param = LAB_PARAMS.find(p => p.id === paramId);
+    if (!param) return;
+    onAddResult(selectedPatient.ipNo, {
+      id: entry.id,
+      date: entry.date,
+      type: param.name,
+      value: entry.value,
     });
-    const cleared: Record<string, string> = {};
-    labTypes.forEach(lt => { cleared[lt.name] = ''; });
-    setInputs(prev => ({ ...prev, ...cleared }));
   };
-
-  const categories = useMemo(() => Array.from(labTypesByCategory.entries()), [labTypesByCategory]);
 
   return (
-    <div className="flex flex-col space-y-6">
-      {/* Patient selector */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Select Patient to Track</label>
-        <select
-          className="w-full md:w-1/2 p-2 border border-slate-300 rounded-md bg-white text-sm"
-          value={selectedPatientId}
-          onChange={e => setSelectedPatientId(e.target.value)}
-        >
-          <option value="">-- Choose Patient --</option>
-          {patients.map(p => (
-            <option key={p.ipNo} value={p.ipNo}>Bed {p.bed}: {p.name}</option>
-          ))}
-        </select>
+    <div className="flex flex-col gap-4">
+      {/* Patient picker */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+          Select Patient
+        </p>
+        <PatientPicker
+          patients={patients}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+        />
       </div>
 
       {!selectedPatient ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 rounded-lg border-2 border-dashed border-slate-300 text-slate-400 p-12">
-          <Activity className="w-16 h-16 mb-2 opacity-50" />
-          <p>Select a patient to view and update lab trends</p>
+        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50
+                        rounded-xl border-2 border-dashed border-slate-200 p-16 text-center">
+          <Activity className="w-10 h-10 text-slate-200 mb-3" />
+          <p className="text-sm font-semibold text-slate-500">Select a patient above</p>
+          <p className="text-xs text-slate-400 mt-1">Lab trends will appear here</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {categories.map(([category, labTypes]) => (
-            <CategoryPanel
-              key={category}
-              category={category}
-              labTypes={labTypes}
-              labResults={labResults}
-              date={date}
-              onDateChange={setDate}
-              inputs={inputs}
-              onInputChange={handleInputChange}
-              onAdd={handleAdd}
-            />
-          ))}
-        </div>
+        <>
+          {/* Patient header */}
+          <div className="bg-slate-900 rounded-xl p-4 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">{selectedPatient.name}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {selectedPatient.age}y {selectedPatient.gender} · Bed {selectedPatient.bed} · IP: {selectedPatient.ipNo}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-[10px] text-slate-400">{selectedPatient.ward}</p>
+              <p className="text-[10px] text-teal-400 font-semibold mt-0.5">
+                {Object.values(entriesByParam).reduce((n, e) => n + e.length, 0)} entries
+              </p>
+            </div>
+          </div>
+
+          {/* 2×2 chart grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {LAB_PARAMS.map(param => (
+              <LabChartCard
+                key={param.id}
+                param={param}
+                entries={entriesByParam[param.id] ?? []}
+                onAddEntry={id => setSheetParam(LAB_PARAMS.find(p => p.id === id) ?? null)}
+              />
+            ))}
+          </div>
+
+          {/* Add investigation hook */}
+          <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl
+                             text-xs font-semibold text-slate-400 hover:border-teal-300
+                             hover:text-teal-500 transition-colors flex items-center justify-center gap-2">
+            <Plus className="w-3.5 h-3.5" /> Add investigation
+          </button>
+        </>
       )}
+
+      {/* Add entry bottom sheet */}
+      <AddEntrySheet
+        isOpen={!!sheetParam}
+        param={sheetParam}
+        onClose={() => setSheetParam(null)}
+        onSave={handleSaveEntry}
+      />
     </div>
   );
 };

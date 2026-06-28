@@ -369,6 +369,8 @@ export interface Investigation {
   type: string;
   findings: string;
   imageUrl: string;
+  /** 'preop' = before surgery, 'postop' = after. Defaults to 'preop' for legacy records. */
+  phase?: 'preop' | 'postop';
 }
 
 export interface ToDoItem {

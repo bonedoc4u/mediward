@@ -10,6 +10,7 @@ export async function insertImaging(patientIpNo: string, inv: Investigation, hos
     type:          inv.type,
     findings:      inv.findings,
     image_url:     inv.imageUrl || null,
+    ...(inv.phase  ? { phase: inv.phase }        : {}),
     ...(hospitalId ? { hospital_id: hospitalId } : {}),
   });
   if (error) throw new Error(`insertImaging: ${error.message}`);
