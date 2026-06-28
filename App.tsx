@@ -127,6 +127,7 @@ const BASE_NAV_ITEMS_LEFT: NavItem[] = [
   { id: 'pending',   label: 'Pending List', icon: ClipboardList,   section: 'Overview' },
   { id: 'master',    label: 'Master List',  icon: Database,        section: 'Overview' },
   { id: 'discharge', label: 'Discharge',    icon: LogOut,          section: 'Overview' },
+  { id: 'wenthome',  label: 'Went Home',   icon: Home,            section: 'Overview' },
   { id: 'rounds',    label: 'Daily Rounds', icon: ListChecks,      section: 'Clinical Tools' },
   { id: 'labs',      label: 'Lab Trends',   icon: Activity,        section: 'Clinical Tools' },
   { id: 'radiology', label: 'Radiology',    icon: FileImage,       section: 'Clinical Tools' },
@@ -205,6 +206,7 @@ const App: React.FC = () => {
     otlist:       { title: procedureListName,         description: 'Manage scheduled procedures and surgery lists' },
     patient:      { title: 'Patient Detail',          description: 'Comprehensive patient overview' },
     discharge:    { title: 'Discharge',               description: 'Discharge summaries for all discharged patients' },
+    wenthome:     { title: 'Went Home',              description: 'Patients sent home temporarily — not formally discharged' },
     'round-mode': { title: 'Ward Rounds',             description: 'Bedside round mode — swipe through patients' },
     audit:        { title: 'Audit Log',               description: 'System audit trail — all actions logged by user and time' },
     settings:     { title: 'Configuration',            description: 'Hospital settings, department presets, wards, units and lab types' },
@@ -459,7 +461,7 @@ const App: React.FC = () => {
         return (
           <WardDashboard
             patients={patients}
-            viewMode={currentView === 'dashboard' ? 'home' : currentView as 'pending' | 'master'}
+            viewMode={currentView === 'dashboard' ? 'home' : currentView as 'pending' | 'master' | 'wenthome'}
             onAddPatient={can(user, 'patient:add') ? openAddModal : undefined}
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
             onViewPatient={(ipNo: string) => navigateTo('patient', { id: ipNo })}

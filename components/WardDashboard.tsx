@@ -3,7 +3,7 @@ import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home } from 'lucide-react';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
 import { calcPod } from './HandoverSummary';
 import TodaySchedule from './TodaySchedule';
@@ -49,7 +49,7 @@ type FlatItem =
 
 interface Props {
   patients: Patient[];
-  viewMode?: 'home' | 'pending' | 'master';
+  viewMode?: 'home' | 'pending' | 'master' | 'wenthome';
   onAddPatient?: () => void;
   onEditPatient?: (patient: Patient) => void;
   onViewPatient?: (ipNo: string) => void;
@@ -84,6 +84,12 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
   const filteredPatients = useMemo(() => {
     return patients.filter(p => {
+      if (viewMode === 'wenthome') {
+        return p.patientStatus === PatientStatus.WentHome;
+      }
+      // Always hide WentHome from active ward views
+      if (p.patientStatus === PatientStatus.WentHome) return false;
+
       if (viewMode === 'home') {
         if (p.patientStatus === PatientStatus.Discharged) return false;
       } else if (viewMode === 'pending') {
@@ -222,6 +228,49 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       setQuickLabSaving(false);
     }
   };
+
+  // ─── Went Home View ─────────────────────────────────────────────────────────
+  if (viewMode === 'wenthome') {
+    return (
+      <div className="space-y-3">
+        {filteredPatients.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
+            <Home className="w-12 h-12 mb-3 opacity-30" />
+            <p className="text-base font-semibold text-slate-600">No patients went home</p>
+            <p className="text-sm mt-1">Patients temporarily sent home will appear here.</p>
+          </div>
+        ) : (
+          filteredPatients.map(p => (
+            <div
+              key={p.ipNo}
+              className="bg-white rounded-xl border border-slate-200 border-l-4 border-l-violet-400 p-4 flex items-center gap-4 cursor-pointer hover:shadow-sm hover:border-violet-300 transition-all active:scale-[0.99]"
+              onClick={() => onViewPatient?.(p.ipNo)}
+            >
+              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 shrink-0">
+                {p.bed}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-slate-900 truncate">{p.name}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{p.age}y · {p.gender} · IP {p.ipNo}</p>
+                <p className="text-xs text-slate-600 mt-1 truncate">{p.diagnosis}</p>
+              </div>
+              <div className="shrink-0 flex flex-col items-end gap-1.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-800 border border-violet-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                  Went Home
+                </span>
+                {p.doa && (
+                  <span className="text-[10px] text-slate-400">
+                    DOA {new Date(p.doa).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

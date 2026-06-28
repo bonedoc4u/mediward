@@ -8,7 +8,7 @@ import {
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   FileJson, Download, Pill, ClipboardList, Droplets, Bandage,
-  Calculator, Send, X, ChevronDown,
+  Calculator, Send, X, ChevronDown, Home,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBoundary from './ErrorBoundary';
@@ -24,11 +24,12 @@ const WoundCare        = lazy(() => import('./WoundCare'));
 
 // ─── Status Badge Config ──────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string }> = {
-  'Fit':        { bg: 'bg-green-100',   text: 'text-green-800',  dot: 'bg-green-500'  },
-  'Review':     { bg: 'bg-amber-100',   text: 'text-amber-800',  dot: 'bg-amber-500'  },
-  'Critical':   { bg: 'bg-red-100',     text: 'text-red-800',    dot: 'bg-red-500'    },
-  'Discharged': { bg: 'bg-blue-100',    text: 'text-blue-800',   dot: 'bg-blue-500'   },
-  'Stable':     { bg: 'bg-green-100',   text: 'text-green-800',  dot: 'bg-green-500'  },
+  'Fit':        { bg: 'bg-green-100',   text: 'text-green-800',   dot: 'bg-green-500'  },
+  'Review':     { bg: 'bg-amber-100',   text: 'text-amber-800',   dot: 'bg-amber-500'  },
+  'Critical':   { bg: 'bg-red-100',     text: 'text-red-800',     dot: 'bg-red-500'    },
+  'Went Home':  { bg: 'bg-violet-100',  text: 'text-violet-800',  dot: 'bg-violet-500' },
+  'Discharged': { bg: 'bg-blue-100',    text: 'text-blue-800',    dot: 'bg-blue-500'   },
+  'Stable':     { bg: 'bg-green-100',   text: 'text-green-800',   dot: 'bg-green-500'  },
 };
 const DEFAULT_STATUS = { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' };
 
@@ -88,8 +89,9 @@ const PatientDetail: React.FC = () => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
   const { labTypes, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, hospitalName } = useConfig();
 
-  const [showDischargeConfirm, setShowDischargeConfirm] = useState(false);
-  const [showDeleteConfirm,    setShowDeleteConfirm]    = useState(false);
+  const [showDischargeConfirm,  setShowDischargeConfirm]  = useState(false);
+  const [showWentHomeConfirm,   setShowWentHomeConfirm]   = useState(false);
+  const [showDeleteConfirm,     setShowDeleteConfirm]     = useState(false);
   const [showFhirExport,       setShowFhirExport]       = useState(false);
   const [showScoring,          setShowScoring]           = useState(false);
   const [showReferral,         setShowReferral]          = useState(false);
@@ -138,6 +140,17 @@ const PatientDetail: React.FC = () => {
     updatePatient({ ...patient, patientStatus: PatientStatus.Discharged, dod: new Date().toISOString().split('T')[0] });
     setShowDischargeConfirm(false);
     navigateTo('discharge', { id: patient.ipNo });
+  };
+
+  const handleWentHome = () => {
+    updatePatient({ ...patient, patientStatus: PatientStatus.WentHome });
+    setShowWentHomeConfirm(false);
+    navigateTo('dashboard');
+  };
+
+  const handleReturnToWard = () => {
+    updatePatient({ ...patient, patientStatus: PatientStatus.Review });
+    navigateTo('dashboard');
   };
 
   const handleDelete = () => {
@@ -434,10 +447,19 @@ const PatientDetail: React.FC = () => {
           <button onClick={() => navigateTo('discharge', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-xl shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-xs font-bold text-teal-700 whitespace-nowrap">
             <FileText className="w-4 h-4 text-teal-600" /> Discharge Summary
           </button>
-        ) : canDischarge ? (
-          <button onClick={() => setShowDischargeConfirm(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-red-50 rounded-xl shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-xs font-bold text-red-700 whitespace-nowrap">
-            <LogOut className="w-4 h-4 text-red-500" /> Discharge
+        ) : patient.patientStatus === PatientStatus.WentHome ? (
+          <button onClick={handleReturnToWard} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-violet-50 rounded-xl shadow-sm border border-violet-200 hover:bg-violet-100 transition-colors text-xs font-bold text-violet-700 whitespace-nowrap">
+            <ArrowLeft className="w-4 h-4 text-violet-500" /> Return to Ward
           </button>
+        ) : canDischarge ? (
+          <>
+            <button onClick={() => setShowWentHomeConfirm(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-violet-50 rounded-xl shadow-sm border border-violet-200 hover:bg-violet-100 transition-colors text-xs font-bold text-violet-700 whitespace-nowrap">
+              <Home className="w-4 h-4 text-violet-500" /> Went Home
+            </button>
+            <button onClick={() => setShowDischargeConfirm(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-red-50 rounded-xl shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-xs font-bold text-red-700 whitespace-nowrap">
+              <LogOut className="w-4 h-4 text-red-500" /> Discharge
+            </button>
+          </>
         ) : null}
       </div>
 
@@ -630,6 +652,15 @@ const PatientDetail: React.FC = () => {
       )}
 
       {/* ─── DIALOGS ───────────────────────────────────────────────────── */}
+      <ConfirmDialog
+        isOpen={showWentHomeConfirm}
+        title="Send Patient Home"
+        message={`Mark ${patient.name} as Went Home? They will be removed from the active ward list but can be returned at any time.`}
+        confirmLabel="Yes, Went Home"
+        variant="warning"
+        onConfirm={handleWentHome}
+        onCancel={() => setShowWentHomeConfirm(false)}
+      />
       <ConfirmDialog
         isOpen={showDischargeConfirm}
         title="Discharge Patient"

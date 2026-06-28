@@ -60,6 +60,8 @@ export const getStatusColor = (status: string) => {
     case 'post op':
     case 'postop':
       return 'bg-cyan-100 text-cyan-800 border-cyan-300';
+    case 'went home':
+      return 'bg-violet-100 text-violet-800 border-violet-300';
     case 'discharged':
       return 'bg-slate-100 text-slate-600 border-slate-300';
     case 'discharge ready':
@@ -117,9 +119,10 @@ export const getTriagePriority = (p: Patient): number => {
 
 // Returns a left-border Tailwind class reflecting clinical urgency.
 export const getTriageBorderClass = (p: Patient): string => {
-  if (p.patientStatus === PatientStatus.Critical) return 'border-l-4 border-l-red-500';
-  if (p.pod !== undefined && p.pod <= 2) return 'border-l-4 border-l-teal-500';   // post-op: teal
-  if (p.pacStatus === PacStatus.Pending) return 'border-l-4 border-l-orange-500'; // pre-op: orange
+  if (p.patientStatus === PatientStatus.WentHome)   return 'border-l-4 border-l-violet-400';
+  if (p.patientStatus === PatientStatus.Critical)   return 'border-l-4 border-l-red-500';
+  if (p.pod !== undefined && p.pod <= 2)            return 'border-l-4 border-l-teal-500';
+  if (p.pacStatus === PacStatus.Pending)            return 'border-l-4 border-l-orange-500';
   if (p.patientStatus === PatientStatus.DischargeReady) return 'border-l-4 border-l-emerald-400';
   return 'border-l-4 border-l-slate-100';
 };

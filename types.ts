@@ -15,6 +15,7 @@ export enum PatientStatus {
   Fit = "Fit",
   Review = "Review",
   Critical = "Critical",
+  WentHome = "Went Home",
   DischargeReady = "Discharge Ready",
   Discharged = "Discharged"
 }
@@ -592,7 +593,7 @@ export interface AppNotification {
 // ─── Route Types ──────────────────────────────────────────────────────────────
 
 export type ViewMode =
-  | 'dashboard' | 'pending' | 'master' | 'discharge'
+  | 'dashboard' | 'pending' | 'master' | 'discharge' | 'wenthome'
   | 'radiology' | 'labs' | 'team' | 'audit'
   | 'rounds' | 'pac' | 'preop' | 'otlist'
   | 'patient' | 'round-mode' | 'settings' | 'status';

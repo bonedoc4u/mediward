@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  CheckCircle2, Eye, AlertCircle, LogOut, HeartPulse,
+  CheckCircle2, Eye, AlertCircle, LogOut, HeartPulse, Home,
 } from 'lucide-react';
 import { PatientStatus } from '../../types';
 
@@ -28,6 +28,11 @@ const CONFIG: Record<PatientStatus, {
     label: 'Critical',
     Icon: AlertCircle,
     classes: 'bg-red-100 text-red-800 border-red-300',
+  },
+  [PatientStatus.WentHome]: {
+    label: 'Went Home',
+    Icon: Home,
+    classes: 'bg-violet-100 text-violet-800 border-violet-300',
   },
   [PatientStatus.DischargeReady]: {
     label: 'Discharge Ready',
