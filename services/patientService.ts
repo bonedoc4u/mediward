@@ -49,6 +49,7 @@ interface ImagingRowRead {
   type: string;
   findings: string;
   image_url: string | null;
+  phase: string | null;
 }
 
 // ─── DB row shape (mirrors the Supabase table exactly) ───
@@ -140,6 +141,7 @@ function rowToPatient(row: PatientRow): Patient {
         type:     i.type,
         findings: i.findings,
         imageUrl: i.image_url ?? '',
+        ...(i.phase ? { phase: i.phase as Investigation['phase'] } : {}),
       }))
     : [];
 
@@ -290,7 +292,7 @@ const PATIENT_SELECT = [
   'management',
   'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
   'labs(id, date, type, value)',
-  'imaging(id, date, type, findings, image_url)',
+  'imaging(id, date, type, findings, image_url, phase)',
   'rounds(date, note, todos)',
   'patient_vitals(id, timestamp, recorded_by, bp_systolic, bp_diastolic, heart_rate, temperature, spo2, respiratory_rate, weight, pain_score, news2_score, notes)',
 ].join(', ');
