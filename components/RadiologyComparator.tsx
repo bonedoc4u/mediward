@@ -37,11 +37,83 @@ const MODALITY: Record<string, {
 const getModality = (type: string) =>
   MODALITY[type] ?? { bg: 'bg-slate-900', badge: 'bg-slate-700 text-slate-200', Icon: ImageIcon };
 
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+const Lightbox: React.FC<{
+  inv: Investigation;
+  onClose: () => void;
+}> = ({ inv, onClose }) => {
+  const cfg = getModality(inv.type);
+  const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black flex flex-col"
+      onClick={onClose}
+    >
+      {/* Top bar */}
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-black/70 shrink-0"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2">
+          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded ${cfg.badge}`}>
+            {inv.type}
+          </span>
+          <span className="text-white/50 text-xs">{fmtDate}</span>
+          {inv.findings && (
+            <span className="text-white/70 text-xs truncate max-w-[180px]">{inv.findings}</span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Image */}
+      <div
+        className="flex-1 flex items-center justify-center p-4 overflow-hidden"
+        onClick={onClose}
+      >
+        {inv.imageUrl ? (
+          <img
+            src={inv.imageUrl}
+            alt={inv.type}
+            className="max-w-full max-h-full object-contain select-none"
+            style={{ touchAction: 'pinch-zoom' }}
+            onClick={e => e.stopPropagation()}
+            draggable={false}
+          />
+        ) : (
+          <div className="text-white/30 text-center">
+            <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No image available</p>
+          </div>
+        )}
+      </div>
+
+      <p className="text-center text-white/30 text-xs pb-3 shrink-0">Tap anywhere to close</p>
+    </div>
+  );
+};
+
 // ─── ImageCard ────────────────────────────────────────────────────────────────
 const ImageCard: React.FC<{
   inv: Investigation;
   onDelete?: () => void;
-}> = ({ inv, onDelete }) => {
+  onClick?: () => void;
+}> = ({ inv, onDelete, onClick }) => {
   const cfg  = getModality(inv.type);
   const Icon = cfg.Icon;
   const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
@@ -49,9 +121,12 @@ const ImageCard: React.FC<{
   });
 
   return (
-    <div className="group rounded-xl border border-slate-200 overflow-hidden cursor-pointer
-                    hover:border-teal-300 hover:-translate-y-0.5 hover:shadow-sm
-                    transition-all active:scale-[0.98]">
+    <div
+      className="group rounded-xl border border-slate-200 overflow-hidden cursor-pointer
+                  hover:border-teal-300 hover:-translate-y-0.5 hover:shadow-sm
+                  transition-all active:scale-[0.98]"
+      onClick={onClick}
+    >
       <div className={`h-[72px] flex items-center justify-center relative ${cfg.bg}`}>
         {inv.imageUrl
           ? <img src={inv.imageUrl} alt={inv.type} className="w-full h-full object-cover" />
@@ -400,6 +475,7 @@ const RadiologyComparator: React.FC<Props> = ({
   const [uploadPhase, setUploadPhase]     = useState<RadPhase>('preop');
   const [isUploading, setIsUploading]     = useState(false);
   const [uploadError, setUploadError]     = useState<string | null>(null);
+  const [lightboxInv, setLightboxInv]     = useState<Investigation | null>(null);
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const isNativePlatform = Capacitor.isNativePlatform();
@@ -588,6 +664,7 @@ const RadiologyComparator: React.FC<Props> = ({
                 <ImageCard
                   key={inv.id}
                   inv={inv}
+                  onClick={() => setLightboxInv(inv)}
                   onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                 />
               ))}
@@ -603,6 +680,7 @@ const RadiologyComparator: React.FC<Props> = ({
                 <ImageCard
                   key={inv.id}
                   inv={inv}
+                  onClick={() => setLightboxInv(inv)}
                   onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                 />
               ))}
@@ -647,6 +725,11 @@ const RadiologyComparator: React.FC<Props> = ({
         onSave={handleSave}
         onCancel={handleCancelUpload}
       />
+
+      {/* Fullscreen lightbox */}
+      {lightboxInv && (
+        <Lightbox inv={lightboxInv} onClose={() => setLightboxInv(null)} />
+      )}
     </div>
   );
 };

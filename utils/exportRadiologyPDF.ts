@@ -6,7 +6,6 @@ interface ScanForExport {
   region?: string;
   date: string;
   imageUrl: string;
-  thumbnailUrl?: string;
   notes?: string;
 }
 
@@ -20,6 +19,50 @@ interface PatientForExport {
   dos?: string;
 }
 
+const PAGE_W = 210;
+const PAGE_H = 297;
+const MARGIN = 12;
+
+function drawPageHeader(
+  pdf: jsPDF,
+  patient: PatientForExport,
+  phase: 'PreOp' | 'PostOp',
+  phaseRgb: [number, number, number],
+) {
+  pdf.setFillColor(15, 23, 42);
+  pdf.rect(0, 0, PAGE_W, 22, 'F');
+
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(11);
+  pdf.text(patient.name, MARGIN, 10);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(148, 163, 184);
+  pdf.text(
+    `${patient.age}y ${patient.gender} · IP: ${patient.ipNo} · ${patient.ward} · ${patient.diagnosis}`,
+    MARGIN, 17,
+    { maxWidth: PAGE_W - MARGIN * 2 - 34 },
+  );
+
+  pdf.setFillColor(...phaseRgb);
+  pdf.roundedRect(PAGE_W - MARGIN - 30, 6, 30, 10, 2, 2, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7);
+  pdf.text(phase === 'PreOp' ? 'PRE-OP' : 'POST-OP', PAGE_W - MARGIN - 15, 12.5, { align: 'center' });
+}
+
+function drawPageFooter(pdf: jsPDF, pageNum: number, totalPages: number) {
+  const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  pdf.setFontSize(7);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setTextColor(148, 163, 184);
+  pdf.text(`MediWard · ${dateStr}`, MARGIN, PAGE_H - 4);
+  pdf.text(`${pageNum} / ${totalPages}`, PAGE_W - MARGIN, PAGE_H - 4, { align: 'right' });
+}
+
 export async function exportRadiologyPDF(
   patient: PatientForExport,
   scans: ScanForExport[],
@@ -27,139 +70,96 @@ export async function exportRadiologyPDF(
   onProgress?: (pct: number) => void,
 ): Promise<void> {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pageW = 210, pageH = 297, margin = 15;
-  let y = margin;
-
-  // ── Header ──────────────────────────────────────────────────────────
-  pdf.setFillColor(15, 23, 42);
-  pdf.rect(0, 0, pageW, 28, 'F');
-
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(18);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('MediWard', margin, 12);
-
-  pdf.setFontSize(9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(148, 163, 184);
-  pdf.text('Clinical Radiology Report', margin, 20);
-
   const phaseRgb: [number, number, number] = phase === 'PreOp' ? [29, 78, 216] : [13, 148, 136];
-  pdf.setFillColor(...phaseRgb);
-  pdf.roundedRect(pageW - margin - 32, 8, 32, 10, 2, 2, 'F');
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(8);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text(phase === 'PreOp' ? 'PRE-OP' : 'POST-OP', pageW - margin - 24, 14.5);
-
-  y = 38;
-
-  // ── Patient block ────────────────────────────────────────────────────
-  pdf.setFillColor(241, 245, 249);
-  pdf.roundedRect(margin, y, pageW - 2 * margin, 26, 3, 3, 'F');
-  pdf.setTextColor(15, 23, 42);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(13);
-  pdf.text(patient.name, margin + 4, y + 9);
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(9);
-  pdf.setTextColor(71, 85, 105);
-  pdf.text(
-    `${patient.age}y ${patient.gender}  ·  IP: ${patient.ipNo}  ·  ${patient.ward}  ·  ${patient.diagnosis}`,
-    margin + 4, y + 17,
-  );
-  if (patient.dos) {
-    pdf.text(
-      `DOS: ${new Date(patient.dos).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`,
-      margin + 4, y + 23,
-    );
-  }
-  y += 34;
-
-  // ── Phase heading ────────────────────────────────────────────────────
-  pdf.setFontSize(11);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setTextColor(...phaseRgb);
-  pdf.text(
-    `${phase === 'PreOp' ? 'Pre-Operative' : 'Post-Operative'} Radiology (${scans.length} image${scans.length !== 1 ? 's' : ''})`,
-    margin, y,
-  );
-  y += 8;
-
-  // ── Images (2-column grid) ───────────────────────────────────────────
-  const imgW = (pageW - 2 * margin - 6) / 2;
-  const imgH = 60;
-  let col = 0;
 
   for (let i = 0; i < scans.length; i++) {
-    onProgress?.(Math.round((i / scans.length) * 80));
+    onProgress?.(Math.round((i / scans.length) * 88));
     const scan = scans[i];
-    const x = margin + col * (imgW + 6);
+    if (i > 0) pdf.addPage();
 
-    pdf.setFillColor(248, 250, 252);
-    pdf.setDrawColor(226, 232, 240);
-    pdf.roundedRect(x, y, imgW, imgH + 20, 3, 3, 'FD');
+    // ── Header strip (same on every page) ──────────────────────────────
+    drawPageHeader(pdf, patient, phase, phaseRgb);
 
-    const imageUrl = scan.thumbnailUrl || scan.imageUrl;
+    // ── Scan label strip ───────────────────────────────────────────────
+    const labelY = 26;
+    const fmtDate = new Date(scan.date).toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    });
+    pdf.setTextColor(15, 23, 42);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text(scan.region || scan.type, MARGIN, labelY + 6);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 116, 139);
+    pdf.text(`${scan.type} · ${fmtDate}`, MARGIN, labelY + 13);
+
+    // ── Image area (fills rest of page, preserving aspect ratio) ───────
+    const imgAreaTop = labelY + 18;
+    const imgAreaH   = PAGE_H - imgAreaTop - 10; // 10mm footer
+    const imgAreaW   = PAGE_W - 2 * MARGIN;
+
+    const imageUrl = scan.imageUrl;
     if (imageUrl) {
       try {
         const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        const base64 = await new Promise<string>(resolve => {
+        const blob     = await response.blob();
+        const base64   = await new Promise<string>(resolve => {
           const reader = new FileReader();
           reader.onload = () => resolve((reader.result as string).split(',')[1]);
           reader.readAsDataURL(blob);
         });
-        const ext = imageUrl.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-        pdf.addImage(`data:image/${ext.toLowerCase()};base64,${base64}`, ext, x + 1, y + 1, imgW - 2, imgH - 2);
+        const ext     = blob.type === 'image/png' ? 'PNG' : 'JPEG';
+        const imgData = `data:image/${ext.toLowerCase()};base64,${base64}`;
+
+        // Intrinsic dimensions from jsPDF for accurate aspect ratio
+        const props   = pdf.getImageProperties(imgData);
+        const natW    = props.width;
+        const natH    = props.height;
+
+        // Scale to fit imgAreaW × imgAreaH, maintain aspect ratio
+        let drawW = imgAreaW;
+        let drawH = (natH / natW) * drawW;
+        if (drawH > imgAreaH) {
+          drawH = imgAreaH;
+          drawW = (natW / natH) * drawH;
+        }
+
+        // Center within the image area
+        const imgX = MARGIN + (imgAreaW - drawW) / 2;
+        const imgY = imgAreaTop + (imgAreaH - drawH) / 2;
+
+        pdf.addImage(imgData, ext, imgX, imgY, drawW, drawH);
       } catch {
+        // Fetch/decode failed — draw a dark placeholder
         pdf.setFillColor(15, 23, 42);
-        pdf.roundedRect(x + 1, y + 1, imgW - 2, imgH - 2, 2, 2, 'F');
+        pdf.rect(MARGIN, imgAreaTop, imgAreaW, imgAreaH, 'F');
         pdf.setTextColor(148, 163, 184);
-        pdf.setFontSize(9);
+        pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
-        pdf.text(scan.type, x + imgW / 2, y + imgH / 2, { align: 'center' });
+        pdf.text(scan.type, PAGE_W / 2, imgAreaTop + imgAreaH / 2, { align: 'center' });
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('Image unavailable', PAGE_W / 2, imgAreaTop + imgAreaH / 2 + 8, { align: 'center' });
       }
-    }
-
-    const metaY = y + imgH + 3;
-    pdf.setTextColor(15, 23, 42);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8);
-    pdf.text(scan.region || scan.type, x + 3, metaY + 5, { maxWidth: imgW - 6 });
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(100, 116, 139);
-    pdf.setFontSize(7);
-    pdf.text(
-      new Date(scan.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }),
-      x + 3, metaY + 12,
-    );
-
-    col++;
-    if (col === 2) {
-      col = 0;
-      y += imgH + 24;
-      if (y + imgH + 24 > pageH - margin) {
-        pdf.addPage();
-        y = margin;
-      }
+    } else {
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(MARGIN, imgAreaTop, imgAreaW, imgAreaH, 'F');
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('No image uploaded', PAGE_W / 2, imgAreaTop + imgAreaH / 2, { align: 'center' });
     }
   }
 
-  // ── Footer ───────────────────────────────────────────────────────────
+  // ── Add footers now that page count is known ────────────────────────
   const totalPages = pdf.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     pdf.setPage(p);
-    pdf.setFontSize(7);
-    pdf.setTextColor(148, 163, 184);
-    pdf.text(
-      `Generated by MediWard · ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`,
-      margin, pageH - 8,
-    );
-    pdf.text(`Page ${p} of ${totalPages}`, pageW - margin, pageH - 8, { align: 'right' });
+    drawPageFooter(pdf, p, totalPages);
   }
 
-  onProgress?.(90);
+  onProgress?.(95);
 
   const fileName = `${patient.name.replace(/\s+/g, '_')}_${phase}.pdf`;
 
