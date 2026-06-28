@@ -107,8 +107,8 @@ export const getLabTrend = (labResults: LabResult[], type: LabType): LabTrendDat
 // Returns a sort key: lower = more urgent. Tiebreaker is bed number.
 export const getTriagePriority = (p: Patient): number => {
   if (p.patientStatus === PatientStatus.Critical) return 0;
-  if (p.pod === 0) return 1;
-  if (p.pod === 1) return 2;
+  if (p.pod === 1) return 1;
+  if (p.pod === 2) return 2;
   if (p.pacStatus === PacStatus.Pending) return 3;
   if (p.patientStatus === PatientStatus.Review) return 4;
   if (p.patientStatus === PatientStatus.DischargeReady) return 6;
@@ -118,8 +118,8 @@ export const getTriagePriority = (p: Patient): number => {
 // Returns a left-border Tailwind class reflecting clinical urgency.
 export const getTriageBorderClass = (p: Patient): string => {
   if (p.patientStatus === PatientStatus.Critical) return 'border-l-4 border-l-red-500';
-  if (p.pod === 0 || p.pod === 1) return 'border-l-4 border-l-amber-400';
-  if (p.pacStatus === PacStatus.Pending) return 'border-l-4 border-l-orange-400';
+  if (p.pod !== undefined && p.pod <= 2) return 'border-l-4 border-l-teal-500';   // post-op: teal
+  if (p.pacStatus === PacStatus.Pending) return 'border-l-4 border-l-orange-500'; // pre-op: orange
   if (p.patientStatus === PatientStatus.DischargeReady) return 'border-l-4 border-l-emerald-400';
   return 'border-l-4 border-l-slate-100';
 };

@@ -6,7 +6,7 @@ import { Scissors, HeartPulse, AlertTriangle, ListChecks, ClipboardList, FileDow
 export function calcPod(dos: string | undefined, today: string): number | undefined {
   if (!dos) return undefined;
   const diff = Math.round((new Date(today).getTime() - new Date(dos).getTime()) / 86_400_000);
-  return diff >= 0 ? diff : undefined;
+  return diff >= 0 ? diff + 1 : undefined;
 }
 
 interface Props {

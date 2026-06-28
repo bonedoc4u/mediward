@@ -101,7 +101,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       const matchesPending = filterPending ? p.pacStatus === PacStatus.Pending : true;
       const matchesSurgery = filterSurgeryToday ? (p.dos === today || p.plannedDos === today) : true;
-      const matchesPod01 = filterPod01 ? (() => { const d = calcPod(p.dos, today); return d === 0 || d === 1; })() : true;
+      const matchesPod01 = filterPod01 ? (() => { const d = calcPod(p.dos, today); return d === 1 || d === 2; })() : true;
       const matchesOverdue = filterOverdueTodos ? p.todos.some(t => !t.isDone) : true;
 
       return matchesSearch && matchesPending && matchesSurgery && matchesPod01 && matchesOverdue;
@@ -420,7 +420,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       )}
                       {patient.patientStatus !== PatientStatus.Fit && (
                         <span className={`px-2 py-1 rounded-full text-xs font-medium border ${patient.patientStatus === PatientStatus.Discharged ? 'bg-slate-100 text-slate-600 border-slate-200' : getStatusColor(patient.patientStatus)} block w-fit`}>
-                          {patient.patientStatus}
+                          {patient.patientStatus === PatientStatus.Review ? 'Needs Review' : patient.patientStatus}
                         </span>
                       )}
                     </td>
@@ -631,7 +631,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.patientStatus)}`}>
                             {item.patient.patientStatus === PatientStatus.Critical && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
                             {item.patient.patientStatus === PatientStatus.DischargeReady && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
-                            {item.patient.patientStatus}
+                            {item.patient.patientStatus === PatientStatus.Review ? 'Needs Review' : item.patient.patientStatus}
                           </span>
                         )}
                       </div>

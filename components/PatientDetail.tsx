@@ -189,7 +189,7 @@ const PatientDetail: React.FC = () => {
           <div className="shrink-0 flex flex-col items-end gap-1.5 mt-1">
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold ${statusBadge.bg} ${statusBadge.text}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
-              {patient.patientStatus}
+              {patient.patientStatus === PatientStatus.Review ? 'Needs Review' : patient.patientStatus}
             </span>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border ${pacBadge.bg} ${pacBadge.text} ${pacBadge.border}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${pacBadge.dot}`} />
