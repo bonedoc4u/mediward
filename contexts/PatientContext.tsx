@@ -276,7 +276,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             await insertLab(patientId, result, labHid);
           } else if (op.type === 'insert_imaging') {
             const { patientId, hospitalId: imgHid, inv } = op.payload as { patientId: string; hospitalId?: string; inv: Investigation };
-            await insertImaging(patientId, inv, imgHid);
+            // Patch hospitalId in case the op was queued before hospitalId was populated
+            const resolvedImgHid = imgHid ?? userRef.current?.hospitalId;
+            await insertImaging(patientId, inv, resolvedImgHid);
           } else if (op.type === 'delete_imaging') {
             await deleteImaging(op.payload as string);
           } else if (op.type === 'upsert_round') {
