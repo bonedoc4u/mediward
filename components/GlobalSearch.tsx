@@ -55,10 +55,11 @@ const GlobalSearch: React.FC = () => {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="p-2 hover:bg-white/80 rounded-xl transition-all glass-effect flex items-center gap-2"
+        className="p-2 hover:bg-white/10 md:hover:bg-white/80 rounded-xl transition-all md:glass-effect flex items-center gap-2"
         title="Search (⌘K)"
+        aria-label="Search patients"
       >
-        <Search className="w-5 h-5 text-slate-600" />
+        <Search className="w-5 h-5 text-white md:text-slate-600" />
         <span className="hidden lg:inline text-xs text-slate-400">⌘K</span>
       </button>
 

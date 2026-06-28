@@ -9,7 +9,10 @@ import {
 import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
 import { generateId } from '../utils/sanitize';
 import { Capacitor } from '@capacitor/core';
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { exportRadiologyPDF } from '../utils/exportRadiologyPDF';
+import { compressImage } from '../utils/imageUtils';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 
 type RadPhase = 'preop' | 'postop';
 
@@ -332,20 +335,19 @@ const UploadSheet: React.FC<{
             <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
               Modality
             </label>
-            <select
+            <BottomSheetPicker
+              title="Modality"
               value={invType}
-              onChange={e => onTypeChange(e.target.value)}
+              options={[
+                { value: 'X-Ray',  label: 'X-Ray' },
+                { value: 'CT',     label: 'CT Scan' },
+                { value: 'MRI',    label: 'MRI' },
+                { value: 'USG',    label: 'Ultrasound (USG)' },
+                { value: 'Report', label: 'Report / Document' },
+              ]}
+              onChange={onTypeChange}
               disabled={isUploading}
-              className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold
-                         text-slate-700 bg-white focus:outline-none focus:ring-2
-                         focus:ring-teal-500/20 focus:border-teal-400 disabled:opacity-60"
-            >
-              <option value="X-Ray">X-Ray</option>
-              <option value="CT">CT Scan</option>
-              <option value="MRI">MRI</option>
-              <option value="USG">Ultrasound (USG)</option>
-              <option value="Report">Report / Document</option>
-            </select>
+            />
           </div>
 
           {uploadError && (
@@ -400,8 +402,7 @@ const RadiologyComparator: React.FC<Props> = ({
   const [uploadError, setUploadError]     = useState<string | null>(null);
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  const isNativePlatform = Capacitor.isNativePlatform();
 
   useEffect(() => {
     if (initialPatientId) setSelectedPatientId(initialPatientId);
@@ -435,23 +436,29 @@ const RadiologyComparator: React.FC<Props> = ({
     return { preOpScans, postOpScans };
   }, [investigations, selectedPatient]);
 
-  const handleCameraClick = () => {
-    if (!cameraInputRef.current) return;
-    cameraInputRef.current.value = '';
-    let pickerOpened = false;
-    const onFocus = () => {
-      window.removeEventListener('focus', onFocus);
-      if (pickerOpened && !selectedFile) {
-        setTimeout(() => {
-          if (!selectedFile && !showUploadForm) {
-            setUploadError('No photo selected. Enable Camera permission: Settings → Apps → MediWard → Permissions → Camera.');
-          }
-        }, 300);
+  const handleCameraClick = async () => {
+    try {
+      const photo = await CapCamera.getPhoto({
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera,
+        quality: 80,
+        allowEditing: false,
+        saveToGallery: false,
+      });
+      if (!photo.webPath) return;
+      const res  = await fetch(photo.webPath);
+      const blob = await res.blob();
+      const file = new File([blob], `scan_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+      setShowUploadForm(true);
+      setUploadError(null);
+    } catch (err) {
+      if (err instanceof Error && err.message !== 'User cancelled photos app') {
+        setUploadError('Camera unavailable. Check camera permissions in device Settings.');
       }
-    };
-    window.addEventListener('focus', onFocus);
-    pickerOpened = true;
-    cameraInputRef.current.click();
+    }
   };
 
   const openUpload = (phase: RadPhase) => {
@@ -479,7 +486,8 @@ const RadiologyComparator: React.FC<Props> = ({
     setIsUploading(true);
     setUploadError(null);
     try {
-      const imageUrl = await uploadInvestigationImage(selectedFile, user?.hospitalId ?? 'shared', selectedPatientId);
+      const fileToUpload = await compressImage(selectedFile);
+      const imageUrl = await uploadInvestigationImage(fileToUpload, user?.hospitalId ?? 'shared', selectedPatientId);
       const newInv: Investigation = {
         id: generateId(),
         date: new Date().toISOString().split('T')[0],
@@ -503,7 +511,7 @@ const RadiologyComparator: React.FC<Props> = ({
     setPreviewUrl(null);
     setShowUploadForm(false);
     setUploadError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (fileInputRef.current)  fileInputRef.current.value  = '';
   };
 
   const handleDelete = (invId: string, imageUrl: string) => {
@@ -525,11 +533,8 @@ const RadiologyComparator: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Hidden file inputs */}
+      {/* Hidden file input for gallery / file picker */}
       <input type="file" accept="image/*,.pdf" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-      {isAndroidNative && (
-        <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileChange} />
-      )}
 
       {/* Patient picker */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -564,7 +569,7 @@ const RadiologyComparator: React.FC<Props> = ({
                 </p>
               </div>
             )}
-            {isAndroidNative && (
+            {isNativePlatform && (
               <button
                 onClick={handleCameraClick}
                 className="shrink-0 flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700

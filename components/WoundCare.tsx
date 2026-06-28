@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { Bandage, Plus, Trash2, Calendar } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import { useAuth } from '../contexts/AppContext';
 import { WoundCareRecord } from '../types';
 import { fetchWoundCare, addWoundCare, deleteWoundCare } from '../services/woundCareService';
@@ -136,43 +137,39 @@ const WoundCare: React.FC<Props> = ({ patientIpNo }) => {
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Wound Type</label>
-              <select
+              <BottomSheetPicker
+                title="Wound Type"
                 value={form.woundType}
-                onChange={e => setForm(f => ({ ...f, woundType: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                {WOUND_TYPES.map(t => <option key={t}>{t}</option>)}
-              </select>
+                options={WOUND_TYPES.map(t => ({ value: t, label: t }))}
+                onChange={val => setForm(f => ({ ...f, woundType: val }))}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Wound Condition</label>
-              <select
+              <BottomSheetPicker
+                title="Wound Condition"
                 value={form.woundCondition}
-                onChange={e => setForm(f => ({ ...f, woundCondition: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                {WOUND_CONDITIONS.map(c => <option key={c}>{c}</option>)}
-              </select>
+                options={WOUND_CONDITIONS.map(c => ({ value: c, label: c }))}
+                onChange={val => setForm(f => ({ ...f, woundCondition: val }))}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Dressing Type</label>
-              <select
+              <BottomSheetPicker
+                title="Dressing Type"
                 value={form.dressingType}
-                onChange={e => setForm(f => ({ ...f, dressingType: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                {DRESSING_TYPES.map(d => <option key={d}>{d}</option>)}
-              </select>
+                options={DRESSING_TYPES.map(d => ({ value: d, label: d }))}
+                onChange={val => setForm(f => ({ ...f, dressingType: val }))}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Exudate</label>
-              <select
+              <BottomSheetPicker
+                title="Exudate Level"
                 value={form.exudate}
-                onChange={e => setForm(f => ({ ...f, exudate: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                {EXUDATE_LEVELS.map(e => <option key={e}>{e}</option>)}
-              </select>
+                options={EXUDATE_LEVELS.map(e => ({ value: e, label: e }))}
+                onChange={val => setForm(f => ({ ...f, exudate: val }))}
+              />
             </div>
           </div>
 

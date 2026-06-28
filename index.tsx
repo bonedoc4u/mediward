@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
 import App from './App';
 import { AppProvider } from './contexts/AppContext';
 import { initCapacitor } from './utils/capacitorInit';
@@ -7,6 +8,18 @@ import { recoverDurableStorage } from './services/persistence';
 import { initSyncQueue } from './services/syncQueue';
 import { startConnectivityPolling } from './utils/connectivity';
 import { toast } from './utils/toast';
+
+const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    environment: (import.meta.env.VITE_ENVIRONMENT as string) ?? 'production',
+    integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
+    tracesSampleRate: 0.1,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 1.0,
+  });
+}
 
 // Boot native integrations (no-op on web/PWA)
 initCapacitor();
@@ -34,9 +47,11 @@ Promise.all([
   const root = ReactDOM.createRoot(document.getElementById('root')!);
   root.render(
     <React.StrictMode>
-      <AppProvider>
-        <App />
-      </AppProvider>
+      <Sentry.ErrorBoundary fallback={<div style={{ padding: 32, fontFamily: 'sans-serif' }}>An unexpected error occurred. Please reload the page.</div>}>
+        <AppProvider>
+          <App />
+        </AppProvider>
+      </Sentry.ErrorBoundary>
     </React.StrictMode>
   );
 });

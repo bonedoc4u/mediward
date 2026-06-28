@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { Droplets, Plus, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import { useAuth } from '../contexts/AppContext';
 import { BloodTransfusionRecord } from '../types';
 import {
@@ -114,24 +115,22 @@ const BloodTransfusion: React.FC<Props> = ({ patientIpNo }) => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Blood Product</label>
-              <select
+              <BottomSheetPicker
+                title="Blood Product"
                 value={form.bloodProduct}
-                onChange={e => setForm(f => ({ ...f, bloodProduct: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                {BLOOD_PRODUCTS.map(p => <option key={p}>{p}</option>)}
-              </select>
+                options={BLOOD_PRODUCTS.map(p => ({ value: p, label: p }))}
+                onChange={val => setForm(f => ({ ...f, bloodProduct: val }))}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Blood Group</label>
-              <select
-                value={form.bloodGroup}
-                onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                <option value="">Unknown</option>
-                {BLOOD_GROUPS.map(g => <option key={g}>{g}</option>)}
-              </select>
+              <BottomSheetPicker
+                title="Blood Group"
+                value={form.bloodGroup ?? ''}
+                placeholder="Unknown"
+                options={[{ value: '', label: 'Unknown' }, ...BLOOD_GROUPS.map(g => ({ value: g, label: g }))]}
+                onChange={val => setForm(f => ({ ...f, bloodGroup: val }))}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Units</label>
@@ -165,13 +164,12 @@ const BloodTransfusion: React.FC<Props> = ({ patientIpNo }) => {
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Reaction</label>
-              <select
+              <BottomSheetPicker
+                title="Transfusion Reaction"
                 value={form.reaction}
-                onChange={e => setForm(f => ({ ...f, reaction: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                {REACTIONS.map(r => <option key={r}>{r}</option>)}
-              </select>
+                options={REACTIONS.map(r => ({ value: r, label: r }))}
+                onChange={val => setForm(f => ({ ...f, reaction: val }))}
+              />
             </div>
           </div>
 

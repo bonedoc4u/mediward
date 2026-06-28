@@ -21,7 +21,7 @@ ALTER TABLE public.patients
   DROP CONSTRAINT IF EXISTS chk_patient_status,
   ADD  CONSTRAINT chk_patient_status CHECK (
     patient_status IN (
-      'Fit', 'Review', 'Critical', 'Discharge Ready', 'Discharged'
+      'Fit', 'Review', 'Critical', 'Went Home', 'Discharge Ready', 'Discharged'
     )
   );
 

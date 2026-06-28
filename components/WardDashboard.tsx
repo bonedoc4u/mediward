@@ -5,6 +5,7 @@ import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBor
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home } from 'lucide-react';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import { calcPod } from './HandoverSummary';
 import TodaySchedule from './TodaySchedule';
 import OTDatePicker from './OTDatePicker';
@@ -777,16 +778,17 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             </button>
           </div>
           <div className="flex gap-2">
-            <select
+            <BottomSheetPicker
+              title="Lab Type"
               value={quickLabType}
-              onChange={e => setQuickLabType(e.target.value)}
-              className="flex-1 min-h-[44px] p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white"
-            >
-              <option value="">Select lab type…</option>
-              {labTypes.filter(l => l.active).map(lt => (
-                <option key={lt.id} value={lt.name}>{lt.name} ({lt.unit})</option>
-              ))}
-            </select>
+              placeholder="Select lab type…"
+              options={[
+                { value: '', label: 'Select lab type…' },
+                ...labTypes.filter(l => l.active).map(lt => ({ value: lt.name, label: `${lt.name} (${lt.unit})` })),
+              ]}
+              onChange={val => setQuickLabType(val)}
+              triggerClassName="flex-1 min-h-[44px] p-2 border border-slate-300 rounded text-sm flex items-center justify-between gap-1 bg-white"
+            />
             <input
               type="number"
               placeholder="Value"

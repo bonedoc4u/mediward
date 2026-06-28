@@ -4,6 +4,7 @@ import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx-js-style';
 import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -826,15 +827,13 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
                                         <GripVertical className="w-4 h-4 text-slate-400" />
                                     </td>
                                     <td className="p-4">
-                                        <select
+                                        <BottomSheetPicker
+                                            title="Category"
                                             value={patient.category || ''}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'category', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm font-bold text-slate-700 cursor-pointer"
-                                        >
-                                            {getTableOptions().map(opt => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
+                                            options={getTableOptions().map(opt => ({ value: opt, label: opt }))}
+                                            onChange={val => handleUpdateEntry(patient.id, 'category', val)}
+                                            triggerClassName="w-full text-sm font-bold text-slate-700 flex items-center gap-1 cursor-pointer p-0"
+                                        />
                                     </td>
                                     <td className="p-4 text-slate-500 font-mono font-bold">
                                         {/* Auto-calculated sequence based on index + 1 */}
@@ -877,14 +876,13 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
                                             placeholder="Age"
                                             />
                                             <span className="text-slate-400">/</span>
-                                            <select
-                                            value={patient.gender}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'gender', e.target.value)}
-                                            className="w-12 bg-transparent border-none focus:ring-0 p-0 text-sm cursor-pointer"
-                                            >
-                                                <option value="M">M</option>
-                                                <option value="F">F</option>
-                                            </select>
+                                            <BottomSheetPicker
+                                                title="Gender"
+                                                value={patient.gender}
+                                                options={[{ value: 'M', label: 'M' }, { value: 'F', label: 'F' }]}
+                                                onChange={val => handleUpdateEntry(patient.id, 'gender', val)}
+                                                triggerClassName="w-12 text-sm font-medium text-slate-700 flex items-center gap-0.5 cursor-pointer p-0"
+                                            />
                                         </div>
                                     </td>
                                     <td className="p-4">
@@ -915,14 +913,13 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
                                         />
                                     </td>
                                     <td className="p-4">
-                                        <select 
+                                        <BottomSheetPicker
+                                            title="C-Arm Required"
                                             value={patient.cArm}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'cArm', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm cursor-pointer"
-                                        >
-                                            <option value="Yes">Yes</option>
-                                            <option value="No">No</option>
-                                        </select>
+                                            options={[{ value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }]}
+                                            onChange={val => handleUpdateEntry(patient.id, 'cArm', val)}
+                                            triggerClassName="w-full text-sm font-medium text-slate-700 flex items-center gap-1 cursor-pointer p-0"
+                                        />
                                     </td>
                                     <td className="p-4">
                                         <textarea 

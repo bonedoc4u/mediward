@@ -526,6 +526,7 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <GlobalSearch />
             <NotificationCenter />
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}>
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

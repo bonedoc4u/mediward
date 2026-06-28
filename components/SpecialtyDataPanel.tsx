@@ -13,6 +13,7 @@ import {
   Scissors, Layers, BarChart2
 } from 'lucide-react';
 import { SpecialtyFieldGroup, SpecialtyField } from '../types';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 
 // ─── Icon map (Lucide icon names → components) ────────────────────────────────
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -109,16 +110,16 @@ const FieldView: React.FC<FieldProps> = ({ field, value, editing, onChange }) =>
     return (
       <div>
         <label className="text-xs font-semibold text-slate-500 block mb-1">{field.label}</label>
-        <select
+        <BottomSheetPicker
+          title={field.label}
           value={strVal}
-          onChange={e => onChange(field.key, e.target.value)}
-          className={baseInput}
-        >
-          <option value="">— select —</option>
-          {field.options?.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
+          placeholder="— select —"
+          options={[
+            { value: '', label: '— select —' },
+            ...(field.options ?? []).map(opt => ({ value: opt, label: opt })),
+          ]}
+          onChange={val => onChange(field.key, val)}
+        />
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AppContext';
 import { PrescribedMedication, MedAdministration, MedAdminStatus, MedRoute } from '../types';
 import { fetchMedications, addMedicationPrescription, stopMedication, recordAdministration, fetchAdministrations } from '../services/marService';
 import { Plus, X, CheckCircle2, Clock, AlertCircle, XCircle, Pill, Save } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 
 const ROUTES: MedRoute[] = ['Oral','IV','IM','SC','Topical','Inhaled','PR','SL'];
 const FREQUENCIES = ['Once daily','Twice daily','Three times daily','Four times daily','Every 6h','Every 8h','Every 12h','Once (stat)','At bedtime','As needed (PRN)'];
@@ -148,23 +149,21 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId, drugAllergi
             </div>
             <div>
               <label className="text-xs text-slate-600 mb-1 block">Route</label>
-              <select
+              <BottomSheetPicker
+                title="Route"
                 value={newMed.route}
-                onChange={e => setNewMed(p => ({ ...p, route: e.target.value as MedRoute }))}
-                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white"
-              >
-                {ROUTES.map(r => <option key={r}>{r}</option>)}
-              </select>
+                options={ROUTES.map(r => ({ value: r, label: r }))}
+                onChange={val => setNewMed(p => ({ ...p, route: val as MedRoute }))}
+              />
             </div>
             <div className="col-span-2">
               <label className="text-xs text-slate-600 mb-1 block">Frequency</label>
-              <select
+              <BottomSheetPicker
+                title="Frequency"
                 value={newMed.frequency}
-                onChange={e => setNewMed(p => ({ ...p, frequency: e.target.value }))}
-                className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-violet-400 outline-none bg-white"
-              >
-                {FREQUENCIES.map(f => <option key={f}>{f}</option>)}
-              </select>
+                options={FREQUENCIES.map(f => ({ value: f, label: f }))}
+                onChange={val => setNewMed(p => ({ ...p, frequency: val }))}
+              />
             </div>
             <div className="col-span-2">
               <label className="text-xs text-slate-600 mb-1 block">Notes (optional)</label>

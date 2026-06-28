@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 // @ts-ignore -- install with: npm install
 import { VitePWA } from 'vite-plugin-pwa';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { envCheckPlugin } from './plugins/vite-plugin-env-check';
 
 export default defineConfig(({ mode }) => {
@@ -18,6 +19,14 @@ export default defineConfig(({ mode }) => {
         react(),
         tailwindcss(),
         envCheckPlugin(),   // fails CI build if env vars are missing/invalid
+        // Uploads source maps to Sentry on production builds when auth token is set.
+        // Skipped automatically when SENTRY_AUTH_TOKEN is absent (dev, open PRs).
+        ...(env.SENTRY_AUTH_TOKEN ? [sentryVitePlugin({
+          org:     env.SENTRY_ORG,
+          project: env.SENTRY_PROJECT,
+          authToken: env.SENTRY_AUTH_TOKEN,
+          telemetry: false,
+        })] : []),
         VitePWA({
           // injectManifest: use our custom sw.ts instead of generateSW so we
           // can add Workbox BackgroundSync for offline round note mutations.
@@ -61,6 +70,7 @@ export default defineConfig(({ mode }) => {
         'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
       },
       build: {
+        sourcemap: true,
         // xlsx-js-style is inherently large (~870 kB) but lazy-loaded; raise threshold to suppress noise.
         chunkSizeWarningLimit: 1000,
         rollupOptions: {

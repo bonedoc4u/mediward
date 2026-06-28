@@ -2,6 +2,7 @@ import React from 'react';
 import { Patient, PacStatus, PacFlowData } from '../types';
 import { sortByBed } from '../utils/calculations';
 import { Check, HeartPulse } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import PacFlowChart from './PacFlowChart';
 
 interface Props {
@@ -78,16 +79,18 @@ const PacManagement: React.FC<Props> = ({ patients, onUpdatePatient }) => {
                 <p className="text-xs font-medium text-slate-700 mt-0.5 truncate">{patient.diagnosis}</p>
               </div>
 
-              <select
+              <BottomSheetPicker
+                title="PAC Status"
                 value={patient.pacStatus}
-                onChange={e => handleStatusChange(patient, e.target.value)}
-                className={`text-xs font-bold px-2 py-1.5 rounded-lg border outline-none cursor-pointer shrink-0 ${getStatusBadge(patient.pacStatus)}`}
-              >
-                <option value={PacStatus.Fit}>FIT</option>
-                <option value={PacStatus.Pending}>PENDING</option>
-                <option value={PacStatus.Review}>REVIEW</option>
-                <option value={PacStatus.Unfit}>UNFIT</option>
-              </select>
+                options={[
+                  { value: PacStatus.Fit,     label: 'FIT'     },
+                  { value: PacStatus.Pending,  label: 'PENDING' },
+                  { value: PacStatus.Review,   label: 'REVIEW'  },
+                  { value: PacStatus.Unfit,    label: 'UNFIT'   },
+                ]}
+                onChange={val => handleStatusChange(patient, val)}
+                triggerClassName={`text-xs font-bold px-2 py-1.5 rounded-lg border flex items-center gap-1 cursor-pointer shrink-0 ${getStatusBadge(patient.pacStatus)}`}
+              />
             </div>
 
             {/* PAC Flowchart */}

@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { Droplets, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import { useAuth } from '../contexts/AppContext';
 import { IntakeOutputEntry, IOType } from '../types';
 import { fetchIntakeOutput, addIntakeOutputEntry, deleteIntakeOutputEntry } from '../services/intakeOutputService';
@@ -143,13 +144,12 @@ const IntakeOutput: React.FC<Props> = ({ patientIpNo }) => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Category</label>
-              <select
+              <BottomSheetPicker
+                title="Category"
                 value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-              >
-                {categories.map(c => <option key={c}>{c}</option>)}
-              </select>
+                options={categories.map(c => ({ value: c, label: c }))}
+                onChange={val => setForm(f => ({ ...f, category: val }))}
+              />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Amount (mL)</label>

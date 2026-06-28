@@ -3,6 +3,7 @@ import { KeyboardAwareView } from './ui/KeyboardAwareView';
 import { Patient, Gender, PacStatus, PatientStatus, Ward } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { X, Save, UserPlus, Pencil, Loader2, ChevronDown, ChevronUp, ScanLine } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import { supabase } from '../lib/supabase';
 import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
 
@@ -571,40 +572,36 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ward</label>
-                  <select
-                    className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                  <BottomSheetPicker
+                    title="Select Ward"
                     value={formData.ward}
                     disabled={activeWards.length === 0}
-                    onChange={e => {
-                      const selectedWard = activeWards.find(w => w.name === e.target.value);
+                    placeholder="— No wards configured —"
+                    options={activeWards.map(w => ({ value: w.name, label: w.name }))}
+                    onChange={val => {
+                      const selectedWard = activeWards.find(w => w.name === val);
                       setFormData(prev => ({
                         ...prev,
-                        ward: e.target.value as Ward,
+                        ward: val as Ward,
                         unit: isAdmin
                           ? (selectedWard?.unit?.length === 1 ? selectedWard.unit[0] : prev.unit)
                           : prev.unit,
                       }));
                     }}
-                  >
-                    {activeWards.length === 0
-                      ? <option value="">— No wards configured —</option>
-                      : activeWards.map(w => <option key={w.name} value={w.name}>{w.name}</option>)
-                    }
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                     Unit{!isAdmin && <span className="ml-1 text-slate-500 normal-case font-normal">(your unit)</span>}
                   </label>
                   {isAdmin ? (
-                    <select
-                      className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white"
-                      value={formData.unit}
-                      onChange={e => setFormData({...formData, unit: e.target.value})}
-                    >
-                      <option value="">— Unassigned —</option>
-                      {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
+                    <BottomSheetPicker
+                      title="Select Unit"
+                      value={formData.unit ?? ''}
+                      placeholder="— Unassigned —"
+                      options={[{ value: '', label: '— Unassigned —' }, ...unitOptions.map(u => ({ value: u, label: u }))]}
+                      onChange={val => setFormData({ ...formData, unit: val })}
+                    />
                   ) : (
                     <input type="text" readOnly className="w-full p-2 border border-slate-200 rounded text-sm bg-slate-50 text-slate-600 cursor-not-allowed" value={formData.unit || '—'} />
                   )}
@@ -648,11 +645,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
-                    <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
-                      <option value={Gender.Male}>Male</option>
-                      <option value={Gender.Female}>Female</option>
-                      <option value={Gender.Other}>Other</option>
-                    </select>
+                    <BottomSheetPicker
+                      title="Select Gender"
+                      value={formData.gender}
+                      options={Object.values(Gender).map(g => ({ value: g, label: g }))}
+                      onChange={val => setFormData({ ...formData, gender: val as Gender })}
+                    />
                   </div>
                 </div>
               </div>
@@ -742,15 +740,21 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">PAC Status</label>
-                  <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white" value={formData.pacStatus} onChange={e => setFormData({...formData, pacStatus: e.target.value as PacStatus})}>
-                    {Object.values(PacStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <BottomSheetPicker
+                    title="PAC Status"
+                    value={formData.pacStatus}
+                    options={Object.values(PacStatus).map(s => ({ value: s, label: s }))}
+                    onChange={val => setFormData({ ...formData, pacStatus: val as PacStatus })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Patient Status</label>
-                  <select className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none bg-white" value={formData.patientStatus} onChange={e => setFormData({...formData, patientStatus: e.target.value as PatientStatus})}>
-                    {Object.values(PatientStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <BottomSheetPicker
+                    title="Patient Status"
+                    value={formData.patientStatus}
+                    options={Object.values(PatientStatus).map(s => ({ value: s, label: s }))}
+                    onChange={val => setFormData({ ...formData, patientStatus: val as PatientStatus })}
+                  />
                 </div>
               </div>
 

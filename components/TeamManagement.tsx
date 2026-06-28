@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, UserPlus, Shield, Trash2, Edit2, Eye, EyeOff, Save, X, KeyRound, Loader2
 } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { StoredUser, UserRole } from '../types';
 import { ROLE_LABELS, ROLE_ACCESS_DESC, ROLE_COLORS } from '../utils/permissions';
@@ -273,28 +274,25 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 mb-1 block">Access Level *</label>
-              <select
+              <BottomSheetPicker
+                title="Select Access Level"
                 value={form.role}
-                onChange={e => setForm(v => ({ ...v, role: e.target.value as UserRole }))}
-                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
-              >
-                {ALL_ROLES.map(r => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]} — {ROLE_ACCESS_DESC[r]}</option>
-                ))}
-              </select>
+                options={ALL_ROLES.map(r => ({ value: r, label: ROLE_LABELS[r], description: ROLE_ACCESS_DESC[r] }))}
+                onChange={val => setForm(v => ({ ...v, role: val as UserRole }))}
+              />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 mb-1 block">Unit</label>
-              <select
-                value={form.unit}
-                onChange={e => setForm(v => ({ ...v, unit: e.target.value }))}
-                className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
-              >
-                <option value="">— No unit (Admin / ICU — sees all) —</option>
-                {unitOptions.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
+              <BottomSheetPicker
+                title="Select Unit"
+                value={form.unit ?? ''}
+                placeholder="— No unit (Admin / ICU — sees all) —"
+                options={[
+                  { value: '', label: '— No unit (Admin / ICU — sees all) —' },
+                  ...unitOptions.map(u => ({ value: u, label: u })),
+                ]}
+                onChange={val => setForm(v => ({ ...v, unit: val }))}
+              />
               <p className="text-[10px] text-slate-400 mt-1">
                 Users with a unit only see their unit's patients. Leave blank for full access.
               </p>
@@ -350,16 +348,13 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
 
                     <td className="px-6 py-4">
                       {editingId === u.id ? (
-                        <select
+                        <BottomSheetPicker
+                          title="Change Role"
                           value={editRole}
-                          onChange={e => setEditRole(e.target.value as UserRole)}
-                          className="p-1.5 border border-blue-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-200 outline-none"
-                          autoFocus
-                        >
-                          {ALL_ROLES.map(r => (
-                            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                          ))}
-                        </select>
+                          options={ALL_ROLES.map(r => ({ value: r, label: ROLE_LABELS[r], description: ROLE_ACCESS_DESC[r] }))}
+                          onChange={val => setEditRole(val as UserRole)}
+                          triggerClassName="flex items-center justify-between gap-1 p-1.5 border border-blue-300 rounded-lg text-xs bg-white focus:outline-none"
+                        />
                       ) : (
                         <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${ROLE_COLORS[u.role]}`}>
                           {ROLE_LABELS[u.role]}
@@ -369,16 +364,17 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
 
                     <td className="px-6 py-4">
                       {editingId === u.id ? (
-                        <select
+                        <BottomSheetPicker
+                          title="Unit"
                           value={editUnit}
-                          onChange={e => setEditUnit(e.target.value)}
-                          className="p-1.5 border border-blue-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-200 outline-none"
-                        >
-                          <option value="">All units</option>
-                          {unitOptions.map(unit => (
-                            <option key={unit} value={unit}>{unit}</option>
-                          ))}
-                        </select>
+                          placeholder="All units"
+                          options={[
+                            { value: '', label: 'All units' },
+                            ...unitOptions.map(unit => ({ value: unit, label: unit })),
+                          ]}
+                          onChange={val => setEditUnit(val)}
+                          triggerClassName="p-1.5 border border-blue-300 rounded-lg text-xs bg-white flex items-center gap-1 cursor-pointer"
+                        />
                       ) : u.unit ? (
                         <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">
                           {u.unit}

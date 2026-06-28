@@ -5,6 +5,7 @@
  */
 import React, { useState } from 'react';
 import { X, Calculator, ChevronRight } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 
 // ─── GCS ─────────────────────────────────────────────────────────────────────
 function GCSCalculator() {
@@ -309,13 +310,12 @@ function NIHSSCalculator() {
       {items.map(item => (
         <div key={item.key}>
           <p className="text-sm font-semibold text-slate-700 mb-1">{item.label}</p>
-          <select value={vals[item.key]}
-            onChange={e => setVals(p => ({ ...p, [item.key]: parseInt(e.target.value) }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-            {item.opts.map(o => (
-              <option key={o.v} value={o.v}>{o.v} — {o.l}</option>
-            ))}
-          </select>
+          <BottomSheetPicker
+            title={item.label}
+            value={vals[item.key].toString()}
+            options={item.opts.map(o => ({ value: o.v.toString(), label: `${o.v} — ${o.l}` }))}
+            onChange={v => setVals(p => ({ ...p, [item.key]: parseInt(v) }))}
+          />
         </div>
       ))}
       <div className={`rounded-xl p-4 ${severity.color}`}>
@@ -491,10 +491,12 @@ function SOFACalculator() {
   const sel = (label: string, val: number, set: (n: number) => void, opts: { v: number; l: string }[]) => (
     <div key={label}>
       <p className="text-sm font-semibold text-slate-700 mb-1">{label}</p>
-      <select value={val} onChange={e => set(parseInt(e.target.value))}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-        {opts.map(o => <option key={o.v} value={o.v}>{o.v} — {o.l}</option>)}
-      </select>
+      <BottomSheetPicker
+        title={label}
+        value={val.toString()}
+        options={opts.map(o => ({ value: o.v.toString(), label: `${o.v} — ${o.l}` }))}
+        onChange={v => set(parseInt(v))}
+      />
     </div>
   );
 
@@ -554,10 +556,12 @@ function GRACECalculator() {
   const sel = (label: string, val: number, set: (n: number) => void, opts: { v: number; l: string }[]) => (
     <div key={label}>
       <p className="text-sm font-semibold text-slate-700 mb-1">{label}</p>
-      <select value={val} onChange={e => set(parseInt(e.target.value))}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-        {opts.map(o => <option key={o.v} value={o.v}>{o.l} ({o.v} pts)</option>)}
-      </select>
+      <BottomSheetPicker
+        title={label}
+        value={val.toString()}
+        options={opts.map(o => ({ value: o.v.toString(), label: `${o.l} (${o.v} pts)` }))}
+        onChange={v => set(parseInt(v))}
+      />
     </div>
   );
 
@@ -624,10 +628,12 @@ function MRSCalculator() {
     <div className="space-y-3">
       <div>
         <p className="text-sm font-semibold text-slate-700 mb-1">Select mRS Grade</p>
-        <select value={grade} onChange={e => setGrade(parseInt(e.target.value))}
-          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-          {grades.map(g => <option key={g.v} value={g.v}>{g.v} — {g.l}</option>)}
-        </select>
+        <BottomSheetPicker
+          title="Modified Rankin Scale"
+          value={grade.toString()}
+          options={grades.map(g => ({ value: g.v.toString(), label: `${g.v} — ${g.l}` }))}
+          onChange={v => setGrade(parseInt(v))}
+        />
       </div>
       <div className={`rounded-xl p-4 ${color}`}>
         <p className="text-2xl font-black">mRS Grade {grade}</p>
@@ -656,10 +662,12 @@ function ECOGCalculator() {
     <div className="space-y-3">
       <div>
         <p className="text-sm font-semibold text-slate-700 mb-1">Select ECOG Grade</p>
-        <select value={grade} onChange={e => setGrade(parseInt(e.target.value))}
-          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-          {grades.map(g => <option key={g.v} value={g.v}>{g.v} — {g.l}</option>)}
-        </select>
+        <BottomSheetPicker
+          title="ECOG Performance Status"
+          value={grade.toString()}
+          options={grades.map(g => ({ value: g.v.toString(), label: `${g.v} — ${g.l}` }))}
+          onChange={v => setGrade(parseInt(v))}
+        />
       </div>
       <div className={`rounded-xl p-4 ${colors[grade]}`}>
         <p className="text-2xl font-black">ECOG Grade {grade}</p>
@@ -699,10 +707,12 @@ function PHQ9Calculator() {
       {questions.map((q, i) => (
         <div key={i} className={i === 8 ? 'p-2 border border-red-200 rounded-lg bg-red-50' : ''}>
           <p className="text-sm font-semibold text-slate-700 mb-1">{i + 1}. {q}</p>
-          <select value={vals[i]} onChange={e => setVals(p => { const n = [...p]; n[i] = parseInt(e.target.value); return n; })}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-            {optLabels.map((l, v) => <option key={v} value={v}>{v} — {l}</option>)}
-          </select>
+          <BottomSheetPicker
+            title={`Q${i + 1}`}
+            value={vals[i].toString()}
+            options={optLabels.map((l, v) => ({ value: v.toString(), label: `${v} — ${l}` }))}
+            onChange={v => setVals(p => { const n = [...p]; n[i] = parseInt(v); return n; })}
+          />
         </div>
       ))}
       {q9Alert && (
@@ -743,10 +753,12 @@ function GAD7Calculator() {
       {questions.map((q, i) => (
         <div key={i}>
           <p className="text-sm font-semibold text-slate-700 mb-1">{i + 1}. {q}</p>
-          <select value={vals[i]} onChange={e => setVals(p => { const n = [...p]; n[i] = parseInt(e.target.value); return n; })}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-            {optLabels.map((l, v) => <option key={v} value={v}>{v} — {l}</option>)}
-          </select>
+          <BottomSheetPicker
+            title={`Q${i + 1}`}
+            value={vals[i].toString()}
+            options={optLabels.map((l, v) => ({ value: v.toString(), label: `${v} — ${l}` }))}
+            onChange={v => setVals(p => { const n = [...p]; n[i] = parseInt(v); return n; })}
+          />
         </div>
       ))}
       <div className={`rounded-xl p-4 ${severity.color}`}>
@@ -781,10 +793,12 @@ function BlatchfordCalculator() {
   const sel = (label: string, val: number, set: (n: number) => void, opts: { v: number; l: string }[]) => (
     <div key={label}>
       <p className="text-sm font-semibold text-slate-700 mb-1">{label}</p>
-      <select value={val} onChange={e => set(parseInt(e.target.value))}
-        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white">
-        {opts.map(o => <option key={o.v} value={o.v}>{o.l} (+{o.v})</option>)}
-      </select>
+      <BottomSheetPicker
+        title={label}
+        value={val.toString()}
+        options={opts.map(o => ({ value: o.v.toString(), label: `${o.l} (+${o.v})` }))}
+        onChange={v => set(parseInt(v))}
+      />
     </div>
   );
 

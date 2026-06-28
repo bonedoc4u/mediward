@@ -56,9 +56,11 @@ AS $$
   LIMIT 1
 $$;
 
--- Grant execute to anon so the login flow can call this RPC
-GRANT EXECUTE ON FUNCTION public.lookup_user_for_login(TEXT) TO anon;
-GRANT EXECUTE ON FUNCTION public.lookup_user_for_login(TEXT) TO authenticated;
+-- login flow calls get_app_user_by_email only AFTER Supabase Auth succeeds (authenticated JWT);
+-- anon access is not needed and enables email enumeration.
+REVOKE EXECUTE ON FUNCTION public.lookup_user_for_login(TEXT) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.lookup_user_for_login(TEXT) TO authenticated;
+GRANT  EXECUTE ON FUNCTION public.lookup_user_for_login(TEXT) TO service_role;
 
 -- Only admins can create/update/delete users
 DROP POLICY IF EXISTS "app_users_insert" ON public.app_users;

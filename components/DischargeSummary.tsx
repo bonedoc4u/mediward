@@ -6,6 +6,7 @@ import {
   ArrowLeft, FileDown, Save, Search, FileText,
   CheckCircle, LogOut, RotateCcw, AlertTriangle, Plus, X as XIcon, Pill,
 } from 'lucide-react';
+import BottomSheetPicker from './ui/BottomSheetPicker';
 
 // ─── Auto-generate hospital course from patient data ───
 function buildDefaultCourse(patient: Patient): string {
@@ -412,17 +413,23 @@ const MedicationPicker: React.FC<{
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Frequency</label>
-              <select value={addForm.freq} onChange={e => setAddForm(f => f && ({ ...f, freq: e.target.value }))}
-                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                {FREQUENCIES.map(f => <option key={f}>{f}</option>)}
-              </select>
+              <BottomSheetPicker
+                title="Frequency"
+                value={addForm.freq}
+                options={FREQUENCIES.map(f => ({ value: f, label: f }))}
+                onChange={val => setAddForm(f => f && ({ ...f, freq: val }))}
+                triggerClassName="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none flex items-center justify-between gap-1"
+              />
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Duration</label>
-              <select value={addForm.duration} onChange={e => setAddForm(f => f && ({ ...f, duration: e.target.value }))}
-                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                {DURATIONS.map(d => <option key={d}>{d}</option>)}
-              </select>
+              <BottomSheetPicker
+                title="Duration"
+                value={addForm.duration}
+                options={DURATIONS.map(d => ({ value: d, label: d }))}
+                onChange={val => setAddForm(f => f && ({ ...f, duration: val }))}
+                triggerClassName="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none flex items-center justify-between gap-1"
+              />
             </div>
           </div>
           <div className="flex gap-2 justify-end">
