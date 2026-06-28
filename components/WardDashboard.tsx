@@ -355,16 +355,15 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       {/* Patient Tables by Ward — Desktop only; mobile uses virtual list below */}
       <div className="hidden md:block space-y-6">
       {wardsToDisplay.map(ward => {
-        // Sort by clinical urgency first, then bed number as tiebreaker
         const wardPatients = [...patientsByWard[ward]].sort((a, b) => {
           if (viewMode === 'pending') {
-            // Sort by plannedDos ascending; undated last
+            // Pending: earliest planned surgery date first, undated last
             if (a.plannedDos && b.plannedDos) return a.plannedDos.localeCompare(b.plannedDos);
             if (a.plannedDos) return -1;
             if (b.plannedDos) return 1;
           }
-          const diff = getTriagePriority(a) - getTriagePriority(b);
-          return diff !== 0 ? diff : sortByBed(a, b);
+          // Primary sort: bed number (mirrors physical ward layout)
+          return sortByBed(a, b);
         });
         const isIcuWard = icuWardNames.has(ward);
         const criticalCount = isIcuWard ? wardPatients.length : 0;
