@@ -35,8 +35,12 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-function buildOcrPrompt(presets: string[]): string {
-  const presetList = presets.length > 0 ? presets.join(', ') : 'HTN, DM, CAD, CKD, CVA, Hypothyroid, Asthma, COPD';
+interface ComorbidityEntry { short: string; full: string; }
+
+function buildOcrPrompt(comorbidityMap: ComorbidityEntry[]): string {
+  const mapping = comorbidityMap.length > 0
+    ? comorbidityMap.map(e => `${e.short}=${e.full}`).join(', ')
+    : 'HTN=Hypertension, DM=Diabetes Mellitus, CAD=Coronary Artery Disease, CKD=Chronic Kidney Disease, CVA=Cerebrovascular Accident, Hypothyroid=Hypothyroidism, Asthma=Bronchial Asthma, COPD=COPD';
   return `You are reading the front cover of a hospital case sheet from Government Medical College Kozhikode (or similar Indian government hospital).
 
 ZONE MAP of the case sheet cover:
@@ -54,7 +58,7 @@ CRITICAL RULES:
 4. age: check BOTH the sticker (e.g. "Age 87 Years") AND the handwritten name line (e.g. "BHASKARAN 87|M" → 87). Return numbers only.
 5. gender: check BOTH the sticker AND the handwritten name line suffix (|M, /F, or bare M/F). Expand M=Male, F=Female.
 6. mobile_number: PRIMARY source is the RIGHT MIDDLE THIRD handwritten number. Secondary source is the sticker phone. If both exist and differ, use the RIGHT MIDDLE THIRD number as mobile_number and put the sticker number in mobile_conflict. Any 10-digit number in the right middle zone is a phone number even if unlabelled.
-7. comorbidities: scan the LOWER part of the LEFT MIDDLE THIRD zone. Extract EVERY condition written there — do NOT skip anything. Try to match against this list: ${presetList}. If a written term is not on the list, still include it exactly as written. Common shorthands: IHD=CAD, HT=HTN, DM2=DM, CRF=CKD, BA=Asthma. Return ALL found conditions as an array of strings.
+7. comorbidities: scan the LOWER part of the LEFT MIDDLE THIRD zone. Extract EVERY condition written there — do NOT skip anything. Use this short→full mapping to normalise: ${mapping}. When you see a short form, return the full name. Additional shorthands: IHD=Coronary Artery Disease, HT=Hypertension, DM2=Diabetes Mellitus, CRF=Chronic Kidney Disease, BA=Bronchial Asthma. If a written term does not match any mapping, include it exactly as written. Return ALL found conditions as an array of full-name strings.
 8. mode_of_injury: look in the UPPER part of the LEFT MIDDLE THIRD zone. Map to the closest value: RTA, Slip and Fall, Fall from Height, Trivial Fall, Direct Blow, Sports Injury, Assault, Pathological, Other. Common shorthands: FFH=Fall from Height, RTA=RTA, S&F=Slip and Fall. Leave empty string only if nothing is written there.
 9. diagnosis: expand abbreviations, keep (R)/(L) side notation. # means fracture — expand it.
 
@@ -111,8 +115,8 @@ serve(async (req: Request) => {
     }
 
     // ─── Parse request body ───
-    const body = await req.json() as { image: string; mimeType?: string; presets?: string[] };
-    const { image, mimeType = 'image/jpeg', presets = [] } = body;
+    const body = await req.json() as { image: string; mimeType?: string; comorbidityMap?: ComorbidityEntry[] };
+    const { image, mimeType = 'image/jpeg', comorbidityMap = [] } = body;
 
     if (!image || typeof image !== 'string') {
       return new Response(JSON.stringify({ error: 'image (base64 string) is required' }), {
@@ -121,7 +125,7 @@ serve(async (req: Request) => {
     }
 
     // ─── Call Claude Vision ───
-    const prompt = buildOcrPrompt(presets);
+    const prompt = buildOcrPrompt(comorbidityMap);
 
     const anthropicRes = await fetch(ANTHROPIC_URL, {
       method: 'POST',

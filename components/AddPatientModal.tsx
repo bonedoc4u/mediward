@@ -64,7 +64,7 @@ function parseDDMMYYYY(s: string): string | null {
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
-  const { presets, savePresets } = useComorbidityPresets();
+  const { comorbidityMap, saveComorbidityMap } = useComorbidityPresets();
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
@@ -271,7 +271,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
     // Comorbidities — merge only new ones
     const newComorbs = (r.comorbidities ?? []).filter(c => c && !prevComorbs.includes(c));
-    const unrecog = (r.comorbidities ?? []).filter(c => c && !presets.includes(c));
+    const unrecog = (r.comorbidities ?? []).filter(c => c && !comorbidityMap.some(e => e.full === c));
 
     return { updates, filled, newComorbs, unrecog, mobileConflict: r.mobile_conflict || null };
   };
@@ -287,7 +287,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
     try {
       const { data, error } = await supabase.functions.invoke('parse-admission-slip', {
-        body: { image: base64, mimeType, presets },
+        body: { image: base64, mimeType, comorbidityMap },
       });
       if (error) throw new Error(error.message ?? 'OCR failed');
 
@@ -895,20 +895,25 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 </div>
                 {selectedComorbidities.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
-                    {selectedComorbidities.map(c => (
-                      <span
-                        key={c}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-sm ${getTagColor(c)} ${ocrComorbidities.includes(c) ? 'ring-1 ring-blue-400' : ''}`}
-                      >
-                        {c}
-                        {ocrComorbidities.includes(c) && (
-                          <span className="text-[8px] font-bold text-blue-600 leading-none">✦</span>
-                        )}
-                        <button type="button" onClick={() => toggleComorbidity(c)} aria-label={`Remove ${c}`} className="hover:bg-black/10 rounded-full p-0.5">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
+                    {selectedComorbidities.map(full => {
+                      const entry = comorbidityMap.find(e => e.full === full);
+                      const display = entry?.short ?? full;
+                      return (
+                        <span
+                          key={full}
+                          title={full}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-sm ${getTagColor(full)} ${ocrComorbidities.includes(full) ? 'ring-1 ring-blue-400' : ''}`}
+                        >
+                          {display}
+                          {ocrComorbidities.includes(full) && (
+                            <span className="text-[8px] font-bold text-blue-600 leading-none">✦</span>
+                          )}
+                          <button type="button" onClick={() => toggleComorbidity(full)} aria-label={`Remove ${full}`} className="hover:bg-black/10 rounded-full p-0.5">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
                 {selectedComorbidities.length === 0 && !showComorbidityPicker && (
@@ -925,9 +930,16 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                       onKeyDown={addCustomComorbidity}
                     />
                     <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-0.5">
-                      {presets.filter(opt => !selectedComorbidities.includes(opt)).map(opt => (
-                        <button key={opt} type="button" onClick={() => toggleComorbidity(opt)} className="px-2 py-1 rounded-md text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-teal-600 hover:bg-blue-50 transition-all">
-                          + {opt}
+                      {comorbidityMap.filter(e => !selectedComorbidities.includes(e.full)).map(e => (
+                        <button
+                          key={e.short}
+                          type="button"
+                          title={e.full}
+                          onClick={() => toggleComorbidity(e.full)}
+                          className="flex flex-col items-start px-2 py-1 rounded-md text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-teal-600 hover:bg-blue-50 transition-all"
+                        >
+                          <span className="font-semibold font-mono">+ {e.short}</span>
+                          {e.short !== e.full && <span className="text-[9px] text-slate-400 leading-none">{e.full}</span>}
                         </button>
                       ))}
                     </div>
@@ -1098,9 +1110,9 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     {/* Comorbidity preset editor */}
     {showPresetEditor && (
       <PresetEditor
-        presets={presets}
+        presets={comorbidityMap}
         prefill={presetEditorPrefill}
-        onSave={savePresets}
+        onSave={saveComorbidityMap}
         onClose={() => { setShowPresetEditor(false); setPresetEditorPrefill(''); }}
       />
     )}

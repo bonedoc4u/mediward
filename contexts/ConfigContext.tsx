@@ -10,7 +10,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig, DepartmentTemplateOverride, SpecialtyFieldGroup, VitalThresholds } from '../types';
+import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig, DepartmentTemplateOverride, SpecialtyFieldGroup, VitalThresholds, ComorbidityEntry } from '../types';
 import {
   fetchWards, createWard, updateWard, deleteWard,
   fetchLabTypes, createLabType, updateLabType, deleteLabType,
@@ -137,6 +137,10 @@ interface ConfigContextType {
   vitalThresholds: VitalThresholds;
   /** Persist updated hospital config to DB + cache. */
   saveHospitalConfig: (config: HospitalConfig) => Promise<void>;
+  /** Comorbidity short→full mapping used by OCR and the comorbidity picker. */
+  comorbidityMap: ComorbidityEntry[];
+  /** Persist an updated comorbidity map (wraps saveHospitalConfig). */
+  saveComorbidityMap: (map: ComorbidityEntry[]) => Promise<void>;
   /** Timestamp (Date.now()) set whenever a background config refresh updates the config.
    *  Components with open forms can watch this to show a "Settings updated" banner. */
   configUpdatedAt: number | null;
@@ -323,6 +327,16 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success('Hospital settings saved');
   }, []);
 
+  const saveComorbidityMap = useCallback(async (map: ComorbidityEntry[]) => {
+    setHospitalConfigState(prev => {
+      const next = { ...prev, comorbidityMap: map };
+      upsertHospitalConfig(next).catch(err => console.error('[Config] saveComorbidityMap failed:', err));
+      saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, next);
+      return next;
+    });
+    toast.success('Comorbidity list saved');
+  }, []);
+
   // ─── Derived values ───
   const icuWardNames = useMemo(
     () => new Set(wards.filter(w => w.isIcu).map(w => w.name)),
@@ -470,6 +484,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     customTodoShortcuts:  hospitalConfig.customTodoShortcuts  ?? [],
     vitalThresholds:      hospitalConfig.vitalThresholds      ?? DEFAULT_HOSPITAL_CONFIG.vitalThresholds,
     saveHospitalConfig,
+    comorbidityMap: hospitalConfig.comorbidityMap ?? [],
+    saveComorbidityMap,
     configUpdatedAt,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
@@ -480,7 +496,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     wards, labTypes, isLoadingConfig,
     icuWardNames, labTypesByCategory,
     unitChiefs, setUnitChief,
-    hospitalConfig, saveHospitalConfig, configUpdatedAt,
+    hospitalConfig, saveHospitalConfig, saveComorbidityMap, configUpdatedAt,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
     medications, addMedication, saveMedication, removeMedication, seedMedications,

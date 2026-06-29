@@ -5,23 +5,25 @@
  * Android tablets from ~88 KB to ~8 KB for this shell.
  */
 import React, { lazy, Suspense, useState } from 'react';
-import { Building2, BedDouble, FlaskConical, Pill, Settings2 } from 'lucide-react';
+import { Building2, BedDouble, FlaskConical, Pill, Settings2, HeartPulse } from 'lucide-react';
 import WardSkeleton from './WardSkeleton';
 
-const HospitalSettings    = lazy(() => import('./settings/HospitalSettings'));
-const WardSettings        = lazy(() => import('./settings/WardSettings'));
-const LabSettings         = lazy(() => import('./settings/LabSettings'));
-const MedicationSettings  = lazy(() => import('./settings/MedicationSettings'));
-const AdvancedSettings    = lazy(() => import('./settings/AdvancedSettings'));
+const HospitalSettings      = lazy(() => import('./settings/HospitalSettings'));
+const WardSettings          = lazy(() => import('./settings/WardSettings'));
+const LabSettings           = lazy(() => import('./settings/LabSettings'));
+const MedicationSettings    = lazy(() => import('./settings/MedicationSettings'));
+const ComorbiditySettings   = lazy(() => import('./settings/ComorbiditySettings'));
+const AdvancedSettings      = lazy(() => import('./settings/AdvancedSettings'));
 
-type Tab = 'hospital' | 'wards' | 'labs' | 'medications' | 'advanced';
+type Tab = 'hospital' | 'wards' | 'labs' | 'medications' | 'comorbidities' | 'advanced';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'hospital',    label: 'Hospital',    icon: <Building2    className="w-4 h-4" /> },
-  { id: 'wards',       label: 'Wards',       icon: <BedDouble    className="w-4 h-4" /> },
-  { id: 'labs',        label: 'Labs',        icon: <FlaskConical className="w-4 h-4" /> },
-  { id: 'medications', label: 'Medications', icon: <Pill         className="w-4 h-4" /> },
-  { id: 'advanced',    label: 'Advanced',    icon: <Settings2    className="w-4 h-4" /> },
+  { id: 'hospital',      label: 'Hospital',      icon: <Building2    className="w-4 h-4" /> },
+  { id: 'wards',         label: 'Wards',         icon: <BedDouble    className="w-4 h-4" /> },
+  { id: 'labs',          label: 'Labs',          icon: <FlaskConical className="w-4 h-4" /> },
+  { id: 'medications',   label: 'Medications',   icon: <Pill         className="w-4 h-4" /> },
+  { id: 'comorbidities', label: 'Comorbidities', icon: <HeartPulse   className="w-4 h-4" /> },
+  { id: 'advanced',      label: 'Advanced',      icon: <Settings2    className="w-4 h-4" /> },
 ];
 
 const AdminSettings: React.FC = () => {
@@ -56,11 +58,12 @@ const AdminSettings: React.FC = () => {
 
       {/* Active panel — each mounts only when first selected */}
       <Suspense fallback={<WardSkeleton />}>
-        {activeTab === 'hospital'    && <HospitalSettings />}
-        {activeTab === 'wards'       && <WardSettings />}
-        {activeTab === 'labs'        && <LabSettings />}
-        {activeTab === 'medications' && <MedicationSettings />}
-        {activeTab === 'advanced'    && <AdvancedSettings />}
+        {activeTab === 'hospital'      && <HospitalSettings />}
+        {activeTab === 'wards'         && <WardSettings />}
+        {activeTab === 'labs'          && <LabSettings />}
+        {activeTab === 'medications'   && <MedicationSettings />}
+        {activeTab === 'comorbidities' && <ComorbiditySettings />}
+        {activeTab === 'advanced'      && <AdvancedSettings />}
       </Suspense>
     </div>
   );

@@ -47,6 +47,14 @@ export interface Hospital {
 /** Lab test name — now a plain string fed from the lab_type_config database table. */
 export type LabType = string;
 
+/** A comorbidity abbreviation → full-name mapping entry. */
+export interface ComorbidityEntry {
+  /** Abbreviation written on case sheets, e.g. "HTN" */
+  short: string;
+  /** Full clinical name stored in the patient record, e.g. "Hypertension" */
+  full: string;
+}
+
 /** Hospital-level configuration stored in the hospital_config table. */
 export interface HospitalConfig {
   hospitalName: string;
@@ -84,6 +92,9 @@ export interface HospitalConfig {
   /** ICU vital sign alert thresholds. Monitored when bedside monitors are connected.
    *  Admins can configure these to match department protocols. */
   vitalThresholds: VitalThresholds;
+  /** Short-form → full-name mapping for comorbidities. Used by OCR to normalise
+   *  case-sheet abbreviations and by the picker to display compact labels. */
+  comorbidityMap?: ComorbidityEntry[];
 }
 
 /** A ward row from the ward_config table. */

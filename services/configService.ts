@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig } from '../types';
+import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig, ComorbidityEntry } from '../types';
 
 // ─── Row parsers ───
 
@@ -166,7 +166,7 @@ const DEFAULT_HOSPITAL_CONFIG: HospitalConfig = {
 export async function fetchHospitalConfig(hospitalId?: string): Promise<HospitalConfig> {
   let query = supabase
     .from('hospital_config')
-    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care, show_news2, custom_todo_shortcuts, vital_thresholds');
+    .select('hospital_name, department, units, pre_op_module_name, procedure_list_name, pre_op_checklist_template, show_nursing_notes, show_medication_chart, show_intake_output, show_blood_transfusion, show_wound_care, show_news2, custom_todo_shortcuts, vital_thresholds, show_wound_assessment, show_rehabilitation, comorbidity_map');
   if (hospitalId) query = (query as any).eq('hospital_id', hospitalId);
   const { data, error } = await (query as any).limit(1).maybeSingle();
   if (error) throw error;
@@ -194,6 +194,9 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     vitalThresholds: (data.vital_thresholds && typeof data.vital_thresholds === 'object')
       ? data.vital_thresholds
       : DEFAULT_HOSPITAL_CONFIG.vitalThresholds,
+    comorbidityMap: Array.isArray(data.comorbidity_map) && data.comorbidity_map.length > 0
+      ? (data.comorbidity_map as ComorbidityEntry[])
+      : undefined,
   };
 }
 
@@ -223,6 +226,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_news2:                 config.showNews2,
         custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
         vital_thresholds:           config.vitalThresholds,
+        comorbidity_map:            config.comorbidityMap ?? [],
         updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
@@ -245,6 +249,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         show_news2:                 config.showNews2,
         custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
         vital_thresholds:           config.vitalThresholds,
+        comorbidity_map:            config.comorbidityMap ?? [],
       });
     if (error) throw error;
   }
