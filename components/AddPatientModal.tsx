@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { KeyboardAwareView } from './ui/KeyboardAwareView';
 import { Patient, Gender, PacStatus, PatientStatus, Ward } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { X, Save, UserPlus, Pencil, Loader2, ChevronDown, ChevronUp, ScanLine } from 'lucide-react';
+import { X, Save, UserPlus, Pencil, Loader2, ScanLine, Settings2, AlertTriangle } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { supabase } from '../lib/supabase';
 import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
-
+import { useComorbidityPresets } from '../hooks/useComorbidityPresets';
+import PresetEditor from './admission/PresetEditor';
 
 interface Props {
   isOpen: boolean;
@@ -15,61 +17,71 @@ interface Props {
   initialData?: Patient | null;
 }
 
-const COMORBIDITY_OPTIONS = [
-  "HTN", "DM", "CAD", "CKD", "CVA",
-  "Hypothyroid", "Hyperthyroid", "Asthma", "COPD", "TB",
-  "Seizure Disorder", "DLP", "NOCM", "CA", "RA",
-  "SVT", "DCM", "Parkinson's", "Hyponatremia", "Factor VIII Def.",
-  "Sickle Cell Anemia", "Cardioembolism", "Pulmon Atresia", "RAD", "RDD", "Psy"
+// ─── OCR result shape returned by parse-admission-slip Edge Function ──────────
+interface OCRResult {
+  patient_name: string;
+  age: string;
+  gender: string;
+  ip_number: string;
+  date_of_admission: string; // DD/MM/YYYY
+  mobile_number: string;
+  mobile_conflict: string;
+  diagnosis: string;
+  mode_of_injury: string;
+  comorbidities: string[];
+}
+
+const MODE_OF_INJURY_OPTIONS = [
+  'RTA', 'Slip and Fall', 'Fall from Height', 'Trivial Fall',
+  'Direct Blow', 'Sports Injury', 'Assault', 'Pathological', 'Other',
 ];
 
 const COLORS = [
-  "bg-red-100 text-red-800", "bg-orange-100 text-orange-800", "bg-amber-100 text-amber-800",
-  "bg-green-100 text-green-800", "bg-emerald-100 text-emerald-800", "bg-teal-100 text-teal-800",
-  "bg-cyan-100 text-cyan-800", "bg-sky-100 text-sky-800", "bg-blue-100 text-blue-800",
-  "bg-indigo-100 text-indigo-800", "bg-violet-100 text-violet-800", "bg-purple-100 text-purple-800",
-  "bg-fuchsia-100 text-fuchsia-800", "bg-pink-100 text-pink-800", "bg-rose-100 text-rose-800"
+  'bg-red-100 text-red-800', 'bg-orange-100 text-orange-800', 'bg-amber-100 text-amber-800',
+  'bg-green-100 text-green-800', 'bg-emerald-100 text-emerald-800', 'bg-teal-100 text-teal-800',
+  'bg-cyan-100 text-cyan-800', 'bg-sky-100 text-sky-800', 'bg-blue-100 text-blue-800',
+  'bg-indigo-100 text-indigo-800', 'bg-violet-100 text-violet-800', 'bg-purple-100 text-purple-800',
+  'bg-fuchsia-100 text-fuchsia-800', 'bg-pink-100 text-pink-800', 'bg-rose-100 text-rose-800',
 ];
 
 const STEP_LABELS = ['Location & Identity', 'Patient Details', 'Status & Plan'];
 
-/** Shape of the admission wizard form. Declared explicitly so setFormData
- *  callbacks can type `prev` and avoid implicit-any errors. */
 interface AdmitFormState {
   bed: string; ward: Ward; unit: string; ipNo: string;
   name: string; age: string; gender: Gender; mobile: string;
-  diagnosis: string; doa: string; procedure: string; dos: string;
+  diagnosis: string; modeOfInjury: string; doa: string; procedure: string; dos: string;
   pacStatus: PacStatus; patientStatus: PatientStatus;
+}
+
+// Parse DD/MM/YYYY → YYYY-MM-DD for the date input
+function parseDDMMYYYY(s: string): string | null {
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
 }
 
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
+  const { presets, savePresets } = useComorbidityPresets();
 
-  // Non-admins are locked to their own unit; admins and superadmins can assign any unit
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
-  // Unit users only see their own wards + ICU wards (mirrors WardDashboard logic).
-  // Admins see all wards.
   const activeWards = wards
     .filter(w => w.active)
     .filter(w => {
-      if (!user?.unit) return true;                        // admin / no unit → all wards
+      if (!user?.unit) return true;
       return !w.unit?.length || w.unit.includes(user.unit) || w.isIcu;
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const defaultWard = activeWards[0]?.name ?? '';
   const defaultUnit = user?.unit ?? '';
 
-  // Auto-correct ward + unit when session/wards arrive from the background fetch.
-  // Both formData.ward and formData.unit initialize once (useState lazy init).
-  // If the session profile refresh or ward cache load completes after the modal
-  // opens, this effect patches both fields so the user never sees stale "—".
   useEffect(() => {
     setFormData(prev => {
       const wardStillValid = activeWards.some(w => w.name === prev.ward);
       const firstWard = activeWards[0]?.name ?? '';
-      // For non-admins always sync unit from the live session
       const correctUnit = isAdmin ? prev.unit : (user?.unit ?? prev.unit ?? '');
       return {
         ...prev,
@@ -80,8 +92,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWards.map(w => w.name).join(','), user?.unit]);
 
-  // ── Wizard step ──
-  // STEP_KEY sessionStorage stores { step, formData } to survive screen rotation
   const STEP_KEY = 'mediward_admit_step';
 
   const [formData, setFormData] = useState<AdmitFormState>(() => {
@@ -96,6 +106,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         gender: initialData.gender,
         mobile: initialData.mobile,
         diagnosis: initialData.diagnosis,
+        modeOfInjury: initialData.modeOfInjury ?? '',
         doa: initialData.doa,
         procedure: initialData.procedure || '',
         dos: initialData.dos || '',
@@ -103,7 +114,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         patientStatus: initialData.patientStatus,
       };
     }
-    // Try restoring from sessionStorage (new patient draft)
     try {
       const saved = sessionStorage.getItem(STEP_KEY);
       if (saved) {
@@ -121,6 +131,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       gender: Gender.Male,
       mobile: '',
       diagnosis: '',
+      modeOfInjury: '',
       doa: new Date().toISOString().split('T')[0],
       procedure: '',
       dos: '',
@@ -153,6 +164,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConsent, setShowConsent] = useState(false);
   const [showComorbidityPicker, setShowComorbidityPicker] = useState(false);
+  const [showPresetEditor, setShowPresetEditor] = useState(false);
+  const [presetEditorPrefill, setPresetEditorPrefill] = useState('');
 
   const validateStep = (s: number): string | null => {
     if (s === 1) {
@@ -181,7 +194,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     return [];
   });
   const [customComorbidity, setCustomComorbidity] = useState('');
-  
+
   const [drugAllergies, setDrugAllergies] = useState<string[]>(() => {
     if (initialData?.drugAllergies) return initialData.drugAllergies;
     try {
@@ -195,65 +208,170 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   });
   const [customAllergyInput, setCustomAllergyInput] = useState('');
 
-  // Keep sessionStorage in sync whenever formData changes (debounced to avoid thrashing on every keystroke)
   useEffect(() => {
     if (!initialData) {
       const timer = setTimeout(() => {
         try {
           sessionStorage.setItem(STEP_KEY, JSON.stringify({
-            step, formData, selectedComorbidities, drugAllergies
+            step, formData, selectedComorbidities, drugAllergies,
           }));
         } catch { /* ignore */ }
-      }, 500); // debounce: write after 500ms of inactivity
+      }, 500);
       return () => clearTimeout(timer);
     }
     return undefined;
   }, [formData, step, selectedComorbidities, drugAllergies, initialData]);
 
-  // ── Scan Slip (OCR) ──
+  // ── Scan Slip (OCR) ──────────────────────────────────────────────────────────
   const scanInputRef = useRef<HTMLInputElement>(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  // ocrValues tracks what OCR set for each field: badge shows while value matches
+  const [ocrValues, setOcrValues] = useState<Record<string, string>>({});
+  const [ocrComorbidities, setOcrComorbidities] = useState<string[]>([]);
+  const [ocrMobileConflict, setOcrMobileConflict] = useState<string | null>(null);
+  const [ocrUnrecognised, setOcrUnrecognised] = useState<string[]>([]);
+  const [showOcrBanner, setShowOcrBanner] = useState(false);
+  const [ocrFilledCount, setOcrFilledCount] = useState(0);
 
-  const handleScanFile = async (file: File) => {
+  const today = new Date().toISOString().split('T')[0];
+
+  const processOcrResult = (r: OCRResult, prevForm: AdmitFormState, prevComorbs: string[]) => {
+    const updates: Partial<AdmitFormState> = {};
+    const filled: Record<string, string> = {};
+
+    if (r.ip_number && !prevForm.ipNo) {
+      updates.ipNo = r.ip_number; filled.ipNo = r.ip_number;
+    }
+    if (r.date_of_admission) {
+      const parsed = parseDDMMYYYY(r.date_of_admission);
+      if (parsed && (!prevForm.doa || prevForm.doa === today)) {
+        updates.doa = parsed; filled.doa = parsed;
+      }
+    }
+    if (r.mobile_number && !prevForm.mobile) {
+      updates.mobile = r.mobile_number; filled.mobile = r.mobile_number;
+    }
+    if (r.patient_name && !prevForm.name) {
+      updates.name = r.patient_name; filled.name = r.patient_name;
+    }
+    if (r.age && !prevForm.age) {
+      updates.age = r.age; filled.age = r.age;
+    }
+    if (r.gender) {
+      const g = r.gender === 'Female' ? Gender.Female : r.gender === 'Male' ? Gender.Male : null;
+      if (g) { updates.gender = g; filled.gender = g; }
+    }
+    if (r.diagnosis && !prevForm.diagnosis) {
+      updates.diagnosis = r.diagnosis; filled.diagnosis = r.diagnosis;
+    }
+    if (r.mode_of_injury && !prevForm.modeOfInjury) {
+      updates.modeOfInjury = r.mode_of_injury; filled.modeOfInjury = r.mode_of_injury;
+    }
+
+    // Comorbidities — merge only new ones
+    const newComorbs = (r.comorbidities ?? []).filter(c => c && !prevComorbs.includes(c));
+    const unrecog = (r.comorbidities ?? []).filter(c => c && !presets.includes(c));
+
+    return { updates, filled, newComorbs, unrecog, mobileConflict: r.mobile_conflict || null };
+  };
+
+  const handleScanBase64 = async (base64: string, mimeType: string) => {
     setScanError(null);
     setScanLoading(true);
+    setOcrValues({});
+    setOcrComorbidities([]);
+    setOcrMobileConflict(null);
+    setOcrUnrecognised([]);
+    setShowOcrBanner(false);
+
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // Strip the data:image/...;base64, prefix
-          resolve(result.split(',')[1] ?? result);
-        };
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
       const { data, error } = await supabase.functions.invoke('parse-admission-slip', {
-        body: { image: base64, mimeType: file.type || 'image/jpeg' },
+        body: { image: base64, mimeType, presets },
       });
       if (error) throw new Error(error.message ?? 'OCR failed');
-      const r = data as Record<string, unknown>;
-      setFormData(prev => ({
-        ...prev,
-        ...(r.name   && typeof r.name   === 'string' ? { name: r.name }               : {}),
-        ...(r.age    && typeof r.age    === 'number' ? { age: String(r.age) }          : {}),
-        ...(r.gender && typeof r.gender === 'string' ? { gender: r.gender as any }     : {}),
-        ...(r.ipNo   && typeof r.ipNo   === 'string' ? { ipNo: r.ipNo }                : {}),
-        ...(r.doa    && typeof r.doa    === 'string' ? { doa: r.doa }                  : {}),
-        ...(r.mobile && typeof r.mobile === 'string' ? { mobile: r.mobile }            : {}),
-      }));
-      // Jump to step 1 so user can see & verify extracted fields
-      setStepRaw(1);
-    } catch (err: any) {
-      setScanError(err.message ?? 'Scan failed. Please try again.');
+
+      const r = data as OCRResult;
+      let filledRecord: Record<string, string> = {};
+      let newCombsResult: string[] = [];
+
+      setFormData(prev => {
+        const { updates, filled, newComorbs } = processOcrResult(r, prev, selectedComorbidities);
+        filledRecord = filled;
+        newCombsResult = newComorbs;
+        return { ...prev, ...updates };
+      });
+
+      // Merge new comorbidities — run after setFormData settles
+      setTimeout(() => {
+        if (newCombsResult.length > 0) {
+          setSelectedComorbidities(prev => [...prev, ...newCombsResult.filter(c => !prev.includes(c))]);
+        }
+      }, 0);
+
+      const { unrecog, mobileConflict } = processOcrResult(r, formData, selectedComorbidities);
+      setOcrValues(filledRecord);
+      setOcrComorbidities(r.comorbidities ?? []);
+      setOcrUnrecognised(unrecog);
+      setOcrMobileConflict(mobileConflict);
+
+      const count = Object.keys(filledRecord).length + (r.comorbidities?.length ?? 0);
+      setOcrFilledCount(count);
+      if (count > 0) setShowOcrBanner(true);
+
+      setStepRaw(1); // go to step 1 so user can verify
+    } catch (err: unknown) {
+      setScanError(
+        err instanceof Error ? err.message : 'Could not read case sheet — please enter details manually.'
+      );
     } finally {
       setScanLoading(false);
       if (scanInputRef.current) scanInputRef.current.value = '';
     }
   };
 
-  // ── Focus trap ──
+  const handleScanFile = async (file: File) => {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1] ?? (reader.result as string));
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+    await handleScanBase64(base64, file.type || 'image/jpeg');
+  };
+
+  const triggerScan = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+        const photo = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Base64,
+          source: CameraSource.Camera,
+        });
+        if (photo.base64String) {
+          await handleScanBase64(photo.base64String, `image/${photo.format ?? 'jpeg'}`);
+        }
+        return;
+      } catch {
+        // User cancelled or camera unavailable — fall through to file input
+      }
+    }
+    scanInputRef.current?.click();
+  };
+
+  // OCR badge: shows when current field value still matches what OCR set
+  const ScanBadge: React.FC<{ field: string; value: string }> = ({ field, value }) => {
+    if (!ocrValues[field] || ocrValues[field] !== value) return null;
+    return (
+      <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-700 rounded uppercase tracking-wide leading-none">
+        FROM SCAN
+      </span>
+    );
+  };
+
+  // ── Focus trap ───────────────────────────────────────────────────────────────
   const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!isOpen) return;
@@ -279,24 +397,24 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // ── iOS keyboard: scroll first input into view when step changes ──
   useEffect(() => {
     const first = dialogRef.current?.querySelector<HTMLElement>('input, select, textarea');
     if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [step]);
 
-
-  // Effect to populate form when editing
   useEffect(() => {
-    // Always reset submitting flag when the modal opens or closes.
-    // Without this, a previous successful submit leaves isSubmitting=true,
-    // and the next open silently ignores the Admit button click.
     setIsSubmitting(false);
     setStepError(null);
     setShowConsent(false);
     setShowComorbidityPicker(false);
     setScanError(null);
     setScanLoading(false);
+    setOcrValues({});
+    setOcrComorbidities([]);
+    setOcrMobileConflict(null);
+    setOcrUnrecognised([]);
+    setShowOcrBanner(false);
+
     if (isOpen && initialData) {
       setFormData({
         bed: initialData.bed,
@@ -308,22 +426,21 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         gender: initialData.gender,
         mobile: initialData.mobile,
         diagnosis: initialData.diagnosis,
+        modeOfInjury: initialData.modeOfInjury ?? '',
         doa: initialData.doa,
         procedure: initialData.procedure || '',
         dos: initialData.dos || '',
         pacStatus: initialData.pacStatus,
-        patientStatus: initialData.patientStatus
+        patientStatus: initialData.patientStatus,
       });
       setSelectedComorbidities(initialData.comorbidities || []);
       setDrugAllergies(initialData.drugAllergies ?? []);
     } else if (isOpen && !initialData) {
-      // Restore sessionStorage draft if present; otherwise reset for a fresh new patient
       try {
         const saved = sessionStorage.getItem(STEP_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed.formData) {
-            // Non-admins: always override unit from live session, not stale draft
             const restoredForm = {
               ...parsed.formData,
               unit: !isAdmin && user?.unit ? user.unit : parsed.formData.unit,
@@ -333,21 +450,21 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
             if (parsed.drugAllergies) setDrugAllergies(parsed.drugAllergies);
             const n = parsed.step ? parseInt(String(parsed.step), 10) : 1;
             setStepRaw(n >= 1 && n <= 3 ? n : 1);
-            return; // draft restored — don't overwrite with blank form
+            return;
           }
         }
       } catch { /* ignore */ }
-      // No draft — blank form for new admission
       setFormData({
         bed: '',
         ward: defaultWard,
         unit: defaultUnit,
         ipNo: '',
-          name: '',
+        name: '',
         age: '',
         gender: Gender.Male,
         mobile: '',
         diagnosis: '',
+        modeOfInjury: '',
         doa: new Date().toISOString().split('T')[0],
         procedure: '',
         dos: '',
@@ -384,14 +501,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    // New patient: show DPDP consent modal before saving
     if (!initialData && !showConsent) {
       setShowConsent(true);
       return;
     }
     setIsSubmitting(true);
     const patientData: Patient = {
-      // Preserve IDs and existing arrays if editing, otherwise create new
       ...((initialData || {}) as any),
       bed: formData.bed,
       ward: formData.ward,
@@ -402,6 +517,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       gender: formData.gender,
       mobile: formData.mobile,
       diagnosis: formData.diagnosis,
+      modeOfInjury: formData.modeOfInjury || undefined,
       comorbidities: selectedComorbidities,
       drugAllergies,
       doa: formData.doa,
@@ -413,13 +529,11 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       investigations: initialData?.investigations || [],
       labResults: initialData?.labResults || [],
       todos: initialData?.todos || [],
-      // Stamp consent on new patient records (DPDP Act 2023)
       ...(!initialData ? {
         consentGivenAt: new Date().toISOString(),
         consentVersion: CONSENT_VERSION,
       } : {}),
     };
-
     sessionStorage.removeItem(STEP_KEY);
     onSave(patientData);
     onClose();
@@ -427,7 +541,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   const handleConsentAccepted = () => {
     setShowConsent(false);
-    // Re-trigger save now that consent is obtained
     setIsSubmitting(true);
     const patientData: Patient = {
       ...({} as any),
@@ -440,6 +553,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       gender: formData.gender,
       mobile: formData.mobile,
       diagnosis: formData.diagnosis,
+      modeOfInjury: formData.modeOfInjury || undefined,
       comorbidities: selectedComorbidities,
       drugAllergies,
       doa: formData.doa,
@@ -459,11 +573,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     onClose();
   };
 
-  // Helper to get a consistent color for a tag
-  const getTagColor = (tag: string) => {
-    const index = tag.length % COLORS.length;
-    return COLORS[index];
-  };
+  const getTagColor = (tag: string) => COLORS[tag.length % COLORS.length];
 
   return (
     <>
@@ -486,18 +596,19 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               <h3 className="font-bold text-slate-800">{initialData ? 'Edit Patient Details' : 'Admit New Patient'}</h3>
             </div>
             <div className="flex items-center gap-2">
-              {/* Hidden file input for OCR scan */}
+              {/* Hidden file input for web/desktop */}
               <input
                 ref={scanInputRef}
                 type="file"
                 accept="image/*"
+                capture="environment"
                 className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleScanFile(f); }}
               />
               <button
                 type="button"
                 title="Scan admission slip"
-                onClick={() => scanInputRef.current?.click()}
+                onClick={triggerScan}
                 disabled={scanLoading}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
               >
@@ -506,7 +617,9 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   : <ScanLine className="w-3.5 h-3.5" />}
                 {scanLoading ? 'Scanning…' : 'Scan Slip'}
               </button>
-              <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close modal"><X className="w-5 h-5" /></button>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label="Close modal">
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
@@ -524,11 +637,11 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
             </div>
 
             {/* Scan error banner */}
-          {scanError && (
-            <p className="mx-4 mb-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{scanError}</p>
-          )}
+            {scanError && (
+              <p className="mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{scanError}</p>
+            )}
 
-          {/* Step labels — clickable breadcrumbs in edit mode, static otherwise */}
+            {/* Step labels */}
             <div className="flex justify-between px-1 mt-0.5 pb-2">
               {STEP_LABELS.map((label, i) => (
                 initialData ? (
@@ -555,14 +668,35 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           </div>
         </div>
 
+        {/* ── Scanning overlay ── */}
+        {scanLoading && (
+          <div className="absolute inset-0 z-20 bg-white/80 flex flex-col items-center justify-center gap-3 rounded-lg">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-sm font-semibold text-slate-700">Reading case sheet…</p>
+          </div>
+        )}
+
         <KeyboardAwareView>
         <form onSubmit={handleSubmit} autoComplete="off" className="p-4 sm:p-6 space-y-4 sm:space-y-5">
 
+          {/* ── OCR success banner (dismissable) ── */}
+          {showOcrBanner && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+              <span>✓ {ocrFilledCount} field{ocrFilledCount !== 1 ? 's' : ''} extracted from scan — highlighted below</span>
+              <button
+                type="button"
+                onClick={() => setShowOcrBanner(false)}
+                className="text-blue-400 hover:text-blue-600 shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* ── Step 1: Location & Identity ── */}
           {step === 1 && (
             <div className="space-y-4">
-              {/* No wards configured — admin must set them up first */}
               {activeWards.length === 0 && (
                 <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                   <span className="text-amber-500 shrink-0">⚠️</span>
@@ -614,19 +748,51 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.bed} onChange={e => setFormData({...formData, bed: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">IP Number</label>
-                  <input type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.ipNo} disabled={!!initialData} onChange={e => setFormData({...formData, ipNo: e.target.value})} />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    IP Number
+                    <ScanBadge field="ipNo" value={formData.ipNo} />
+                  </label>
+                  <input
+                    type="text"
+                    className={`w-full p-2 border rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none ${ocrValues.ipNo && ocrValues.ipNo === formData.ipNo ? 'border-blue-300 bg-blue-50/40' : 'border-slate-300'}`}
+                    value={formData.ipNo}
+                    disabled={!!initialData}
+                    onChange={e => setFormData({...formData, ipNo: e.target.value})}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Admission</label>
-                  <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.doa} onChange={e => setFormData({...formData, doa: e.target.value})} />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    Date of Admission
+                    <ScanBadge field="doa" value={formData.doa} />
+                  </label>
+                  <input
+                    type="date"
+                    max={new Date().toISOString().split('T')[0]}
+                    className={`w-full p-2 min-h-[44px] border rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none ${ocrValues.doa && ocrValues.doa === formData.doa ? 'border-blue-300 bg-blue-50/40' : 'border-slate-300'}`}
+                    value={formData.doa}
+                    onChange={e => setFormData({...formData, doa: e.target.value})}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mobile Number</label>
-                  <input type="tel" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    Mobile Number
+                    <ScanBadge field="mobile" value={formData.mobile} />
+                  </label>
+                  <input
+                    type="tel"
+                    className={`w-full p-2 border rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none ${ocrValues.mobile && ocrValues.mobile === formData.mobile ? 'border-blue-300 bg-blue-50/40' : 'border-slate-300'}`}
+                    value={formData.mobile}
+                    onChange={e => setFormData({...formData, mobile: e.target.value})}
+                  />
+                  {/* Phone conflict warning */}
+                  {ocrMobileConflict && (
+                    <p className="mt-1 flex items-start gap-1 text-xs text-amber-700">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      Sticker had a different number: {ocrMobileConflict} — verify which is current
+                    </p>
+                  )}
                 </div>
               </div>
-
             </div>
           )}
 
@@ -635,16 +801,37 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Patient Name</label>
-                  <input required type="text" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    Patient Name
+                    <ScanBadge field="name" value={formData.name} />
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    className={`w-full p-2 border rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none ${ocrValues.name && ocrValues.name === formData.name ? 'border-blue-300 bg-blue-50/40' : 'border-slate-300'}`}
+                    value={formData.name}
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Age</label>
-                    <input required type="number" className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} />
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                      Age
+                      <ScanBadge field="age" value={formData.age} />
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      className={`w-full p-2 border rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none ${ocrValues.age && ocrValues.age === formData.age ? 'border-blue-300 bg-blue-50/40' : 'border-slate-300'}`}
+                      value={formData.age}
+                      onChange={e => setFormData({...formData, age: e.target.value})}
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                      Gender
+                      <ScanBadge field="gender" value={formData.gender} />
+                    </label>
                     <BottomSheetPicker
                       title="Select Gender"
                       value={formData.gender}
@@ -656,14 +843,49 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Diagnosis</label>
-                <textarea required rows={2} className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.diagnosis} onChange={e => setFormData({...formData, diagnosis: e.target.value})} />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                  Diagnosis
+                  <ScanBadge field="diagnosis" value={formData.diagnosis} />
+                </label>
+                <textarea
+                  required
+                  rows={2}
+                  className={`w-full p-2 border rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none ${ocrValues.diagnosis && ocrValues.diagnosis === formData.diagnosis ? 'border-blue-300 bg-blue-50/40' : 'border-slate-300'}`}
+                  value={formData.diagnosis}
+                  onChange={e => setFormData({...formData, diagnosis: e.target.value})}
+                />
               </div>
 
-              {/* Comorbidities — collapsed by default to keep step height mobile-friendly */}
+              {/* Mode of Injury */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                  Mode of Injury
+                  <ScanBadge field="modeOfInjury" value={formData.modeOfInjury} />
+                </label>
+                <BottomSheetPicker
+                  title="Select Mode of Injury"
+                  value={formData.modeOfInjury}
+                  placeholder="— Not specified —"
+                  options={[{ value: '', label: '— Not specified —' }, ...MODE_OF_INJURY_OPTIONS.map(m => ({ value: m, label: m }))]}
+                  onChange={val => setFormData({ ...formData, modeOfInjury: val })}
+                />
+              </div>
+
+              {/* Comorbidities */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Comorbidities</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
+                    Comorbidities
+                    <button
+                      type="button"
+                      onClick={() => { setPresetEditorPrefill(''); setShowPresetEditor(true); }}
+                      title="Edit comorbidity presets"
+                      className="text-slate-400 hover:text-slate-600 p-0.5 rounded"
+                      aria-label="Edit comorbidity presets"
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                    </button>
+                  </label>
                   <button
                     type="button"
                     onClick={() => setShowComorbidityPicker(v => !v)}
@@ -675,9 +897,17 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 {selectedComorbidities.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
                     {selectedComorbidities.map(c => (
-                      <span key={c} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${getTagColor(c)} shadow-sm`}>
+                      <span
+                        key={c}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold shadow-sm ${getTagColor(c)} ${ocrComorbidities.includes(c) ? 'ring-1 ring-blue-400' : ''}`}
+                      >
                         {c}
-                        <button type="button" onClick={() => toggleComorbidity(c)} aria-label={`Remove ${c}`} className="hover:bg-black/10 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                        {ocrComorbidities.includes(c) && (
+                          <span className="text-[8px] font-bold text-blue-600 leading-none">✦</span>
+                        )}
+                        <button type="button" onClick={() => toggleComorbidity(c)} aria-label={`Remove ${c}`} className="hover:bg-black/10 rounded-full p-0.5">
+                          <X className="w-3 h-3" />
+                        </button>
                       </span>
                     ))}
                   </div>
@@ -687,12 +917,41 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 )}
                 {showComorbidityPicker && (
                   <div className="border border-slate-200 rounded-lg p-2 bg-white">
-                    <input type="text" placeholder="Type custom and press Enter…" className="w-full text-sm p-2 border border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none mb-2" value={customComorbidity} onChange={e => setCustomComorbidity(e.target.value)} onKeyDown={addCustomComorbidity} />
+                    <input
+                      type="text"
+                      placeholder="Type custom and press Enter…"
+                      className="w-full text-sm p-2 border border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:ring-2 focus:ring-teal-500 outline-none mb-2"
+                      value={customComorbidity}
+                      onChange={e => setCustomComorbidity(e.target.value)}
+                      onKeyDown={addCustomComorbidity}
+                    />
                     <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-0.5">
-                      {COMORBIDITY_OPTIONS.filter(opt => !selectedComorbidities.includes(opt)).map(opt => (
-                        <button key={opt} type="button" onClick={() => toggleComorbidity(opt)} className="px-2 py-1 rounded-md text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-teal-600 hover:bg-blue-50 transition-all">+ {opt}</button>
+                      {presets.filter(opt => !selectedComorbidities.includes(opt)).map(opt => (
+                        <button key={opt} type="button" onClick={() => toggleComorbidity(opt)} className="px-2 py-1 rounded-md text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-teal-600 hover:bg-blue-50 transition-all">
+                          + {opt}
+                        </button>
                       ))}
                     </div>
+                  </div>
+                )}
+                {/* Unrecognised comorbidity warning */}
+                {ocrUnrecognised.length > 0 && (
+                  <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      OCR found unrecognised: <strong>{ocrUnrecognised.join(', ')}</strong>
+                      {' — '}
+                      <button
+                        type="button"
+                        className="underline font-semibold"
+                        onClick={() => {
+                          setPresetEditorPrefill(ocrUnrecognised[0]);
+                          setShowPresetEditor(true);
+                        }}
+                      >
+                        Add to presets →
+                      </button>
+                    </span>
                   </div>
                 )}
               </div>
@@ -702,8 +961,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           {/* ── Step 3: Status & Plan ── */}
           {step === 3 && (
             <div className="space-y-4">
-
-              {/* Drug Allergies — safety critical, first field on step 3 */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">
                   Drug Allergies <span className="normal-case font-normal text-red-500 ml-1">⚠ Safety critical</span>
@@ -821,7 +1078,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 </button>
               )}
             </div>
-            {/* Inline step validation error */}
             {stepError && (
               <p className="text-xs text-red-600 mt-1">{stepError}</p>
             )}
@@ -831,12 +1087,22 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       </div>
     </div>
 
-    {/* DPDP Act 2023 consent gate — shown above the main modal (z-[400]) */}
+    {/* DPDP consent gate */}
     {showConsent && (
       <PatientConsentModal
         patientName={formData.name}
         onAccept={handleConsentAccepted}
         onCancel={() => { setShowConsent(false); setIsSubmitting(false); }}
+      />
+    )}
+
+    {/* Comorbidity preset editor */}
+    {showPresetEditor && (
+      <PresetEditor
+        presets={presets}
+        prefill={presetEditorPrefill}
+        onSave={savePresets}
+        onClose={() => { setShowPresetEditor(false); setPresetEditorPrefill(''); }}
       />
     )}
     </>

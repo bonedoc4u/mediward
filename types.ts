@@ -488,6 +488,8 @@ export interface Patient {
   age: number;
   gender: Gender;
   diagnosis: string;
+  /** How the injury occurred — e.g. "RTA", "Slip and Fall", "Fall from Height". */
+  modeOfInjury?: string;
   comorbidities: string[];
   /** Known drug allergies — used as a safety gate in the MAR. e.g. ["Penicillin", "NSAIDs"] */
   drugAllergies?: string[];

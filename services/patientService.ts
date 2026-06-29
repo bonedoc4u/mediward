@@ -67,6 +67,7 @@ interface PatientRow {
   specialty: string | null;
   specialty_data: Record<string, unknown> | null;
   diagnosis: string;
+  mode_of_injury: string | null;
   procedure: string | null;
   comorbidities: string[];
   drug_allergies: string[] | null;
@@ -180,6 +181,7 @@ function rowToPatient(row: PatientRow): Patient {
     bed:              row.bed,
     unit:             row.unit ?? undefined,
     diagnosis:        row.diagnosis,
+    modeOfInjury:     row.mode_of_injury   ?? undefined,
     procedure:        row.procedure        ?? undefined,
     comorbidities:    Array.isArray(row.comorbidities)   ? row.comorbidities   : [],
     drugAllergies:    Array.isArray(row.drug_allergies)  ? row.drug_allergies  : [],
@@ -238,6 +240,7 @@ function patientToRow(patient: Patient) {
     specialty:         patient.specialty         ?? null,
     specialty_data:    patient.specialtyData     ?? null,
     diagnosis:         patient.diagnosis,
+    mode_of_injury:    patient.modeOfInjury     ?? null,
     procedure:         patient.procedure        ?? null,
     comorbidities:     patient.comorbidities,
     drug_allergies:    patient.drugAllergies   ?? [],
@@ -274,7 +277,7 @@ function patientToRow(patient: Patient) {
 const PATIENT_LIST_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'management',
   'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
@@ -286,7 +289,7 @@ const PATIENT_LIST_SELECT = [
 const PATIENT_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
   'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
