@@ -1,7 +1,9 @@
 # .github/workflows/deploy-staging.yml
 # Triggers: push to main.
-# Pipeline: build → deploy to Vercel.
+# Pipeline: vercel pull → vercel build → vercel deploy --prebuilt
 # DB migrations are applied manually via Supabase MCP or CLI before merging.
+# Env vars (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are stored in the
+# Vercel project settings and pulled automatically by `vercel pull`.
 
 name: Deploy to Staging
 
@@ -11,18 +13,18 @@ on:
 
 concurrency:
   group: deploy-staging
-  cancel-in-progress: false   # never cancel a running deploy mid-way
-
-env:
-  PNPM_VERSION: '9'
-  NODE_VERSION: '20'
+  cancel-in-progress: false
 
 jobs:
-  # ─── 1. Build frontend ──────────────────────────────────────────────────────
-  build:
-    name: Build Vite PWA
+  deploy:
+    name: Build & Deploy to Vercel
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,67 +32,27 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '20'
           cache: 'pnpm'
 
-      - name: Install
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Type-check
         run: pnpm exec tsc --noEmit
 
-      - name: Build
-        env:
-          VITE_SUPABASE_URL:      ${{ secrets.STAGING_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
-          VITE_ENVIRONMENT:       staging
-        run: pnpm build
-
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-staging
-          path: dist/
-          retention-days: 1
-
-  # ─── 2. Deploy to Vercel ────────────────────────────────────────────────────
-  deploy:
-    name: Deploy to Vercel
-    runs-on: ubuntu-latest
-    needs: build
-    timeout-minutes: 10
-    outputs:
-      preview-url: ${{ steps.deploy.outputs.preview-url }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download dist
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-staging
-          path: dist/
-
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
-      - name: Pull Vercel environment
-        env:
-          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Pull Vercel environment & project settings
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build via Vercel
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy prebuilt to Vercel
         id: deploy
-        env:
-          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          URL=$(vercel deploy --prebuilt \
-            --token=${{ secrets.VERCEL_TOKEN }} \
-            --env VITE_SUPABASE_URL="${{ secrets.STAGING_SUPABASE_URL }}" \
-            --env VITE_SUPABASE_ANON_KEY="${{ secrets.STAGING_SUPABASE_ANON_KEY }}")
+          URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
           echo "preview-url=$URL" >> $GITHUB_OUTPUT
           echo "Deployed to: $URL"
