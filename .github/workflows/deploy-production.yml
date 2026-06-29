@@ -2,12 +2,11 @@
 # Triggers: push of a tag matching v*.*.* (e.g. v1.2.3)
 # Gate: requires manual approval via GitHub Environment "production"
 #
-# Web deployment: handled by Vercel's GitHub App (no token needed).
-#   On approval, this workflow force-pushes the tag commit to the
-#   "production" branch, which Vercel watches for production deploys.
-#   Configure in Vercel: Settings → Git → Production Branch → "production"
+# Web deployment: handled automatically by Vercel's GitHub App when main is
+# pushed. By the time a tag is created, the code is already live on
+# mediward.vercel.app — no VERCEL_TOKEN or extra deploy step needed.
 #
-# Android: builds, signs, and uploads a signed AAB to Play Store internal track.
+# This workflow only handles: DB migrations, Android build/sign/upload, GitHub Release.
 
 name: Deploy to Production
 
@@ -31,31 +30,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - run: echo "Production deploy approved for ${{ github.ref_name }}"
+      - run: echo "Production release approved for ${{ github.ref_name }}"
 
-  # ─── 1. Push to production branch → triggers Vercel production deploy ────────
-  deploy-web:
-    name: Trigger Vercel production deploy
-    runs-on: ubuntu-latest
-    needs: gate
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push tag commit to production branch
-        run: |
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name  "github-actions[bot]"
-          git push origin HEAD:refs/heads/production --force
-          echo "Pushed to production branch — Vercel will deploy automatically"
-
-  # ─── 2. DB migrations (runs BEFORE Android build) ───────────────────────────
+  # ─── 1. DB migrations ────────────────────────────────────────────────────────
   migrate:
-    name: DB migrations (production)
+    name: DB migrations
     runs-on: ubuntu-latest
     needs: gate
     timeout-minutes: 15
@@ -73,15 +52,14 @@ jobs:
           supabase link --project-ref ${{ secrets.PROD_PROJECT_REF }} --password "${{ secrets.PROD_DB_PASSWORD }}"
           supabase db push --linked --password "${{ secrets.PROD_DB_PASSWORD }}"
 
-  # ─── 3. Build and sign Android AAB ──────────────────────────────────────────
-  # Skips gracefully if KEYSTORE_BASE64 is still the placeholder value.
-  # Replace the placeholder secrets with real values when ready for Play Store.
+  # ─── 2. Build and sign Android AAB ──────────────────────────────────────────
+  # Skip gracefully until KEYSTORE_BASE64 is replaced with a real keystore.
   build-android:
     name: Build & sign Android AAB
     runs-on: ubuntu-latest
     needs: migrate
     timeout-minutes: 30
-    continue-on-error: true   # don't block release if keystore not yet configured
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -167,11 +145,11 @@ jobs:
           releaseName:    ${{ github.ref_name }}
           changesNotSentForReview: true
 
-  # ─── 4. Create GitHub Release ────────────────────────────────────────────────
+  # ─── 3. Create GitHub Release ────────────────────────────────────────────────
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: deploy-web
+    needs: gate
     permissions:
       contents: write
     steps:
@@ -202,21 +180,8 @@ jobs:
             ## Changes in ${{ github.ref_name }}
 
             ${{ env.CHANGELOG }}
+
+            ---
+            **Live at:** https://mediward.vercel.app
           draft: false
           prerelease: false
-
-  # ─── 5. Notify Slack ─────────────────────────────────────────────────────────
-  notify:
-    name: Notify Slack
-    runs-on: ubuntu-latest
-    needs: [deploy-web, build-android, release]
-    if: always()
-    steps:
-      - uses: slackapi/slack-github-action@v2
-        with:
-          webhook:      ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "text": "${{ needs.deploy-web.result == 'success' && '🚀' || '❌' }} Production release *${{ github.ref_name }}* — web: ${{ needs.deploy-web.result }} · android: ${{ needs.build-android.result }}"
-            }
