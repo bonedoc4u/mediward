@@ -579,11 +579,15 @@ const RadiologyComparator: React.FC<Props> = ({
 
   const handleSave = async () => {
     if (!selectedPatientId || !selectedFile) return;
+    if (!user?.hospitalId) {
+      setUploadError('Session error — please log out and log in again.');
+      return;
+    }
     setIsUploading(true);
     setUploadError(null);
     try {
       const fileToUpload = await compressImage(selectedFile);
-      const imageUrl = await uploadInvestigationImage(fileToUpload, user?.hospitalId ?? 'shared', selectedPatientId);
+      const imageUrl = await uploadInvestigationImage(fileToUpload, user.hospitalId, selectedPatientId);
       const newInv: Investigation = {
         id: generateId(),
         date: new Date().toISOString().split('T')[0],

@@ -143,17 +143,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     findUserByEmail(user.email).then(fresh => {
       if (!fresh) return;
       const changed =
-        fresh.unit  !== user.unit  ||
-        fresh.role  !== user.role  ||
-        fresh.name  !== user.name  ||
-        fresh.ward  !== user.ward;
+        fresh.unit       !== user.unit       ||
+        fresh.role       !== user.role       ||
+        fresh.name       !== user.name       ||
+        fresh.ward       !== user.ward       ||
+        fresh.hospitalId !== user.hospitalId; // patch stale sessions that predate hospitalId field
       if (!changed) return;
       const updated: AuthUser = {
         ...user,
-        unit:  fresh.unit,
-        role:  fresh.role,
-        name:  fresh.name,
-        ward:  fresh.ward,
+        unit:       fresh.unit,
+        role:       fresh.role,
+        name:       fresh.name,
+        ward:       fresh.ward,
+        hospitalId: fresh.hospitalId,
       };
       setUser(updated);
       saveToStorage('session', updated);
