@@ -156,7 +156,8 @@ const ImageCard: React.FC<{
           <button
             onClick={e => { e.stopPropagation(); onDelete(); }}
             className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white
-                       p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                       p-1 rounded-full opacity-0 group-hover:opacity-100
+                       [@media(hover:none)]:opacity-100 transition-opacity"
           >
             <X className="w-3 h-3" />
           </button>
