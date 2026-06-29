@@ -348,7 +348,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           quality: 90,
           allowEditing: false,
           resultType: CameraResultType.Base64,
-          source: CameraSource.Camera,
+          source: CameraSource.Prompt,
         });
         if (photo.base64String) {
           await handleScanBase64(photo.base64String, `image/${photo.format ?? 'jpeg'}`);
@@ -601,7 +601,6 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                 ref={scanInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleScanFile(f); }}
               />
