@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
-import { Patient, ViewMode } from './types';
+import { Patient, ViewMode, PacStatus, PatientStatus } from './types';
+import type { UnitStat } from './components/UnitPicker';
 import { can } from './utils/permissions';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
@@ -178,6 +179,29 @@ const App: React.FC = () => {
     isMobileMenuOpen, setIsMobileMenuOpen, isTransitioning,
   } = useUI();
   const { preOpModuleName, procedureListName, department, hospitalName, unitOptions } = useConfig();
+
+  const resolvedUnits = unitOptions.length > 0 ? unitOptions : ['OR1', 'OR2', 'OR3', 'OR4', 'OR5'];
+
+  const unitStats = useMemo<Record<string, UnitStat>>(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const active = patients.filter(p => p.patientStatus !== PatientStatus.Discharged && p.patientStatus !== PatientStatus.WentHome);
+    const stats: Record<string, UnitStat> = {
+      all: {
+        total: active.length,
+        pacPending: active.filter(p => p.pacStatus === PacStatus.Pending).length,
+        surgeryToday: active.filter(p => p.dos === today || p.plannedDos === today).length,
+      },
+    };
+    resolvedUnits.forEach(u => {
+      const unitPts = active.filter(p => p.unit === u);
+      stats[u] = {
+        total: unitPts.length,
+        pacPending: unitPts.filter(p => p.pacStatus === PacStatus.Pending).length,
+        surgeryToday: unitPts.filter(p => p.dos === today || p.plannedDos === today).length,
+      };
+    });
+    return stats;
+  }, [patients, resolvedUnits]);
 
   const mobileTabs = useMemo(() => [
     { id: 'dashboard' as ViewMode, label: 'Ward',                icon: LayoutDashboard },
@@ -402,7 +426,8 @@ const App: React.FC = () => {
           userName={user.name}
           hospitalName={hospitalName || 'Kozhikode Medical College'}
           departmentName={deptLabel}
-          units={unitOptions.length > 0 ? unitOptions : ['OR1', 'OR2', 'OR3', 'OR4', 'OR5']}
+          units={resolvedUnits}
+          unitStats={unitStats}
           onSelect={(unit) => setSelectedUnit(unit)}
         />
         <ToastContainer />

@@ -64,15 +64,18 @@ interface Props {
 
 const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, hasMore, isLoadingMore, onLoadMore }) => {
   const { wards: configWards, icuWardNames, labTypes, showNews2 } = useConfig();
-  const { user } = useAuth();
+  const { user, selectedUnit } = useAuth();
 
-  // For unit-scoped users: show only wards belonging to their unit + shared wards (no unit) + ICU wards.
-  // Admins (no unit) see all wards.
+  // Determine which unit's wards to show:
+  // - Unit-assigned staff: use their own unit
+  // - Admin/superadmin who picked a specific unit from UnitPicker: use selectedUnit
+  // - Admin who picked 'all': show all wards
   const activeConfigWards = useMemo(() => {
     const all = configWards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
-    if (!user?.unit) return all; // admin — all wards
-    return all.filter(w => !w.unit?.length || w.unit.includes(user.unit!) || w.isIcu);
-  }, [configWards, user?.unit]);
+    const effectiveUnit = user?.unit ?? (selectedUnit && selectedUnit !== 'all' ? selectedUnit : null);
+    if (!effectiveUnit) return all;
+    return all.filter(w => !w.unit?.length || w.unit.includes(effectiveUnit) || w.isIcu);
+  }, [configWards, user?.unit, selectedUnit]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPending, setFilterPending] = useState(false);
