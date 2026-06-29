@@ -248,6 +248,16 @@ export function clearDeadLetterQueue(): void {
   _persistDlq([]);
 }
 
+/** Clears all pending ops from the main queue. */
+export function clearMainQueue(): void {
+  _persist([]);
+}
+
+/** Returns the number of ops currently in the main queue. */
+export function getMainQueueSize(): number {
+  return _cache.length;
+}
+
 /** Retry a single DLQ op by re-enqueuing it and removing it from the DLQ. */
 export function retryDeadLetterOp(id: string): void {
   const op = _dlq.find(o => o.id === id);

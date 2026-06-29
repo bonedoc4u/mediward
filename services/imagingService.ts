@@ -1,10 +1,10 @@
 import { supabase } from '../lib/supabase';
 import { Investigation } from '../types';
 
-/** Insert a new imaging row into the normalized imaging table. */
+/** Insert (or idempotently upsert) an imaging row into the normalized imaging table. */
 export async function insertImaging(patientIpNo: string, inv: Investigation, hospitalId?: string): Promise<void> {
   if (!hospitalId) throw new Error('insertImaging: hospitalId is required');
-  const { error } = await supabase.from('imaging').insert({
+  const { error } = await supabase.from('imaging').upsert({
     id:            inv.id,
     patient_ip_no: patientIpNo,
     date:          inv.date,
@@ -13,7 +13,7 @@ export async function insertImaging(patientIpNo: string, inv: Investigation, hos
     image_url:     inv.imageUrl || null,
     phase:         inv.phase ?? null,
     hospital_id:   hospitalId,
-  });
+  }, { onConflict: 'id' });
   if (error) throw new Error(`insertImaging: ${error.message}`);
 }
 

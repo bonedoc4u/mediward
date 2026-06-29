@@ -246,17 +246,41 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // ─── Offline Sync Queue — replay on reconnect ───
   // Ref so the handler always reads the current user without a stale closure
   const userRef = useRef(user);
-  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => {
+    const wasNull = !userRef.current;
+    userRef.current = user;
+    // If user just became available (login completed after mount), kick off a sync
+    // that was skipped on mount due to the "no user yet" guard.
+    if (wasNull && user) {
+      handleOnlineRef.current();
+    }
+  }, [user]);
 
   // Keep a ref so the visibilitychange and startup handlers always call the
   // latest version without stale closures (the effect deps array stays []).
   const handleOnlineRef = useRef<() => Promise<void>>(async () => {});
+  // Show the DLQ alert at most once per session so it doesn't re-fire on every tab-focus.
+  const dlqAlertedRef = useRef(false);
 
   useEffect(() => {
     const handleOnline = async () => {
       if (!navigator.onLine) return;
+      // Don't attempt sync before the user session is loaded — hospitalId would
+      // be undefined, causing every queued op to fail immediately.
+      if (!userRef.current) return;
+
       // Only replay ops whose backoff window has elapsed
       const queue = getRetryableQueue();
+
+      // Show DLQ alert once per session, regardless of whether there are pending ops.
+      const dlq = getDeadLetterQueue();
+      if (dlq.length > 0 && !dlqAlertedRef.current) {
+        dlqAlertedRef.current = true;
+        toast.error(
+          `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently and need re-entry. Go to Settings → Advanced to review.`,
+        );
+      }
+
       if (queue.length === 0) return;
 
       toast.info(`Syncing ${queue.length} offline change${queue.length > 1 ? 's' : ''}…`);
@@ -324,15 +348,6 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           .catch(() => {/* stay on current state */});
       } else {
         toast.warning(`${remaining} change${remaining > 1 ? 's' : ''} couldn't sync. Will retry later.`);
-      }
-
-      // Persistent alert if any ops permanently failed (dead-letter queue)
-      const dlq = getDeadLetterQueue();
-      if (dlq.length > 0) {
-        toast.error(
-          `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently and need re-entry. Go to Settings → Advanced to review.`,
-          // Keep visible until dismissed — lost clinical data must not be silently ignored
-        );
       }
     };
 

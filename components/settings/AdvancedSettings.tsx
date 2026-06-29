@@ -4,7 +4,7 @@ import { SpecialtyFieldGroup, SpecialtyField } from '../../types';
 import { anonymizePatient, exportPatientData } from '../../services/patientService';
 import { SPECIALTY_DISPLAY_NAMES } from '../../services/specialtyTemplates';
 import { createIncident, updateIncidentStatus, deleteIncident, fetchIncidents, StatusIncident, IncidentSeverity, IncidentStatus } from '../../services/statusService';
-import { getDeadLetterQueue, clearDeadLetterQueue, retryDeadLetterOp, DeadLetterOp } from '../../services/syncQueue';
+import { getDeadLetterQueue, clearDeadLetterQueue, retryDeadLetterOp, clearMainQueue, getMainQueueSize, DeadLetterOp } from '../../services/syncQueue';
 import {
   Link2, Server, Globe, Radio, ShieldAlert, LayoutTemplate, UserX, Download,
   Plus, Pencil, Trash2, Save, X, ChevronDown, ChevronUp, RotateCcw,
@@ -216,6 +216,10 @@ const AdvancedSettings: React.FC = () => {
   const [dlqEntries, setDlqEntries] = useState<DeadLetterOp[]>(() => getDeadLetterQueue());
   const [dlqExpanded, setDlqExpanded] = useState(false);
   const refreshDlq = () => setDlqEntries(getDeadLetterQueue());
+
+  // Main sync queue state
+  const [mainQueueSize, setMainQueueSize] = useState(() => getMainQueueSize());
+  const refreshMainQueue = () => setMainQueueSize(getMainQueueSize());
 
   return (
     <div className="space-y-6">
@@ -541,6 +545,47 @@ const AdvancedSettings: React.FC = () => {
                 ))
               )}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Pending Sync Queue */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="w-full flex items-center justify-between p-5">
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-100 p-2 rounded-lg"><RefreshCw className="w-5 h-5 text-yellow-600" /></div>
+            <div>
+              <h3 className="font-bold text-slate-800">Pending Sync Queue</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Operations waiting to be saved to the server</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {mainQueueSize > 0 && (
+              <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-2 py-0.5 rounded-full">{mainQueueSize}</span>
+            )}
+            <button onClick={refreshMainQueue}
+              className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Refresh">
+              <RefreshCw className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+        </div>
+        {mainQueueSize === 0 ? (
+          <div className="border-t border-slate-100 px-5 pb-5">
+            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-3">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              No pending operations — all data is synced.
+            </div>
+          </div>
+        ) : (
+          <div className="border-t border-slate-100 px-5 pb-5 space-y-3">
+            <p className="text-sm text-slate-600">
+              {mainQueueSize} operation{mainQueueSize > 1 ? 's are' : ' is'} queued for sync. If operations keep failing, you can clear them below — the uploaded images will remain in local storage but the server records will need to be re-entered.
+            </p>
+            <button
+              onClick={() => { clearMainQueue(); refreshMainQueue(); }}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm hover:bg-red-100 transition-colors">
+              <Trash2 className="w-4 h-4" /> Clear Pending Queue
+            </button>
           </div>
         )}
       </div>
