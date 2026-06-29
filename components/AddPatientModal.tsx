@@ -403,6 +403,13 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   }, [step]);
 
   useEffect(() => {
+    // Always wipe the draft when the modal closes — prevents OCR-filled data
+    // from a previous patient leaking into the next new-patient session.
+    if (!isOpen) {
+      sessionStorage.removeItem(STEP_KEY);
+      return;
+    }
+
     setIsSubmitting(false);
     setStepError(null);
     setShowConsent(false);
