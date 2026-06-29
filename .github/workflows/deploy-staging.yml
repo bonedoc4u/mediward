@@ -1,29 +1,23 @@
 # .github/workflows/deploy-staging.yml
-# Triggers: push to main.
-# Pipeline: vercel pull → vercel build → vercel deploy --prebuilt
-# DB migrations are applied manually via Supabase MCP or CLI before merging.
-# Env vars (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are stored in the
-# Vercel project settings and pulled automatically by `vercel pull`.
+# Runs on every push to main.
+# Only job: type-check the codebase BEFORE Vercel deploys it.
+# Vercel's GitHub App watches main and deploys automatically — no token needed here.
 
-name: Deploy to Staging
+name: CI Checks
 
 on:
   push:
     branches: [main]
 
 concurrency:
-  group: deploy-staging
-  cancel-in-progress: false
+  group: ci-checks-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Build & Deploy to Vercel
+  typecheck:
+    name: Type-check
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -40,19 +34,3 @@ jobs:
 
       - name: Type-check
         run: pnpm exec tsc --noEmit
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Pull Vercel environment & project settings
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build via Vercel
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy prebuilt to Vercel
-        id: deploy
-        run: |
-          URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
-          echo "preview-url=$URL" >> $GITHUB_OUTPUT
-          echo "Deployed to: $URL"

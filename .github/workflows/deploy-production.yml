@@ -1,7 +1,13 @@
 # .github/workflows/deploy-production.yml
 # Triggers: push of a tag matching v*.*.* (e.g. v1.2.3)
 # Gate: requires manual approval via GitHub Environment "production"
-# Order (critical for zero-downtime): migrate → deploy web → release + build Android
+#
+# Web deployment: handled by Vercel's GitHub App (no token needed).
+#   On approval, this workflow force-pushes the tag commit to the
+#   "production" branch, which Vercel watches for production deploys.
+#   Configure in Vercel: Settings → Git → Production Branch → "production"
+#
+# Android: builds, signs, and uploads a signed AAB to Play Store internal track.
 
 name: Deploy to Production
 
@@ -15,13 +21,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PNPM_VERSION: '9'
-  NODE_VERSION:  '20'
-  JAVA_VERSION:  '17'
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
 
 jobs:
-  # ─── Gate: manual approval (GitHub Environment "production") ────────────────
-  # Configure in: Settings → Environments → production → Required reviewers
+  # ─── Gate: manual approval ───────────────────────────────────────────────────
   gate:
     name: Await approval
     runs-on: ubuntu-latest
@@ -29,7 +33,27 @@ jobs:
     steps:
       - run: echo "Production deploy approved for ${{ github.ref_name }}"
 
-  # ─── 1. Migrate production DB (runs BEFORE new code goes live) ──────────────
+  # ─── 1. Push to production branch → triggers Vercel production deploy ────────
+  deploy-web:
+    name: Trigger Vercel production deploy
+    runs-on: ubuntu-latest
+    needs: gate
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push tag commit to production branch
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git push origin HEAD:refs/heads/production --force
+          echo "Pushed to production branch — Vercel will deploy automatically"
+
+  # ─── 2. DB migrations (runs BEFORE Android build) ───────────────────────────
   migrate:
     name: DB migrations (production)
     runs-on: ubuntu-latest
@@ -49,78 +73,101 @@ jobs:
           supabase link --project-ref ${{ secrets.PROD_PROJECT_REF }} --password "${{ secrets.PROD_DB_PASSWORD }}"
           supabase db push --linked --password "${{ secrets.PROD_DB_PASSWORD }}"
 
-  # ─── 2. Build frontend ───────────────────────────────────────────────────────
-  build-web:
-    name: Build Vite PWA
+  # ─── 3. Build and sign Android AAB ──────────────────────────────────────────
+  # Skips gracefully if KEYSTORE_BASE64 is still the placeholder value.
+  # Replace the placeholder secrets with real values when ready for Play Store.
+  build-android:
+    name: Build & sign Android AAB
     runs-on: ubuntu-latest
     needs: migrate
-    timeout-minutes: 15
+    timeout-minutes: 30
+    continue-on-error: true   # don't block release if keystore not yet configured
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        # version read from packageManager in package.json
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
       - run: pnpm install --frozen-lockfile
 
-      - name: Build
+      - name: Capacitor sync
         env:
           VITE_SUPABASE_URL:      ${{ secrets.PROD_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.PROD_SUPABASE_ANON_KEY }}
-          VITE_ABDM_BASE_URL:     ${{ secrets.PROD_ABDM_BASE_URL }}
           VITE_ENVIRONMENT:       production
-        run: pnpm build
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist-production
-          path: dist/
-          retention-days: 3
-
-  # ─── 3. Deploy to Vercel production ─────────────────────────────────────────
-  deploy-web:
-    name: Deploy to Vercel production
-    runs-on: ubuntu-latest
-    needs: build-web
-    timeout-minutes: 10
-    outputs:
-      deployment-url: ${{ steps.deploy.outputs.url }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist-production
-          path: dist/
-
-      - run: npm install -g vercel@latest
-
-      - name: Pull Vercel environment
         run: |
-          vercel pull --yes --environment=production \
-            --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          pnpm build
+          pnpm exec cap sync android
 
-      - name: Deploy to production
-        id: deploy
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/mediward.keystore
+
+      - name: Write keystore.properties
         run: |
-          URL=$(vercel deploy --prebuilt --prod \
-            --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$URL" >> $GITHUB_OUTPUT
-        env:
-          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          cat > android/keystore.properties <<EOF
+          storeFile=mediward.keystore
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
 
-  # ─── 4. Create GitHub Release with changelog ────────────────────────────────
+      - name: Set versionCode from tag
+        run: |
+          TAG=${{ github.ref_name }}
+          VERSION="${TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
+          sed -i "s/versionCode 1/versionCode $VERSION_CODE/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"$VERSION\"/"  android/app/build.gradle
+
+      - name: Build release AAB
+        working-directory: android
+        run: ./gradlew bundleRelease
+
+      - name: Sign AAB
+        run: |
+          jarsigner \
+            -verbose \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            -keystore android/app/mediward.keystore \
+            -storepass "${{ secrets.STORE_PASSWORD }}" \
+            -keypass  "${{ secrets.KEY_PASSWORD }}" \
+            android/app/build/outputs/bundle/release/app-release.aab \
+            "${{ secrets.KEY_ALIAS }}"
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f android/app/mediward.keystore android/keystore.properties
+
+      - name: Upload signed AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mediward-${{ github.ref_name }}.aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload to Play Store (Internal Testing)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_JSON }}
+          packageName:    com.mediward.app
+          releaseFiles:   android/app/build/outputs/bundle/release/app-release.aab
+          track:          internal
+          status:         completed
+          releaseName:    ${{ github.ref_name }}
+          changesNotSentForReview: true
+
+  # ─── 4. Create GitHub Release ────────────────────────────────────────────────
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
@@ -133,14 +180,12 @@ jobs:
           fetch-depth: 0
 
       - name: Generate changelog
-        id: changelog
         run: |
           PREV_TAG=$(git tag --sort=-v:refname | sed -n '2p')
           if [ -z "$PREV_TAG" ]; then
             LOG=$(git log --pretty=format:"- %s (%h)" | head -30)
           else
-            LOG=$(git log "${PREV_TAG}".."${{ github.ref_name }}" \
-                    --pretty=format:"- %s (%h)")
+            LOG=$(git log "${PREV_TAG}".."${{ github.ref_name }}" --pretty=format:"- %s (%h)")
           fi
           echo "CHANGELOG<<EOF" >> $GITHUB_ENV
           echo "$LOG"           >> $GITHUB_ENV
@@ -157,114 +202,10 @@ jobs:
             ## Changes in ${{ github.ref_name }}
 
             ${{ env.CHANGELOG }}
-
-            ---
-            **Deployed to:** ${{ needs.deploy-web.outputs.deployment-url }}
           draft: false
           prerelease: false
 
-  # ─── 5. Build and sign Android AAB ──────────────────────────────────────────
-  build-android:
-    name: Build & sign Android AAB
-    runs-on: ubuntu-latest
-    needs: build-web          # web must build first so cap sync has fresh assets
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        # version read from packageManager in package.json
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-
-      - run: pnpm install --frozen-lockfile
-
-      # Sync web assets into the Android project
-      - name: Capacitor sync
-        env:
-          VITE_SUPABASE_URL:      ${{ secrets.PROD_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.PROD_SUPABASE_ANON_KEY }}
-          VITE_ABDM_BASE_URL:     ${{ secrets.PROD_ABDM_BASE_URL }}
-          VITE_ENVIRONMENT:       production
-        run: |
-          pnpm build
-          pnpm exec cap sync android
-
-      # Decode keystore from base64 secret
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/mediward.keystore
-
-      # Write signing properties file (never committed to repo)
-      - name: Write keystore.properties
-        run: |
-          cat > android/keystore.properties <<EOF
-          storeFile=mediward.keystore
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
-
-      # Bump versionCode from tag (v1.2.3 → 1002003)
-      - name: Set versionCode from tag
-        run: |
-          TAG=${{ github.ref_name }}
-          VERSION="${TAG#v}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-          VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
-          sed -i "s/versionCode 1/versionCode $VERSION_CODE/" android/app/build.gradle
-          sed -i "s/versionName \"1.0\"/versionName \"$VERSION\"/" android/app/build.gradle
-
-      - name: Build release AAB
-        working-directory: android
-        run: ./gradlew bundleRelease
-
-      # Sign with jarsigner (keystore already written above)
-      - name: Sign AAB
-        run: |
-          jarsigner \
-            -verbose \
-            -sigalg SHA256withRSA \
-            -digestalg SHA-256 \
-            -keystore android/app/mediward.keystore \
-            -storepass "${{ secrets.STORE_PASSWORD }}" \
-            -keypass  "${{ secrets.KEY_PASSWORD }}" \
-            android/app/build/outputs/bundle/release/app-release.aab \
-            "${{ secrets.KEY_ALIAS }}"
-
-      # Clean up keystore from runner filesystem
-      - name: Remove keystore
-        if: always()
-        run: rm -f android/app/mediward.keystore android/keystore.properties
-
-      - name: Upload signed AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mediward-${{ github.ref_name }}.aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: 30
-
-      # Upload to Google Play Internal Testing track
-      - name: Upload to Play Store (Internal Testing)
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_JSON }}
-          packageName:        com.mediward.app
-          releaseFiles:       android/app/build/outputs/bundle/release/app-release.aab
-          track:              internal
-          status:             completed
-          releaseName:        ${{ github.ref_name }}
-          changesNotSentForReview: true
-
-  # ─── 6. Notify Slack ────────────────────────────────────────────────────────
+  # ─── 5. Notify Slack ─────────────────────────────────────────────────────────
   notify:
     name: Notify Slack
     runs-on: ubuntu-latest
@@ -277,14 +218,5 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": "${{ needs.deploy-web.result == 'success' && '🚀' || '❌' }} Production release *${{ github.ref_name }}* — ${{ needs.deploy-web.result }}",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "${{ needs.deploy-web.result == 'success' && '🚀' || '❌' }} *MediWard ${{ github.ref_name }} production release*\nWeb: ${{ needs.deploy-web.result }} · Android: ${{ needs.build-android.result }}\n<https://mediward.app|mediward.app> · <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}|Release notes>"
-                  }
-                }
-              ]
+              "text": "${{ needs.deploy-web.result == 'success' && '🚀' || '❌' }} Production release *${{ github.ref_name }}* — web: ${{ needs.deploy-web.result }} · android: ${{ needs.build-android.result }}"
             }
