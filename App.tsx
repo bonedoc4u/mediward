@@ -7,7 +7,6 @@ import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
 import LoginPage from './components/LoginPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
-import HospitalRegisterPage from './components/HospitalRegisterPage';
 import SuperAdminPanel from './components/SuperAdminPanel';
 import DepartmentPicker from './components/DepartmentPicker';
 import UnitPicker from './components/UnitPicker';
@@ -154,9 +153,6 @@ const App: React.FC = () => {
     viewingHospitalId, viewingHospitalName, setViewingHospital,
     selectedDepartment, selectedUnit, setSelectedDepartment, setSelectedUnit, clearWorkspaceSelection,
   } = useAuth();
-  const [showRegister, setShowRegister] = useState(
-    () => window.location.hash === '#/register',
-  );
   const [showStatus, setShowStatus] = useState(
     () => window.location.hash === '#/status',
   );
@@ -366,22 +362,8 @@ const App: React.FC = () => {
         </Suspense>
       );
     }
-    if (showRegister) {
-      return (
-        <HospitalRegisterPage
-          onBack={() => {
-            setShowRegister(false);
-            window.location.hash = '#/dashboard';
-          }}
-        />
-      );
-    }
     return (
       <LoginPage
-        onRegister={() => {
-          setShowRegister(true);
-          window.location.hash = '#/register';
-        }}
         onStatus={() => {
           setShowStatus(true);
           window.location.hash = '#/status';

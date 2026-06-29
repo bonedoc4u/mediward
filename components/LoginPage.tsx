@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AppContext';
 import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
-const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPrivacy?: () => void; onTerms?: () => void }> = ({ onRegister, onStatus, onPrivacy, onTerms }) => {
+const LoginPage: React.FC<{ onStatus?: () => void; onPrivacy?: () => void; onTerms?: () => void }> = ({ onStatus, onPrivacy, onTerms }) => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -163,18 +163,6 @@ const LoginPage: React.FC<{ onRegister?: () => void; onStatus?: () => void; onPr
               )}
             </button>
           </form>
-
-          {onRegister && (
-            <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-              <p className="text-slate-500 text-sm">New to MediWard?</p>
-              <button
-                onClick={onRegister}
-                className="mt-1 text-teal-600 hover:text-blue-700 font-semibold text-sm transition-colors"
-              >
-                Register your hospital →
-              </button>
-            </div>
-          )}
 
           {onStatus && (
             <div className="mt-4 text-center pb-4 border-b border-slate-100">
