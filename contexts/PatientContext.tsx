@@ -316,8 +316,9 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             await supabase.from('medication_administrations').insert(op.payload as Record<string, unknown>);
           }
           dequeue(op.id);
-        } catch {
-          const { dropped, opType, label } = incrementAttempts(op.id);
+        } catch (err) {
+          console.error(`[SyncQueue] op ${op.type} failed:`, err);
+          const { dropped, opType, label } = incrementAttempts(op.id, err);
           if (dropped) {
             const what = opType === 'upsert_patient'
               ? `Patient record${label ? ` for ${label}` : ''}`

@@ -204,7 +204,7 @@ export function dequeue(id: string): void {
   _persist(_cache.filter(op => op.id !== id));
 }
 
-export function incrementAttempts(id: string): { dropped: boolean; opType?: QueuedOpType; label?: string } {
+export function incrementAttempts(id: string, error?: unknown): { dropped: boolean; opType?: QueuedOpType; label?: string } {
   const q = [..._cache];
   const op = q.find(o => o.id === id);
   if (!op) return { dropped: false };
@@ -218,7 +218,9 @@ export function incrementAttempts(id: string): { dropped: boolean; opType?: Queu
       label = (p?.name as string) ?? (p?.ipNo as string);
     }
     // Move to dead-letter queue instead of silently dropping
-    _persistDlq([..._dlq, { ...op, failedAt: new Date().toISOString(), reason: `max_attempts_exceeded (${MAX_ATTEMPTS})` }]);
+    const errMsg = error instanceof Error ? error.message : (error ? String(error) : '');
+    const reason = errMsg ? `max_attempts_exceeded: ${errMsg}` : `max_attempts_exceeded (${MAX_ATTEMPTS})`;
+    _persistDlq([..._dlq, { ...op, failedAt: new Date().toISOString(), reason }]);
     _persist(q.filter(o => o.id !== id));
     return { dropped: true, opType: op.type, label };
   }
