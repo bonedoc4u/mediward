@@ -153,9 +153,6 @@ const App: React.FC = () => {
     viewingHospitalId, viewingHospitalName, setViewingHospital,
     selectedDepartment, selectedUnit, setSelectedDepartment, setSelectedUnit, clearWorkspaceSelection,
   } = useAuth();
-  const [showStatus, setShowStatus] = useState(
-    () => window.location.hash === '#/status',
-  );
   const [showPrivacy, setShowPrivacy] = useState(
     () => window.location.hash === '#/privacy',
   );
@@ -355,19 +352,8 @@ const App: React.FC = () => {
     if (showTerms) {
       return <LegalPage type="terms" onBack={() => { setShowTerms(false); window.location.hash = ''; }} />;
     }
-    if (showStatus) {
-      return (
-        <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-teal-500" /></div>}>
-          <StatusPage onBack={() => { setShowStatus(false); window.location.hash = ''; }} />
-        </Suspense>
-      );
-    }
     return (
       <LoginPage
-        onStatus={() => {
-          setShowStatus(true);
-          window.location.hash = '#/status';
-        }}
         onPrivacy={() => {
           setShowPrivacy(true);
           window.location.hash = '#/privacy';
