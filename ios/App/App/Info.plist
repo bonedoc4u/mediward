@@ -46,8 +46,12 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>MediWard uses the camera to scan patient admission slips and documents.</string>
+	<string>MediWard uses the camera to capture radiology images and patient documents.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>MediWard may access photos to attach documents to patient records.</string>
+	<string>MediWard accesses photos to attach radiology images to patient records.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>MediWard saves exported reports and radiology images to your photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MediWard may use the microphone for video capture during procedures.</string>
 </dict>
 </plist>

@@ -166,6 +166,15 @@ export async function uploadInvestigationImage(file: File, hospitalId: string, p
 }
 
 /**
+ * Evict a path from the signed-URL cache so the next resolveImageUrl call
+ * generates a fresh signed URL. Used by the auto-refresh timer in useSignedUrl.
+ */
+export function clearImageUrlCache(pathOrUrl: string): void {
+  const path = extractStoragePath(pathOrUrl);
+  _urlCache.delete(path);
+}
+
+/**
  * Delete an investigation image from Supabase Storage.
  * Accepts both the new path format and legacy full URLs.
  * Gracefully skips data: URIs (legacy base64).

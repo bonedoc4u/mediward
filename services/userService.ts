@@ -26,7 +26,10 @@ function rowToUser(row: UserRow): StoredUser {
     role:       row.role as UserRole,
     ward:       (row.ward ?? undefined) as StoredUser['ward'],
     unit:       row.unit ?? undefined,
-    hospitalId: row.hospital_id ?? '00000000-0000-0000-0000-000000000001',
+    hospitalId: row.hospital_id ?? (() => {
+      console.error(`[Auth] app_users row ${row.id} has no hospital_id — DB inserts will fail`);
+      return '';
+    })(),
   };
 }
 
@@ -144,7 +147,7 @@ export async function createAuthUser(
       role,
       ward:       ward  ?? null,
       unit:       unit  ?? null,
-      hospitalId: hospitalId ?? '00000000-0000-0000-0000-000000000001',
+      hospitalId: hospitalId ?? null,
     }),
   });
 

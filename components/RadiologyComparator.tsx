@@ -6,16 +6,22 @@ import {
   CloudUpload, FileDown, Loader2, Search, ChevronDown,
   Bone, ScanLine, Waves,
 } from 'lucide-react';
-import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile, resolveImageUrl } from '../services/storageService';
+import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile, resolveImageUrl, clearImageUrlCache } from '../services/storageService';
 
-/** Resolves a storage path or legacy URL to a signed URL for display. */
+/** Resolves a storage path or legacy URL to a signed URL for display.
+ *  Auto-refreshes 49 min in so the image never goes blank during a long session
+ *  (signed URLs expire at 60 min; cache expires at 50 min). */
 function useSignedUrl(rawUrl: string | undefined): string | undefined {
   const [signed, setSigned] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (!rawUrl) { setSigned(undefined); return; }
     let cancelled = false;
-    resolveImageUrl(rawUrl).then(url => { if (!cancelled) setSigned(url ?? undefined); });
-    return () => { cancelled = true; };
+    const resolve = () =>
+      resolveImageUrl(rawUrl).then(url => { if (!cancelled) setSigned(url ?? undefined); });
+    resolve();
+    // Evict cache and re-resolve 1 min before the 50-min cache entry expires
+    const timer = setTimeout(() => { clearImageUrlCache(rawUrl); resolve(); }, 49 * 60 * 1000);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [rawUrl]);
   return signed;
 }

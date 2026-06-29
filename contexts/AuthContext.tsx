@@ -261,6 +261,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (document.visibilityState === 'hidden') {
         hiddenAtRef.current = Date.now();
       } else if (document.visibilityState === 'visible') {
+        // Refresh Supabase JWT on app-focus so RLS stays valid during long sessions.
+        // JWT expires in 1h but our app session is 8h — without this, DB writes
+        // silently fail with auth errors after the first hour of inactivity.
+        supabase.auth.getSession().catch(() => {});
+
         const hiddenAt = hiddenAtRef.current;
         hiddenAtRef.current = null;
         if (hiddenAt !== null && Date.now() - hiddenAt > LOCK_REAUTH_AFTER_MS) {

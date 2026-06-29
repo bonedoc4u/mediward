@@ -276,8 +276,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const dlq = getDeadLetterQueue();
       if (dlq.length > 0 && !dlqAlertedRef.current) {
         dlqAlertedRef.current = true;
+        // Show the first failure's reason so the problem is immediately diagnosable
+        const firstReason = dlq[0]?.reason?.replace(/^max_attempts_exceeded:\s*/i, '').slice(0, 80);
+        const detail = firstReason ? ` — "${firstReason}"` : '';
         toast.error(
-          `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently and need re-entry. Go to Settings → Advanced to review.`,
+          `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently${detail}. Go to Settings → Advanced to review.`,
         );
       }
 
