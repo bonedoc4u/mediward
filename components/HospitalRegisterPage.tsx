@@ -137,6 +137,10 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       setError('Password must be at least 8 characters.');
       return;
     }
+    if (!/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setError('Password must include at least one uppercase letter, one number, and one special character.');
+      return;
+    }
     setIsLoading(true);
     setError('');
 

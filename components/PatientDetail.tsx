@@ -15,12 +15,26 @@ import ErrorBoundary from './ErrorBoundary';
 import FHIRExportModal from './FHIRExportModal';
 import ScoringTools from './ScoringTools';
 import ReferralLetter from './ReferralLetter';
+import { resolveImageUrl } from '../services/storageService';
 
 const MedicationChart  = lazy(() => import('./MedicationChart'));
 const NursingNotes     = lazy(() => import('./NursingNotes'));
 const IntakeOutput     = lazy(() => import('./IntakeOutput'));
 const BloodTransfusion = lazy(() => import('./BloodTransfusion'));
 const WoundCare        = lazy(() => import('./WoundCare'));
+
+// ─── Signed thumbnail: resolves storage path to a 1-hour signed URL ──────────
+const SignedThumbnail: React.FC<{ rawUrl: string; alt: string }> = ({ rawUrl, alt }) => {
+  const [src, setSrc] = React.useState<string | undefined>(undefined);
+  React.useEffect(() => {
+    if (!rawUrl) return;
+    let cancelled = false;
+    resolveImageUrl(rawUrl).then(url => { if (!cancelled) setSrc(url ?? undefined); });
+    return () => { cancelled = true; };
+  }, [rawUrl]);
+  if (!src) return <div className="w-full h-full bg-slate-800" />;
+  return <img src={src} alt={alt} className="w-full h-full object-cover" />;
+};
 
 // ─── Status Badge Config ──────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string }> = {
@@ -426,9 +440,11 @@ const PatientDetail: React.FC = () => {
         <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
           <HeartPulse className="w-4 h-4 text-blue-500" /> PAC Status
         </button>
-        <button onClick={() => setShowFhirExport(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-xl shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-xs font-bold text-teal-700 whitespace-nowrap">
-          <FileJson className="w-4 h-4 text-teal-600" /> FHIR
-        </button>
+        {can(user, 'investigations:write') && (
+          <button onClick={() => setShowFhirExport(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-xl shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-xs font-bold text-teal-700 whitespace-nowrap">
+            <FileJson className="w-4 h-4 text-teal-600" /> FHIR
+          </button>
+        )}
         <button
           onClick={() => {
             const blob = new Blob([JSON.stringify(patient, null, 2)], { type: 'application/json' });
@@ -616,7 +632,7 @@ const PatientDetail: React.FC = () => {
               <div className="grid grid-cols-3 gap-2">
                 {patient.investigations.slice(0, 6).map(inv => (
                   <div key={inv.id} className="relative aspect-square bg-black rounded-xl overflow-hidden border border-slate-200">
-                    <img src={inv.imageUrl} alt={inv.type} className="w-full h-full object-cover" />
+                    <SignedThumbnail rawUrl={inv.imageUrl} alt={inv.type} />
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
                       <p className="text-[10px] text-white font-bold">{inv.type}</p>
                     </div>

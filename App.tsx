@@ -150,7 +150,7 @@ const ViewLoader = () => (
 // ─── Main App ───
 const App: React.FC = () => {
   const {
-    isAuthenticated, isRecoveryMode, isLocked, unlock, user, login, logout,
+    isAuthenticated, isRecoveryMode, isLocked, unlock, user, verifyPassword, logout,
     viewingHospitalId, viewingHospitalName, setViewingHospital,
     selectedDepartment, selectedUnit, setSelectedDepartment, setSelectedUnit, clearWorkspaceSelection,
   } = useAuth();
@@ -343,7 +343,7 @@ const App: React.FC = () => {
       <LockScreen
         userName={user?.name ?? ''}
         onUnlock={async (password) => {
-          const result = await login(user?.email ?? '', password);
+          const result = await verifyPassword(password);
           if (result.success) unlock();
           return result;
         }}

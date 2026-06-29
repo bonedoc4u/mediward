@@ -6,7 +6,19 @@ import {
   CloudUpload, FileDown, Loader2, Search, ChevronDown,
   Bone, ScanLine, Waves,
 } from 'lucide-react';
-import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
+import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile, resolveImageUrl } from '../services/storageService';
+
+/** Resolves a storage path or legacy URL to a signed URL for display. */
+function useSignedUrl(rawUrl: string | undefined): string | undefined {
+  const [signed, setSigned] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!rawUrl) { setSigned(undefined); return; }
+    let cancelled = false;
+    resolveImageUrl(rawUrl).then(url => { if (!cancelled) setSigned(url ?? undefined); });
+    return () => { cancelled = true; };
+  }, [rawUrl]);
+  return signed;
+}
 import { generateId } from '../utils/sanitize';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -43,6 +55,7 @@ const Lightbox: React.FC<{
   onClose: () => void;
 }> = ({ inv, onClose }) => {
   const cfg = getModality(inv.type);
+  const signedUrl = useSignedUrl(inv.imageUrl);
   const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
   });
@@ -87,14 +100,18 @@ const Lightbox: React.FC<{
         onClick={onClose}
       >
         {inv.imageUrl ? (
-          <img
-            src={inv.imageUrl}
-            alt={inv.type}
-            className="max-w-full max-h-full object-contain select-none"
-            style={{ touchAction: 'pinch-zoom' }}
-            onClick={e => e.stopPropagation()}
-            draggable={false}
-          />
+          signedUrl ? (
+            <img
+              src={signedUrl}
+              alt={inv.type}
+              className="max-w-full max-h-full object-contain select-none"
+              style={{ touchAction: 'pinch-zoom' }}
+              onClick={e => e.stopPropagation()}
+              draggable={false}
+            />
+          ) : (
+            <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
+          )
         ) : (
           <div className="text-white/30 text-center">
             <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-30" />
@@ -114,8 +131,9 @@ const ImageCard: React.FC<{
   onDelete?: () => void;
   onClick?: () => void;
 }> = ({ inv, onDelete, onClick }) => {
-  const cfg  = getModality(inv.type);
-  const Icon = cfg.Icon;
+  const cfg      = getModality(inv.type);
+  const Icon     = cfg.Icon;
+  const signedUrl = useSignedUrl(inv.imageUrl);
   const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: '2-digit',
   });
@@ -129,7 +147,9 @@ const ImageCard: React.FC<{
     >
       <div className={`h-[72px] flex items-center justify-center relative ${cfg.bg}`}>
         {inv.imageUrl
-          ? <img src={inv.imageUrl} alt={inv.type} className="w-full h-full object-cover" />
+          ? (signedUrl
+              ? <img src={signedUrl} alt={inv.type} className="w-full h-full object-cover" />
+              : <Loader2 className="w-5 h-5 text-white/30 animate-spin" />)
           : <Icon className="w-7 h-7 text-white/25" />
         }
         {onDelete && (

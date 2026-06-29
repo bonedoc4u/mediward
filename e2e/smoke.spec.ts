@@ -8,7 +8,10 @@ import { test, expect, Page } from '@playwright/test';
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
 const EMAIL    = process.env.TEST_USER_EMAIL    ?? 'dr.or1@staging.mediward.test';
-const PASSWORD = process.env.TEST_USER_PASSWORD ?? 'Test@1234';
+if (!process.env.TEST_USER_PASSWORD) {
+  throw new Error('TEST_USER_PASSWORD env var is required — do not hardcode credentials');
+}
+const PASSWORD = process.env.TEST_USER_PASSWORD;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -42,6 +42,8 @@ function getInactivityLimits(role: AuthUser['role'] | undefined): { limit: numbe
 interface AuthContextType {
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  /** Verify the current user's password without extending the session (used by lock screen). */
+  verifyPassword: (password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: boolean;
   /** True when the user arrived via a password-reset email link. App should show ResetPasswordPage. */
@@ -359,6 +361,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: false, error: authError?.message ?? 'Invalid email or password.' };
   }, []);
 
+  // ─── Verify password without extending session (lock screen re-auth) ───
+  // Uses signInWithPassword only to confirm credentials. Does NOT update
+  // sessionExpiry so the original 8-hour absolute limit is preserved.
+  const verifyPassword = useCallback(async (
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!user?.email) return { success: false, error: 'No active session.' };
+    const { error } = await supabase.auth.signInWithPassword({ email: user.email, password });
+    if (error) return { success: false, error: 'Incorrect password.' };
+    return { success: true };
+  }, [user?.email]);
+
   // ─── Logout ───
   const logout = useCallback(() => {
     if (user) {
@@ -371,6 +385,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     removeFromStorage('session');
     clearWorkspaceSelection();
     clearDisclaimerAccepted(); // next user on this device must re-accept
+    // Clear sessionStorage (patient form drafts, etc.) so next user on a shared tablet
+    // cannot see a prior user's in-progress admission form (L-2 audit fix)
+    try { sessionStorage.clear(); } catch { /* ignore */ }
     // Purge SW caches so the next user on a shared tablet cannot read cached patient data
     if ('caches' in window) {
       caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(() => {});
@@ -382,6 +399,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user,
       login,
+      verifyPassword,
       logout,
       isAuthenticated: !!user && user.sessionExpiry > Date.now(),
       isRecoveryMode,

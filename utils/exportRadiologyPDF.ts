@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { Capacitor } from '@capacitor/core';
+import { resolveImageUrl } from '../services/storageService';
 
 interface ScanForExport {
   type: string;
@@ -99,7 +100,7 @@ export async function exportRadiologyPDF(
     const imgAreaH   = PAGE_H - imgAreaTop - 10; // 10mm footer
     const imgAreaW   = PAGE_W - 2 * MARGIN;
 
-    const imageUrl = scan.imageUrl;
+    const imageUrl = scan.imageUrl ? await resolveImageUrl(scan.imageUrl) : null;
     if (imageUrl) {
       try {
         const response = await fetch(imageUrl);
