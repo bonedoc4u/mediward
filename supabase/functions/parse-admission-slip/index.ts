@@ -41,7 +41,9 @@ function buildOcrPrompt(presets: string[]): string {
 
 ZONE MAP of the case sheet cover:
 - TOP RIGHT sticker label — UHID, IPD number, patient name, age, gender, address, phone (sticker phone), AND admission date (look for "Admit Dt:" or "Admission Date:" field on the sticker)
-- LEFT MIDDLE THIRD of the page — handwritten comorbidities written by the resident
+- LEFT MIDDLE THIRD of the page — two handwritten sections stacked vertically:
+    UPPER part: mode of injury (e.g. "RTA", "Fall", "Slip and Fall", "FFH", "Direct Blow" — may be unlabelled or labelled "MOI:", "H/O:", "Mechanism:")
+    LOWER part: comorbidities list (individual conditions written one per line or comma-separated, e.g. "HTN", "DM", "CAD/IHD", "CKD", "CVA" etc.)
 - RIGHT MIDDLE THIRD of the page — handwritten mobile/phone number written by the admitting doctor or nurse (this is the most current contact number; it may appear as a raw 10-digit number, or labelled "Ph:", "Mob:", "Cell:", "Contact:" etc.)
 - BOTTOM printed fields (handwritten) — Name line — age and gender sometimes written inline after name e.g. "BHASKARAN 87|M" or "RAJAN 54/M" or "LEELA 62 F"; also Date of Admission, Ward, Unit, Diagnosis
 
@@ -52,8 +54,8 @@ CRITICAL RULES:
 4. age: check BOTH the sticker (e.g. "Age 87 Years") AND the handwritten name line (e.g. "BHASKARAN 87|M" → 87). Return numbers only.
 5. gender: check BOTH the sticker AND the handwritten name line suffix (|M, /F, or bare M/F). Expand M=Male, F=Female.
 6. mobile_number: PRIMARY source is the RIGHT MIDDLE THIRD handwritten number. Secondary source is the sticker phone. If both exist and differ, use the RIGHT MIDDLE THIRD number as mobile_number and put the sticker number in mobile_conflict. Any 10-digit number in the right middle zone is a phone number even if unlabelled.
-7. comorbidities: scan the LEFT MIDDLE THIRD zone. Match ONLY from this list: ${presetList}. If something written doesn't match exactly, still include it as-is in the array.
-8. mode_of_injury: infer from context if possible. Values: RTA, Slip and Fall, Fall from Height, Trivial Fall, Direct Blow, Sports Injury, Assault, Pathological, Other. Leave empty string if unclear.
+7. comorbidities: scan the LOWER part of the LEFT MIDDLE THIRD zone. Extract EVERY condition written there — do NOT skip anything. Try to match against this list: ${presetList}. If a written term is not on the list, still include it exactly as written. Common shorthands: IHD=CAD, HT=HTN, DM2=DM, CRF=CKD, BA=Asthma. Return ALL found conditions as an array of strings.
+8. mode_of_injury: look in the UPPER part of the LEFT MIDDLE THIRD zone. Map to the closest value: RTA, Slip and Fall, Fall from Height, Trivial Fall, Direct Blow, Sports Injury, Assault, Pathological, Other. Common shorthands: FFH=Fall from Height, RTA=RTA, S&F=Slip and Fall. Leave empty string only if nothing is written there.
 9. diagnosis: expand abbreviations, keep (R)/(L) side notation. # means fracture — expand it.
 
 Return ONLY valid JSON, no explanation, no markdown fences:
