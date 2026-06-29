@@ -278,9 +278,8 @@ const PATIENT_LIST_SELECT = [
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'management',
   'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
-  // Only rounds join for list rendering — labs/imaging fetched on detail view only
   'rounds(date, note, todos)',
-  // No labs, imaging, or patient_vitals in list queries — cuts payload by ~70%
+  'imaging(id, date, type, findings, image_url, phase)',
 ].join(', ');
 
 // Full select (all vitals) — used only when a single patient's detail is loaded
