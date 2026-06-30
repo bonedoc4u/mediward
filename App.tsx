@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
-import { Patient, ViewMode, PacStatus, PatientStatus } from './types';
+import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
 import { can } from './utils/permissions';
 import { App as CapApp } from '@capacitor/app';
@@ -18,7 +18,7 @@ import ToastContainer from './components/ToastContainer';
 import {
   LayoutDashboard, FileImage, Menu, X, Home, ClipboardList, Database,
   Activity, Users, HeartPulse, LogOut, Stethoscope, ListChecks, Syringe,
-  Loader2, Shield, Settings
+  Loader2, Shield, Settings, BookOpen,
 } from 'lucide-react';
 
 // Lazy load heavy components
@@ -38,6 +38,7 @@ const RoundMode = lazy(() => import('./components/RoundMode'));
 const AuditLogViewer = lazy(() => import('./components/AuditLogViewer'));
 const AdminSettings = lazy(() => import('./components/AdminSettings'));
 const StatusPage = lazy(() => import('./components/StatusPage'));
+const AdmissionList = lazy(() => import('./components/AdmissionList'));
 import OfflineBanner from './components/OfflineBanner';
 import { NetworkBanner } from './components/NetworkBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
@@ -123,14 +124,15 @@ interface NavItem {
 
 // Static nav items — PAC/OT labels are dynamically set inside App using config
 const BASE_NAV_ITEMS_LEFT: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard',   icon: LayoutDashboard, section: 'Overview' },
-  { id: 'pending',   label: 'Pending List', icon: ClipboardList,   section: 'Overview' },
-  { id: 'master',    label: 'Master List',  icon: Database,        section: 'Overview' },
-  { id: 'discharge', label: 'Discharge',    icon: LogOut,          section: 'Overview' },
-  { id: 'wenthome',  label: 'Went Home',   icon: Home,            section: 'Overview' },
-  { id: 'rounds',    label: 'Daily Rounds', icon: ListChecks,      section: 'Clinical Tools' },
-  { id: 'labs',      label: 'Lab Trends',   icon: Activity,        section: 'Clinical Tools' },
-  { id: 'radiology', label: 'Radiology',    icon: FileImage,       section: 'Clinical Tools' },
+  { id: 'dashboard',  label: 'Dashboard',      icon: LayoutDashboard, section: 'Overview' },
+  { id: 'admissions', label: 'Admission List',  icon: BookOpen,        section: 'Overview' },
+  { id: 'pending',    label: 'Pending List',    icon: ClipboardList,   section: 'Overview' },
+  { id: 'master',     label: 'Master List',     icon: Database,        section: 'Overview' },
+  { id: 'discharge',  label: 'Discharge',       icon: LogOut,          section: 'Overview' },
+  { id: 'wenthome',   label: 'Went Home',       icon: Home,            section: 'Overview' },
+  { id: 'rounds',     label: 'Daily Rounds',    icon: ListChecks,      section: 'Clinical Tools' },
+  { id: 'labs',       label: 'Lab Trends',      icon: Activity,        section: 'Clinical Tools' },
+  { id: 'radiology',  label: 'Radiology',       icon: FileImage,       section: 'Clinical Tools' },
 ];
 const BASE_NAV_ITEMS_RIGHT: NavItem[] = [
   { id: 'preop',    label: 'Pre-Op Prep',    icon: Syringe,  section: 'Surgical' },
@@ -197,10 +199,11 @@ const App: React.FC = () => {
   }, [patients, resolvedUnits]);
 
   const mobileTabs = useMemo(() => [
-    { id: 'dashboard' as ViewMode, label: 'Ward',                icon: LayoutDashboard },
-    { id: 'rounds'    as ViewMode, label: 'Rounds',              icon: ListChecks      },
-    { id: 'otlist'    as ViewMode, label: procedureListName,     icon: ClipboardList   },
-    { id: 'pac'       as ViewMode, label: preOpModuleName,       icon: HeartPulse      },
+    { id: 'dashboard'  as ViewMode, label: 'Ward',       icon: LayoutDashboard },
+    { id: 'admissions' as ViewMode, label: 'Admissions', icon: BookOpen        },
+    { id: 'rounds'     as ViewMode, label: 'Rounds',     icon: ListChecks      },
+    { id: 'otlist'     as ViewMode, label: procedureListName, icon: ClipboardList },
+    { id: 'pac'        as ViewMode, label: preOpModuleName,   icon: HeartPulse    },
   ], [preOpModuleName, procedureListName]);
 
   const navItems = useMemo((): NavItem[] => [
@@ -246,6 +249,7 @@ const App: React.FC = () => {
   // Modal State (kept local since it's UI-only)
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [addModalSource, setAddModalSource] = useState<AdmissionSource | undefined>();
 
   const handleSavePatient = useCallback((patient: Patient) => {
     if (editingPatient) {
@@ -257,8 +261,9 @@ const App: React.FC = () => {
     setIsAddPatientModalOpen(false);
   }, [editingPatient, updatePatient, addPatient]);
 
-  const openAddModal = useCallback(() => {
+  const openAddModal = useCallback((source?: AdmissionSource) => {
     setEditingPatient(null);
+    setAddModalSource(source);
     setIsAddPatientModalOpen(true);
     setIsMobileMenuOpen(false);
   }, []);
@@ -449,6 +454,13 @@ const App: React.FC = () => {
         return <PreOpPrep patients={patients} onUpdatePatient={updatePatient} />;
       case 'otlist':
         return <OTListManagement patients={patients} onUpdatePatient={updatePatient} />;
+      case 'admissions':
+        return (
+          <AdmissionList
+            onAddPatient={can(user, 'patient:add') ? (src) => openAddModal(src) : undefined}
+            onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
+          />
+        );
       default:
         if (isLoadingPatients) return <WardSkeleton />;
         return (
@@ -721,6 +733,7 @@ const App: React.FC = () => {
           onClose={() => setIsAddPatientModalOpen(false)}
           onSave={handleSavePatient}
           initialData={editingPatient}
+          defaultAdmissionSource={editingPatient ? undefined : addModalSource}
         />
       </Suspense>
 

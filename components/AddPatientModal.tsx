@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeyboardAwareView } from './ui/KeyboardAwareView';
-import { Patient, Gender, PacStatus, PatientStatus, Ward } from '../types';
+import { Patient, Gender, PacStatus, PatientStatus, Ward, AdmissionSource } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { X, Save, UserPlus, Pencil, Loader2, ScanLine, Settings2, AlertTriangle } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
@@ -15,6 +15,8 @@ interface Props {
   onClose: () => void;
   onSave: (patient: Patient) => void;
   initialData?: Patient | null;
+  /** Pre-select OPD or Casualty when opening for a new patient from the Admission List view. */
+  defaultAdmissionSource?: AdmissionSource;
 }
 
 // ─── OCR result shape returned by parse-admission-slip Edge Function ──────────
@@ -51,6 +53,7 @@ interface AdmitFormState {
   name: string; age: string; gender: Gender; mobile: string;
   diagnosis: string; modeOfInjury: string; doa: string; procedure: string; dos: string;
   pacStatus: PacStatus; patientStatus: PatientStatus;
+  admissionSource: 'OPD' | 'Casualty' | '';
 }
 
 // Parse DD/MM/YYYY → YYYY-MM-DD for the date input
@@ -95,7 +98,7 @@ async function compressImageBase64(
   });
 }
 
-const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
+const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, defaultAdmissionSource }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
   const { comorbidityMap, saveComorbidityMap } = useComorbidityPresets();
@@ -146,6 +149,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         dos: initialData.dos || '',
         pacStatus: initialData.pacStatus,
         patientStatus: initialData.patientStatus,
+        admissionSource: initialData.admissionSource ?? '',
       };
     }
     try {
@@ -171,6 +175,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       dos: '',
       pacStatus: PacStatus.Pending,
       patientStatus: PatientStatus.Review,
+      admissionSource: defaultAdmissionSource ?? '',
     };
   });
 
@@ -455,6 +460,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         dos: initialData.dos || '',
         pacStatus: initialData.pacStatus,
         patientStatus: initialData.patientStatus,
+        admissionSource: initialData.admissionSource ?? '',
       });
       setSelectedComorbidities(initialData.comorbidities || []);
       setDrugAllergies(initialData.drugAllergies ?? []);
@@ -493,6 +499,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         dos: '',
         pacStatus: PacStatus.Pending,
         patientStatus: PatientStatus.Review,
+        admissionSource: defaultAdmissionSource ?? '',
       });
       setSelectedComorbidities([]);
       setDrugAllergies([]);
@@ -541,6 +548,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       mobile: formData.mobile,
       diagnosis: formData.diagnosis,
       modeOfInjury: formData.modeOfInjury || undefined,
+      admissionSource: (formData.admissionSource as Patient['admissionSource']) || undefined,
       comorbidities: selectedComorbidities,
       drugAllergies,
       doa: formData.doa,
@@ -577,6 +585,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       mobile: formData.mobile,
       diagnosis: formData.diagnosis,
       modeOfInjury: formData.modeOfInjury || undefined,
+      admissionSource: (formData.admissionSource as Patient['admissionSource']) || undefined,
       comorbidities: selectedComorbidities,
       drugAllergies,
       doa: formData.doa,
@@ -891,6 +900,29 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   options={[{ value: '', label: '— Not specified —' }, ...MODE_OF_INJURY_OPTIONS.map(m => ({ value: m, label: m }))]}
                   onChange={val => setFormData({ ...formData, modeOfInjury: val })}
                 />
+              </div>
+
+              {/* Admission Source */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Admission Source</label>
+                <div className="flex gap-2">
+                  {(['OPD', 'Casualty'] as const).map(src => (
+                    <button
+                      key={src}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, admissionSource: prev.admissionSource === src ? '' : src }))}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                        formData.admissionSource === src
+                          ? src === 'OPD'
+                            ? 'bg-teal-600 text-white border-teal-600'
+                            : 'bg-orange-500 text-white border-orange-500'
+                          : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {src}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Comorbidities */}

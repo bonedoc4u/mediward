@@ -486,6 +486,8 @@ export interface PacFlowData {
   branches: PacFlowBranch[];
 }
 
+export type AdmissionSource = 'OPD' | 'Casualty';
+
 export interface Patient {
   bed: string;
   ward: Ward;
@@ -501,6 +503,8 @@ export interface Patient {
   diagnosis: string;
   /** How the injury occurred — e.g. "RTA", "Slip and Fall", "Fall from Height". */
   modeOfInjury?: string;
+  /** Where the patient was referred from for this admission. */
+  admissionSource?: AdmissionSource;
   comorbidities: string[];
   /** Known drug allergies — used as a safety gate in the MAR. e.g. ["Penicillin", "NSAIDs"] */
   drugAllergies?: string[];
@@ -611,4 +615,5 @@ export type ViewMode =
   | 'dashboard' | 'pending' | 'master' | 'discharge' | 'wenthome'
   | 'radiology' | 'labs' | 'team' | 'audit'
   | 'rounds' | 'pac' | 'preop' | 'otlist'
+  | 'admissions'
   | 'patient' | 'round-mode' | 'settings' | 'status';
