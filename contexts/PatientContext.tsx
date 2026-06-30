@@ -776,6 +776,26 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           toast.error('Session expired — log in again. Patient saved locally and will sync after login.');
           return;
         }
+        // Duplicate-key: the patient already exists in the DB (first insert reached the
+        // server before an auth error was returned, or the user re-entered a known IP).
+        // Remove the ghost optimistic entry and show the real DB record instead.
+        if (err instanceof Error && (err.message.includes('duplicate key') || err.message.includes('unique constraint'))) {
+          setPatients(prev => prev.filter(pt => pt.ipNo !== p.ipNo));
+          fetchPatientById(p.ipNo, p.hospitalId ?? undefined)
+            .then(existing => {
+              if (existing) {
+                setPatients(prev => {
+                  if (prev.some(pt => pt.ipNo === existing.ipNo)) return prev;
+                  return enrichPatientData([existing, ...prev]);
+                });
+                toast.info(`IP ${p.ipNo} is already in the system — showing existing record. Use the edit (✏️) button if you need to update it.`);
+              }
+            })
+            .catch(() => {
+              toast.warning(`IP ${p.ipNo} already exists — check the ward list for the existing record.`);
+            });
+          return;
+        }
         enqueue('upsert_patient', p);
         toast.warning('Saved locally — will sync when online.');
       });

@@ -156,7 +156,16 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       const saved = sessionStorage.getItem(STEP_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.formData) return parsed.formData;
+        if (parsed.formData) return {
+          ...parsed.formData,
+          // Always apply the caller-supplied admission source (e.g. "+ Add Casualty" button).
+          // Without this override, stale sessionStorage from a previous open would silently
+          // drop the source and the patient ends up missing from the Casualty/OPD list.
+          ...(defaultAdmissionSource ? { admissionSource: defaultAdmissionSource } : {}),
+          // Reset date to today so a stale OCR-filled date from a previous session
+          // doesn't silently put the patient under the wrong admission-list day.
+          doa: new Date().toISOString().split('T')[0],
+        };
       }
     } catch { /* ignore */ }
     return {

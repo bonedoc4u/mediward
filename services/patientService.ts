@@ -449,18 +449,12 @@ export async function upsertPatient(patient: Patient, forceUpdate = false): Prom
       throw new Error(`CONCURRENT_EDIT:${patient.ipNo}`);
     }
   } else {
-    // New patient: insert.
-    // A duplicate-key (23505) is treated as success — it means the first insert
-    // reached the server before an auth error was returned to the client, so the
-    // row already exists and no data is lost. This makes the operation idempotent
-    // for queue replay and prevents false-alarm DLQ entries.
+    // New patient: plain insert
     const { error } = await supabase
       .from('patients')
       .insert(patientToRow(patient));
 
-    if (error && error.code !== '23505') {
-      throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
-    }
+    if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
   }
 }
 
