@@ -17,6 +17,8 @@ interface Props {
   initialData?: Patient | null;
   /** Pre-select OPD or Casualty when opening for a new patient from the Admission List view. */
   defaultAdmissionSource?: AdmissionSource;
+  /** Admin's currently-viewed unit — pre-fills unit and filters wards accordingly. */
+  viewingUnit?: string;
 }
 
 // ─── OCR result shape returned by parse-admission-slip Edge Function ──────────
@@ -98,28 +100,36 @@ async function compressImageBase64(
   });
 }
 
-const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, defaultAdmissionSource }) => {
+const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, defaultAdmissionSource, viewingUnit }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
   const { comorbidityMap, saveComorbidityMap } = useComorbidityPresets();
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
+  // Effective unit for ward filtering and form default:
+  // - non-admin → their own unit (fixed)
+  // - admin viewing a specific unit → the unit the admin selected in the dashboard
+  // - admin viewing "all" → no filter (viewingUnit is undefined)
+  const effectiveUnit = user?.unit ?? (isAdmin ? viewingUnit : undefined);
+
   const activeWards = wards
     .filter(w => w.active)
     .filter(w => {
-      if (!user?.unit) return true;
-      return !w.unit?.length || w.unit.includes(user.unit) || w.isIcu;
+      if (!effectiveUnit) return true;
+      return !w.unit?.length || w.unit.includes(effectiveUnit) || w.isIcu;
     })
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const defaultWard = activeWards[0]?.name ?? '';
-  const defaultUnit = user?.unit ?? '';
+  const defaultUnit = user?.unit ?? (viewingUnit ?? '');
 
   useEffect(() => {
     setFormData(prev => {
       const wardStillValid = activeWards.some(w => w.name === prev.ward);
       const firstWard = activeWards[0]?.name ?? '';
-      const correctUnit = isAdmin ? prev.unit : (user?.unit ?? prev.unit ?? '');
+      const correctUnit = !isAdmin && user?.unit ? user.unit
+                        : isAdmin && viewingUnit   ? viewingUnit
+                        : prev.unit ?? '';
       return {
         ...prev,
         ward: wardStillValid ? prev.ward : (firstWard as Ward) || prev.ward,
@@ -484,7 +494,15 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           if (parsed.formData) {
             const restoredForm = {
               ...parsed.formData,
-              unit: !isAdmin && user?.unit ? user.unit : parsed.formData.unit,
+              // Non-admin: always pin to their own unit.
+              // Admin with a specific unit selected: apply it (overrides stale sessionStorage).
+              unit: !isAdmin && user?.unit ? user.unit
+                  : viewingUnit                ? viewingUnit
+                  : parsed.formData.unit,
+              // Apply admission source from the button that opened the modal.
+              ...(defaultAdmissionSource ? { admissionSource: defaultAdmissionSource } : {}),
+              // Reset to today so a stale OCR date from a prior session is cleared.
+              doa: new Date().toISOString().split('T')[0],
             };
             setFormData(restoredForm);
             if (parsed.selectedComorbidities) setSelectedComorbidities(parsed.selectedComorbidities);
@@ -498,7 +516,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       setFormData({
         bed: '',
         ward: defaultWard,
-        unit: defaultUnit,
+        unit: defaultUnit,   // already resolves to viewingUnit for admin (see above)
         ipNo: '',
         name: '',
         age: '',

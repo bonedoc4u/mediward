@@ -734,6 +734,11 @@ const App: React.FC = () => {
           onSave={handleSavePatient}
           initialData={editingPatient}
           defaultAdmissionSource={editingPatient ? undefined : addModalSource}
+          viewingUnit={
+            editingPatient ? undefined
+            : ((user?.role === 'admin' || user?.role === 'superadmin') && selectedUnit && selectedUnit !== 'all') ? selectedUnit
+            : undefined
+          }
         />
       </Suspense>
 
