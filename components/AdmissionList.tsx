@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { ClipboardList, Plus, Pencil, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ClipboardList, Plus, Pencil, Printer, ChevronLeft, ChevronRight, Trash2, AlertTriangle } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Patient } from '../types';
@@ -7,6 +7,7 @@ import { Patient } from '../types';
 interface Props {
   onAddPatient?: (source: 'OPD' | 'Casualty') => void;
   onEditPatient?: (patient: Patient) => void;
+  onDeletePatient?: (patient: Patient) => void;
 }
 
 function todayStr() {
@@ -37,8 +38,19 @@ const AdmissionListTable: React.FC<{
   patients: Patient[];
   onAdd?: () => void;
   onEdit?: (p: Patient) => void;
-}> = ({ source, patients, onAdd, onEdit }) => {
+  onDelete?: (p: Patient) => void;
+}> = ({ source, patients, onAdd, onEdit, onDelete }) => {
   const style = SOURCE_STYLE[source];
+  const [confirmIpNo, setConfirmIpNo] = useState<string | null>(null);
+
+  const handleDeleteClick = (p: Patient) => {
+    setConfirmIpNo(p.ipNo);
+  };
+
+  const handleConfirmDelete = (p: Patient) => {
+    setConfirmIpNo(null);
+    onDelete?.(p);
+  };
 
   return (
     <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -76,12 +88,12 @@ const AdmissionListTable: React.FC<{
                 <th className="px-3 py-2 text-center">Age/Sex</th>
                 <th className="px-3 py-2 text-left">Diagnosis</th>
                 <th className="px-3 py-2 text-left">Mobile</th>
-                <th className="px-3 py-2 w-10" />
+                <th className="px-3 py-2 w-20" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {patients.map((p, idx) => (
-                <tr key={p.ipNo} className="hover:bg-slate-50 transition-colors">
+                <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
                   <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
                   <td className="px-3 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{p.ipNo}</td>
                   <td className="px-3 py-2.5 font-semibold text-slate-800">{p.name}</td>
@@ -92,15 +104,46 @@ const AdmissionListTable: React.FC<{
                   <td className="px-3 py-2.5 text-slate-700 max-w-[200px] truncate" title={p.diagnosis}>{p.diagnosis}</td>
                   <td className="px-3 py-2.5 font-mono text-slate-600 whitespace-nowrap">{p.mobile || '—'}</td>
                   <td className="px-3 py-2.5">
-                    {onEdit && (
-                      <button
-                        type="button"
-                        onClick={() => onEdit(p)}
-                        className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                        title="Edit patient"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
+                    {confirmIpNo === p.ipNo ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmDelete(p)}
+                          className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                        >
+                          <AlertTriangle className="w-3 h-3" /> Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmIpNo(null)}
+                          className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        {onEdit && (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(p)}
+                            className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                            title="Edit patient"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(p)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove from list"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -113,7 +156,82 @@ const AdmissionListTable: React.FC<{
   );
 };
 
-const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient }) => {
+const OtherAdmissionsTable: React.FC<{
+  patients: Patient[];
+  onEdit?: (p: Patient) => void;
+  onDelete?: (p: Patient) => void;
+}> = ({ patients, onEdit, onDelete }) => {
+  const [confirmIpNo, setConfirmIpNo] = useState<string | null>(null);
+  return (
+    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50 text-slate-600">
+        <span className="text-sm font-semibold">Other admissions (no source set)</span>
+        <span className="text-xs text-slate-400">{patients.length}</span>
+      </div>
+      <div className="overflow-x-auto bg-white">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
+              <th className="px-3 py-2 text-center w-10">Sl</th>
+              <th className="px-3 py-2 text-left">IP No</th>
+              <th className="px-3 py-2 text-left">Name</th>
+              <th className="px-3 py-2 text-center">Age/Sex</th>
+              <th className="px-3 py-2 text-left">Diagnosis</th>
+              <th className="px-3 py-2 text-left">Mobile</th>
+              <th className="px-3 py-2 w-20" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {patients.map((p, idx) => (
+              <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
+                <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{p.ipNo}</td>
+                <td className="px-3 py-2.5 font-semibold text-slate-800">{p.name}</td>
+                <td className="px-3 py-2.5 text-center whitespace-nowrap text-slate-600">
+                  {p.age}<span className="text-slate-400 mx-0.5">/</span>
+                  <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
+                </td>
+                <td className="px-3 py-2.5 text-slate-700 max-w-[200px] truncate" title={p.diagnosis}>{p.diagnosis}</td>
+                <td className="px-3 py-2.5 font-mono text-slate-600">{p.mobile || '—'}</td>
+                <td className="px-3 py-2.5">
+                  {confirmIpNo === p.ipNo ? (
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => { setConfirmIpNo(null); onDelete?.(p); }}
+                        className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                        <AlertTriangle className="w-3 h-3" /> Delete
+                      </button>
+                      <button type="button" onClick={() => setConfirmIpNo(null)}
+                        className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      {onEdit && (
+                        <button type="button" onClick={() => onEdit(p)}
+                          className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Edit">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button type="button" onClick={() => setConfirmIpNo(p.ipNo)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove from list">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeletePatient }) => {
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const { patients } = usePatients();
   const { user } = useAuth();
@@ -227,6 +345,7 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient }) => {
         patients={opdPatients}
         onAdd={onAddPatient ? () => onAddPatient('OPD') : undefined}
         onEdit={onEditPatient}
+        onDelete={onDeletePatient}
       />
 
       {/* Casualty section */}
@@ -235,53 +354,16 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient }) => {
         patients={casualtyPatients}
         onAdd={onAddPatient ? () => onAddPatient('Casualty') : undefined}
         onEdit={onEditPatient}
+        onDelete={onDeletePatient}
       />
 
-      {/* Patients without a source — show with a note so they're not hidden */}
+      {/* Patients without a source */}
       {otherPatients.length > 0 && (
-        <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50 text-slate-600">
-            <span className="text-sm font-semibold">Other admissions (no source set)</span>
-            <span className="text-xs text-slate-400">{otherPatients.length}</span>
-          </div>
-          <div className="overflow-x-auto bg-white">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                  <th className="px-3 py-2 text-center w-10">Sl</th>
-                  <th className="px-3 py-2 text-left">IP No</th>
-                  <th className="px-3 py-2 text-left">Name</th>
-                  <th className="px-3 py-2 text-center">Age/Sex</th>
-                  <th className="px-3 py-2 text-left">Diagnosis</th>
-                  <th className="px-3 py-2 text-left">Mobile</th>
-                  <th className="px-3 py-2 w-10" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {otherPatients.map((p, idx) => (
-                  <tr key={p.ipNo} className="hover:bg-slate-50">
-                    <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{p.ipNo}</td>
-                    <td className="px-3 py-2.5 font-semibold text-slate-800">{p.name}</td>
-                    <td className="px-3 py-2.5 text-center whitespace-nowrap text-slate-600">
-                      {p.age}<span className="text-slate-400 mx-0.5">/</span>
-                      <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-700 max-w-[200px] truncate" title={p.diagnosis}>{p.diagnosis}</td>
-                    <td className="px-3 py-2.5 font-mono text-slate-600">{p.mobile || '—'}</td>
-                    <td className="px-3 py-2.5">
-                      {onEditPatient && (
-                        <button type="button" onClick={() => onEditPatient(p)} className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <OtherAdmissionsTable
+          patients={otherPatients}
+          onEdit={onEditPatient}
+          onDelete={onDeletePatient}
+        />
       )}
 
       {/* Empty state for the whole day */}

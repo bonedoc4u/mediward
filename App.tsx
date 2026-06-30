@@ -164,7 +164,7 @@ const App: React.FC = () => {
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => hasAcceptedDisclaimer());
   const [superAdminMode, setSuperAdminMode] = useState(false);
   const {
-    patients, isLoadingPatients, updatePatient, addPatient,
+    patients, isLoadingPatients, updatePatient, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation,
     hasMore, isLoadingMore, loadMorePatients, saveRound,
     concurrentEditConflict, resolveConcurrentEdit, realtimeStatus,
@@ -458,6 +458,7 @@ const App: React.FC = () => {
           <AdmissionList
             onAddPatient={can(user, 'patient:add') ? (src) => openAddModal(src) : undefined}
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
+            onDeletePatient={can(user, 'patient:delete') ? (p) => deletePatient(p.ipNo) : undefined}
           />
         );
       default:
