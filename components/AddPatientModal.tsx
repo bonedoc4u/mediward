@@ -61,6 +61,35 @@ function parseDDMMYYYY(s: string): string | null {
   return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
 }
 
+// Compress image to ≤1200px wide, JPEG 75% — reduces a 12MP photo from ~5 MB to ~250 KB
+async function compressImageBase64(
+  base64: string,
+  mimeType: string,
+  maxWidth = 1200,
+  quality = 0.75,
+): Promise<{ base64: string; mimeType: string }> {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+      if (scale === 1 && mimeType === 'image/jpeg') {
+        resolve({ base64, mimeType });
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve({ base64, mimeType }); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+    };
+    img.onerror = () => resolve({ base64, mimeType });
+    img.src = `data:${mimeType};base64,${base64}`;
+  });
+}
+
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
@@ -234,49 +263,19 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const [showOcrBanner, setShowOcrBanner] = useState(false);
   const [ocrFilledCount, setOcrFilledCount] = useState(0);
 
-  const today = new Date().toISOString().split('T')[0];
-
-  const processOcrResult = (r: OCRResult, prevForm: AdmitFormState, prevComorbs: string[]) => {
-    const updates: Partial<AdmitFormState> = {};
-    const filled: Record<string, string> = {};
-
-    if (r.ip_number && !prevForm.ipNo) {
-      updates.ipNo = r.ip_number; filled.ipNo = r.ip_number;
-    }
-    if (r.date_of_admission) {
-      const parsed = parseDDMMYYYY(r.date_of_admission);
-      if (parsed && (!prevForm.doa || prevForm.doa === today)) {
-        updates.doa = parsed; filled.doa = parsed;
-      }
-    }
-    if (r.mobile_number && !prevForm.mobile) {
-      updates.mobile = r.mobile_number; filled.mobile = r.mobile_number;
-    }
-    if (r.patient_name && !prevForm.name) {
-      updates.name = r.patient_name; filled.name = r.patient_name;
-    }
-    if (r.age && !prevForm.age) {
-      updates.age = r.age; filled.age = r.age;
-    }
-    if (r.gender) {
-      const g = r.gender === 'Female' ? Gender.Female : r.gender === 'Male' ? Gender.Male : null;
-      if (g) { updates.gender = g; filled.gender = g; }
-    }
-    if (r.diagnosis && !prevForm.diagnosis) {
-      updates.diagnosis = r.diagnosis; filled.diagnosis = r.diagnosis;
-    }
-    if (r.mode_of_injury && !prevForm.modeOfInjury) {
-      updates.modeOfInjury = r.mode_of_injury; filled.modeOfInjury = r.mode_of_injury;
-    }
-
-    // Comorbidities — merge only new ones
-    const newComorbs = (r.comorbidities ?? []).filter(c => c && !prevComorbs.includes(c));
-    const unrecog = (r.comorbidities ?? []).filter(c => c && !comorbidityMap.some(e => e.full === c));
-
-    return { updates, filled, newComorbs, unrecog, mobileConflict: r.mobile_conflict || null };
-  };
-
   const handleScanBase64 = async (base64: string, mimeType: string) => {
+    // 1. Immediately blank all OCR-fillable fields so stale data from a
+    //    previous scan never shows through while the new one is loading.
+    setFormData(prev => ({
+      ...prev,
+      ipNo: '', name: '', age: '', gender: Gender.Male,
+      mobile: '', diagnosis: '', modeOfInjury: '',
+      doa: new Date().toISOString().split('T')[0],
+    }));
+    setSelectedComorbidities([]);
+    setStepRaw(1);
+
+    // 2. Reset OCR tracking state
     setScanError(null);
     setScanLoading(true);
     setOcrValues({});
@@ -286,40 +285,48 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     setShowOcrBanner(false);
 
     try {
+      // 3. Compress before upload (12 MP photo → ~250 KB)
+      const { base64: img64, mimeType: imgMime } = await compressImageBase64(base64, mimeType);
+
       const { data, error } = await supabase.functions.invoke('parse-admission-slip', {
-        body: { image: base64, mimeType, comorbidityMap },
+        body: { image: img64, mimeType: imgMime, comorbidityMap },
       });
       if (error) throw new Error(error.message ?? 'OCR failed');
 
       const r = data as OCRResult;
-      let filledRecord: Record<string, string> = {};
-      let newCombsResult: string[] = [];
 
-      setFormData(prev => {
-        const { updates, filled, newComorbs } = processOcrResult(r, prev, selectedComorbidities);
-        filledRecord = filled;
-        newCombsResult = newComorbs;
-        return { ...prev, ...updates };
-      });
+      // 4. Apply results — form is already blank so every field can be filled
+      const filled: Record<string, string> = {};
+      const updates: Partial<AdmitFormState> = {};
 
-      // Merge new comorbidities — run after setFormData settles
-      setTimeout(() => {
-        if (newCombsResult.length > 0) {
-          setSelectedComorbidities(prev => [...prev, ...newCombsResult.filter(c => !prev.includes(c))]);
-        }
-      }, 0);
+      if (r.ip_number)      { updates.ipNo = r.ip_number;          filled.ipNo = r.ip_number; }
+      if (r.date_of_admission) {
+        const parsed = parseDDMMYYYY(r.date_of_admission);
+        if (parsed)          { updates.doa = parsed;                filled.doa = parsed; }
+      }
+      if (r.mobile_number)  { updates.mobile = r.mobile_number;    filled.mobile = r.mobile_number; }
+      if (r.patient_name)   { updates.name = r.patient_name;       filled.name = r.patient_name; }
+      if (r.age)            { updates.age = r.age;                  filled.age = r.age; }
+      if (r.gender) {
+        const g = r.gender === 'Female' ? Gender.Female : r.gender === 'Male' ? Gender.Male : null;
+        if (g)               { updates.gender = g;                  filled.gender = g; }
+      }
+      if (r.diagnosis)      { updates.diagnosis = r.diagnosis;     filled.diagnosis = r.diagnosis; }
+      if (r.mode_of_injury) { updates.modeOfInjury = r.mode_of_injury; filled.modeOfInjury = r.mode_of_injury; }
 
-      const { unrecog, mobileConflict } = processOcrResult(r, formData, selectedComorbidities);
-      setOcrValues(filledRecord);
-      setOcrComorbidities(r.comorbidities ?? []);
-      setOcrUnrecognised(unrecog);
-      setOcrMobileConflict(mobileConflict);
+      setFormData(prev => ({ ...prev, ...updates }));
 
-      const count = Object.keys(filledRecord).length + (r.comorbidities?.length ?? 0);
+      const comorbs = r.comorbidities ?? [];
+      setSelectedComorbidities(comorbs);
+      setOcrValues(filled);
+      setOcrComorbidities(comorbs);
+      setOcrMobileConflict(r.mobile_conflict || null);
+      setOcrUnrecognised(comorbs.filter(c => !comorbidityMap.some(e => e.full === c)));
+
+      const count = Object.keys(filled).length + comorbs.length;
       setOcrFilledCount(count);
       if (count > 0) setShowOcrBanner(true);
 
-      setStepRaw(1); // go to step 1 so user can verify
     } catch (err: unknown) {
       setScanError(
         err instanceof Error ? err.message : 'Could not read case sheet — please enter details manually.'
@@ -345,7 +352,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       try {
         const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
         const photo = await Camera.getPhoto({
-          quality: 90,
+          quality: 60,
           allowEditing: false,
           resultType: CameraResultType.Base64,
           source: CameraSource.Prompt,
