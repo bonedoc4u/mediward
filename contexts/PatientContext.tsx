@@ -719,8 +719,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         if (isAuthError(err)) {
           setSessionExpired(true);
-          toast.error('Session expired — please log in again.');
-          return; // do NOT enqueue; op will fail again after re-login when user re-submits
+          // Enqueue so the edit is not silently lost — will replay with a fresh session
+          // after the user logs back in.
+          enqueue('upsert_patient', sanitized);
+          toast.error('Session expired — log in again. Your edit is saved locally and will sync after login.');
+          return;
         }
         enqueue('upsert_patient', sanitized);
         toast.warning('Saved locally — will sync when online.');
@@ -753,7 +756,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.error('[Patients] addPatient failed:', err);
         if (isAuthError(err)) {
           setSessionExpired(true);
-          toast.error('Session expired — please log in again.');
+          // Still enqueue so the record is not lost — the queue replay will use the
+          // fresh session after the user logs back in.
+          enqueue('upsert_patient', p);
+          toast.error('Session expired — log in again. Patient saved locally and will sync after login.');
           return;
         }
         enqueue('upsert_patient', p);

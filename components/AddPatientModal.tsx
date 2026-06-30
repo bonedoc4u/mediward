@@ -372,6 +372,9 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           source: CameraSource.Prompt,
         });
         if (photo.base64String) {
+          // Camera native UI suspends the WebView — refresh the auth token before
+          // making any Supabase calls so a stale token doesn't block OCR or the save.
+          try { await supabase.auth.refreshSession(); } catch { /* non-fatal */ }
           await handleScanBase64(photo.base64String, `image/${photo.format ?? 'jpeg'}`);
         }
         return;
