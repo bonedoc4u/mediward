@@ -250,6 +250,11 @@ export function clearDeadLetterQueue(): void {
   _persistDlq([]);
 }
 
+/** Remove a single entry from the dead-letter queue by id. */
+export function removeFromDeadLetterQueue(id: string): void {
+  _persistDlq(_dlq.filter(o => o.id !== id));
+}
+
 /** Clears all pending ops from the main queue. */
 export function clearMainQueue(): void {
   _persist([]);

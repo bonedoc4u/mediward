@@ -38,7 +38,7 @@ import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
 import { upsertRound } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
-import { enqueue, getRetryableQueue, getQueue, dequeue, incrementAttempts, getDeadLetterQueue } from '../services/syncQueue';
+import { enqueue, getRetryableQueue, getQueue, dequeue, incrementAttempts, getDeadLetterQueue, removeFromDeadLetterQueue } from '../services/syncQueue';
 import {
   registerServiceWorker,
   requestNotificationPermission,
@@ -290,6 +290,12 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const queue = getRetryableQueue();
 
       // Show DLQ alert once per session, regardless of whether there are pending ops.
+      // First, silently remove any duplicate-key entries — they are false alarms.
+      // A duplicate-key means the insert already succeeded server-side; the patient IS saved.
+      getDeadLetterQueue()
+        .filter(d => d.reason?.includes('duplicate key') || d.reason?.includes('unique constraint'))
+        .forEach(d => removeFromDeadLetterQueue(d.id));
+
       const dlq = getDeadLetterQueue();
       if (dlq.length > 0 && !dlqAlertedRef.current) {
         dlqAlertedRef.current = true;
