@@ -301,13 +301,20 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             `${concurrentCount} offline edit${concurrentCount > 1 ? 's were' : ' was'} overridden by changes made on another device. Go to Settings → Advanced to review.`,
           );
         } else {
-          const firstReason = dlq[0]?.reason
-            ?.replace(/^max_attempts_exceeded:\s*/i, '')
-            ?.replace(/CONCURRENT_EDIT:\S+/g, 'record modified on another device')
-            ?.slice(0, 80);
-          const detail = firstReason ? ` — "${firstReason}"` : '';
+          // Build a user-friendly reason: strip technical prefixes and translate
+          // common machine strings into plain language.
+          const rawReason = dlq[0]?.reason ?? '';
+          const isGenericMaxAttempts = /^max_attempts_exceeded\s*\(/i.test(rawReason);
+          const friendlyReason = isGenericMaxAttempts
+            ? 'connection was too weak to sync'
+            : rawReason
+                .replace(/^max_attempts_exceeded:\s*/i, '')
+                .replace(/CONCURRENT_EDIT:\S+/g, 'record modified on another device')
+                .replace(/\[object Object\]/g, 'server error')
+                .slice(0, 80);
+          const detail = friendlyReason ? ` — ${friendlyReason}` : '';
           toast.error(
-            `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently${detail}. Go to Settings → Advanced to review.`,
+            `⚠️ ${dlq.length} offline change${dlq.length > 1 ? 's' : ''} could not be saved${detail}. Go to Settings → Advanced to review.`,
           );
         }
       }
@@ -377,6 +384,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           dequeue(op.id);
         } catch (err) {
           console.error(`[SyncQueue] op ${op.type} failed:`, err);
+          // Auth errors (expired JWT, invalid token) will never succeed on retry.
+          // Surface as session-expired immediately and stop processing the queue.
+          if (isAuthError(err)) {
+            setSessionExpired(true);
+            toast.error('Session expired — please log out and log in again to save offline changes.');
+            break;
+          }
           const { dropped, opType, label } = incrementAttempts(op.id, err);
           if (dropped) {
             const what = opType === 'upsert_patient'
