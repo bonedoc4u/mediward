@@ -200,7 +200,6 @@ const App: React.FC = () => {
 
   const mobileTabs = useMemo(() => [
     { id: 'dashboard'  as ViewMode, label: 'Ward',       icon: LayoutDashboard },
-    { id: 'admissions' as ViewMode, label: 'Admissions', icon: BookOpen        },
     { id: 'rounds'     as ViewMode, label: 'Rounds',     icon: ListChecks      },
     { id: 'otlist'     as ViewMode, label: procedureListName, icon: ClipboardList },
     { id: 'pac'        as ViewMode, label: preOpModuleName,   icon: HeartPulse    },
@@ -490,10 +489,10 @@ const App: React.FC = () => {
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
       <style>{`
         :root {
-          --bottom-nav-height: 56px;
+          --bottom-nav-height: 60px;
           --safe-area-top: env(safe-area-inset-top, 0px);
           --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-          --content-bottom-pad: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 16px);
+          --content-bottom-pad: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 24px);
           --fab-bottom: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 16px);
         }
         * { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -755,7 +754,7 @@ const App: React.FC = () => {
       {/* ─── Mobile Bottom Tab Bar ─── */}
       <PwaInstallBanner />
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'var(--safe-area-bottom)' }}>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="grid grid-cols-5">
           {mobileTabs.map(tab => (
             <button
