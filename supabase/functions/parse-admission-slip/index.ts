@@ -20,13 +20,20 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ALLOWED_ORIGINS = [
   'https://mediward.vercel.app',
   'https://mediward.app',
-  'capacitor://localhost',
-  'http://localhost:5173',
+  'capacitor://localhost',   // iOS Capacitor
+  'https://localhost',       // Android Capacitor (Capacitor v5+)
+  'http://localhost',        // Android Capacitor (older / some configs)
+  'http://localhost:5173',   // Vite dev server
   'http://localhost:3000',
 ];
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Allow any localhost variant (covers all Capacitor WebView origins)
+  const isAllowed = origin != null && (
+    ALLOWED_ORIGINS.includes(origin) ||
+    /^https?:\/\/localhost(:\d+)?$/.test(origin)
+  );
+  const allowedOrigin = isAllowed ? origin! : ALLOWED_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -156,8 +163,12 @@ serve(async (req: Request) => {
 
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
-      console.error('Anthropic API error:', errText);
-      return new Response(JSON.stringify({ error: 'OCR service error' }), {
+      console.error('Anthropic API error:', anthropicRes.status, errText);
+      let humanMsg = `OCR error (${anthropicRes.status})`;
+      if (anthropicRes.status === 401) humanMsg = 'OCR API key invalid — contact admin';
+      else if (anthropicRes.status === 429) humanMsg = 'OCR rate limit reached — wait a moment and try again';
+      else if (anthropicRes.status === 400) humanMsg = `OCR rejected image: ${errText.slice(0, 200)}`;
+      return new Response(JSON.stringify({ error: humanMsg }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

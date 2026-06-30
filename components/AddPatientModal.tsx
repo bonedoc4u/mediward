@@ -61,32 +61,37 @@ function parseDDMMYYYY(s: string): string | null {
   return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
 }
 
-// Compress image to ≤1200px wide, JPEG 75% — reduces a 12MP photo from ~5 MB to ~250 KB
+// Compress image to ≤1200px wide, JPEG 75% — reduces a 12MP photo from ~5 MB to ~250 KB.
+// 5-second timeout guards against canvas hanging in older Android WebViews.
 async function compressImageBase64(
   base64: string,
   mimeType: string,
   maxWidth = 1200,
   quality = 0.75,
 ): Promise<{ base64: string; mimeType: string }> {
+  const safeMime = mimeType?.startsWith('image/') ? mimeType : 'image/jpeg';
   return new Promise(resolve => {
+    const fallback = () => resolve({ base64, mimeType: safeMime });
+    const timer = setTimeout(fallback, 5000);
     const img = new Image();
     img.onload = () => {
-      const scale = img.width > maxWidth ? maxWidth / img.width : 1;
-      if (scale === 1 && mimeType === 'image/jpeg') {
-        resolve({ base64, mimeType });
-        return;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve({ base64, mimeType }); return; }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', quality);
-      resolve({ base64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+      clearTimeout(timer);
+      try {
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        if (scale === 1 && safeMime === 'image/jpeg') { resolve({ base64, mimeType: safeMime }); return; }
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve({ base64, mimeType: safeMime }); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const compressed = dataUrl.split(',')[1];
+        resolve({ base64: compressed || base64, mimeType: 'image/jpeg' });
+      } catch { resolve({ base64, mimeType: safeMime }); }
     };
-    img.onerror = () => resolve({ base64, mimeType });
-    img.src = `data:${mimeType};base64,${base64}`;
+    img.onerror = () => { clearTimeout(timer); fallback(); };
+    img.src = `data:${safeMime};base64,${base64}`;
   });
 }
 
@@ -288,10 +293,15 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       // 3. Compress before upload (12 MP photo → ~250 KB)
       const { base64: img64, mimeType: imgMime } = await compressImageBase64(base64, mimeType);
 
-      const { data, error } = await supabase.functions.invoke('parse-admission-slip', {
+      // 30-second timeout — edge function cold-starts can take ~10 s; network issues shouldn't hang forever
+      const invokePromise = supabase.functions.invoke('parse-admission-slip', {
         body: { image: img64, mimeType: imgMime, comorbidityMap },
       });
-      if (error) throw new Error(error.message ?? 'OCR failed');
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Scan timed out (30 s) — check your internet connection and try again')), 30_000)
+      );
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]);
+      if (error) throw new Error(error.message ?? 'OCR service returned an error');
 
       const r = data as OCRResult;
 
@@ -328,9 +338,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       if (count > 0) setShowOcrBanner(true);
 
     } catch (err: unknown) {
-      setScanError(
-        err instanceof Error ? err.message : 'Could not read case sheet — please enter details manually.'
-      );
+      const msg = err instanceof Error ? err.message : String(err);
+      setScanError(msg || 'Scan failed — please enter details manually.');
     } finally {
       setScanLoading(false);
       if (scanInputRef.current) scanInputRef.current.value = '';
