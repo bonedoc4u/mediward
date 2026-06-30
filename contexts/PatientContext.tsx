@@ -506,10 +506,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (status === 'SUBSCRIBED') {
             retryDelay = 2000; // reset backoff on success
             setRealtimeStatus('connected');
+            toast.dismiss('rt-conn'); // clear any "connection lost" banner
           }
           if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !destroyed) {
             setRealtimeStatus('reconnecting');
-            toast.warning('Realtime connection lost — reconnecting…');
+            toast.warning('Realtime connection lost — reconnecting…', 'rt-conn');
             supabase.removeChannel(ch);
             channelRef.current = null;
             retryTimer = setTimeout(() => {
