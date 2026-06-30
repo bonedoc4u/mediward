@@ -276,12 +276,23 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const dlq = getDeadLetterQueue();
       if (dlq.length > 0 && !dlqAlertedRef.current) {
         dlqAlertedRef.current = true;
-        // Show the first failure's reason so the problem is immediately diagnosable
-        const firstReason = dlq[0]?.reason?.replace(/^max_attempts_exceeded:\s*/i, '').slice(0, 80);
-        const detail = firstReason ? ` — "${firstReason}"` : '';
-        toast.error(
-          `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently${detail}. Go to Settings → Advanced to review.`,
-        );
+        const concurrentCount = dlq.filter(d => d.reason?.includes('CONCURRENT_EDIT')).length;
+        const otherCount = dlq.length - concurrentCount;
+        if (concurrentCount > 0 && otherCount === 0) {
+          // All failures are concurrent-edit — not a data-loss situation, just stale offline edits
+          toast.warning(
+            `${concurrentCount} offline edit${concurrentCount > 1 ? 's were' : ' was'} overridden by changes made on another device. Go to Settings → Advanced to review.`,
+          );
+        } else {
+          const firstReason = dlq[0]?.reason
+            ?.replace(/^max_attempts_exceeded:\s*/i, '')
+            ?.replace(/CONCURRENT_EDIT:\S+/g, 'record modified on another device')
+            ?.slice(0, 80);
+          const detail = firstReason ? ` — "${firstReason}"` : '';
+          toast.error(
+            `⚠️ ${dlq.length} update${dlq.length > 1 ? 's' : ''} failed permanently${detail}. Go to Settings → Advanced to review.`,
+          );
+        }
       }
 
       if (queue.length === 0) return;
@@ -297,7 +308,35 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const withHid: Patient = qp.hospitalId
               ? qp
               : { ...qp, hospitalId: userRef.current?.hospitalId };
-            await upsertPatient(withHid);
+            try {
+              await upsertPatient(withHid);
+            } catch (qErr) {
+              // CONCURRENT_EDIT in queue: another device updated the record while we were offline.
+              // Auto-resolve: if no meaningful field changed, adopt the remote timestamp and retry.
+              // This prevents 5× pointless retries → DLQ for a trivially resolvable conflict.
+              if (qErr instanceof Error && qErr.message.startsWith('CONCURRENT_EDIT:')) {
+                const remote = await fetchPatientById(withHid.ipNo, withHid.hospitalId ?? undefined);
+                if (remote) {
+                  const MKEYS = ['bed', 'ward', 'diagnosis', 'patientStatus', 'pacStatus',
+                    'procedure', 'dos', 'dod', 'pod', 'management', 'unit'] as const;
+                  const hasRealDiff = MKEYS.some(
+                    k => String((withHid as unknown as Record<string, unknown>)[k] ?? '') !==
+                         String((remote  as unknown as Record<string, unknown>)[k] ?? ''),
+                  );
+                  if (!hasRealDiff) {
+                    await upsertPatient({ ...withHid, updatedAt: remote.updatedAt });
+                  } else {
+                    throw new Error(
+                      `${withHid.name || withHid.ipNo}: offline edit not applied — record was changed on another device.`,
+                    );
+                  }
+                } else {
+                  throw qErr;
+                }
+              } else {
+                throw qErr;
+              }
+            }
           } else if (op.type === 'insert_lab') {
             const { patientId, hospitalId: labHid, result } = op.payload as { patientId: string; hospitalId?: string; result: LabResult };
             await insertLab(patientId, result, labHid);
@@ -633,7 +672,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               // Re-save with the server's updatedAt so the conditional check passes.
               upsertPatient({ ...sanitized, updatedAt: remote.updatedAt })
                 .then(() => { toast.success(`${sanitized.name} updated`); if (isDischarge) hapticSuccess(); })
-                .catch(() => { enqueue('upsert_patient', sanitized); toast.warning('Saved locally — will sync when online.'); });
+                .catch(() => {
+                  // Enqueue with the remote's updatedAt so the next replay passes the conditional check
+                  enqueue('upsert_patient', { ...sanitized, updatedAt: remote.updatedAt });
+                  toast.warning('Saved locally — will sync when online.');
+                });
               return;
             }
             // Real conflict — show the dialog so the user can decide
