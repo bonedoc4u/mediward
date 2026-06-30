@@ -359,9 +359,11 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
       });
   }, [patients, selectedDate, user?.unit]);
 
-  const opdPatients      = useMemo(() => dayPatients.filter(p => p.admissionSource === 'OPD'),      [dayPatients]);
-  const casualtyPatients = useMemo(() => dayPatients.filter(p => p.admissionSource === 'Casualty'), [dayPatients]);
-  const otherPatients    = useMemo(() => dayPatients.filter(p => !p.admissionSource),               [dayPatients]);
+  const byIpAsc = (a: Patient, b: Patient) => parseInt(a.ipNo, 10) - parseInt(b.ipNo, 10);
+
+  const opdPatients      = useMemo(() => dayPatients.filter(p => p.admissionSource === 'OPD').sort(byIpAsc),      [dayPatients]);
+  const casualtyPatients = useMemo(() => dayPatients.filter(p => p.admissionSource === 'Casualty').sort(byIpAsc), [dayPatients]);
+  const otherPatients    = useMemo(() => dayPatients.filter(p => !p.admissionSource).sort(byIpAsc),               [dayPatients]);
 
   const handlePrint = useCallback(() => window.print(), []);
 
