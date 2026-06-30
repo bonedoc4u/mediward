@@ -79,30 +79,30 @@ const AdmissionListTable: React.FC<{
         </div>
       ) : (
         <div className="overflow-x-auto bg-white">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[700px] text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                <th className="px-3 py-2 text-center w-10">Sl</th>
-                <th className="px-3 py-2 text-left">IP No</th>
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-center">Age/Sex</th>
-                <th className="px-3 py-2 text-left">Diagnosis</th>
-                <th className="px-3 py-2 text-left">Mobile</th>
-                <th className="px-3 py-2 w-20" />
+                <th className="px-3 py-2.5 text-center w-10">Sl</th>
+                <th className="px-3 py-2.5 text-left w-20">IP No</th>
+                <th className="px-3 py-2.5 text-left w-36">Name</th>
+                <th className="px-3 py-2.5 text-center w-16">Age/Sex</th>
+                <th className="px-3 py-2.5 text-left">Diagnosis</th>
+                <th className="px-3 py-2.5 text-left w-32">Mobile</th>
+                <th className="px-3 py-2.5 w-20" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {patients.map((p, idx) => (
                 <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
-                  <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{p.ipNo}</td>
-                  <td className="px-3 py-2.5 font-semibold text-slate-800">{p.name}</td>
-                  <td className="px-3 py-2.5 text-center whitespace-nowrap text-slate-600">
+                  <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">{p.ipNo}</td>
+                  <td className="px-3 py-3 font-semibold text-slate-800">{p.name}</td>
+                  <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
                     {p.age}<span className="text-slate-400 mx-0.5">/</span>
                     <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-slate-700 max-w-[200px] truncate" title={p.diagnosis}>{p.diagnosis}</td>
-                  <td className="px-3 py-2.5 font-mono text-slate-600 whitespace-nowrap">{p.mobile || '—'}</td>
+                  <td className="px-3 py-3 text-slate-700 leading-snug">{p.diagnosis}</td>
+                  <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">{p.mobile || '—'}</td>
                   <td className="px-3 py-2.5">
                     {confirmIpNo === p.ipNo ? (
                       <div className="flex items-center gap-1">
@@ -169,30 +169,30 @@ const OtherAdmissionsTable: React.FC<{
         <span className="text-xs text-slate-400">{patients.length}</span>
       </div>
       <div className="overflow-x-auto bg-white">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[700px] text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-              <th className="px-3 py-2 text-center w-10">Sl</th>
-              <th className="px-3 py-2 text-left">IP No</th>
-              <th className="px-3 py-2 text-left">Name</th>
-              <th className="px-3 py-2 text-center">Age/Sex</th>
-              <th className="px-3 py-2 text-left">Diagnosis</th>
-              <th className="px-3 py-2 text-left">Mobile</th>
-              <th className="px-3 py-2 w-20" />
+              <th className="px-3 py-2.5 text-center w-10">Sl</th>
+              <th className="px-3 py-2.5 text-left w-20">IP No</th>
+              <th className="px-3 py-2.5 text-left w-36">Name</th>
+              <th className="px-3 py-2.5 text-center w-16">Age/Sex</th>
+              <th className="px-3 py-2.5 text-left">Diagnosis</th>
+              <th className="px-3 py-2.5 text-left w-32">Mobile</th>
+              <th className="px-3 py-2.5 w-20" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {patients.map((p, idx) => (
               <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
-                <td className="px-3 py-2.5 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-                <td className="px-3 py-2.5 font-mono text-xs text-slate-600">{p.ipNo}</td>
-                <td className="px-3 py-2.5 font-semibold text-slate-800">{p.name}</td>
-                <td className="px-3 py-2.5 text-center whitespace-nowrap text-slate-600">
+                <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                <td className="px-3 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">{p.ipNo}</td>
+                <td className="px-3 py-3 font-semibold text-slate-800">{p.name}</td>
+                <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
                   {p.age}<span className="text-slate-400 mx-0.5">/</span>
                   <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
                 </td>
-                <td className="px-3 py-2.5 text-slate-700 max-w-[200px] truncate" title={p.diagnosis}>{p.diagnosis}</td>
-                <td className="px-3 py-2.5 font-mono text-slate-600">{p.mobile || '—'}</td>
+                <td className="px-3 py-3 text-slate-700 leading-snug">{p.diagnosis}</td>
+                <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">{p.mobile || '—'}</td>
                 <td className="px-3 py-2.5">
                   {confirmIpNo === p.ipNo ? (
                     <div className="flex items-center gap-1">
