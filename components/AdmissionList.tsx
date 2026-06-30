@@ -140,64 +140,61 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient }) => {
   return (
     <div className="space-y-4 pb-24">
       {/* Header bar */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+        {/* Row 1: title + print */}
+        <div className="flex items-center gap-2">
           <ClipboardList className="w-5 h-5 text-teal-600 shrink-0" />
-          <div className="min-w-0">
+          <div className="flex-1 min-w-0">
             <h2 className="font-bold text-slate-800 leading-tight">Admission List</h2>
             {user?.unit && (
               <p className="text-xs text-slate-500">{user.unit}</p>
             )}
           </div>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors shrink-0"
+          >
+            <Printer className="w-4 h-4" /> Print
+          </button>
         </div>
 
-        {/* Date navigator */}
+        {/* Row 2: date navigator */}
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setSelectedDate(d => stepDate(d, -1))}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
             aria-label="Previous day"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <div className="flex items-center gap-1">
-            <input
-              type="date"
-              value={selectedDate}
-              max={todayStr()}
-              onChange={e => setSelectedDate(e.target.value)}
-              className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 outline-none"
-            />
-            {!isToday && (
-              <button
-                type="button"
-                onClick={() => setSelectedDate(todayStr())}
-                className="text-xs text-teal-600 hover:text-teal-800 font-semibold px-2 py-1 rounded-lg hover:bg-teal-50"
-              >
-                Today
-              </button>
-            )}
-          </div>
+          <input
+            type="date"
+            value={selectedDate}
+            max={todayStr()}
+            onChange={e => setSelectedDate(e.target.value)}
+            className="flex-1 min-w-0 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-slate-800 focus:ring-2 focus:ring-teal-500 outline-none"
+          />
+          {!isToday && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr())}
+              className="text-xs text-teal-600 hover:text-teal-800 font-semibold px-2 py-1 rounded-lg hover:bg-teal-50 shrink-0"
+            >
+              Today
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setSelectedDate(d => stepDate(d, 1))}
             disabled={isToday}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30 transition-colors shrink-0"
             aria-label="Next day"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Print */}
-        <button
-          type="button"
-          onClick={handlePrint}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors"
-        >
-          <Printer className="w-4 h-4" /> Print
-        </button>
       </div>
 
       {/* Summary chips */}
