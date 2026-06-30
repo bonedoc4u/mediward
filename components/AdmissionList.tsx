@@ -79,30 +79,41 @@ const AdmissionListTable: React.FC<{
         </div>
       ) : (
         <div className="overflow-x-auto bg-white">
-          <table className="w-full min-w-[700px] text-sm">
+          {/* table-fixed forces the browser to honour the colgroup widths strictly.
+              Without it, the auto layout expands Name and squeezes Diagnosis. */}
+          <table className="w-full min-w-[860px] text-sm table-fixed">
+            <colgroup>
+              <col className="w-10" />          {/* Sl */}
+              <col className="w-[88px]" />      {/* IP No */}
+              <col className="w-[150px]" />     {/* Name */}
+              <col className="w-[72px]" />      {/* Age/Sex */}
+              <col />                           {/* Diagnosis — takes all remaining space */}
+              <col className="w-[128px]" />     {/* Mobile */}
+              <col className="w-[88px]" />      {/* Actions */}
+            </colgroup>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                <th className="px-3 py-2.5 text-center w-10">Sl</th>
-                <th className="px-3 py-2.5 text-left w-20">IP No</th>
-                <th className="px-3 py-2.5 text-left w-36">Name</th>
-                <th className="px-3 py-2.5 text-center w-16">Age/Sex</th>
+                <th className="px-3 py-2.5 text-center">Sl</th>
+                <th className="px-3 py-2.5 text-left">IP No</th>
+                <th className="px-3 py-2.5 text-left">Name</th>
+                <th className="px-3 py-2.5 text-center">Age/Sex</th>
                 <th className="px-3 py-2.5 text-left">Diagnosis</th>
-                <th className="px-3 py-2.5 text-left w-32">Mobile</th>
-                <th className="px-3 py-2.5 w-20" />
+                <th className="px-3 py-2.5 text-left">Mobile</th>
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {patients.map((p, idx) => (
                 <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
                   <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-                  <td className="px-3 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">{p.ipNo}</td>
-                  <td className="px-3 py-3 font-semibold text-slate-800">{p.name}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
+                  <td className="px-3 py-3 font-semibold text-slate-800 break-words">{p.name}</td>
                   <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
                     {p.age}<span className="text-slate-400 mx-0.5">/</span>
                     <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
                   </td>
-                  <td className="px-3 py-3 text-slate-700 leading-snug">{p.diagnosis}</td>
-                  <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">{p.mobile || '—'}</td>
+                  <td className="px-3 py-3 text-slate-700 leading-snug break-words">{p.diagnosis}</td>
+                  <td className="px-3 py-3 font-mono text-slate-600 break-all">{p.mobile || '—'}</td>
                   <td className="px-3 py-2.5">
                     {confirmIpNo === p.ipNo ? (
                       <div className="flex items-center gap-1">
@@ -169,30 +180,39 @@ const OtherAdmissionsTable: React.FC<{
         <span className="text-xs text-slate-400">{patients.length}</span>
       </div>
       <div className="overflow-x-auto bg-white">
-        <table className="w-full min-w-[700px] text-sm">
+        <table className="w-full min-w-[860px] text-sm table-fixed">
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-[88px]" />
+            <col className="w-[150px]" />
+            <col className="w-[72px]" />
+            <col />
+            <col className="w-[128px]" />
+            <col className="w-[88px]" />
+          </colgroup>
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-              <th className="px-3 py-2.5 text-center w-10">Sl</th>
-              <th className="px-3 py-2.5 text-left w-20">IP No</th>
-              <th className="px-3 py-2.5 text-left w-36">Name</th>
-              <th className="px-3 py-2.5 text-center w-16">Age/Sex</th>
+              <th className="px-3 py-2.5 text-center">Sl</th>
+              <th className="px-3 py-2.5 text-left">IP No</th>
+              <th className="px-3 py-2.5 text-left">Name</th>
+              <th className="px-3 py-2.5 text-center">Age/Sex</th>
               <th className="px-3 py-2.5 text-left">Diagnosis</th>
-              <th className="px-3 py-2.5 text-left w-32">Mobile</th>
-              <th className="px-3 py-2.5 w-20" />
+              <th className="px-3 py-2.5 text-left">Mobile</th>
+              <th className="px-3 py-2.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {patients.map((p, idx) => (
               <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
                 <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-                <td className="px-3 py-3 font-mono text-xs text-slate-600 whitespace-nowrap">{p.ipNo}</td>
-                <td className="px-3 py-3 font-semibold text-slate-800">{p.name}</td>
+                <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
+                <td className="px-3 py-3 font-semibold text-slate-800 break-words">{p.name}</td>
                 <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
                   {p.age}<span className="text-slate-400 mx-0.5">/</span>
                   <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
                 </td>
-                <td className="px-3 py-3 text-slate-700 leading-snug">{p.diagnosis}</td>
-                <td className="px-3 py-3 font-mono text-slate-600 whitespace-nowrap">{p.mobile || '—'}</td>
+                <td className="px-3 py-3 text-slate-700 leading-snug break-words">{p.diagnosis}</td>
+                <td className="px-3 py-3 font-mono text-slate-600 break-all">{p.mobile || '—'}</td>
                 <td className="px-3 py-2.5">
                   {confirmIpNo === p.ipNo ? (
                     <div className="flex items-center gap-1">
@@ -238,18 +258,23 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
 
   const isToday = selectedDate === todayStr();
 
-  // Filter by date and unit, deduplicating by ipNo so a transient realtime
-  // race (cache + fresh fetch + INSERT event all overlapping) never produces
-  // repeated rows in the admission list.
+  // Filter by date and unit, deduplicate, then sort by IP No ascending
+  // so the earliest-admitted patient is always SL 1.
   const dayPatients = useMemo(() => {
     const seen = new Set<string>();
-    return patients.filter(p => {
-      if (p.doa !== selectedDate) return false;
-      if (user?.unit && p.unit && p.unit !== user.unit) return false;
-      if (seen.has(p.ipNo)) return false;
-      seen.add(p.ipNo);
-      return true;
-    });
+    return patients
+      .filter(p => {
+        if (p.doa !== selectedDate) return false;
+        if (user?.unit && p.unit && p.unit !== user.unit) return false;
+        if (seen.has(p.ipNo)) return false;
+        seen.add(p.ipNo);
+        return true;
+      })
+      .sort((a, b) => {
+        const an = parseInt(a.ipNo, 10);
+        const bn = parseInt(b.ipNo, 10);
+        return isNaN(an) || isNaN(bn) ? a.ipNo.localeCompare(b.ipNo) : an - bn;
+      });
   }, [patients, selectedDate, user?.unit]);
 
   const opdPatients      = useMemo(() => dayPatients.filter(p => p.admissionSource === 'OPD'),      [dayPatients]);
