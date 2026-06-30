@@ -357,6 +357,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 } else {
                   throw qErr;
                 }
+              } else if (
+                qErr instanceof Error &&
+                (qErr.message.includes('duplicate key') || qErr.message.includes('unique constraint')) &&
+                !withHid.updatedAt
+              ) {
+                // The first insert attempt succeeded server-side before the auth error was returned.
+                // The row already exists in the DB — silently treat as success and dequeue.
+                console.info('[SyncQueue] new-patient insert already landed for', withHid.ipNo, '— deduplicating');
               } else {
                 throw qErr;
               }
