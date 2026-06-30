@@ -120,11 +120,16 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient }) => {
 
   const isToday = selectedDate === todayStr();
 
-  // Filter by date and unit
+  // Filter by date and unit, deduplicating by ipNo so a transient realtime
+  // race (cache + fresh fetch + INSERT event all overlapping) never produces
+  // repeated rows in the admission list.
   const dayPatients = useMemo(() => {
+    const seen = new Set<string>();
     return patients.filter(p => {
       if (p.doa !== selectedDate) return false;
       if (user?.unit && p.unit && p.unit !== user.unit) return false;
+      if (seen.has(p.ipNo)) return false;
+      seen.add(p.ipNo);
       return true;
     });
   }, [patients, selectedDate, user?.unit]);

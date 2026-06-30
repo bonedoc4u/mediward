@@ -122,10 +122,27 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // hospitalId used for cache scoping — available synchronously from localStorage-backed auth
   const _initHid = user?.hospitalId ?? '';
 
-  const [patients, setPatients] = useState<Patient[]>(() => {
+  const [patients, _setPatients] = useState<Patient[]>(() => {
     const cached = loadActiveCache(_initHid);
     return cached ? enrichPatientData(cached.patients) : [];
   });
+
+  // Wrapper that guarantees no duplicate ipNo entries survive in state.
+  // All realtime/fetch/optimistic paths funnel through here, so a race
+  // between cache load + initial fetch + realtime INSERT can never accumulate
+  // duplicates in the patients array (last entry for a given ipNo wins).
+  const setPatients = useCallback(
+    (updater: Patient[] | ((prev: Patient[]) => Patient[])) => {
+      _setPatients(prev => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        if (next === prev) return prev;
+        const seen = new Map<string, Patient>();
+        for (const p of next) seen.set(p.ipNo, p);
+        return seen.size === next.length ? next : [...seen.values()];
+      });
+    },
+    [],
+  );
 
   // Show spinner only when there is no cache to fall back on.
   const [isLoadingPatients, setIsLoadingPatients] = useState(() => !loadActiveCache(_initHid));
