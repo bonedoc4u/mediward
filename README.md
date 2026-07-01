@@ -10,7 +10,7 @@ A comprehensive ward management system for orthopedic units, built with React 19
 | Build | Vite 6 |
 | State | React Context (AppContext) with auto-persistence |
 | Persistence | localStorage with versioned envelopes + debounced save |
-| Auth | SHA-256 hashed passwords, 8-hour sessions, seeded demo users |
+| Auth | Supabase Auth (GoTrue, bcrypt), 8-hour sessions, seeded demo users |
 | Routing | Hash-based router with browser back/forward support |
 | Audit | Append-only audit log (all CRUD operations tracked) |
 | Security | Input sanitization, no client-side API keys, XSS prevention |
@@ -26,6 +26,6 @@ A comprehensive ward management system for orthopedic units, built with React 19
 ## Running
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
