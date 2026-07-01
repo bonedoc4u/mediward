@@ -9,3 +9,6 @@ android/.gradle/
 android/app/build/
 android/build/
 .gradle/
+
+.vercel
+.env*
