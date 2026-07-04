@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { registerHospital } from '../services/hospitalService';
 import { validateInvite } from '../services/inviteService';
+import { validatePassword } from '../utils/passwordPolicy';
 
 // ─── Kerala Medical Colleges ──────────────────────────────────────────────────
 const KERALA_COLLEGES = [
@@ -133,12 +134,13 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       setError('Passwords do not match.');
       return;
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+    const pwError = validatePassword(password);
+    if (pwError) {
+      setError(pwError);
       return;
     }
-    if (!/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-      setError('Password must include at least one uppercase letter, one number, and one special character.');
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      setError('Password must include at least one special character.');
       return;
     }
     setIsLoading(true);
@@ -451,9 +453,9 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
-                      minLength={8}
+                      minLength={10}
                       autoComplete="new-password"
-                      placeholder="Minimum 8 characters"
+                      placeholder="Minimum 10 characters"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                       className="w-full pl-9 pr-10 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none text-sm"
@@ -473,7 +475,7 @@ const HospitalRegisterPage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <input
                       type={showConfirm ? 'text' : 'password'}
                       required
-                      minLength={8}
+                      minLength={10}
                       autoComplete="new-password"
                       placeholder="Re-enter password"
                       value={confirmPassword}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { validatePassword } from '../utils/passwordPolicy';
 import { Lock, Eye, EyeOff, CheckCircle, Loader2, Stethoscope } from 'lucide-react';
 
 interface Props {
@@ -19,8 +20,9 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+    const pwError = validatePassword(password);
+    if (pwError) {
+      setError(pwError);
       return;
     }
     if (password !== confirm) {
@@ -76,7 +78,7 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
                   type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Min. 8 characters"
+                  placeholder="Min. 10 characters"
                   className="w-full pl-9 pr-10 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"
                   autoFocus
                   autoComplete="new-password"
