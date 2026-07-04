@@ -1,36 +1,13 @@
 import React, { useMemo } from 'react';
 import { Scissors, CalendarCheck, Zap, ShieldAlert, BedDouble } from 'lucide-react';
+import { UNIT_SCHEDULE, getWeekendDutyUnit } from '../utils/otSchedule';
 
 // ─── Department Schedule ─────────────────────────────────────────────────────
 // JS Date.getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
-
-const UNIT_SCHEDULE: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
-  OR1: { admissionDay: 1, majorDay: 4, minorDay: 3 }, // Mon admit · Thu major · Wed minor
-  OR2: { admissionDay: 2, majorDay: 5, minorDay: 4 }, // Tue admit · Fri major · Thu minor
-  OR3: { admissionDay: 3, majorDay: 1, minorDay: 5 }, // Wed admit · Mon major · Fri minor
-  OR4: { admissionDay: 4, majorDay: 2, minorDay: 1 }, // Thu admit · Tue major · Mon minor
-  OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 }, // Fri admit · Wed major · Tue minor
-};
+// UNIT_SCHEDULE + weekend-duty roster live in utils/otSchedule (shared).
 
 const ALL_UNITS = ['OR1', 'OR2', 'OR3', 'OR4', 'OR5'];
 const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-// 5-week rotating weekend duty, anchored to Saturday 04-Apr-2026
-// Decoded from 3-month duty roster (Apr–Jun 2026)
-const SAT_CYCLE = [4, 3, 1, 2, 1]; // OR unit number per week
-const SUN_CYCLE = [5, 2, 5, 4, 3];
-const ANCHOR_SAT_MS = new Date('2026-04-04').getTime();
-const MS_PER_WEEK  = 7 * 86_400_000;
-
-function getWeekendDutyUnit(date: Date): string | null {
-  const dow = date.getDay();
-  if (dow !== 0 && dow !== 6) return null;
-  const sat = new Date(date);
-  if (dow === 0) sat.setDate(sat.getDate() - 1); // Sun → back to Sat
-  sat.setHours(0, 0, 0, 0);
-  const idx = (((Math.round((sat.getTime() - ANCHOR_SAT_MS) / MS_PER_WEEK)) % 5) + 5) % 5;
-  return `OR${dow === 6 ? SAT_CYCLE[idx] : SUN_CYCLE[idx]}`;
-}
 
 type EventType = 'admission' | 'major' | 'minor' | 'weekend-duty';
 
