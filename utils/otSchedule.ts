@@ -37,3 +37,47 @@ export function getWeekendDutyUnit(date: Date): string | null {
   const idx = (((Math.round((sat.getTime() - ANCHOR_SAT_MS) / MS_PER_WEEK)) % 5) + 5) % 5;
   return `OR${dow === 6 ? SAT_CYCLE[idx] : SUN_CYCLE[idx]}`;
 }
+
+const ymd = (d: Date): string => d.toISOString().split('T')[0];
+
+/**
+ * OT cycle for a unit = the 7-day window starting at the unit's admission day.
+ * Anchors to the CURRENT cycle while its major/minor OT days are still ahead;
+ * once both have passed, rolls to next week's admission cycle. Returns the
+ * cycle's EOT (admission), Major and Minor dates (YYYY-MM-DD).
+ */
+export interface OTCycle {
+  eotDate: string;   // admission day (start of the 7-day window)
+  majorDate: string;
+  minorDate: string;
+  /** Weekend day(s) in this window on which THIS unit is on emergency-OT duty. */
+  eotWeekendDates: string[];
+}
+
+export function getOTCycleDates(unit: string, today: Date = new Date()): OTCycle {
+  const u = unit?.toUpperCase();
+  const s = UNIT_SCHEDULE[u] ?? UNIT_SCHEDULE['OR1'];
+  const base = new Date(today); base.setHours(0, 0, 0, 0);
+  // Most recent admission day on or before today.
+  const daysSinceAdm = (base.getDay() - s.admissionDay + 7) % 7;
+  const adm = new Date(base); adm.setDate(base.getDate() - daysSinceAdm);
+  const dateForDow = (from: Date, dow: number) => {
+    const off = (dow - s.admissionDay + 7) % 7; // 0..6 within the window
+    const d = new Date(from); d.setDate(from.getDate() + off); return d;
+  };
+  let major = dateForDow(adm, s.majorDay);
+  let minor = dateForDow(adm, s.minorDay);
+  if (Math.max(major.getTime(), minor.getTime()) < base.getTime()) {
+    adm.setDate(adm.getDate() + 7); // this cycle's OT days are done → next week
+    major = dateForDow(adm, s.majorDay);
+    minor = dateForDow(adm, s.minorDay);
+  }
+  // Weekend EOT: any Sat/Sun in the window where this unit is on weekend duty.
+  const eotWeekendDates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(adm); d.setDate(adm.getDate() + i);
+    const dow = d.getDay();
+    if ((dow === 0 || dow === 6) && getWeekendDutyUnit(d) === u) eotWeekendDates.push(ymd(d));
+  }
+  return { eotDate: ymd(adm), majorDate: ymd(major), minorDate: ymd(minor), eotWeekendDates };
+}

@@ -2,8 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import { UNIT_SCHEDULE, getOTCycleDates } from '../utils/otSchedule';
 import * as XLSX from 'xlsx-js-style';
-import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical, ShieldAlert } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -57,26 +58,8 @@ interface OTPatient {
 
 type OTType = 'Major' | 'Minor' | 'EOT';
 
-// Department OT schedule — used to auto-assign patients to the correct OT type
-const UNIT_SCHEDULE_OT: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
-  OR1: { admissionDay: 1, majorDay: 4, minorDay: 3 },
-  OR2: { admissionDay: 2, majorDay: 5, minorDay: 4 },
-  OR3: { admissionDay: 3, majorDay: 1, minorDay: 5 }, // Fri minor
-  OR4: { admissionDay: 4, majorDay: 2, minorDay: 1 },
-  OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 },
-};
-
-/** Returns the next date (YYYY-MM-DD) on which targetDow occurs, same day if today matches. */
-function nextOccurrence(targetDow: number): string {
-  const today = new Date();
-  const diff = (targetDow - today.getDay() + 7) % 7;
-  const next = new Date(today);
-  next.setDate(today.getDate() + diff);
-  return next.toISOString().split('T')[0];
-}
-
 function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
-  const s = UNIT_SCHEDULE_OT[unit?.toUpperCase()];
+  const s = UNIT_SCHEDULE[unit?.toUpperCase()];
   if (!s) return null;
   const dow = new Date(dateStr + 'T00:00:00').getDay();
   if (dow === s.majorDay)     return 'Major';
@@ -132,12 +115,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       : user?.unit ?? 'OR1'
   ).toUpperCase();
 
-  // Per-tab date state: each tab defaults to its next scheduled OT day for the effective unit
-  const unitKey = effectiveUnit;
-  const unitSched = UNIT_SCHEDULE_OT[unitKey] ?? UNIT_SCHEDULE_OT['OR1'];
-  const [majorDate, setMajorDate] = useState<string>(() => nextOccurrence(unitSched.majorDay));
-  const [minorDate, setMinorDate] = useState<string>(() => nextOccurrence(unitSched.minorDay));
-  const [eotDate,   setEotDate]   = useState<string>(() => nextOccurrence(unitSched.admissionDay));
+  // OT cycle = the 7 days after this unit's admission day (see getOTCycleDates).
+  // Each tab defaults to that cycle's Major / Minor / EOT date.
+  const cycle = useMemo(() => getOTCycleDates(effectiveUnit), [effectiveUnit]);
+  const [majorDate, setMajorDate] = useState<string>(cycle.majorDate);
+  const [minorDate, setMinorDate] = useState<string>(cycle.minorDate);
+  const [eotDate,   setEotDate]   = useState<string>(cycle.eotDate);
+  // Re-anchor when the unit changes (any manual date edits reset to the cycle).
+  useEffect(() => {
+    setMajorDate(cycle.majorDate);
+    setMinorDate(cycle.minorDate);
+    setEotDate(cycle.eotDate);
+  }, [cycle]);
 
   const selectedDate    = activeTab === 'Major' ? majorDate : activeTab === 'Minor' ? minorDate : eotDate;
   const setSelectedDate = activeTab === 'Major' ? setMajorDate : activeTab === 'Minor' ? setMinorDate : setEotDate;
@@ -162,6 +151,8 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       { date: majorDate, fallbackType: 'Major' },
       { date: minorDate, fallbackType: 'Minor' },
       { date: eotDate,   fallbackType: 'EOT'   },
+      // Weekend EOT days when this unit is on weekend duty this cycle.
+      ...cycle.eotWeekendDates.map(date => ({ date, fallbackType: 'EOT' as OTType })),
     ];
     setOtList(prev => {
       const existing = new Set(prev.map(p => p.ipNo));
@@ -195,7 +186,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [majorDate, minorDate, eotDate, patients]);
+  }, [majorDate, minorDate, eotDate, patients, cycle]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -672,6 +663,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
           />
         </div>
       </div>
+
+      {/* Weekend EOT duty hint — shown on the EOT tab when this unit is on weekend duty this cycle */}
+      {activeTab === 'EOT' && cycle.eotWeekendDates.length > 0 && (
+        <div className="flex items-center gap-2 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          {effectiveUnit} is on weekend duty this cycle — weekend EOT:{' '}
+          {cycle.eotWeekendDates
+            .map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))
+            .join(', ')}
+          . Cases dated on these days appear in this list.
+        </div>
+      )}
 
       {/* List Meta — Surgeon / Unit / Time (editable, used in exports) */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
