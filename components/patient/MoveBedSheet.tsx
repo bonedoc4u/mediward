@@ -32,10 +32,10 @@ const MoveBedSheet: React.FC<Props> = ({ patient, wardOptions, onSave, onClose }
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col justify-end">
+    <div className="fixed inset-0 z-[80] flex flex-col justify-end sm:items-center sm:justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 sheet-in-bottom">
-        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl px-5 pt-5 pb-10 sm:pb-6 sheet-in-bottom sm:animate-none">
+        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5 sm:hidden" />
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
             <ArrowRightLeft className="w-4 h-4 text-teal-600" /> Move bed
