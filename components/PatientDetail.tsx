@@ -8,7 +8,7 @@ import {
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   FileJson, Download, Pill, ClipboardList, Droplets, Bandage,
-  Calculator, Send, X, ChevronDown, Home, ArrowRightLeft,
+  Calculator, Send, X, ChevronDown, Home, ArrowRightLeft, Pencil, Plus,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBoundary from './ErrorBoundary';
@@ -224,9 +224,23 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         {/* Name row + Status badges */}
         <div className="flex items-start justify-between gap-3 mb-1.5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="bg-white/10 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold text-white border border-white/20">
-              {patient.bed}
-            </div>
+            {canEdit ? (
+              <button
+                onClick={() => setShowMoveBed(true)}
+                aria-label={patient.bed ? `Change bed (currently ${patient.bed})` : 'Assign bed'}
+                title="Tap to assign / change bed"
+                className="relative bg-white/10 hover:bg-white/20 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold text-white border border-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+              >
+                {patient.bed || <Plus className="w-5 h-5 text-white/70" />}
+                <span className="absolute -bottom-1 -right-1 bg-teal-500 rounded-full p-0.5 border-2 border-slate-900">
+                  <Pencil className="w-2.5 h-2.5 text-white" />
+                </span>
+              </button>
+            ) : (
+              <div className="bg-white/10 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold text-white border border-white/20">
+                {patient.bed || '—'}
+              </div>
+            )}
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-white tracking-tight truncate">{patient.name}</h1>
               <p className="text-slate-400 text-xs mt-0.5">
