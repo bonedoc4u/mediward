@@ -50,7 +50,7 @@ const MedRow: React.FC<{
       <td className="px-3 py-2"><input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} className="w-full p-1 border border-green-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-400" /></td>
       <td className="px-3 py-2"><input value={draft.brand} onChange={e => setDraft(d => ({ ...d, brand: e.target.value }))} placeholder="Brand" className="w-full p-1 border border-green-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-400" /></td>
       <td className="px-3 py-2">
-        <select value={draft.form} onChange={e => setDraft(d => ({ ...d, form: e.target.value }))} className="w-full p-1 border border-green-300 rounded text-xs focus:outline-none">
+        <select value={draft.form} aria-label="Drug form" onChange={e => setDraft(d => ({ ...d, form: e.target.value }))} className="w-full p-1 border border-green-300 rounded text-xs focus:outline-none">
           {DRUG_FORMS.map(f => <option key={f}>{f}</option>)}
         </select>
       </td>
@@ -59,8 +59,8 @@ const MedRow: React.FC<{
       <td className="px-3 py-2 text-center"><input type="checkbox" checked={draft.active} onChange={e => setDraft(d => ({ ...d, active: e.target.checked }))} className="w-4 h-4 accent-green-600" /></td>
       <td className="px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-1">
-          <button onClick={handleSave} disabled={busy} className="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50"><Save className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setEditing(false)} className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={handleSave} disabled={busy} aria-label="Save medication" className="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50"><Save className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setEditing(false)} aria-label="Cancel editing" className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded"><X className="w-3.5 h-3.5" /></button>
         </div>
       </td>
     </tr>
@@ -123,7 +123,7 @@ const MedicationSettings: React.FC = () => {
                 placeholder="Search medications…"
                 className="flex-1 text-xs bg-transparent focus:outline-none text-slate-700" />
             </div>
-            <select value={medCategoryFilter} onChange={e => setMedCategoryFilter(e.target.value)}
+            <select value={medCategoryFilter} aria-label="Filter medications by category" onChange={e => setMedCategoryFilter(e.target.value)}
               className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">
               {medCategories.map(c => <option key={c}>{c}</option>)}
             </select>
@@ -158,7 +158,7 @@ const MedicationSettings: React.FC = () => {
           placeholder="Generic name *" className="flex-1 min-w-36 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none" />
         <input value={newMed.brand} onChange={e => setNewMed(m => ({ ...m, brand: e.target.value }))}
           placeholder="Brand name" className="w-36 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none" />
-        <select value={newMed.form} onChange={e => setNewMed(m => ({ ...m, form: e.target.value }))}
+        <select value={newMed.form} aria-label="Drug form" onChange={e => setNewMed(m => ({ ...m, form: e.target.value }))}
           className="w-32 p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-green-500 outline-none">
           {DRUG_FORMS.map(f => <option key={f}>{f}</option>)}
         </select>

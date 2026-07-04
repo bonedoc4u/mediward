@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 export interface PickerOption {
   value: string;
@@ -29,7 +30,7 @@ const BottomSheetPicker: React.FC<Props> = ({
   title,
 }) => {
   const [open, setOpen] = React.useState(false);
-  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useFocusTrap<HTMLDivElement>(open);
 
   const selected = options.find(o => o.value === value);
 
@@ -61,7 +62,12 @@ const BottomSheetPicker: React.FC<Props> = ({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[200] flex items-end justify-center md:items-center">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={title ?? placeholder}
+          className="fixed inset-0 z-[200] flex items-end justify-center md:items-center"
+        >
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50"

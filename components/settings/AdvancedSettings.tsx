@@ -455,7 +455,7 @@ const AdvancedSettings: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Severity</label>
-                  <select value={newIncSeverity} onChange={e => setNewIncSev(e.target.value as IncidentSeverity)}
+                  <select value={newIncSeverity} aria-label="Incident severity" onChange={e => setNewIncSev(e.target.value as IncidentSeverity)}
                     className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-red-500 outline-none">
                     <option value="minor">Minor (partial degradation)</option>
                     <option value="major">Major (significant impact)</option>
@@ -464,7 +464,7 @@ const AdvancedSettings: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide block mb-1">Initial Status</label>
-                  <select value={newIncStatus} onChange={e => setNewIncStatus(e.target.value as IncidentStatus)}
+                  <select value={newIncStatus} aria-label="Initial incident status" onChange={e => setNewIncStatus(e.target.value as IncidentStatus)}
                     className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-red-500 outline-none">
                     <option value="investigating">Investigating</option>
                     <option value="identified">Identified</option>
@@ -513,7 +513,7 @@ const AdvancedSettings: React.FC = () => {
                           {inc.resolvedAt && ` · Resolved: ${new Date(inc.resolvedAt).toLocaleString('en-IN')}`}
                         </p>
                       </div>
-                      <button onClick={() => handleDeleteIncident(inc.id)} className="p-1 hover:bg-black/10 rounded text-current opacity-50 hover:opacity-100 shrink-0">
+                      <button onClick={() => handleDeleteIncident(inc.id)} aria-label={`Delete incident: ${inc.title}`} className="p-1 hover:bg-black/10 rounded text-current opacity-50 hover:opacity-100 shrink-0">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -523,7 +523,7 @@ const AdvancedSettings: React.FC = () => {
                           value={updateMsg[inc.id] ?? ''}
                           onChange={e => setUpdateMsg(prev => ({ ...prev, [inc.id]: e.target.value }))}
                           className="flex-1 text-xs border border-current/30 rounded-lg px-2.5 py-1.5 bg-white/60 outline-none focus:bg-white" />
-                        <select defaultValue={inc.status} id={`inc-status-${inc.id}`}
+                        <select defaultValue={inc.status} id={`inc-status-${inc.id}`} aria-label="Update incident status"
                           className="text-xs border border-current/30 rounded-lg px-2 py-1.5 bg-white/60 outline-none">
                           <option value="investigating">Investigating</option>
                           <option value="identified">Identified</option>

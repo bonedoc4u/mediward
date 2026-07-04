@@ -8,6 +8,7 @@ import { User } from 'lucide-react';
 import { Patient, Gender, AdmissionSource } from '../../types';
 import { validateName, validateAge, validateMobile } from '../../utils/patientValidation';
 import EditableSectionCard from './EditableSectionCard';
+import BottomSheetPicker from '../ui/BottomSheetPicker';
 
 interface Props {
   patient: Patient;
@@ -85,17 +86,28 @@ const DemographicsSection: React.FC<Props> = ({ patient, canEdit, onUpdate }) =>
           <input className={INPUT} value={draft.name} onChange={e => set('name', e.target.value)} placeholder="Patient name" />
           <div className="grid grid-cols-2 gap-2">
             <input className={INPUT} type="number" inputMode="numeric" value={draft.age} onChange={e => set('age', e.target.value)} placeholder="Age" />
-            <select className={INPUT} value={draft.gender} onChange={e => set('gender', e.target.value as Gender)}>
-              {Object.values(Gender).map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
+            <BottomSheetPicker
+              value={draft.gender}
+              options={Object.values(Gender).map(g => ({ value: g, label: g }))}
+              onChange={g => set('gender', g as Gender)}
+              title="Sex"
+              triggerClassName={`${INPUT} flex items-center justify-between gap-2 text-left`}
+            />
           </div>
           <input className={INPUT} type="tel" inputMode="tel" value={draft.mobile} onChange={e => set('mobile', e.target.value)} placeholder="Mobile (optional)" />
           <input className={INPUT} value={draft.modeOfInjury} onChange={e => set('modeOfInjury', e.target.value)} placeholder="Mode of injury (optional)" />
-          <select className={INPUT} value={draft.admissionSource} onChange={e => set('admissionSource', e.target.value as AdmissionSource | '')}>
-            <option value="">Admission source (optional)</option>
-            <option value="OPD">OPD</option>
-            <option value="Casualty">Casualty</option>
-          </select>
+          <BottomSheetPicker
+            value={draft.admissionSource}
+            options={[
+              { value: '', label: 'Not recorded' },
+              { value: 'OPD', label: 'OPD' },
+              { value: 'Casualty', label: 'Casualty' },
+            ]}
+            onChange={s => set('admissionSource', s as AdmissionSource | '')}
+            title="Admission source"
+            placeholder="Admission source (optional)"
+            triggerClassName={`${INPUT} flex items-center justify-between gap-2 text-left`}
+          />
         </>
       }
     />

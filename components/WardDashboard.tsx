@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useRef, useLayoutEffect, memo } from 'react';
 import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { getStatusColor, sortByBed, groupByWard, getTriagePriority, getTriageBorderClass } from '../utils/calculations';
+import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, BedSingle, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home } from 'lucide-react';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { calcPod } from './HandoverSummary';
@@ -578,6 +578,8 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       {/* ─── Mobile: Virtualised flat card list (all wards) ─── */}
       <div className="md:hidden" ref={listRef}>
         <div
+          role="list"
+          aria-label="Patient list"
           style={{
             height: `${virtualizer.getTotalSize()}px`,
             width: '100%',
@@ -589,6 +591,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             return (
               <div
                 key={vi.key}
+                role={item.kind === 'patient' ? 'listitem' : undefined}
                 data-index={vi.index}
                 ref={virtualizer.measureElement}
                 style={{

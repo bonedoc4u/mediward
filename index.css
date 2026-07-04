@@ -213,3 +213,15 @@ button:active, a:active { opacity: 0.85; }
   background: linear-gradient(to right, transparent, white);
   pointer-events: none;
 }
+
+/* ── Global reduced-motion guard (WCAG 2.3.3) ─────────────────── */
+/* Catches Tailwind transition/animation utilities not covered by the
+   targeted rules above. Near-zero (not zero) so transitionend still fires. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
