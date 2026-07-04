@@ -46,7 +46,7 @@ import { NetworkBanner } from './components/NetworkBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import SwUpdateBanner from './components/SwUpdateBanner';
 import IosInstallModal from './components/IosInstallModal';
-import ClinicalDisclaimer, { hasAcceptedDisclaimer } from './components/ClinicalDisclaimer';
+import ClinicalDisclaimer, { hasAcceptedDisclaimer, hasAcceptedDisclaimerRemote, markDisclaimerAccepted } from './components/ClinicalDisclaimer';
 import ConcurrentEditModal from './components/ConcurrentEditModal';
 import LegalPage from './components/LegalPage';
 
@@ -167,7 +167,13 @@ const App: React.FC = () => {
   const [showTerms, setShowTerms] = useState(
     () => window.location.hash === '#/terms',
   );
-  const [disclaimerAccepted, setDisclaimerAccepted] = useState(() => hasAcceptedDisclaimer());
+  // ─── Clinical disclaimer acceptance (once per user, per doc version) ───
+  // null = still determining for the current user, true = accepted, false = must show.
+  // localStorage is a per-session fast-path (cleared on logout); the DB audit table
+  // is the cross-device source of truth, so a returning user isn't re-prompted while
+  // a different user on a shared device still is.
+  const [disclaimerOk, setDisclaimerOk] = useState<boolean | null>(() => (hasAcceptedDisclaimer() ? true : null));
+  const checkedDisclaimerFor = useRef<string | null>(null);
   const [superAdminMode, setSuperAdminMode] = useState(false);
   const {
     patients, isLoadingPatients, updatePatient, addPatient, deletePatient,
@@ -236,6 +242,37 @@ const App: React.FC = () => {
     audit:        { title: 'Audit Log',               description: 'System audit trail — all actions logged by user and time' },
     settings:     { title: 'Configuration',            description: 'Hospital settings, department presets, wards, units and lab types' },
   }), [preOpModuleName, procedureListName]);
+
+  // Resolve disclaimer acceptance for the current user: localStorage fast-path,
+  // otherwise the server audit table. Re-runs when the signed-in user changes so a
+  // different user on a shared device is still prompted. Fails safe (shows it).
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setDisclaimerOk(hasAcceptedDisclaimer() ? true : null);
+      checkedDisclaimerFor.current = null;
+      return;
+    }
+    if (checkedDisclaimerFor.current === user.id) return;
+    if (hasAcceptedDisclaimer()) {
+      checkedDisclaimerFor.current = user.id;
+      setDisclaimerOk(true);
+      return;
+    }
+    let cancelled = false;
+    let done = false;
+    const finish = (accepted: boolean) => {
+      if (cancelled || done) return;
+      done = true;
+      checkedDisclaimerFor.current = user.id;
+      if (accepted) markDisclaimerAccepted();
+      setDisclaimerOk(accepted);
+    };
+    setDisclaimerOk(null); // undetermined → show a loader, never flash the disclaimer
+    // Fail-safe: on flaky ward Wi-Fi, don't hang on the loader — show the disclaimer.
+    const timeout = setTimeout(() => finish(false), 4000);
+    hasAcceptedDisclaimerRemote().then(accepted => { clearTimeout(timeout); finish(accepted); });
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, [isAuthenticated, user?.id]);
 
   // iOS PWA install prompt
   const [showIosInstall, setShowIosInstall] = useState(false);
@@ -394,9 +431,21 @@ const App: React.FC = () => {
     );
   }
 
-  // ─── Clinical Disclaimer (first login) ───
-  if (!disclaimerAccepted) {
-    return <ClinicalDisclaimer onAccept={() => setDisclaimerAccepted(true)} />;
+  // ─── Clinical Disclaimer (once per user, per doc version) ───
+  if (disclaimerOk !== true) {
+    if (disclaimerOk === null) {
+      // Still checking whether this user has already accepted — avoid a flash.
+      return (
+        <div className="min-h-[100dvh] flex items-center justify-center bg-slate-50">
+          <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
+        </div>
+      );
+    }
+    return (
+      <ClinicalDisclaimer
+        onAccept={() => { checkedDisclaimerFor.current = user?.id ?? null; setDisclaimerOk(true); }}
+      />
+    );
   }
 
   // ─── Department Picker (superadmin must choose a department on every fresh login) ───
