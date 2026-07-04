@@ -8,7 +8,7 @@ const WardSkeleton: React.FC = () => {
     <div className="space-y-6 animate-pulse">
       {/* Ward Tab Bar skeleton */}
       <div className="flex gap-2 border-b border-slate-200 pb-0 overflow-x-auto">
-        {['All', '', '', ''].map((label, i) => (
+        {['All', '', '', ''].map((label) => (
           <div
             key={label}
             className="h-9 w-20 rounded-t-md bg-slate-200 shrink-0"

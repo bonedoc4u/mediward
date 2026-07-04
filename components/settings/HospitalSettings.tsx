@@ -85,7 +85,7 @@ const HospitalSettings: React.FC = () => {
       setLocalShowNews2(showNews2);
       setLocalShortcuts(customTodoShortcuts ?? []);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [isLoadingConfig]);
 
   const prevConfigRef = React.useRef(configUpdatedAt);
@@ -110,7 +110,7 @@ const HospitalSettings: React.FC = () => {
       setRemoteUpdated(true);
       setTimeout(() => setRemoteUpdated(false), 4000);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [configUpdatedAt]);
 
   const featureValues: Record<string, [boolean, (v: boolean) => void]> = {

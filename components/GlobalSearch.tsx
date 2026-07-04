@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
-import { Search, X, User, Activity, FileImage } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 const GlobalSearch: React.FC = () => {
   const { patients, navigateTo } = useApp();

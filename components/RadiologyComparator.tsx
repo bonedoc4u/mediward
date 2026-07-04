@@ -1,13 +1,13 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Patient, Investigation } from '../types';
-import { useConfig, useAuth } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AppContext';
 import {
-  ImageIcon, Camera, X, Trash2,
+  ImageIcon, Camera, X,
   CloudUpload, FileDown, Loader2, Search, ChevronDown, Leaf,
 } from 'lucide-react';
 import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
 import { useSignedUrl } from '../hooks/useSignedUrl';
-import { MODALITY, getModality } from './radiology/modality';
+import { getModality } from './radiology/modality';
 import Lightbox from './radiology/Lightbox';
 import { generateId } from '../utils/sanitize';
 import { Capacitor } from '@capacitor/core';
@@ -417,12 +417,6 @@ const RadiologyComparator: React.FC<Props> = ({
   const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
   const investigations  = selectedPatient?.investigations ?? [];
 
-  // Phase from DOS vs today
-  const defaultPhase = useMemo((): RadPhase => {
-    if (!selectedPatient?.dos) return 'preop';
-    return new Date() < new Date(selectedPatient.dos) ? 'preop' : 'postop';
-  }, [selectedPatient]);
-
   // Split into pre/post — legacy scans without phase: compare date to DOS
   const { preOpScans, postOpScans } = useMemo(() => {
     const dos = selectedPatient?.dos;
@@ -603,7 +597,7 @@ const RadiologyComparator: React.FC<Props> = ({
                   onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                 />
               ))}
-              <UploadCard phase="preop" onClick={() => { setUploadPhase('preop'); fileInputRef.current?.click(); }} />
+              <UploadCard phase="preop" onClick={() => openUpload('preop')} />
             </div>
           </div>
 
@@ -620,7 +614,7 @@ const RadiologyComparator: React.FC<Props> = ({
                     onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                   />
                 ))}
-                <UploadCard phase="postop" onClick={() => { setUploadPhase('postop'); fileInputRef.current?.click(); }} />
+                <UploadCard phase="postop" onClick={() => openUpload('postop')} />
               </div>
             </div>
           ) : (

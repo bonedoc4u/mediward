@@ -17,7 +17,6 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
-  defaultDropAnimationSideEffects,
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
@@ -103,7 +102,7 @@ const SortableRow = ({ id, children, className }: { id: string, children: React.
   );
 };
 
-const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdatePatient }) => {
+const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const { unitChiefs, hospitalName, department, weekendDuty } = useConfig();
   const { user, selectedUnit } = useAuth();
   const [activeTab, setActiveTab] = useState<OTType>('Major');
@@ -185,7 +184,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       }
       return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [majorDate, minorDate, eotDate, patients, cycle]);
 
   // Sensors for drag and drop
@@ -265,24 +264,6 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
 
     if (activeCategory !== overCategory && overCategory) {
         setOtList((items) => {
-            const activeIndex = items.findIndex((i) => i.id === activeId);
-            const overIndex = items.findIndex((i) => i.id === overId);
-
-            let newIndex;
-            if (overId === overCategory) {
-                // Dropped on a category header/empty container -> move to end of that category?
-                // Or start? Let's say start for now, or just let it be handled by arrayMove if it was an item
-                newIndex = items.length; 
-            } else {
-                const isBelowOverItem =
-                over &&
-                active.rect.current.translated &&
-                active.rect.current.translated.top > over.rect.top + over.rect.height;
-
-                const modifier = isBelowOverItem ? 1 : 0;
-                newIndex = overIndex >= 0 ? overIndex + modifier : items.length + 1;
-            }
-
             return items.map(item => {
                 if (item.id === activeId) {
                     return { ...item, category: overCategory };

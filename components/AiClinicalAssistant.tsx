@@ -282,7 +282,7 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [fabPos, liveDrag]);
 
   const generateInsights = useCallback(async () => {

@@ -367,7 +367,7 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
 
   const handlePrint = useCallback(() => window.print(), []);
 
-  const totalLabelled = opdPatients.length + casualtyPatients.length;
+
 
   return (
     <div className="space-y-4 pb-24">

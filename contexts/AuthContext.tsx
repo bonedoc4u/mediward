@@ -160,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(updated);
       saveToStorage('session', updated);
     }).catch(() => {}); // silently ignore offline / RLS errors
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []); // intentionally run only on mount (app open)
 
   // ─── JWT role verification — prevents localStorage role tampering ───
@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
   // Only run on login (user.id change), not on every render
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [user?.id]);
 
   // ─── Session Expiry Timers ───

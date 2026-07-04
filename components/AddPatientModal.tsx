@@ -137,7 +137,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         unit: correctUnit,
       };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [activeWards.map(w => w.name).join(','), user?.unit]);
 
   const STEP_KEY = 'mediward_admit_step';

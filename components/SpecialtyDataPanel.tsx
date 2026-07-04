@@ -7,7 +7,7 @@
 
 import React, { useState, useCallback } from 'react';
 import {
-  ChevronDown, ChevronRight, Edit2, Save, X, Plus,
+  ChevronDown, ChevronRight, Edit2, Save, X,
   Stethoscope, Brain, Heart, Activity, Shield, Users,
   FlaskConical, AlertTriangle, ClipboardList, Eye, Wind,
   Scissors, Layers, BarChart2

@@ -31,7 +31,7 @@ import { sanitizeInput } from '../utils/sanitize';
 import { logAuditEvent } from '../services/auditLog';
 import {
   fetchActivePatients, fetchActivePatientsPage, fetchAllPatients,
-  upsertPatient, removePatient, parsePatientRow, PATIENT_PAGE_SIZE,
+  upsertPatient, removePatient, PATIENT_PAGE_SIZE,
   fetchPatientById,
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
@@ -185,7 +185,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Debounced cache write — reduced to 300ms so a backgrounded/killed app loses
   // at most 300ms of realtime events rather than 2000ms.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const debouncedSaveActiveCache = useCallback(
     debounce((pts: Patient[], hid: string) => saveActiveCache(pts, hid), 300),
     [],

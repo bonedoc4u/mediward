@@ -347,14 +347,6 @@ function APACHE2Calculator() {
   const [ageVal, setAgeVal] = useState('');
   const [chronicPoints, setChronicPoints] = useState(0);
 
-  function score4(v: number, ranges: [number, number, number][]): number {
-    // ranges: [low, high, pts] inclusive
-    for (const [lo, hi, pts] of ranges) {
-      if (v >= lo && v <= hi) return pts;
-    }
-    return 0;
-  }
-
   const compute = (): { aps: number; age: number; chronic: number; total: number } | null => {
     const t = parseFloat(temp);
     const m = parseFloat(map);

@@ -69,7 +69,7 @@ export function useOptimisticMutation<TData>({
       });
     },
     // startTransition is stable; mutationFn/onMutate/onError are caller deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [mutationFn, onMutate, onError, errorMessage],
   );
 

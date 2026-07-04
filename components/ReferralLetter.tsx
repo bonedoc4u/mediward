@@ -3,7 +3,7 @@
  * Generate inter-department and inter-hospital referral letters with PDF export.
  */
 import React, { useState } from 'react';
-import { X, Send, Download, FileText } from 'lucide-react';
+import { X, Download, FileText } from 'lucide-react';
 import { Patient } from '../types';
 
 interface Props {

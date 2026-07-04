@@ -91,7 +91,7 @@ export function useNetworkQuality(): NetworkState {
       window.removeEventListener('offline', handleChange);
       conn?.removeEventListener('change', handleChange);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   return state;
