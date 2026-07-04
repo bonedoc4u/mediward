@@ -44,6 +44,7 @@ function News2Badge({ vitals, compact = false }: { vitals?: VitalSigns[]; compac
 }
 import HandoverSummary from './HandoverSummary';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { todayYmd } from '../utils/dates';
 
 // ─── Virtual list item types ───
 type FlatItem =
@@ -89,7 +90,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   const [filterOverdueTodos, setFilterOverdueTodos] = useState(false);
   const [selectedWard, setSelectedWard] = useState<string>('All');
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayYmd();
 
   const filteredPatients = useMemo(() => {
     return patients.filter(p => {

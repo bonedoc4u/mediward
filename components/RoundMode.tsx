@@ -15,6 +15,7 @@ import { RoundModeOfflineBanner } from './RoundModeOfflineBanner';
 import { useSaveRoundNote } from '../hooks/useSaveRoundNote';
 import { RoundConflictModal } from './RoundConflictModal';
 import { useNetworkQuality } from '../hooks/useNetworkQuality';
+import { localYmd, todayYmd } from '../utils/dates';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
@@ -89,10 +90,10 @@ const RoundMode: React.FC = () => {
   const todoInputRef = useRef<HTMLInputElement>(null);
 
   // Reactive today — updates at midnight so cross-midnight sessions get the correct date
-  const [today, setToday] = useState(() => new Date().toISOString().split('T')[0]);
+  const [today, setToday] = useState(() => todayYmd());
   useEffect(() => {
     const tick = () => {
-      const next = new Date().toISOString().split('T')[0];
+      const next = todayYmd();
       setToday(prev => prev !== next ? next : prev);
     };
     const id = setInterval(tick, 60_000); // check every minute
@@ -104,7 +105,7 @@ const RoundMode: React.FC = () => {
     try {
       const twoDaysAgo = new Date();
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      const cutoff = twoDaysAgo.toISOString().split('T')[0];
+      const cutoff = localYmd(twoDaysAgo);
       Object.keys(localStorage)
         .filter(k => k.startsWith('mediward_round_draft_') && k.slice('mediward_round_draft_'.length) < cutoff)
         .forEach(k => localStorage.removeItem(k));

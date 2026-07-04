@@ -7,6 +7,7 @@ import {
   CheckCircle, LogOut, RotateCcw, AlertTriangle, Plus, X as XIcon, Pill,
 } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
+import { todayYmd } from '../utils/dates';
 
 // ─── Auto-generate hospital course from patient data ───
 function buildDefaultCourse(patient: Patient): string {
@@ -712,7 +713,7 @@ const DischargeForm: React.FC<{
     const infoRows = [
       ['Name', patient.name, 'Age / Sex', `${patient.age}y / ${patient.gender}`],
       ['IP No', patient.ipNo, 'Ward / Bed', `${patient.ward} / Bed ${patient.bed}`],
-      ['Date of Admission', patient.doa, 'Date of Discharge', patient.dod || new Date().toISOString().split('T')[0]],
+      ['Date of Admission', patient.doa, 'Date of Discharge', patient.dod || todayYmd()],
       ['Consultant', summary.attendingDoctor || '________________', 'Resident', summary.residentDoctor || '________________'],
     ];
     infoRows.forEach(([l1, v1, l2, v2]) => {

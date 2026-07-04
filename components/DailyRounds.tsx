@@ -8,6 +8,7 @@ const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : be
 import { generateId } from '../utils/sanitize';
 import { CheckSquare, Plus, Trash2, Calendar, Share2, FileDown, ChevronLeft, ChevronRight, Lock, Layout, HeartPulse } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { localYmd, todayYmd } from '../utils/dates';
 
 interface Props {
   patients: Patient[];
@@ -201,7 +202,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
     [configWards],
   );
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayYmd();
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [todoInputs, setTodoInputs]     = useState<Record<string, string>>({});
 
@@ -357,7 +358,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
         <div className="flex items-center gap-2">
           <button onClick={() => {
             const d = new Date(selectedDate); d.setDate(d.getDate() - 1);
-            setSelectedDate(d.toISOString().split('T')[0]);
+            setSelectedDate(localYmd(d));
           }} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -371,7 +372,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
           <button onClick={() => {
             if (isToday) return;
             const d = new Date(selectedDate); d.setDate(d.getDate() + 1);
-            setSelectedDate(d.toISOString().split('T')[0]);
+            setSelectedDate(localYmd(d));
           }} disabled={isToday} className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30">
             <ChevronRight className="w-5 h-5" />
           </button>

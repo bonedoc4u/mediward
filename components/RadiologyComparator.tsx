@@ -15,6 +15,7 @@ import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/
 import { exportRadiologyPDF } from '../utils/exportRadiologyPDF';
 import { compressImage } from '../utils/imageUtils';
 import BottomSheetPicker from './ui/BottomSheetPicker';
+import { todayYmd } from '../utils/dates';
 
 type RadPhase = 'preop' | 'postop';
 
@@ -494,7 +495,7 @@ const RadiologyComparator: React.FC<Props> = ({
       const imageUrl = await uploadInvestigationImage(fileToUpload, user.hospitalId, selectedPatientId);
       const newInv: Investigation = {
         id: generateId(),
-        date: new Date().toISOString().split('T')[0],
+        date: todayYmd(),
         type: invType,
         findings: '',
         imageUrl,

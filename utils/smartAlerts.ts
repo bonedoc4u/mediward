@@ -1,4 +1,5 @@
 import { Patient, PacStatus } from '../types';
+import { localYmd, todayYmd } from './dates';
 
 export interface SmartAlert {
   type: 'critical' | 'warning' | 'info';
@@ -7,8 +8,8 @@ export interface SmartAlert {
 
 export function getSmartAlerts(patient: Patient): SmartAlert[] {
   const alerts: SmartAlert[] = [];
-  const today    = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split('T')[0];
+  const today    = todayYmd();
+  const tomorrow = localYmd(new Date(Date.now() + 86_400_000));
 
   if (patient.dos === today && patient.pacStatus === PacStatus.Pending)
     alerts.push({ type: 'critical', message: 'Surgery TODAY — PAC not cleared!' });

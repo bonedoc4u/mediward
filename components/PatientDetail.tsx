@@ -20,6 +20,7 @@ import MoveBedSheet from './patient/MoveBedSheet';
 import FHIRExportModal from './FHIRExportModal';
 import ScoringTools from './ScoringTools';
 import ReferralLetter from './ReferralLetter';
+import { todayYmd } from '../utils/dates';
 const MedicationChart  = lazy(() => import('./MedicationChart'));
 const NursingNotes     = lazy(() => import('./NursingNotes'));
 const IntakeOutput     = lazy(() => import('./IntakeOutput'));
@@ -73,7 +74,7 @@ const DateBottomSheet: React.FC<{
           type="date"
           value={date}
           onChange={e => setDate(e.target.value)}
-          max={new Date().toISOString().split('T')[0]}
+          max={todayYmd()}
           className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl text-base text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-4"
           autoFocus
         />
@@ -165,7 +166,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
   const isDiagCode         = /^[#A-Z]\w{2,}$/.test(editDiagnosis.trim());
 
   const handleDischarge = () => {
-    updatePatient({ ...patient, patientStatus: PatientStatus.Discharged, dod: new Date().toISOString().split('T')[0] });
+    updatePatient({ ...patient, patientStatus: PatientStatus.Discharged, dod: todayYmd() });
     setShowDischargeConfirm(false);
     navigateTo('discharge', { id: patient.ipNo });
   };

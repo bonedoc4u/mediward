@@ -5,6 +5,7 @@ import {
   ReferenceArea, ResponsiveContainer,
 } from 'recharts';
 import { Activity, Plus, TrendingDown, TrendingUp, Minus, Search, ChevronDown } from 'lucide-react';
+import { todayYmd } from '../utils/dates';
 
 interface Props {
   patients: Patient[];
@@ -57,7 +58,7 @@ const AddEntrySheet: React.FC<{
   onSave: (paramId: string, entry: LabEntry) => void;
 }> = ({ isOpen, param, onClose, onSave }) => {
   const [value, setValue] = useState('');
-  const [date, setDate]   = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate]   = useState(todayYmd());
 
   const numVal  = parseFloat(value);
   const isHigh  = !isNaN(numVal) && !!param && numVal > param.refMax;
@@ -68,7 +69,7 @@ const AddEntrySheet: React.FC<{
     if (!isValid || !param) return;
     onSave(param.id, { id: crypto.randomUUID(), date, value: numVal });
     setValue('');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(todayYmd());
     onClose();
   };
 
@@ -121,7 +122,7 @@ const AddEntrySheet: React.FC<{
             type="date"
             value={date}
             onChange={e => setDate(e.target.value)}
-            max={new Date().toISOString().split('T')[0]}
+            max={todayYmd()}
             className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5
                        text-sm font-semibold text-slate-700 focus:outline-none
                        focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"

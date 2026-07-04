@@ -3,6 +3,7 @@ import { ClipboardList, Plus, Pencil, Printer, ChevronLeft, ChevronRight, Trash2
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Patient } from '../types';
+import { localYmd, todayYmd } from '../utils/dates';
 
 interface Props {
   onAddPatient?: (source: 'OPD' | 'Casualty') => void;
@@ -11,7 +12,7 @@ interface Props {
 }
 
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  return todayYmd();
 }
 
 function fmtDisplay(dateStr: string): string {
@@ -23,7 +24,7 @@ function fmtDisplay(dateStr: string): string {
 function stepDate(dateStr: string, delta: number): string {
   const d = new Date(dateStr);
   d.setDate(d.getDate() + delta);
-  return d.toISOString().split('T')[0];
+  return localYmd(d);
 }
 
 type SourceSection = 'OPD' | 'Casualty';

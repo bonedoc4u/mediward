@@ -3,8 +3,11 @@ import { getSmartAlerts } from '../utils/smartAlerts';
 import { PacStatus, PatientStatus, Gender } from '../types';
 import type { Patient } from '../types';
 
-const today    = new Date().toISOString().split('T')[0];
-const tomorrow = new Date(Date.now() + 86_400_000).toISOString().split('T')[0];
+// Local dates, matching the implementation - the old toISOString() helpers
+// made these tests fail when run between 00:00 and 05:30 IST.
+import { localYmd } from '../utils/dates';
+const today    = localYmd(new Date());
+const tomorrow = localYmd(new Date(Date.now() + 86_400_000));
 
 function makePatient(overrides: Partial<Patient>): Patient {
   return {

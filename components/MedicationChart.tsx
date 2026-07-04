@@ -9,6 +9,7 @@ import { PrescribedMedication, MedAdministration, MedAdminStatus, MedRoute } fro
 import { fetchMedications, addMedicationPrescription, stopMedication, recordAdministration, fetchAdministrations } from '../services/marService';
 import { Plus, X, CheckCircle2, Clock, AlertCircle, XCircle, Pill, Save } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
+import { todayYmd } from '../utils/dates';
 
 const ROUTES: MedRoute[] = ['Oral','IV','IM','SC','Topical','Inhaled','PR','SL'];
 const FREQUENCIES = ['Once daily','Twice daily','Three times daily','Four times daily','Every 6h','Every 8h','Every 12h','Once (stat)','At bedtime','As needed (PRN)'];
@@ -35,7 +36,7 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId, drugAllergi
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayYmd();
 
   const [newMed, setNewMed] = useState({
     drugName: '', dose: '', route: 'Oral' as MedRoute, frequency: 'Once daily', notes: '',
