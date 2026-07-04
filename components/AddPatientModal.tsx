@@ -10,6 +10,7 @@ import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
 import { useComorbidityPresets } from '../hooks/useComorbidityPresets';
 import PresetEditor from './admission/PresetEditor';
 import { validateName, validateDiagnosis, validateMobile } from '../utils/patientValidation';
+import { todayYmd } from '../utils/dates';
 
 interface Props {
   isOpen: boolean;
@@ -175,7 +176,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           ...(defaultAdmissionSource ? { admissionSource: defaultAdmissionSource } : {}),
           // Reset date to today so a stale OCR-filled date from a previous session
           // doesn't silently put the patient under the wrong admission-list day.
-          doa: new Date().toISOString().split('T')[0],
+          doa: todayYmd(),
         };
       }
     } catch { /* ignore */ }
@@ -190,7 +191,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       mobile: '',
       diagnosis: '',
       modeOfInjury: '',
-      doa: new Date().toISOString().split('T')[0],
+      doa: todayYmd(),
       procedure: '',
       dos: '',
       pacStatus: PacStatus.Pending,
@@ -298,7 +299,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ...prev,
       ipNo: '', name: '', age: '', gender: Gender.Male,
       mobile: '', diagnosis: '', modeOfInjury: '',
-      doa: new Date().toISOString().split('T')[0],
+      doa: todayYmd(),
     }));
     setSelectedComorbidities([]);
     setStepRaw(1);
@@ -501,7 +502,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               // Apply admission source from the button that opened the modal.
               ...(defaultAdmissionSource ? { admissionSource: defaultAdmissionSource } : {}),
               // Reset to today so a stale OCR date from a prior session is cleared.
-              doa: new Date().toISOString().split('T')[0],
+              doa: todayYmd(),
             };
             setFormData(restoredForm);
             if (parsed.selectedComorbidities) setSelectedComorbidities(parsed.selectedComorbidities);
@@ -523,7 +524,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         mobile: '',
         diagnosis: '',
         modeOfInjury: '',
-        doa: new Date().toISOString().split('T')[0],
+        doa: todayYmd(),
         procedure: '',
         dos: '',
         pacStatus: PacStatus.Pending,
@@ -827,7 +828,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   </label>
                   <input
                     type="date"
-                    max={new Date().toISOString().split('T')[0]}
+                    max={todayYmd()}
                     className={`w-full p-2 min-h-[44px] border rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none ${ocrValues.doa && ocrValues.doa === formData.doa ? 'border-blue-300 bg-blue-50/40' : 'border-slate-300'}`}
                     value={formData.doa}
                     onChange={e => setFormData({...formData, doa: e.target.value})}
@@ -1123,7 +1124,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date of Surgery (If completed)</label>
-                <input type="date" max={new Date().toISOString().split('T')[0]} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
+                <input type="date" max={todayYmd()} className="w-full p-2 min-h-[44px] border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none" value={formData.dos} onChange={e => setFormData({...formData, dos: e.target.value})} />
                 <p className="text-[10px] text-slate-500 mt-1">Leave blank if surgery is pending.</p>
               </div>
             </div>

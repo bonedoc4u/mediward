@@ -30,12 +30,10 @@ const MS_PER_WEEK = 7 * 86_400_000;
 /** Admin-assigned weekend duty roster: local date "YYYY-MM-DD" → unit ("OR4"). */
 export type WeekendDutyMap = Record<string, string>;
 
-/** Local calendar date "YYYY-MM-DD" — time-of-day / timezone independent.
- *  Used for weekend-duty roster keys (matches what the admin sees on a calendar). */
-export function localYmd(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
+// Canonical local-date helper lives in utils/dates; re-exported here because
+// several modules import it from this file.
+import { localYmd } from './dates';
+export { localYmd };
 
 /**
  * Which OR unit is on weekend duty for the given date, or null on a weekday.
@@ -69,7 +67,8 @@ export function upcomingWeekends(weeks: number, from: Date = new Date()): Date[]
   return out;
 }
 
-const ymd = (d: Date): string => d.toISOString().split('T')[0];
+// (previously had its own toISOString-based `ymd` here — UTC, so it lagged a
+// day before 05:30 IST; all cycle dates now use the local-date helper)
 
 /**
  * OT cycle for a unit = the 7-day window starting at the unit's admission day.
@@ -108,7 +107,7 @@ export function getOTCycleDates(unit: string, today: Date = new Date(), dutyMap:
   for (let i = 0; i < 7; i++) {
     const d = new Date(adm); d.setDate(adm.getDate() + i);
     const dow = d.getDay();
-    if ((dow === 0 || dow === 6) && getWeekendDutyUnit(d, dutyMap) === u) eotWeekendDates.push(ymd(d));
+    if ((dow === 0 || dow === 6) && getWeekendDutyUnit(d, dutyMap) === u) eotWeekendDates.push(localYmd(d));
   }
-  return { eotDate: ymd(adm), majorDate: ymd(major), minorDate: ymd(minor), eotWeekendDates };
+  return { eotDate: localYmd(adm), majorDate: localYmd(major), minorDate: localYmd(minor), eotWeekendDates };
 }

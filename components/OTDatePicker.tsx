@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Check, Trash2 } from 'lucide-react';
 import { UNIT_SCHEDULE, getWeekendDutyUnit, WeekendDutyMap } from '../utils/otSchedule';
 import { useConfig } from '../contexts/AppContext';
+import { localYmd } from '../utils/dates';
 
 // JS Date.getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
 type OTType = 'major' | 'minor' | 'eot' | null;
@@ -31,7 +32,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 const DAY_LABELS  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
 function toYMD(d: Date): string {
-  return d.toISOString().split('T')[0];
+  return localYmd(d);
 }
 
 interface Props {

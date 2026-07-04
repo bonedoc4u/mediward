@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Patient, PacStatus } from '../types';
 import { Scissors, HeartPulse, AlertTriangle, ListChecks, ClipboardList, FileDown } from 'lucide-react';
+import { todayYmd } from '../utils/dates';
 
 /** Compute post-op day from the surgery date (dos). Returns undefined if no surgery yet or surgery is in the future. */
 export function calcPod(dos: string | undefined, today: string): number | undefined {
@@ -38,7 +39,7 @@ const HandoverSummary: React.FC<Props> = ({
   onFilterOverdueTodos,
   onStartRounds,
 }) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayYmd();
 
   const exportShiftPDF = async (data: { surgeryToday: Patient[]; pod01: Patient[]; pacPending: Patient[]; overdueTodos: Patient[] }) => {
     const { jsPDF } = await import('jspdf');

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Patient, PacChecklistItem } from '../types';
 import { useConfig } from '../contexts/ConfigContext';
 import { Calendar, CheckSquare, Square, UserCheck, AlertCircle } from 'lucide-react';
+import { localYmd } from '../utils/dates';
 
 interface Props {
   patients: Patient[];
@@ -19,7 +20,7 @@ const PreOpPrep: React.FC<Props> = ({ patients, onUpdatePatient }) => {
   const [filterDate, setFilterDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
+    return localYmd(d);
   });
 
   const getPatientsForDate = () => preOpPatients.filter(p => p.plannedDos === filterDate);
