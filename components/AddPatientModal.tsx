@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import PatientConsentModal, { CONSENT_VERSION } from './PatientConsentModal';
 import { useComorbidityPresets } from '../hooks/useComorbidityPresets';
 import PresetEditor from './admission/PresetEditor';
+import { validateName, validateDiagnosis, validateMobile } from '../utils/patientValidation';
 
 interface Props {
   isOpen: boolean;
@@ -229,13 +230,11 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     if (s === 1) {
       if (!formData.ipNo.trim()) return 'IP Number is required.';
       if (!formData.ward) return 'Ward is required.';
-      if (formData.mobile && !/^[6-9]\d{9}$/.test(formData.mobile.replace(/\s/g, ''))) {
-        return 'Mobile number must be a valid 10-digit Indian number.';
-      }
+      const mobileErr = validateMobile(formData.mobile);
+      if (mobileErr) return mobileErr;
     }
     if (s === 2) {
-      if (!formData.name.trim()) return 'Patient name is required.';
-      if (!formData.diagnosis.trim()) return 'Diagnosis is required.';
+      return validateName(formData.name) ?? validateDiagnosis(formData.diagnosis);
     }
     return null;
   };
