@@ -113,7 +113,8 @@ const HandoverSummary: React.FC<Props> = ({
 
   const data = useMemo(() => {
     const surgeryToday = patients.filter(p => p.dos === today || p.plannedDos === today);
-    const pod01 = patients.filter(p => { const d = calcPod(p.dos, today); return d === 0 || d === 1; });
+    // calcPod is 1-based (day of surgery = POD 1) — d===0 never matched.
+    const pod01 = patients.filter(p => { const d = calcPod(p.dos, today); return d === 1 || d === 2; });
     const pacPending = patients.filter(p => p.pacStatus === PacStatus.Pending);
     const overdueTodos = patients.filter(p => p.todos.some(t => !t.isDone));
 

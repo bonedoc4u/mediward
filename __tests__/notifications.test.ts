@@ -4,10 +4,16 @@ import { Patient, PatientStatus, PacStatus, Gender } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const daysAgo = (n: number): string =>
-  new Date(Date.now() - n * 86_400_000).toISOString().split('T')[0];
+// Local-time date strings — toISOString() is UTC and lags local IST dates
+// between 00:00 and 05:30, which made these tests (and the code under test)
+// flaky depending on time of day.
+const daysAgo = (n: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
-const today = (): string => new Date().toISOString().split('T')[0];
+const today = (): string => daysAgo(0);
 const yesterday = (): string => daysAgo(1);
 
 const makePatient = (overrides: Partial<Patient> = {}): Patient => ({

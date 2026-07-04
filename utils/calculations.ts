@@ -1,6 +1,7 @@
 import { Patient, LabResult, LabType, AppNotification, PatientStatus, PacStatus, News2Detail } from '../types';
 // Note: Ward display order is now driven by ward_config.sort_order in ConfigContext.
 import { generateId } from './sanitize';
+import { localYmd } from './otSchedule';
 
 // ─── POD Calculation ───
 export const calculatePOD = (dos?: string): number | undefined => {
@@ -14,7 +15,10 @@ export const calculatePOD = (dos?: string): number | undefined => {
   surgeryDate.setHours(0, 0, 0, 0);
   const diffTime = today.getTime() - surgeryDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays >= 0 ? diffDays : undefined;
+  // 1-based: day of surgery = POD 1, matching calcPod in HandoverSummary.
+  // Commit 27919b2 moved the app to this convention but missed this function,
+  // so p.pod stayed 0-based and triage sorted day-of-surgery patients as stable.
+  return diffDays >= 0 ? diffDays + 1 : undefined;
 };
 
 export const enrichPatientData = (patients: Patient[]): Patient[] => {
@@ -41,8 +45,10 @@ export const getStatusColor = (status: string) => {
     case 'pac fit':
     case 'fit':
       return 'bg-green-100 text-green-800 border-green-300';
+    // Bare 'review' belongs to the patient-status group below (amber) —
+    // having it here too made that case unreachable, so "Needs Review"
+    // patients rendered with PAC-purple badges.
     case 'pac review':
-    case 'review':
       return 'bg-purple-100 text-purple-800 border-purple-300';
     // Patient statuses
     case 'admitted':
@@ -173,7 +179,9 @@ export function generateNotifications(patients: Patient[]): AppNotification[] {
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  // localYmd, not toISOString(): converting local midnight to UTC shifts the
+  // date back a day in IST, so the alert compared against 2 days ago.
+  const yesterdayStr = localYmd(yesterday);
 
   const twoDaysAgo = new Date(today);
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);

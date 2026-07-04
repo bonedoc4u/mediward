@@ -16,7 +16,7 @@ export function getSmartAlerts(patient: Patient): SmartAlert[] {
   if (patient.dos === tomorrow && patient.pacStatus === PacStatus.Pending)
     alerts.push({ type: 'warning', message: 'Surgery tomorrow — PAC still pending' });
 
-  if ((patient.pod === 0 || patient.pod === 1) && patient.todos.some(t => !t.isDone))
+  if ((patient.pod === 1 || patient.pod === 2) && patient.todos.some(t => !t.isDone))
     alerts.push({ type: 'warning', message: `POD ${patient.pod} — overdue orders` });
 
   if (patient.pod !== undefined && patient.pod >= 5 && !patient.dischargeSummary)
