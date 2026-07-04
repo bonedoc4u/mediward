@@ -22,6 +22,31 @@ export function clearDisclaimerAccepted(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+/**
+ * Has the CURRENT signed-in user already accepted this disclaimer version, per the
+ * server-side audit table? Lets a returning user skip the disclaimer across devices
+ * without weakening shared-device compliance (a different user has no row yet).
+ * Returns false on any error so we fail safe (show the disclaimer).
+ */
+export async function hasAcceptedDisclaimerRemote(): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data, error } = await supabase
+      .from('compliance_acceptances')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('acceptance_type', 'clinical_disclaimer')
+      .eq('doc_version', DOC_VERSION)
+      .limit(1)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  } catch {
+    return false;
+  }
+}
+
 async function logAcceptanceToDB(): Promise<void> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
