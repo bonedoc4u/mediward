@@ -1,20 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Check, Trash2 } from 'lucide-react';
+import { UNIT_SCHEDULE, getWeekendDutyUnit } from '../utils/otSchedule';
 
 // JS Date.getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
-const UNIT_SCHEDULE: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
-  OR1: { admissionDay: 1, majorDay: 4, minorDay: 3 },
-  OR2: { admissionDay: 2, majorDay: 5, minorDay: 4 },
-  OR3: { admissionDay: 3, majorDay: 1, minorDay: 5 }, // Fri minor
-  OR4: { admissionDay: 4, majorDay: 2, minorDay: 1 },
-  OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 },
-};
-
 type OTType = 'major' | 'minor' | 'eot' | null;
 
-function getOTType(unit: string | undefined, dow: number): OTType {
-  // Weekends (Sun & Sat) are emergency-OT (EOT) duty days for every unit.
-  if (dow === 0 || dow === 6) return 'eot';
+function getOTType(unit: string | undefined, date: Date): OTType {
+  const dow = date.getDay();
+  // Weekend = EOT, but only when THIS unit is on the rotating weekend duty.
+  if (dow === 0 || dow === 6) {
+    return unit && getWeekendDutyUnit(date) === unit.toUpperCase() ? 'eot' : null;
+  }
   if (!unit) return null;
   const s = UNIT_SCHEDULE[unit];
   if (!s) return null;
@@ -153,11 +149,10 @@ const OTDatePicker: React.FC<Props> = ({ unit, value, minDate, onSelect, onCance
           if (!day) return <div key={`empty-${i}`} />;
 
           const date    = new Date(viewYear, viewMonth, day);
-          const dow     = date.getDay();
           const ymd     = toYMD(date);
           const isPast  = date.getTime() < minMs;
           const isSel   = ymd === selected;
-          const otType  = getOTType(unit ?? undefined, dow);
+          const otType  = getOTType(unit ?? undefined, date);
           const style   = otType ? OT_STYLES[otType] : null;
 
           return (
