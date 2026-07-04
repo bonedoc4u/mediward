@@ -259,7 +259,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-slate-900 truncate">{p.name}</p>
                 <p className="text-xs text-slate-500 mt-0.5">{p.age}y · {p.gender} · IP {p.ipNo}</p>
-                <p className="text-xs text-slate-600 mt-1 truncate">{p.diagnosis}</p>
+                <p className="text-xs text-slate-600 mt-1 break-words">{p.diagnosis}</p>
               </div>
               <div className="shrink-0 flex flex-col items-end gap-1.5">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-800 border border-violet-200">
@@ -448,8 +448,8 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         <News2Badge vitals={patient.vitals} />
                       </td>
                     )}
-                    <td className="px-4 py-3 max-w-[200px]">
-                      <span className="block truncate text-sm text-slate-700" title={patient.diagnosis}>{patient.diagnosis}</span>
+                    <td className="px-4 py-3 max-w-[280px]">
+                      <span className="block whitespace-normal break-words text-sm text-slate-700">{patient.diagnosis}</span>
                       {getSmartAlerts(patient).map((a, i) => (
                         <span key={i} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded mt-1 mr-1 ${
                           a.type === 'critical' ? 'bg-red-100 text-red-700' :
@@ -653,7 +653,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                     </div>
                     <div className="text-sm border-t border-slate-100 pt-2">
-                      <p className="font-medium text-slate-800 truncate" title={item.patient.diagnosis}>{item.patient.diagnosis}</p>
+                      <p className="font-medium text-slate-800 break-words">{item.patient.diagnosis}</p>
                       {item.patient.procedure && <p className="text-xs text-slate-500 mt-0.5">{item.patient.procedure}</p>}
                     </div>
                     {/* Planned date row — pending view only */}
