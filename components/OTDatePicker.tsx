@@ -13,6 +13,8 @@ const UNIT_SCHEDULE: Record<string, { admissionDay: number; majorDay: number; mi
 type OTType = 'major' | 'minor' | 'eot' | null;
 
 function getOTType(unit: string | undefined, dow: number): OTType {
+  // Weekends (Sun & Sat) are emergency-OT (EOT) duty days for every unit.
+  if (dow === 0 || dow === 6) return 'eot';
   if (!unit) return null;
   const s = UNIT_SCHEDULE[unit];
   if (!s) return null;
