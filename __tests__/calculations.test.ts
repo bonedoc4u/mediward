@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, getStatusColor } from '../utils/calculations';
+import { calculatePOD, getStatusColor, sortByBed } from '../utils/calculations';
+import type { Patient } from '../types';
+
+/** Minimal Patient stub — sortByBed only reads `bed`. */
+const bedPatient = (bed: string): Patient => ({ bed } as Patient);
 
 /** Returns a YYYY-MM-DD string in local timezone (avoids UTC off-by-one in IST/non-UTC envs). */
 function localDate(d: Date): string {
@@ -27,6 +31,20 @@ describe('calculatePOD', () => {
 
   it('returns undefined when no DOS is provided', () => {
     expect(calculatePOD(undefined)).toBeUndefined();
+  });
+});
+
+describe('sortByBed (round-mode / dashboard ordering)', () => {
+  it('orders beds numerically ascending, not lexicographically', () => {
+    const beds = ['10', '2', '1', '21', '3'].map(bedPatient);
+    const sorted = [...beds].sort(sortByBed).map(p => p.bed);
+    expect(sorted).toEqual(['1', '2', '3', '10', '21']);
+  });
+
+  it('floats varanda beds to the end of the ward', () => {
+    const beds = ['VB2', '5', 'VB1', '1'].map(bedPatient);
+    const sorted = [...beds].sort(sortByBed).map(p => p.bed);
+    expect(sorted).toEqual(['1', '5', 'VB1', 'VB2']);
   });
 });
 
