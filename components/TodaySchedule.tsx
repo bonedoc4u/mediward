@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Scissors, CalendarCheck, Zap, ShieldAlert, BedDouble } from 'lucide-react';
-import { UNIT_SCHEDULE, getWeekendDutyUnit } from '../utils/otSchedule';
+import { UNIT_SCHEDULE, getWeekendDutyUnit, WeekendDutyMap } from '../utils/otSchedule';
+import { useConfig } from '../contexts/AppContext';
 
 // ─── Department Schedule ─────────────────────────────────────────────────────
 // JS Date.getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
@@ -16,7 +17,7 @@ interface UnitDay {
   events: EventType[];
 }
 
-function getUnitDay(unit: string, date: Date): UnitDay {
+function getUnitDay(unit: string, date: Date, dutyMap: WeekendDutyMap): UnitDay {
   const dow = date.getDay();
   const s   = UNIT_SCHEDULE[unit];
   const events: EventType[] = [];
@@ -25,7 +26,7 @@ function getUnitDay(unit: string, date: Date): UnitDay {
     if (dow === s.majorDay)             events.push('major');
     if (dow === s.minorDay)             events.push('minor');
   }
-  if (getWeekendDutyUnit(date) === unit) events.push('weekend-duty');
+  if (getWeekendDutyUnit(date, dutyMap) === unit) events.push('weekend-duty');
   return { unit, events };
 }
 
@@ -62,12 +63,12 @@ function EventBadge({ type, size = 'normal' }: { type: EventType; size?: 'normal
 
 // ─── Unit-user view (single unit) ────────────────────────────────────────────
 
-function UnitUserSchedule({ unit, date }: { unit: string; date: Date }) {
-  const { events } = getUnitDay(unit, date);
+function UnitUserSchedule({ unit, date, dutyMap }: { unit: string; date: Date; dutyMap: WeekendDutyMap }) {
+  const { events } = getUnitDay(unit, date, dutyMap);
   const s = UNIT_SCHEDULE[unit];
   const dow = date.getDay();
   const isWeekend = dow === 0 || dow === 6;
-  const dutyUnit = isWeekend ? getWeekendDutyUnit(date) : null;
+  const dutyUnit = isWeekend ? getWeekendDutyUnit(date, dutyMap) : null;
 
   const hasEvents = events.length > 0;
 
@@ -115,12 +116,12 @@ function UnitUserSchedule({ unit, date }: { unit: string; date: Date }) {
 
 // ─── Admin view (all units) ───────────────────────────────────────────────────
 
-function AdminSchedule({ date }: { date: Date }) {
+function AdminSchedule({ date, dutyMap }: { date: Date; dutyMap: WeekendDutyMap }) {
   const dow = date.getDay();
   const isWeekend = dow === 0 || dow === 6;
-  const dutyUnit  = isWeekend ? getWeekendDutyUnit(date) : null;
+  const dutyUnit  = isWeekend ? getWeekendDutyUnit(date, dutyMap) : null;
 
-  const rows = ALL_UNITS.map(u => getUnitDay(u, date));
+  const rows = ALL_UNITS.map(u => getUnitDay(u, date, dutyMap));
   const anyEvents = rows.some(r => r.events.length > 0);
 
   return (
@@ -193,10 +194,11 @@ interface TodayScheduleProps {
 }
 
 const TodaySchedule: React.FC<TodayScheduleProps> = ({ userUnit, isAdmin }) => {
+  const { weekendDuty } = useConfig();
   const today = useMemo(() => new Date(), []);
 
-  if (isAdmin) return <AdminSchedule date={today} />;
-  if (userUnit && UNIT_SCHEDULE[userUnit]) return <UnitUserSchedule unit={userUnit} date={today} />;
+  if (isAdmin) return <AdminSchedule date={today} dutyMap={weekendDuty} />;
+  if (userUnit && UNIT_SCHEDULE[userUnit]) return <UnitUserSchedule unit={userUnit} date={today} dutyMap={weekendDuty} />;
   return null; // user has no unit and isn't admin — nothing to show
 };
 

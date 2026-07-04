@@ -104,7 +104,7 @@ const SortableRow = ({ id, children, className }: { id: string, children: React.
 };
 
 const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdatePatient }) => {
-  const { unitChiefs, hospitalName, department } = useConfig();
+  const { unitChiefs, hospitalName, department, weekendDuty } = useConfig();
   const { user, selectedUnit } = useAuth();
   const [activeTab, setActiveTab] = useState<OTType>('Major');
 
@@ -117,7 +117,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
 
   // OT cycle = the 7 days after this unit's admission day (see getOTCycleDates).
   // Each tab defaults to that cycle's Major / Minor / EOT date.
-  const cycle = useMemo(() => getOTCycleDates(effectiveUnit), [effectiveUnit]);
+  const cycle = useMemo(() => getOTCycleDates(effectiveUnit, new Date(), weekendDuty), [effectiveUnit, weekendDuty]);
   const [majorDate, setMajorDate] = useState<string>(cycle.majorDate);
   const [minorDate, setMinorDate] = useState<string>(cycle.minorDate);
   const [eotDate,   setEotDate]   = useState<string>(cycle.eotDate);

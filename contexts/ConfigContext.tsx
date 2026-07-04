@@ -141,6 +141,10 @@ interface ConfigContextType {
   comorbidityMap: ComorbidityEntry[];
   /** Persist an updated comorbidity map (wraps saveHospitalConfig). */
   saveComorbidityMap: (map: ComorbidityEntry[]) => Promise<void>;
+  /** Admin-assigned weekend duty roster: local "YYYY-MM-DD" → unit. */
+  weekendDuty: Record<string, string>;
+  /** Persist an updated weekend duty roster (wraps saveHospitalConfig). */
+  saveWeekendDuty: (map: Record<string, string>) => Promise<void>;
   /** Timestamp (Date.now()) set whenever a background config refresh updates the config.
    *  Components with open forms can watch this to show a "Settings updated" banner. */
   configUpdatedAt: number | null;
@@ -337,6 +341,16 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success('Comorbidity list saved');
   }, []);
 
+  const saveWeekendDuty = useCallback(async (map: Record<string, string>) => {
+    setHospitalConfigState(prev => {
+      const next = { ...prev, weekendDuty: map };
+      upsertHospitalConfig(next).catch(err => console.error('[Config] saveWeekendDuty failed:', err));
+      saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, next);
+      return next;
+    });
+    toast.success('Weekend duty roster saved');
+  }, []);
+
   // ─── Derived values ───
   const icuWardNames = useMemo(
     () => new Set(wards.filter(w => w.isIcu).map(w => w.name)),
@@ -486,6 +500,8 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveHospitalConfig,
     comorbidityMap: hospitalConfig.comorbidityMap ?? [],
     saveComorbidityMap,
+    weekendDuty: hospitalConfig.weekendDuty ?? {},
+    saveWeekendDuty,
     configUpdatedAt,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
@@ -496,7 +512,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     wards, labTypes, isLoadingConfig,
     icuWardNames, labTypesByCategory,
     unitChiefs, setUnitChief,
-    hospitalConfig, saveHospitalConfig, saveComorbidityMap, configUpdatedAt,
+    hospitalConfig, saveHospitalConfig, saveComorbidityMap, saveWeekendDuty, configUpdatedAt,
     addWard, saveWard, removeWard,
     addLabType, saveLabType, removeLabType,
     medications, addMedication, saveMedication, removeMedication, seedMedications,

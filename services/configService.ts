@@ -197,6 +197,9 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
     comorbidityMap: Array.isArray(data.comorbidity_map) && data.comorbidity_map.length > 0
       ? (data.comorbidity_map as ComorbidityEntry[])
       : undefined,
+    weekendDuty: (data.weekend_duty && typeof data.weekend_duty === 'object' && !Array.isArray(data.weekend_duty))
+      ? (data.weekend_duty as Record<string, string>)
+      : undefined,
   };
 }
 
@@ -227,6 +230,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
         vital_thresholds:           config.vitalThresholds,
         comorbidity_map:            config.comorbidityMap ?? [],
+        weekend_duty:               config.weekendDuty ?? {},
         updated_at:                 new Date().toISOString(),
       })
       .eq('id', existing.id);
@@ -250,6 +254,7 @@ export async function upsertHospitalConfig(config: HospitalConfig): Promise<void
         custom_todo_shortcuts:      config.customTodoShortcuts ?? [],
         vital_thresholds:           config.vitalThresholds,
         comorbidity_map:            config.comorbidityMap ?? [],
+        weekend_duty:               config.weekendDuty ?? {},
       });
     if (error) throw error;
   }
