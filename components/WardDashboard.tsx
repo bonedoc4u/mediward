@@ -3,7 +3,9 @@ import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home, FileDown } from 'lucide-react';
+import { exportWardListPDF } from '../utils/exportWardList';
+import { toast } from '../utils/toast';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { calcPod } from './HandoverSummary';
@@ -66,7 +68,7 @@ interface Props {
 }
 
 const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, onClearDate, hasMore, isLoadingMore, onLoadMore, highlightIpNo }) => {
-  const { wards: configWards, icuWardNames, labTypes, showNews2 } = useConfig();
+  const { wards: configWards, icuWardNames, labTypes, showNews2, hospitalName, department } = useConfig();
   const { user, selectedUnit } = useAuth();
 
   // Determine which unit's wards to show:
@@ -205,6 +207,27 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
   const hasActiveFilters = filterPending || filterSurgeryToday || filterPod01 || filterOverdueTodos || searchTerm;
 
+  // ─── Export ward list PDF (follows the active ward tab) ───
+  const [exporting, setExporting] = useState(false);
+  const handleExportPdf = async () => {
+    const sections = wardsToDisplay
+      .map(w => ({ name: w, patients: patientsByWard[w] ?? [] }))
+      .filter(s => s.patients.length > 0);
+    if (sections.length === 0) {
+      toast.error('No patients to export in this view.');
+      return;
+    }
+    setExporting(true);
+    try {
+      await exportWardListPDF({ sections, hospitalName, department, scopeLabel: selectedWard });
+    } catch (err) {
+      console.error('[export] ward list PDF failed:', err);
+      toast.error('Could not generate the PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // ─── Assign Date state (pending list) ───
   const [assigningDateIp, setAssigningDateIp] = useState<string | null>(null);
   const [assigningDateValue, setAssigningDateValue] = useState('');
@@ -341,6 +364,17 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 <UserPlus className="w-4 h-4" /> Add Patient
               </button>
             )}
+            {viewMode === 'home' && (
+              <button
+                onClick={handleExportPdf}
+                disabled={exporting}
+                aria-label="Export ward list as PDF"
+                className="flex items-center gap-2 bg-white border border-slate-300 hover:border-teal-400 hover:text-teal-700 text-slate-700 px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+              >
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                {exporting ? 'Exporting…' : 'Export PDF'}
+              </button>
+            )}
             <button
               onClick={() => setFilterPending(!filterPending)}
               className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-lg font-medium text-sm border transition-colors ${filterPending ? 'bg-red-50 text-red-700 border-red-200' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
@@ -437,9 +471,6 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                       <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
                         <span>{patient.age} / {patient.gender} • IP: {patient.ipNo}</span>
-                        {viewMode !== 'pending' && calcPod(patient.dos, today) !== undefined && (
-                          <span className="font-bold text-green-700 bg-green-100 px-1.5 rounded-sm ml-1">POD {calcPod(patient.dos, today)}</span>
-                        )}
                       </div>
                       <div className="text-xs text-teal-600">{patient.mobile}</div>
                     </td>
