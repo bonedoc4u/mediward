@@ -2,6 +2,43 @@
 /* Self-hosted DM Sans variable font — no Google CDN, no DPDP exposure */
 @import "@fontsource-variable/dm-sans";
 
+/* ── Semantic clinical colour tokens (Tailwind 4 @theme) ──────────
+ * Usage: text-vital-critical / bg-vital-critical-surface / border-vital-critical-border
+ * and var(--color-vital-critical) for SVG/Recharts strokes & fills.
+ * -fg = text (≥4.5:1 on white & slate-50); base = graphic/stroke (≥3:1). */
+@theme {
+  /* Critical / abnormal-high / destructive — RED, this meaning ONLY */
+  --color-vital-critical:         #dc2626; /* graphic/stroke  ~4.2:1 */
+  --color-vital-critical-fg:      #b91c1c; /* text   ~5.9:1 on white */
+  --color-vital-critical-surface: #fef2f2; /* tint bg (red-50)       */
+  --color-vital-critical-border:  #fecaca; /* red-200               */
+
+  /* Warning / borderline / moderate — AMBER */
+  --color-vital-warning:          #d97706; /* graphic  ~3.4:1        */
+  --color-vital-warning-fg:       #b45309; /* text   ~4.8:1 on white */
+  --color-vital-warning-surface:  #fffbeb; /* amber-50              */
+  --color-vital-warning-border:   #fde68a; /* amber-200             */
+
+  /* Normal / within-range / success — GREEN (kills teal+emerald split) */
+  --color-vital-normal:           #16a34a; /* graphic  ~3.1:1        */
+  --color-vital-normal-fg:        #15803d; /* text   ~4.6:1 on white */
+  --color-vital-normal-surface:   #f0fdf4; /* green-50              */
+  --color-vital-normal-border:    #bbf7d0; /* green-200             */
+
+  /* Abnormal-low (labs / hypo-) — BLUE (matches existing #2563EB) */
+  --color-vital-low:              #2563eb; /* graphic  ~4.6:1        */
+  --color-vital-low-fg:           #1d4ed8; /* text   ~6.3:1 on white */
+  --color-vital-low-surface:      #eff6ff; /* blue-50               */
+  --color-vital-low-border:       #bfdbfe; /* blue-200              */
+
+  /* Categorical chart series (NON-semantic) — so red is freed for critical */
+  --color-chart-bp-sys: #4f46e5; /* indigo-600 */
+  --color-chart-bp-dia: #818cf8; /* indigo-400 */
+  --color-chart-hr:     #db2777; /* pink-600   */
+  --color-chart-spo2:   #0891b2; /* cyan-600   */
+  --color-chart-temp:   #7c3aed; /* violet-600 */
+}
+
 /* ── Global CSS custom properties ─────────────────────────────── */
 :root {
   --bottom-nav-height: 56px;
@@ -81,6 +118,29 @@ textarea {
 
 /* ── Active state ripple for mobile buttons ───────────────────── */
 button:active, a:active { opacity: 0.85; }
+
+/* ── Ward-list return highlight ───────────────────────────────── */
+/* Briefly accents the row of the patient just viewed so the eye re-lands on
+ * it after scroll restoration. Fades over ~1.5s. See useScrollRestoration. */
+@keyframes rowHighlightFade {
+  0%   { background-color: rgba(20, 184, 166, 0.18); box-shadow: inset 3px 0 0 0 #14b8a6; }
+  100% { background-color: transparent;             box-shadow: inset 3px 0 0 0 transparent; }
+}
+.row-highlight { animation: rowHighlightFade 1.5s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .row-highlight { animation: none; }
+}
+
+/* ── Slide-over sheet (patient quick view) ────────────────────── */
+@keyframes sheetSlideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes sheetSlideInBottom { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheetOverlayFade { from { opacity: 0; } to { opacity: 1; } }
+.sheet-in-right  { animation: sheetSlideInRight 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-in-bottom { animation: sheetSlideInBottom 0.28s cubic-bezier(0.32, 0.72, 0, 1); }
+.sheet-overlay   { animation: sheetOverlayFade 0.2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in-right, .sheet-in-bottom, .sheet-overlay { animation: none; }
+}
 
 /* ── WCAG 2.1 AA minimum touch target (44×44 dp) ─────────────── */
 /*

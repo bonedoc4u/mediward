@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect, useRef } from 'react';
+import { useScrollRestoration, useReturnHighlight, setLastViewedPatient } from './hooks/useScrollRestoration';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
@@ -33,6 +34,7 @@ const AiClinicalAssistant = lazy(() => import('./components/AiClinicalAssistant'
 const OTListManagement = lazy(() => import('./components/OTListManagement'));
 const PreOpPrep = lazy(() => import('./components/PreOpPrep'));
 const PatientDetail = lazy(() => import('./components/PatientDetail'));
+const PatientSheet = lazy(() => import('./components/PatientSheet'));
 const DischargeSummaryView = lazy(() => import('./components/DischargeSummary'));
 const RoundMode = lazy(() => import('./components/RoundMode'));
 const AuditLogViewer = lazy(() => import('./components/AuditLogViewer'));
@@ -140,6 +142,10 @@ const BASE_NAV_ITEMS_RIGHT: NavItem[] = [
   { id: 'audit',    label: 'Audit Log',      icon: Shield,   section: 'Admin' },
   { id: 'settings', label: 'Configuration', icon: Settings, section: 'Admin' },
 ];
+
+// Views that render a patient list and therefore support the quick-view sheet.
+// The sheet opens whenever one of these views carries a patient id in the hash.
+const SHEET_LIST_VIEWS: ViewMode[] = ['dashboard', 'pending', 'master', 'wenthome'];
 
 // ─── Loading Fallback ───
 const ViewLoader = () => (
@@ -275,6 +281,20 @@ const App: React.FC = () => {
 
   const meta = viewMeta[currentView as keyof typeof viewMeta] ?? viewMeta.dashboard;
 
+  // Patient quick-view sheet is open when a list view carries a patient id.
+  const isPatientSheetOpen = !!navParams.id && SHEET_LIST_VIEWS.includes(currentView);
+
+  // ─── Per-view scroll restoration ───
+  // Residents scroll long ward lists; opening a patient and coming back must
+  // land on the same row. The hook records each view's offset and restores it
+  // on return (handling both the <main> scroller on desktop and the
+  // window-virtualized list on mobile). See hooks/useScrollRestoration.ts.
+  const mainRef = useRef<HTMLElement>(null);
+  const getScrollEl = useCallback(() => mainRef.current, []);
+  useScrollRestoration({ key: currentView, ready: !isLoadingPatients, getScrollElement: getScrollEl });
+  // On return to a list view, briefly highlight the row of the patient just viewed.
+  const highlightIpNo = useReturnHighlight(!isLoadingPatients);
+
   // ─── Capacitor native hooks ───
   useEffect(() => {
     // Set status bar to light text on dark background (matches dark header)
@@ -296,6 +316,10 @@ const App: React.FC = () => {
         setIsAddPatientModalOpen(false);
         return;
       }
+      if (isPatientSheetOpen) {
+        navigateTo(currentView); // clear the patient id from the hash → close sheet
+        return;
+      }
       if (currentView !== 'dashboard') {
         navigateTo('dashboard');
         return;
@@ -309,7 +333,7 @@ const App: React.FC = () => {
     return () => {
       subscription.then(h => h.remove()).catch(() => {});
     };
-  }, [concurrentEditConflict, resolveConcurrentEdit, isMobileMenuOpen, isAddPatientModalOpen, currentView, setIsMobileMenuOpen, navigateTo]);
+  }, [concurrentEditConflict, resolveConcurrentEdit, isMobileMenuOpen, isAddPatientModalOpen, isPatientSheetOpen, currentView, setIsMobileMenuOpen, navigateTo]);
 
   // Group nav items by section — filter Team Settings to admin only
   const navSections = useMemo(() => {
@@ -469,7 +493,8 @@ const App: React.FC = () => {
             viewMode={currentView === 'dashboard' ? 'home' : currentView as 'pending' | 'master' | 'wenthome'}
             onAddPatient={can(user, 'patient:add') ? openAddModal : undefined}
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
-            onViewPatient={(ipNo: string) => navigateTo('patient', { id: ipNo })}
+            onViewPatient={(ipNo: string) => { setLastViewedPatient(ipNo); navigateTo(currentView, { id: ipNo }); }}
+            highlightIpNo={highlightIpNo}
             onStartRounds={() => navigateTo('round-mode')}
             onAddLab={async (ipNo, type, value, date) => {
               addLabResult(ipNo, { id: crypto.randomUUID(), date, type, value });
@@ -673,7 +698,11 @@ const App: React.FC = () => {
       </aside>
 
       {/* ─── Main Content ─── */}
-      <main className="flex-1 p-3 sm:p-4 md:p-8 md:h-screen overflow-y-auto min-w-0" style={{ height: 'calc(100svh - 56px - var(--safe-area-top, env(safe-area-inset-top, 0px)))' }}>
+      <main
+        ref={mainRef}
+        className="flex-1 p-3 sm:p-4 md:p-8 md:h-screen overflow-y-auto min-w-0"
+        style={{ height: 'calc(100svh - 56px - var(--safe-area-top, env(safe-area-inset-top, 0px)))' }}
+      >
         <div className="max-w-7xl mx-auto" style={{ paddingBottom: 'var(--content-bottom-pad)' }}>
 
           {/* ─── Superadmin: Viewing another hospital banner ─── */}
@@ -739,6 +768,15 @@ const App: React.FC = () => {
             : ((user?.role === 'admin' || user?.role === 'superadmin') && selectedUnit && selectedUnit !== 'all') ? selectedUnit
             : undefined
           }
+        />
+      </Suspense>
+
+      {/* ─── Patient Quick-View Sheet ─── */}
+      <Suspense fallback={null}>
+        <PatientSheet
+          open={isPatientSheetOpen}
+          patientId={navParams.id || undefined}
+          onClose={() => navigateTo(currentView)}
         />
       </Suspense>
 

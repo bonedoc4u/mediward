@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp, useConfig, usePatients } from '../contexts/AppContext';
 import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacFlowData, PacStatus } from '../types';
-import { getStatusColor } from '../utils/calculations';
+import { getStatusColor, sortByBed } from '../utils/calculations';
 import { generateId } from '../utils/sanitize';
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { hapticTap } from '../utils/capacitorInit';
@@ -50,13 +50,22 @@ const RoundMode: React.FC = () => {
     setSelectedWardRaw(ward);
   };
 
-  // ─── Patients filtered by selected ward ───
+  // ─── Patients filtered by selected ward, ordered ward → bed ───
+  // Sorting mirrors the physical ward layout so rounds move bed-by-bed in
+  // ascending order (matches the dashboard's sortByBed ordering).
   const activePatients = useMemo(
-    () => !selectedWard
-      ? []
-      : selectedWard === '__all__'
-      ? allActivePatients
-      : allActivePatients.filter(p => p.ward === selectedWard),
+    () => {
+      const list = !selectedWard
+        ? []
+        : selectedWard === '__all__'
+        ? [...allActivePatients]
+        : allActivePatients.filter(p => p.ward === selectedWard);
+      return list.sort((a, b) => {
+        const wardCmp = (a.ward ?? '').localeCompare(b.ward ?? '', undefined, { numeric: true });
+        if (wardCmp !== 0) return wardCmp;
+        return sortByBed(a, b);
+      });
+    },
     [allActivePatients, selectedWard]
   );
 

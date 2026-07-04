@@ -60,9 +60,11 @@ interface Props {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  /** Row of the patient just viewed — briefly accent-highlighted on return. */
+  highlightIpNo?: string | null;
 }
 
-const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, hasMore, isLoadingMore, onLoadMore }) => {
+const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, hasMore, isLoadingMore, onLoadMore, highlightIpNo }) => {
   const { wards: configWards, icuWardNames, labTypes, showNews2 } = useConfig();
   const { user, selectedUnit } = useAuth();
 
@@ -411,7 +413,9 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     key={patient.ipNo}
                     className={`border-b last:border-0 hover:bg-slate-50 transition-colors ${getTriageBorderClass(patient)} ${
                       !patient.dos && patient.pacStatus === PacStatus.Pending ? 'bg-red-50/30' : ''
-                    } ${patient.patientStatus === PatientStatus.Discharged ? 'opacity-60 bg-slate-50' : ''}`}
+                    } ${patient.patientStatus === PatientStatus.Discharged ? 'opacity-60 bg-slate-50' : ''} ${
+                      highlightIpNo === patient.ipNo ? 'row-highlight' : ''
+                    }`}
                   >
                     <td className="px-6 py-4 font-medium text-slate-900">{shortBed(patient.bed)}</td>
                     <td className="px-6 py-4">
@@ -613,7 +617,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   <div
                     className={`p-4 space-y-3 bg-white border border-slate-200 rounded-lg mb-2 ${getTriageBorderClass(item.patient)} ${
                       !item.patient.dos && item.patient.pacStatus === PacStatus.Pending ? 'bg-red-50/20' : ''
-                    }`}
+                    } ${highlightIpNo === item.patient.ipNo ? 'row-highlight' : ''}`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">

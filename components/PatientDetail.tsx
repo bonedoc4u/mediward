@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, lazy, Suspense } from 'react';
+import React, { useMemo, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { PatientStatus } from '../types';
 import { can } from '../utils/permissions';
@@ -8,33 +8,23 @@ import {
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   FileJson, Download, Pill, ClipboardList, Droplets, Bandage,
-  Calculator, Send, X, ChevronDown, Home,
+  Calculator, Send, X, ChevronDown, Home, ArrowRightLeft,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBoundary from './ErrorBoundary';
+import DemographicsSection from './patient/DemographicsSection';
+import ComorbiditiesSection from './patient/ComorbiditiesSection';
+import RadiologyPanel from './patient/RadiologyPanel';
+import StickyPatientHeader from './patient/StickyPatientHeader';
+import MoveBedSheet from './patient/MoveBedSheet';
 import FHIRExportModal from './FHIRExportModal';
 import ScoringTools from './ScoringTools';
 import ReferralLetter from './ReferralLetter';
-import { resolveImageUrl } from '../services/storageService';
-
 const MedicationChart  = lazy(() => import('./MedicationChart'));
 const NursingNotes     = lazy(() => import('./NursingNotes'));
 const IntakeOutput     = lazy(() => import('./IntakeOutput'));
 const BloodTransfusion = lazy(() => import('./BloodTransfusion'));
 const WoundCare        = lazy(() => import('./WoundCare'));
-
-// ─── Signed thumbnail: resolves storage path to a 1-hour signed URL ──────────
-const SignedThumbnail: React.FC<{ rawUrl: string; alt: string }> = ({ rawUrl, alt }) => {
-  const [src, setSrc] = React.useState<string | undefined>(undefined);
-  React.useEffect(() => {
-    if (!rawUrl) return;
-    let cancelled = false;
-    resolveImageUrl(rawUrl).then(url => { if (!cancelled) setSrc(url ?? undefined); });
-    return () => { cancelled = true; };
-  }, [rawUrl]);
-  if (!src) return <div className="w-full h-full bg-slate-800" />;
-  return <img src={src} alt={alt} className="w-full h-full object-cover" />;
-};
 
 // ─── Status Badge Config ──────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string }> = {
@@ -99,9 +89,21 @@ const DateBottomSheet: React.FC<{
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const PatientDetail: React.FC = () => {
+interface PatientDetailProps {
+  /** When provided (sheet / deep-link), overrides the router's navParams.id. */
+  patientId?: string;
+  /** When rendered in a sheet: close it instead of navigating to the dashboard. */
+  onClose?: () => void;
+  /** Layout hint — trims chrome the sheet already provides (e.g. its own close). */
+  inSheet?: boolean;
+}
+
+const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inSheet }) => {
   const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
-  const { labTypes, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, hospitalName } = useConfig();
+  const effectiveId = patientId ?? navParams.id;
+  // In a sheet we close it; on the full route we navigate back to the dashboard.
+  const dismiss = onClose ?? (() => navigateTo('dashboard'));
+  const { labTypes, wards, showNursingNotes, showMedicationChart, showIntakeOutput, showBloodTransfusion, showWoundCare, hospitalName } = useConfig();
 
   const [showDischargeConfirm,  setShowDischargeConfirm]  = useState(false);
   const [showWentHomeConfirm,   setShowWentHomeConfirm]   = useState(false);
@@ -112,12 +114,24 @@ const PatientDetail: React.FC = () => {
   const [activeTab,            setActiveTab]             = useState<'overview' | 'medications' | 'nursing' | 'io' | 'transfusion' | 'wound'>('overview');
   const [editingDate,          setEditingDate]           = useState<'doa' | 'dos' | null>(null);
   const [diagExpanded,         setDiagExpanded]          = useState(false);
+  const [showMoveBed,          setShowMoveBed]           = useState(false);
+
+  // Slim sticky header reveals once the tall hero scrolls out of view.
+  const [showSticky, setShowSticky] = useState(false);
+  const heroSentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = heroSentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => setShowSticky(!entry.isIntersecting), { threshold: 0 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [effectiveId]);
 
   const canDischarge = can(user, 'patient:discharge');
   const canDelete    = can(user, 'patient:delete');
   const canEdit      = can(user, 'patient:edit');
 
-  const patient = useMemo(() => patients.find(p => p.ipNo === navParams.id), [patients, navParams.id]);
+  const patient = useMemo(() => patients.find(p => p.ipNo === effectiveId), [patients, effectiveId]);
 
   // Inline-editable fields — save on blur
   const [editDiagnosis, setEditDiagnosis] = useState('');
@@ -134,8 +148,8 @@ const PatientDetail: React.FC = () => {
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <AlertCircle className="w-12 h-12 mb-3 opacity-50" />
         <p className="text-lg font-medium">Patient not found</p>
-        <button onClick={() => navigateTo('dashboard')} className="mt-4 text-teal-600 hover:underline text-sm flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+        <button onClick={dismiss} className="mt-4 text-teal-600 hover:underline text-sm flex items-center gap-1">
+          <ArrowLeft className="w-4 h-4" /> {inSheet ? 'Close' : 'Back to dashboard'}
         </button>
       </div>
     );
@@ -159,18 +173,18 @@ const PatientDetail: React.FC = () => {
   const handleWentHome = () => {
     updatePatient({ ...patient, patientStatus: PatientStatus.WentHome });
     setShowWentHomeConfirm(false);
-    navigateTo('dashboard');
+    dismiss();
   };
 
   const handleReturnToWard = () => {
     updatePatient({ ...patient, patientStatus: PatientStatus.Review });
-    navigateTo('dashboard');
+    dismiss();
   };
 
   const handleDelete = () => {
     deletePatient(patient.ipNo);
     setShowDeleteConfirm(false);
-    navigateTo('dashboard');
+    dismiss();
   };
 
   const TrendIcon = ({ trend }: { trend: string }) => {
@@ -188,15 +202,23 @@ const PatientDetail: React.FC = () => {
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
 
+      {/* ─── SLIM STICKY HEADER (reveals on scroll) ────────────────────── */}
+      <StickyPatientHeader
+        patient={patient}
+        statusLabel={patient.patientStatus === PatientStatus.Review ? 'Needs review' : patient.patientStatus}
+        statusColor={statusBadge}
+        visible={showSticky}
+      />
+
       {/* ─── DARK HEADER CARD ──────────────────────────────────────────── */}
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-b-3xl overflow-hidden mb-4 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-2 pb-6">
 
-        {/* Back */}
+        {/* Back / close — sits top-left, clear of the status badges top-right */}
         <button
-          onClick={() => navigateTo('dashboard')}
+          onClick={dismiss}
           className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded"
         >
-          <ArrowLeft className="w-4 h-4" /> Dashboard
+          <ArrowLeft className="w-4 h-4" /> {inSheet ? 'Close' : 'Dashboard'}
         </button>
 
         {/* Name row + Status badges */}
@@ -239,6 +261,12 @@ const PatientDetail: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Sentinel: once this scrolls above the top, the slim sticky header shows. */}
+      <div ref={heroSentinelRef} className="h-0" aria-hidden="true" />
+
+      {/* ─── RADIOLOGY (pinned — first-class for an ortho ward) ────────── */}
+      <RadiologyPanel patient={patient} onOpenFull={() => navigateTo('radiology', { id: patient.ipNo })} />
 
       {/* ─── DIAGNOSIS + PROCEDURE CARD ────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-3">
@@ -359,6 +387,9 @@ const PatientDetail: React.FC = () => {
         </div>
       </div>
 
+      {/* ─── DEMOGRAPHICS & ADMISSION (inline-editable) ────────────────── */}
+      <DemographicsSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />
+
       {/* ─── CONTACT CARD ──────────────────────────────────────────────── */}
       {patient.mobile && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3">
@@ -408,17 +439,8 @@ const PatientDetail: React.FC = () => {
         <HeartPulse className="w-5 h-5 text-slate-300 shrink-0" />
       </button>
 
-      {/* ─── COMORBIDITIES ─────────────────────────────────────────────── */}
-      {patient.comorbidities.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Comorbidities</p>
-          <div className="flex flex-wrap gap-1.5">
-            {patient.comorbidities.map(c => (
-              <span key={c} className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium">{c}</span>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ─── COMORBIDITIES & ALLERGIES (inline-editable) ───────────────── */}
+      <ComorbiditiesSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />
 
       {/* ─── QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mx-1 px-1 scrollbar-hide">
@@ -440,6 +462,11 @@ const PatientDetail: React.FC = () => {
         <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
           <HeartPulse className="w-4 h-4 text-blue-500" /> PAC Status
         </button>
+        {canEdit && (
+          <button onClick={() => setShowMoveBed(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
+            <ArrowRightLeft className="w-4 h-4 text-blue-500" /> Move bed
+          </button>
+        )}
         {can(user, 'investigations:write') && (
           <button onClick={() => setShowFhirExport(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-xl shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-xs font-bold text-teal-700 whitespace-nowrap">
             <FileJson className="w-4 h-4 text-teal-600" /> FHIR
@@ -623,24 +650,7 @@ const PatientDetail: React.FC = () => {
             </div>
           )}
 
-          {/* Recent Imaging */}
-          {patient.investigations.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mt-3">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3 text-sm">
-                <FileImage className="w-4 h-4 text-teal-500" /> Imaging ({patient.investigations.length})
-              </h3>
-              <div className="grid grid-cols-3 gap-2">
-                {patient.investigations.slice(0, 6).map(inv => (
-                  <div key={inv.id} className="relative aspect-square bg-black rounded-xl overflow-hidden border border-slate-200">
-                    <SignedThumbnail rawUrl={inv.imageUrl} alt={inv.type} />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
-                      <p className="text-[10px] text-white font-bold">{inv.type}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Recent Imaging now lives in the pinned RadiologyPanel above. */}
 
           {/* Rounds History */}
           {patient.dailyRounds.length > 0 && (
@@ -704,6 +714,16 @@ const PatientDetail: React.FC = () => {
           hospitalName={hospitalName ?? 'Hospital'}
           referringDoctor={user?.name ?? 'Doctor'}
           onClose={() => setShowReferral(false)}
+        />
+      )}
+
+      {/* Move bed bottom sheet */}
+      {showMoveBed && (
+        <MoveBedSheet
+          patient={patient}
+          wardOptions={wards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder).map(w => w.name)}
+          onSave={(bed, ward) => updatePatient({ ...patient, bed, ward })}
+          onClose={() => setShowMoveBed(false)}
         />
       )}
 

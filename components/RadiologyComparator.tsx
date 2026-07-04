@@ -2,29 +2,13 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Patient, Investigation } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import {
-  ImageIcon, Camera, X, Trash2, FileText,
-  CloudUpload, FileDown, Loader2, Search, ChevronDown,
-  Bone, ScanLine, Waves,
+  ImageIcon, Camera, X, Trash2,
+  CloudUpload, FileDown, Loader2, Search, ChevronDown, Leaf,
 } from 'lucide-react';
-import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile, resolveImageUrl, clearImageUrlCache } from '../services/storageService';
-
-/** Resolves a storage path or legacy URL to a signed URL for display.
- *  Auto-refreshes 49 min in so the image never goes blank during a long session
- *  (signed URLs expire at 60 min; cache expires at 50 min). */
-function useSignedUrl(rawUrl: string | undefined): string | undefined {
-  const [signed, setSigned] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!rawUrl) { setSigned(undefined); return; }
-    let cancelled = false;
-    const resolve = () =>
-      resolveImageUrl(rawUrl).then(url => { if (!cancelled) setSigned(url ?? undefined); });
-    resolve();
-    // Evict cache and re-resolve 1 min before the 50-min cache entry expires
-    const timer = setTimeout(() => { clearImageUrlCache(rawUrl); resolve(); }, 49 * 60 * 1000);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [rawUrl]);
-  return signed;
-}
+import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
+import { useSignedUrl } from '../hooks/useSignedUrl';
+import { MODALITY, getModality } from './radiology/modality';
+import Lightbox from './radiology/Lightbox';
 import { generateId } from '../utils/sanitize';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -40,96 +24,6 @@ interface Props {
   onDeleteInvestigation?: (patientId: string, investigationId: string) => void;
   initialPatientId?: string;
 }
-
-// ─── Modality config ──────────────────────────────────────────────────────────
-const MODALITY: Record<string, {
-  bg: string; badge: string; Icon: React.FC<{ className?: string }>;
-}> = {
-  'X-Ray'  : { bg: 'bg-slate-900',   badge: 'bg-slate-700 text-slate-200',    Icon: Bone      },
-  'CT'     : { bg: 'bg-indigo-950',  badge: 'bg-indigo-800 text-indigo-200',  Icon: ScanLine  },
-  'MRI'    : { bg: 'bg-violet-950',  badge: 'bg-violet-800 text-violet-200',  Icon: ScanLine  },
-  'USG'    : { bg: 'bg-cyan-950',    badge: 'bg-cyan-800 text-cyan-200',      Icon: Waves     },
-  'Report' : { bg: 'bg-amber-950',   badge: 'bg-amber-800 text-amber-200',    Icon: FileText  },
-};
-
-const getModality = (type: string) =>
-  MODALITY[type] ?? { bg: 'bg-slate-900', badge: 'bg-slate-700 text-slate-200', Icon: ImageIcon };
-
-// ─── Lightbox ─────────────────────────────────────────────────────────────────
-const Lightbox: React.FC<{
-  inv: Investigation;
-  onClose: () => void;
-}> = ({ inv, onClose }) => {
-  const cfg = getModality(inv.type);
-  const signedUrl = useSignedUrl(inv.imageUrl);
-  const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  });
-
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-[70] bg-black flex flex-col"
-      onClick={onClose}
-    >
-      {/* Top bar */}
-      <div
-        className="flex items-center justify-between px-4 py-3 bg-black/70 shrink-0"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2">
-          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded ${cfg.badge}`}>
-            {inv.type}
-          </span>
-          <span className="text-white/50 text-xs">{fmtDate}</span>
-          {inv.findings && (
-            <span className="text-white/70 text-xs truncate max-w-[180px]">{inv.findings}</span>
-          )}
-        </div>
-        <button
-          onClick={onClose}
-          className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Image */}
-      <div
-        className="flex-1 flex items-center justify-center p-4 overflow-hidden"
-        onClick={onClose}
-      >
-        {inv.imageUrl ? (
-          signedUrl ? (
-            <img
-              src={signedUrl}
-              alt={inv.type}
-              className="max-w-full max-h-full object-contain select-none"
-              style={{ touchAction: 'pinch-zoom' }}
-              onClick={e => e.stopPropagation()}
-              draggable={false}
-            />
-          ) : (
-            <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
-          )
-        ) : (
-          <div className="text-white/30 text-center">
-            <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No image available</p>
-          </div>
-        )}
-      </div>
-
-      <p className="text-center text-white/30 text-xs pb-3 shrink-0">Tap anywhere to close</p>
-    </div>
-  );
-};
 
 // ─── ImageCard ────────────────────────────────────────────────────────────────
 const ImageCard: React.FC<{
@@ -368,10 +262,11 @@ const UploadSheet: React.FC<{
   onTypeChange: (t: string) => void;
   phase: RadPhase;
   invType: string;
+  allowPostOp: boolean;
   onSave: () => void;
   onCancel: () => void;
 }> = ({ isOpen, file, previewUrl, patient, isUploading, uploadError,
-        onPhaseChange, onTypeChange, phase, invType, onSave, onCancel }) => {
+        onPhaseChange, onTypeChange, phase, invType, allowPostOp, onSave, onCancel }) => {
   if (!isOpen) return null;
   const isImage = file?.type.startsWith('image/');
 
@@ -403,34 +298,36 @@ const UploadSheet: React.FC<{
           <h3 className="text-base font-semibold text-slate-900">Upload investigation</h3>
           <p className="text-xs text-slate-400">{patient.name} · Bed {patient.bed}</p>
 
-          {/* Phase toggle */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
-              Investigation type
-            </label>
-            <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
-              <button
-                onClick={() => onPhaseChange('preop')}
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  phase === 'preop'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Pre-Op
-              </button>
-              <button
-                onClick={() => onPhaseChange('postop')}
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  phase === 'postop'
-                    ? 'bg-teal-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                Post-Op
-              </button>
+          {/* Phase toggle — hidden for conservative patients (post-op not applicable) */}
+          {allowPostOp && (
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+                Investigation type
+              </label>
+              <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+                <button
+                  onClick={() => onPhaseChange('preop')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    phase === 'preop'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Pre-Op
+                </button>
+                <button
+                  onClick={() => onPhaseChange('postop')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    phase === 'postop'
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Post-Op
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Modality */}
           <div className="space-y-1">
@@ -539,6 +436,12 @@ const RadiologyComparator: React.FC<Props> = ({
     return { preOpScans, postOpScans };
   }, [investigations, selectedPatient]);
 
+  // Conservatively-managed patients aren't operated, so a post-op X-ray isn't
+  // expected. Hide the post-op section for them — but never hide scans that
+  // already exist (e.g. plan changed after imaging), and always keep pre-op.
+  const isConservative = selectedPatient?.management === 'conservative';
+  const showPostOp = !isConservative || postOpScans.length > 0;
+
   const handleCameraClick = async () => {
     try {
       const photo = await CapCamera.getPhoto({
@@ -601,7 +504,8 @@ const RadiologyComparator: React.FC<Props> = ({
         type: invType,
         findings: '',
         imageUrl,
-        phase: uploadPhase,
+        // Conservative patients can't file post-op — guard against stale phase state
+        phase: showPostOp ? uploadPhase : 'preop',
       };
       onAddInvestigation(selectedPatientId, newInv);
       handleCancelUpload();
@@ -704,20 +608,32 @@ const RadiologyComparator: React.FC<Props> = ({
           </div>
 
           {/* ── POST-OP ─────────────────────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-teal-100 p-4">
-            <SectionHeader phase="postop" count={postOpScans.length} patient={selectedPatient} scans={postOpScans} />
-            <div className="grid grid-cols-3 gap-2">
-              {postOpScans.map(inv => (
-                <ImageCard
-                  key={inv.id}
-                  inv={inv}
-                  onClick={() => setLightboxInv(inv)}
-                  onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
-                />
-              ))}
-              <UploadCard phase="postop" onClick={() => { setUploadPhase('postop'); fileInputRef.current?.click(); }} />
+          {showPostOp ? (
+            <div className="bg-white rounded-xl border border-teal-100 p-4">
+              <SectionHeader phase="postop" count={postOpScans.length} patient={selectedPatient} scans={postOpScans} />
+              <div className="grid grid-cols-3 gap-2">
+                {postOpScans.map(inv => (
+                  <ImageCard
+                    key={inv.id}
+                    inv={inv}
+                    onClick={() => setLightboxInv(inv)}
+                    onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
+                  />
+                ))}
+                <UploadCard phase="postop" onClick={() => { setUploadPhase('postop'); fileInputRef.current?.click(); }} />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-emerald-50/40 rounded-xl border border-emerald-100 p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                <Leaf className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-700">Post-op imaging not required</p>
+                <p className="text-xs text-slate-400">Planned conservative management — no post-operative X-ray expected.</p>
+              </div>
+            </div>
+          )}
 
           {/* ── WhatsApp Share Bar ───────────────────────────────────── */}
           {(preOpScans.length + postOpScans.length) > 0 && (
@@ -751,6 +667,7 @@ const RadiologyComparator: React.FC<Props> = ({
         uploadError={uploadError}
         phase={uploadPhase}
         invType={invType}
+        allowPostOp={showPostOp}
         onPhaseChange={setUploadPhase}
         onTypeChange={setInvType}
         onSave={handleSave}
