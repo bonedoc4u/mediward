@@ -26,7 +26,15 @@ import { Queue } from 'workbox-background-sync';
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Take control of existing clients immediately (autoUpdate mode).
+// Prompt-based update flow: the waiting worker activates only when the user
+// accepts the SwUpdateBanner ("Update now" posts SKIP_WAITING via
+// vite-plugin-pwa's updateServiceWorker). Without this listener the new
+// version waited forever on machines where a tab was never fully closed.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// Once activated, take control of open clients immediately.
 clientsClaim();
 
 // Inject the pre-computed precache manifest from workbox-build.

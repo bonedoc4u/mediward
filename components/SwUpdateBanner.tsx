@@ -14,10 +14,15 @@ const SwUpdateBanner: React.FC = () => {
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
-      // Poll for updates every 60 minutes while the app is open
-      if (r) {
-        setInterval(() => r.update(), 60 * 60 * 1000);
-      }
+      if (!r) return;
+      // Poll for updates every 60 minutes while the app is open…
+      setInterval(() => r.update(), 60 * 60 * 1000);
+      // …and whenever the user comes back to the tab — ward desktops keep
+      // the app open for days, so returning focus is the natural moment to
+      // discover a new version.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') r.update();
+      });
     },
   });
 

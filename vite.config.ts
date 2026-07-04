@@ -33,7 +33,12 @@ export default defineConfig(({ mode }) => {
           strategies: 'injectManifest',
           srcDir: '.',
           filename: 'sw.ts',
-          registerType: 'autoUpdate',
+          // 'prompt' pairs with SwUpdateBanner: the new service worker waits
+          // until the user taps "Update now" (never silently reloads
+          // mid-shift). 'autoUpdate' here previously deadlocked desktop tabs:
+          // with a custom injectManifest worker and no skipWaiting call, the
+          // new version waited forever and the banner never fired.
+          registerType: 'prompt',
           includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
           manifest: {
             name: 'MediWard',
