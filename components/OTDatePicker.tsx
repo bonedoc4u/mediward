@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Check, Trash2 } from 'lucide-react';
-import { UNIT_SCHEDULE, getWeekendDutyUnit } from '../utils/otSchedule';
+import { UNIT_SCHEDULE, getWeekendDutyUnit, WeekendDutyMap } from '../utils/otSchedule';
+import { useConfig } from '../contexts/AppContext';
 
 // JS Date.getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
 type OTType = 'major' | 'minor' | 'eot' | null;
 
-function getOTType(unit: string | undefined, date: Date): OTType {
+function getOTType(unit: string | undefined, date: Date, dutyMap: WeekendDutyMap): OTType {
   const dow = date.getDay();
-  // Weekend = EOT, but only when THIS unit is on the rotating weekend duty.
+  // Weekend = EOT, but only when THIS unit is on weekend duty (roster or rotation).
   if (dow === 0 || dow === 6) {
-    return unit && getWeekendDutyUnit(date) === unit.toUpperCase() ? 'eot' : null;
+    return unit && getWeekendDutyUnit(date, dutyMap) === unit.toUpperCase() ? 'eot' : null;
   }
   if (!unit) return null;
   const s = UNIT_SCHEDULE[unit];
@@ -44,6 +45,7 @@ interface Props {
 }
 
 const OTDatePicker: React.FC<Props> = ({ unit, value, minDate, onSelect, onCancel, onClear }) => {
+  const { weekendDuty } = useConfig();
   const ref = useRef<HTMLDivElement>(null);
 
   const initial = value
@@ -152,7 +154,7 @@ const OTDatePicker: React.FC<Props> = ({ unit, value, minDate, onSelect, onCance
           const ymd     = toYMD(date);
           const isPast  = date.getTime() < minMs;
           const isSel   = ymd === selected;
-          const otType  = getOTType(unit ?? undefined, date);
+          const otType  = getOTType(unit ?? undefined, date, weekendDuty);
           const style   = otType ? OT_STYLES[otType] : null;
 
           return (

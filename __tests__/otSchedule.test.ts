@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getWeekendDutyUnit, getOTCycleDates, UNIT_SCHEDULE } from '../utils/otSchedule';
+import { getWeekendDutyUnit, getOTCycleDates, UNIT_SCHEDULE, localYmd, upcomingWeekends } from '../utils/otSchedule';
 
 describe('getWeekendDutyUnit', () => {
   it('returns null on weekdays', () => {
@@ -69,5 +69,34 @@ describe('getOTCycleDates', () => {
     // Same week: OR3 (admits Wed) is on neither Sat(OR4) nor Sun(OR5) duty.
     const r = getOTCycleDates('OR3', new Date(2026, 3, 1, 9));
     expect(r.eotWeekendDates).toEqual([]);
+  });
+});
+
+describe('weekend duty roster overrides', () => {
+  it('localYmd formats the local calendar date', () => {
+    expect(localYmd(new Date(2026, 6, 4))).toBe('2026-07-04');
+  });
+
+  it('an admin roster entry overrides the built-in rotation', () => {
+    const sat = new Date(2026, 3, 4, 9); // Sat 04-Apr → rotation OR4
+    expect(getWeekendDutyUnit(sat)).toBe('OR4');
+    expect(getWeekendDutyUnit(sat, { [localYmd(sat)]: 'OR1' })).toBe('OR1');
+  });
+
+  it('roster feeds getOTCycleDates weekend EOT (OR1 dated onto a Saturday it now owns)', () => {
+    // Assign OR1 to Sat 11-Jul-2026. OR1 admits Mon; window of Mon 06-Jul covers it.
+    const sat = new Date(2026, 6, 11); // Sat 11-Jul
+    const map = { [localYmd(sat)]: 'OR1' };
+    const r = getOTCycleDates('OR1', new Date(2026, 6, 6, 9), map); // Mon 06-Jul
+    expect(r.eotWeekendDates.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('upcomingWeekends returns Saturday/Sunday pairs', () => {
+    const w = upcomingWeekends(2, new Date(2026, 3, 1)); // Wed 01-Apr
+    expect(w).toHaveLength(4);
+    expect(w[0].getDay()).toBe(6); // Sat
+    expect(w[1].getDay()).toBe(0); // Sun
+    expect(w[2].getDay()).toBe(6);
+    expect(w[3].getDay()).toBe(0);
   });
 });

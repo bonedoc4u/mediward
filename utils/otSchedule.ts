@@ -27,15 +27,46 @@ const SUN_CYCLE = [5, 2, 5, 4, 3];
 const ANCHOR_SAT_MS = new Date('2026-04-04').getTime();
 const MS_PER_WEEK = 7 * 86_400_000;
 
-/** Which OR unit (e.g. "OR4") is on weekend duty for the given date, or null on a weekday. */
-export function getWeekendDutyUnit(date: Date): string | null {
+/** Admin-assigned weekend duty roster: local date "YYYY-MM-DD" → unit ("OR4"). */
+export type WeekendDutyMap = Record<string, string>;
+
+/** Local calendar date "YYYY-MM-DD" — time-of-day / timezone independent.
+ *  Used for weekend-duty roster keys (matches what the admin sees on a calendar). */
+export function localYmd(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/**
+ * Which OR unit is on weekend duty for the given date, or null on a weekday.
+ * An admin-assigned roster entry (dutyMap) wins; otherwise the built-in 5-week
+ * rotation is the fallback.
+ */
+export function getWeekendDutyUnit(date: Date, dutyMap: WeekendDutyMap = {}): string | null {
   const dow = date.getDay();
   if (dow !== 0 && dow !== 6) return null;
+  const assigned = dutyMap[localYmd(date)];
+  if (assigned) return assigned.toUpperCase();
   const sat = new Date(date);
   if (dow === 0) sat.setDate(sat.getDate() - 1); // Sun → back to Sat
   sat.setHours(0, 0, 0, 0);
   const idx = (((Math.round((sat.getTime() - ANCHOR_SAT_MS) / MS_PER_WEEK)) % 5) + 5) % 5;
   return `OR${dow === 6 ? SAT_CYCLE[idx] : SUN_CYCLE[idx]}`;
+}
+
+/** Upcoming weekend dates (Sat then Sun each week) for the next `weeks` weeks,
+ *  starting from the coming Saturday. Returns local-midnight Dates. */
+export function upcomingWeekends(weeks: number, from: Date = new Date()): Date[] {
+  const base = new Date(from); base.setHours(0, 0, 0, 0);
+  const toSat = (6 - base.getDay() + 7) % 7; // days until the next Saturday
+  const firstSat = new Date(base); firstSat.setDate(base.getDate() + toSat);
+  const out: Date[] = [];
+  for (let w = 0; w < weeks; w++) {
+    const sat = new Date(firstSat); sat.setDate(firstSat.getDate() + w * 7);
+    const sun = new Date(sat); sun.setDate(sat.getDate() + 1);
+    out.push(sat, sun);
+  }
+  return out;
 }
 
 const ymd = (d: Date): string => d.toISOString().split('T')[0];
@@ -54,7 +85,7 @@ export interface OTCycle {
   eotWeekendDates: string[];
 }
 
-export function getOTCycleDates(unit: string, today: Date = new Date()): OTCycle {
+export function getOTCycleDates(unit: string, today: Date = new Date(), dutyMap: WeekendDutyMap = {}): OTCycle {
   const u = unit?.toUpperCase();
   const s = UNIT_SCHEDULE[u] ?? UNIT_SCHEDULE['OR1'];
   const base = new Date(today); base.setHours(0, 0, 0, 0);
@@ -77,7 +108,7 @@ export function getOTCycleDates(unit: string, today: Date = new Date()): OTCycle
   for (let i = 0; i < 7; i++) {
     const d = new Date(adm); d.setDate(adm.getDate() + i);
     const dow = d.getDay();
-    if ((dow === 0 || dow === 6) && getWeekendDutyUnit(d) === u) eotWeekendDates.push(ymd(d));
+    if ((dow === 0 || dow === 6) && getWeekendDutyUnit(d, dutyMap) === u) eotWeekendDates.push(ymd(d));
   }
   return { eotDate: ymd(adm), majorDate: ymd(major), minorDate: ymd(minor), eotWeekendDates };
 }

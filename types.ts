@@ -95,6 +95,10 @@ export interface HospitalConfig {
   /** Short-form → full-name mapping for comorbidities. Used by OCR to normalise
    *  case-sheet abbreviations and by the picker to display compact labels. */
   comorbidityMap?: ComorbidityEntry[];
+  /** Admin-assigned weekend emergency-OT duty roster: local date "YYYY-MM-DD"
+   *  (Saturday or Sunday) → unit on duty (e.g. "OR4"). Overrides the built-in
+   *  rotating fallback for those specific weekends. */
+  weekendDuty?: Record<string, string>;
 }
 
 /** A ward row from the ward_config table. */
