@@ -271,11 +271,11 @@ const UploadSheet: React.FC<{
   const isImage = file?.type.startsWith('image/');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-2xl
+      <div className="relative w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl
                       animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-center pt-3 pb-1">
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="w-10 h-1 bg-slate-200 rounded-full" />
         </div>
 
