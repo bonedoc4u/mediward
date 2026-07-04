@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import { UNIT_SCHEDULE, getOTCycleDates } from '../utils/otSchedule';
 import * as XLSX from 'xlsx-js-style';
 import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
@@ -57,26 +58,8 @@ interface OTPatient {
 
 type OTType = 'Major' | 'Minor' | 'EOT';
 
-// Department OT schedule — used to auto-assign patients to the correct OT type
-const UNIT_SCHEDULE_OT: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
-  OR1: { admissionDay: 1, majorDay: 4, minorDay: 3 },
-  OR2: { admissionDay: 2, majorDay: 5, minorDay: 4 },
-  OR3: { admissionDay: 3, majorDay: 1, minorDay: 5 }, // Fri minor
-  OR4: { admissionDay: 4, majorDay: 2, minorDay: 1 },
-  OR5: { admissionDay: 5, majorDay: 3, minorDay: 2 },
-};
-
-/** Returns the next date (YYYY-MM-DD) on which targetDow occurs, same day if today matches. */
-function nextOccurrence(targetDow: number): string {
-  const today = new Date();
-  const diff = (targetDow - today.getDay() + 7) % 7;
-  const next = new Date(today);
-  next.setDate(today.getDate() + diff);
-  return next.toISOString().split('T')[0];
-}
-
 function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
-  const s = UNIT_SCHEDULE_OT[unit?.toUpperCase()];
+  const s = UNIT_SCHEDULE[unit?.toUpperCase()];
   if (!s) return null;
   const dow = new Date(dateStr + 'T00:00:00').getDay();
   if (dow === s.majorDay)     return 'Major';
@@ -132,12 +115,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       : user?.unit ?? 'OR1'
   ).toUpperCase();
 
-  // Per-tab date state: each tab defaults to its next scheduled OT day for the effective unit
-  const unitKey = effectiveUnit;
-  const unitSched = UNIT_SCHEDULE_OT[unitKey] ?? UNIT_SCHEDULE_OT['OR1'];
-  const [majorDate, setMajorDate] = useState<string>(() => nextOccurrence(unitSched.majorDay));
-  const [minorDate, setMinorDate] = useState<string>(() => nextOccurrence(unitSched.minorDay));
-  const [eotDate,   setEotDate]   = useState<string>(() => nextOccurrence(unitSched.admissionDay));
+  // OT cycle = the 7 days after this unit's admission day (see getOTCycleDates).
+  // Each tab defaults to that cycle's Major / Minor / EOT date.
+  const cycle = useMemo(() => getOTCycleDates(effectiveUnit), [effectiveUnit]);
+  const [majorDate, setMajorDate] = useState<string>(cycle.majorDate);
+  const [minorDate, setMinorDate] = useState<string>(cycle.minorDate);
+  const [eotDate,   setEotDate]   = useState<string>(cycle.eotDate);
+  // Re-anchor when the unit changes (any manual date edits reset to the cycle).
+  useEffect(() => {
+    setMajorDate(cycle.majorDate);
+    setMinorDate(cycle.minorDate);
+    setEotDate(cycle.eotDate);
+  }, [cycle]);
 
   const selectedDate    = activeTab === 'Major' ? majorDate : activeTab === 'Minor' ? minorDate : eotDate;
   const setSelectedDate = activeTab === 'Major' ? setMajorDate : activeTab === 'Minor' ? setMinorDate : setEotDate;

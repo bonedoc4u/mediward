@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getWeekendDutyUnit, UNIT_SCHEDULE } from '../utils/otSchedule';
+import { getWeekendDutyUnit, getOTCycleDates, UNIT_SCHEDULE } from '../utils/otSchedule';
 
 describe('getWeekendDutyUnit', () => {
   it('returns null on weekdays', () => {
@@ -24,5 +24,37 @@ describe('getWeekendDutyUnit', () => {
 
   it('every unit has a full OT schedule', () => {
     expect(Object.keys(UNIT_SCHEDULE)).toHaveLength(5);
+  });
+});
+
+describe('getOTCycleDates', () => {
+  // Timezone-invariant helpers: differences survive any toISOString offset.
+  const parse = (s: string) => new Date(s + 'T00:00:00');
+  const daysBetween = (a: string, b: string) => Math.round((parse(b).getTime() - parse(a).getTime()) / 86_400_000);
+
+  it('returns three YYYY-MM-DD dates', () => {
+    const r = getOTCycleDates('OR2', new Date(2026, 6, 1, 9));
+    for (const d of [r.eotDate, r.majorDate, r.minorDate]) expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('major & minor fall within the 7-day window after the EOT/admission day', () => {
+    const r = getOTCycleDates('OR2', new Date(2026, 6, 1, 9));
+    expect(daysBetween(r.eotDate, r.majorDate)).toBeGreaterThanOrEqual(1);
+    expect(daysBetween(r.eotDate, r.majorDate)).toBeLessThanOrEqual(6);
+    expect(daysBetween(r.eotDate, r.minorDate)).toBeGreaterThanOrEqual(1);
+    expect(daysBetween(r.eotDate, r.minorDate)).toBeLessThanOrEqual(6);
+  });
+
+  it('rolls forward by exactly 7 days one week later', () => {
+    const a = getOTCycleDates('OR2', new Date(2026, 6, 6, 9));  // Mon 06-Jul
+    const b = getOTCycleDates('OR2', new Date(2026, 6, 13, 9)); // Mon 13-Jul
+    expect(daysBetween(a.eotDate, b.eotDate)).toBe(7);
+    expect(daysBetween(a.majorDate, b.majorDate)).toBe(7);
+    expect(daysBetween(a.minorDate, b.minorDate)).toBe(7);
+  });
+
+  it('unknown unit falls back to a valid cycle', () => {
+    const r = getOTCycleDates('OR9', new Date(2026, 6, 1, 9));
+    expect(r.eotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
