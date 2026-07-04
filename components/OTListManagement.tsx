@@ -4,7 +4,7 @@ import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { UNIT_SCHEDULE, getOTCycleDates } from '../utils/otSchedule';
 import * as XLSX from 'xlsx-js-style';
-import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical, ShieldAlert } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -151,6 +151,8 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       { date: majorDate, fallbackType: 'Major' },
       { date: minorDate, fallbackType: 'Minor' },
       { date: eotDate,   fallbackType: 'EOT'   },
+      // Weekend EOT days when this unit is on weekend duty this cycle.
+      ...cycle.eotWeekendDates.map(date => ({ date, fallbackType: 'EOT' as OTType })),
     ];
     setOtList(prev => {
       const existing = new Set(prev.map(p => p.ipNo));
@@ -184,7 +186,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
       return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [majorDate, minorDate, eotDate, patients]);
+  }, [majorDate, minorDate, eotDate, patients, cycle]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -661,6 +663,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients, onUpdateP
           />
         </div>
       </div>
+
+      {/* Weekend EOT duty hint — shown on the EOT tab when this unit is on weekend duty this cycle */}
+      {activeTab === 'EOT' && cycle.eotWeekendDates.length > 0 && (
+        <div className="flex items-center gap-2 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          {effectiveUnit} is on weekend duty this cycle — weekend EOT:{' '}
+          {cycle.eotWeekendDates
+            .map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }))
+            .join(', ')}
+          . Cases dated on these days appear in this list.
+        </div>
+      )}
 
       {/* List Meta — Surgeon / Unit / Time (editable, used in exports) */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">

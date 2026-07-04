@@ -46,11 +46,17 @@ const ymd = (d: Date): string => d.toISOString().split('T')[0];
  * once both have passed, rolls to next week's admission cycle. Returns the
  * cycle's EOT (admission), Major and Minor dates (YYYY-MM-DD).
  */
-export function getOTCycleDates(
-  unit: string,
-  today: Date = new Date(),
-): { eotDate: string; majorDate: string; minorDate: string } {
-  const s = UNIT_SCHEDULE[unit?.toUpperCase()] ?? UNIT_SCHEDULE['OR1'];
+export interface OTCycle {
+  eotDate: string;   // admission day (start of the 7-day window)
+  majorDate: string;
+  minorDate: string;
+  /** Weekend day(s) in this window on which THIS unit is on emergency-OT duty. */
+  eotWeekendDates: string[];
+}
+
+export function getOTCycleDates(unit: string, today: Date = new Date()): OTCycle {
+  const u = unit?.toUpperCase();
+  const s = UNIT_SCHEDULE[u] ?? UNIT_SCHEDULE['OR1'];
   const base = new Date(today); base.setHours(0, 0, 0, 0);
   // Most recent admission day on or before today.
   const daysSinceAdm = (base.getDay() - s.admissionDay + 7) % 7;
@@ -66,5 +72,12 @@ export function getOTCycleDates(
     major = dateForDow(adm, s.majorDay);
     minor = dateForDow(adm, s.minorDay);
   }
-  return { eotDate: ymd(adm), majorDate: ymd(major), minorDate: ymd(minor) };
+  // Weekend EOT: any Sat/Sun in the window where this unit is on weekend duty.
+  const eotWeekendDates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(adm); d.setDate(adm.getDate() + i);
+    const dow = d.getDay();
+    if ((dow === 0 || dow === 6) && getWeekendDutyUnit(d) === u) eotWeekendDates.push(ymd(d));
+  }
+  return { eotDate: ymd(adm), majorDate: ymd(major), minorDate: ymd(minor), eotWeekendDates };
 }

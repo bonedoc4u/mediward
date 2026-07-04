@@ -57,4 +57,17 @@ describe('getOTCycleDates', () => {
     const r = getOTCycleDates('OR9', new Date(2026, 6, 1, 9));
     expect(r.eotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+
+  it('includes a weekend EOT date when the unit is on weekend duty that cycle', () => {
+    // Week of Sat 04-Apr-2026: Saturday duty = OR4. OR4 admits Thu (02-Apr),
+    // so its 7-day window includes that Saturday.
+    const r = getOTCycleDates('OR4', new Date(2026, 3, 2, 9));
+    expect(r.eotWeekendDates.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('has no weekend EOT date when the unit is not on weekend duty that cycle', () => {
+    // Same week: OR3 (admits Wed) is on neither Sat(OR4) nor Sun(OR5) duty.
+    const r = getOTCycleDates('OR3', new Date(2026, 3, 1, 9));
+    expect(r.eotWeekendDates).toEqual([]);
+  });
 });
