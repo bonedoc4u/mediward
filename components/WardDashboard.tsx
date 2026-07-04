@@ -57,6 +57,7 @@ interface Props {
   onStartRounds?: () => void;
   onAddLab?: (ipNo: string, type: string, value: number, date: string) => Promise<void>;
   onAssignDate?: (ipNo: string, plannedDos: string) => void;
+  onClearDate?: (ipNo: string) => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
@@ -64,7 +65,7 @@ interface Props {
   highlightIpNo?: string | null;
 }
 
-const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, hasMore, isLoadingMore, onLoadMore, highlightIpNo }) => {
+const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAddPatient, onEditPatient, onViewPatient, onStartRounds, onAddLab, onAssignDate, onClearDate, hasMore, isLoadingMore, onLoadMore, highlightIpNo }) => {
   const { wards: configWards, icuWardNames, labTypes, showNews2 } = useConfig();
   const { user, selectedUnit } = useAuth();
 
@@ -766,6 +767,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
               value={assigningDateValue}
               minDate={today}
               onSelect={date => handleAssignDate(assigningDateIp, date)}
+              onClear={() => { if (assigningDateIp) onClearDate?.(assigningDateIp); setAssigningDateIp(null); setAssigningDateValue(''); }}
               onCancel={() => { setAssigningDateIp(null); setAssigningDateValue(''); }}
             />
           </div>

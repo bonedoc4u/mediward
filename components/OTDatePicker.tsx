@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Check, Trash2 } from 'lucide-react';
 
 // JS Date.getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
 const UNIT_SCHEDULE: Record<string, { admissionDay: number; majorDay: number; minorDay: number }> = {
@@ -41,9 +41,11 @@ interface Props {
   minDate: string;        // YYYY-MM-DD
   onSelect: (date: string) => void;
   onCancel: () => void;
+  /** Clear the currently-assigned date. Shown only when a date is already set. */
+  onClear?: () => void;
 }
 
-const OTDatePicker: React.FC<Props> = ({ unit, value, minDate, onSelect, onCancel }) => {
+const OTDatePicker: React.FC<Props> = ({ unit, value, minDate, onSelect, onCancel, onClear }) => {
   const ref = useRef<HTMLDivElement>(null);
 
   const initial = value
@@ -107,7 +109,7 @@ const OTDatePicker: React.FC<Props> = ({ unit, value, minDate, onSelect, onCance
   return (
     <div
       ref={ref}
-      className="bg-white rounded-xl shadow-xl border border-slate-200 p-3 w-72"
+      className="bg-white rounded-xl shadow-xl border border-slate-200 p-3 w-80 max-w-full"
     >
       {/* Unit label + legend */}
       {unitLabel && (
@@ -194,13 +196,20 @@ const OTDatePicker: React.FC<Props> = ({ unit, value, minDate, onSelect, onCance
 
       {/* Footer actions */}
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
-        <button onClick={onCancel} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded hover:bg-slate-100 transition-colors">
-          <X className="w-3.5 h-3.5" /> Cancel
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={onCancel} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded hover:bg-slate-100 transition-colors">
+            <X className="w-3.5 h-3.5" /> Cancel
+          </button>
+          {value && onClear && (
+            <button onClick={onClear} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 px-2 py-1.5 rounded hover:bg-red-50 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear
+            </button>
+          )}
+        </div>
         {selected && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">
-              {new Date(selected + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+            <span className="text-xs text-slate-500 hidden sm:inline">
+              {new Date(selected + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
             </span>
             <button
               onClick={handleConfirm}

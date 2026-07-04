@@ -552,6 +552,10 @@ const App: React.FC = () => {
               const patient = patients.find(p => p.ipNo === ipNo);
               if (patient) updatePatient({ ...patient, plannedDos });
             }}
+            onClearDate={(ipNo) => {
+              const patient = patients.find(p => p.ipNo === ipNo);
+              if (patient) updatePatient({ ...patient, plannedDos: undefined });
+            }}
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
             onLoadMore={loadMorePatients}
