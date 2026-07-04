@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Scissors, CalendarCheck, Zap, ShieldAlert, BedDouble } from 'lucide-react';
+import { Scissors, Zap, ShieldAlert, BedDouble } from 'lucide-react';
 import { UNIT_SCHEDULE, getWeekendDutyUnit, WeekendDutyMap } from '../utils/otSchedule';
 import { useConfig } from '../contexts/AppContext';
 
@@ -8,7 +8,7 @@ import { useConfig } from '../contexts/AppContext';
 // UNIT_SCHEDULE + weekend-duty roster live in utils/otSchedule (shared).
 
 const ALL_UNITS = ['OR1', 'OR2', 'OR3', 'OR4', 'OR5'];
-const DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 
 type EventType = 'admission' | 'major' | 'minor' | 'weekend-duty';
 

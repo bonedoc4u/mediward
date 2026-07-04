@@ -5,7 +5,7 @@
  * initial hospital_config, and the first admin user atomically.
  */
 
-import { supabase } from '../lib/supabase';
+
 
 export interface RegisterHospitalParams {
   hospitalName: string;

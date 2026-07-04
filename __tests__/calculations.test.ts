@@ -14,14 +14,15 @@ function localDate(d: Date): string {
 }
 
 describe('calculatePOD', () => {
-  it('returns 0 when DOS is today', () => {
+  // POD is 1-based app-wide: day of surgery = POD 1 (commit 27919b2).
+  it('returns 1 when DOS is today (day of surgery)', () => {
     const today = localDate(new Date());
-    expect(calculatePOD(today)).toBe(0);
+    expect(calculatePOD(today)).toBe(1);
   });
 
-  it('returns correct POD for a past date', () => {
+  it('returns correct 1-based POD for a past date', () => {
     const threeDaysAgo = localDate(new Date(Date.now() - 3 * 86_400_000));
-    expect(calculatePOD(threeDaysAgo)).toBe(3);
+    expect(calculatePOD(threeDaysAgo)).toBe(4);
   });
 
   it('returns undefined for a future DOS (not yet operated)', () => {
@@ -59,15 +60,15 @@ describe('getStatusColor', () => {
     expect(result).toContain('green');
   });
 
-  it('returns orange + animate-pulse for Critical', () => {
+  it('returns red + animate-pulse for Critical', () => {
     const result = getStatusColor('Critical');
-    expect(result).toContain('orange');
+    expect(result).toContain('red');
     expect(result).toContain('animate-pulse');
   });
 
-  it('returns grey/default for unknown status', () => {
+  it('returns slate/default for unknown status', () => {
     const result = getStatusColor('Unknown Status');
-    expect(result).toContain('gray');
+    expect(result).toContain('slate');
   });
 
   it('is case-insensitive', () => {

@@ -21,7 +21,7 @@ interface Props {
 }
 
 export const RoundModeOfflineBanner: React.FC<Props> = ({ onRetry, networkQuality = 'fast' }) => {
-  const { status, attempt, nextRetryIn, isOnline } = useConnectionStatus();
+  const { status, attempt, nextRetryIn } = useConnectionStatus();
 
   const handleRetry = useCallback(() => {
     onRetry?.();

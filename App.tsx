@@ -851,11 +851,12 @@ const App: React.FC = () => {
       {/* ─── Mobile Bottom Tab Bar ─── */}
       <PwaInstallBanner />
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <nav aria-label="Main navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="grid grid-cols-5">
           {mobileTabs.map(tab => (
             <button
               key={tab.id}
+              aria-current={currentView === tab.id ? 'page' : undefined}
               onClick={() => { navigateTo(tab.id); setIsMobileMenuOpen(false); }}
               className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
                 currentView === tab.id ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
@@ -870,6 +871,8 @@ const App: React.FC = () => {
           ))}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-expanded={isMobileMenuOpen}
+            aria-haspopup="menu"
             className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
               isMobileMenuOpen ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
             }`}

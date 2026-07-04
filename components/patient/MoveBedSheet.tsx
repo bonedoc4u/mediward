@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { X, ArrowRightLeft } from 'lucide-react';
 import { Patient, Ward } from '../../types';
+import BottomSheetPicker from '../ui/BottomSheetPicker';
 
 interface Props {
   patient: Patient;
@@ -48,9 +49,13 @@ const MoveBedSheet: React.FC<Props> = ({ patient, wardOptions, onSave, onClose }
         <div className="space-y-3 mb-4">
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Ward</label>
-            <select className={INPUT} value={ward} onChange={e => setWard(e.target.value)}>
-              {options.map(w => <option key={w} value={w}>{w}</option>)}
-            </select>
+            <BottomSheetPicker
+              value={ward}
+              options={options.map(w => ({ value: w, label: w }))}
+              onChange={w => setWard(w as Ward)}
+              title="Move to ward"
+              triggerClassName={`${INPUT} flex items-center justify-between gap-2 text-left`}
+            />
           </div>
           <div>
             <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Bed</label>

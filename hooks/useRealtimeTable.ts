@@ -55,7 +55,7 @@ export function useRealtimeTable<T extends Record<string, unknown>>(
     retryMsRef.current   = 2_000;
 
     function connect(): void {
-      const { table, filter, event = '*', onInsert, onUpdate, onDelete, enabled = true } = optsRef.current;
+      const { table, filter, event = '*', enabled = true } = optsRef.current;
 
       if (!enabled || destroyedRef.current) return;
 
@@ -99,6 +99,6 @@ export function useRealtimeTable<T extends Record<string, unknown>>(
     };
   // Re-subscribe when the table, filter, event, or enabled flag changes.
   // Callback refs (onInsert etc.) are excluded — they update via optsRef.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [opts.table, opts.filter, opts.event, opts.enabled]);
 }

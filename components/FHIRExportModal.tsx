@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Patient } from '../types';
-import { patientToFhirBundle, parseFhirPatient, FhirBundleSummary } from '../services/fhirService';
+import { patientToFhirBundle, parseFhirPatient } from '../services/fhirService';
 import { X, Download, Copy, Check, ChevronDown, ChevronUp, Shield, FileJson, AlertTriangle } from 'lucide-react';
 
 interface Props {

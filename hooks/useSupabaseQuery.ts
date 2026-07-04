@@ -63,7 +63,7 @@ export function useSupabaseQuery<T>(
       if (data && cacheKey) setCache(data);
       setState({ data, loading: false, error: null, isStale: false });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [...deps]);
 
   useEffect(() => { void run(); }, [run]);

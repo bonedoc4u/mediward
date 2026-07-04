@@ -4,7 +4,7 @@
  * Uses vite-plugin-pwa's useRegisterSW with registerType: 'prompt' so the app
  * NEVER silently reloads mid-session — critical in an active clinical workflow.
  */
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw, X } from 'lucide-react';
 

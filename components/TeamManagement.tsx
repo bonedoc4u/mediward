@@ -6,6 +6,7 @@ import BottomSheetPicker from './ui/BottomSheetPicker';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { StoredUser, UserRole } from '../types';
 import { ROLE_LABELS, ROLE_ACCESS_DESC, ROLE_COLORS } from '../utils/permissions';
+import { validatePassword } from '../utils/passwordPolicy';
 import {
   fetchAllUsers, upsertAppUser, removeAppUser, createAuthUser
 } from '../services/userService';
@@ -67,7 +68,8 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
     setFormError('');
     if (!form.name.trim()) return setFormError('Full name is required.');
     if (!form.email.trim() || !form.email.includes('@')) return setFormError('Valid email is required.');
-    if (form.password.length < 8) return setFormError('Password must be at least 8 characters.');
+    const pwError = validatePassword(form.password);
+    if (pwError) return setFormError(pwError);
     if (users.some(u => u.email.toLowerCase() === form.email.toLowerCase()))
       return setFormError('A user with this email already exists.');
 
@@ -263,7 +265,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                   type={showPw ? 'text' : 'password'}
                   value={form.password}
                   onChange={e => setForm(v => ({ ...v, password: e.target.value }))}
-                  placeholder="Min. 8 characters"
+                  placeholder="Min. 10 characters"
                   className="w-full p-2.5 border border-slate-300 rounded-lg text-sm pr-10 focus:ring-2 focus:ring-blue-200 focus:border-teal-400 outline-none"
                 />
                 <button type="button" onClick={() => setShowPw(v => !v)}

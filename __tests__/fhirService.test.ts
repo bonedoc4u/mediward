@@ -148,19 +148,17 @@ describe('patientsToFhirBundle', () => {
 // ─── downloadFhirBundle ───────────────────────────────────────────────────────
 
 describe('downloadFhirBundle', () => {
-  let createElementSpy: ReturnType<typeof vi.spyOn>;
-  let createObjectURLSpy: ReturnType<typeof vi.spyOn>;
-  let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>;
+
   const fakeUrl = 'blob:http://localhost/fake-uuid';
   const fakeAnchor = { href: '', download: '', click: vi.fn() } as unknown as HTMLAnchorElement;
 
   beforeEach(() => {
-    createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(fakeAnchor);
-    createObjectURLSpy = vi.stubGlobal('URL', {
+    vi.spyOn(document, 'createElement').mockReturnValue(fakeAnchor);
+    vi.stubGlobal('URL', {
       createObjectURL: vi.fn().mockReturnValue(fakeUrl),
       revokeObjectURL: vi.fn(),
     });
-    revokeObjectURLSpy = createObjectURLSpy; // same stub
+
   });
 
   afterEach(() => {

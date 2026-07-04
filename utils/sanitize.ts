@@ -31,12 +31,14 @@ async function getDOMPurify(): Promise<DOMPurifyType | null> {
 export function sanitizeInput(input: string): string {
   if (!input || typeof input !== 'string') return '';
 
-  // Synchronous path: strip all HTML tags via DOM (fast, no async needed for plain text).
-  // This is safe for plain-text fields (name, diagnosis, notes) — not rich HTML.
-  if (typeof window !== 'undefined' && window.document) {
-    const div = document.createElement('div');
-    div.textContent = input; // textContent assignment escapes everything
-    return div.textContent ?? input.trim();
+  // Synchronous path: parse with DOMParser and keep only the text content.
+  // DOMParser documents are inert — nothing executes and no resources load,
+  // unlike innerHTML assignment where <img onerror=…> can still fire.
+  // Clinical strings like "Hb <8" survive: "<" followed by a non-letter is
+  // not a tag start per the HTML spec.
+  if (typeof window !== 'undefined' && 'DOMParser' in window) {
+    const doc = new DOMParser().parseFromString(input, 'text/html');
+    return (doc.body.textContent ?? '').trim();
   }
 
   // SSR / non-browser fallback: strip tags manually
@@ -72,9 +74,9 @@ export async function sanitizeHtml(html: string): Promise<string> {
  */
 export function escapeHtml(str: string): string {
   const entities: Record<string, string> = {
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;',
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;', '/': '&#x2F;',
   };
-  return str.replace(/[&<>"']/g, c => entities[c] ?? c);
+  return str.replace(/[&<>"'/]/g, c => entities[c] ?? c);
 }
 
 /**

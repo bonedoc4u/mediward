@@ -92,6 +92,8 @@ export default defineConfig(({ mode }) => {
         globals: true,
         environment: 'jsdom',
         setupFiles: ['./__tests__/setup.ts'],
+        // e2e/ is Playwright — it must not run under vitest
+        exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
         coverage: {
           provider:        'v8',
           reporter:        ['text', 'json-summary', 'html'],

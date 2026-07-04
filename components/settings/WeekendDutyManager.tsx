@@ -68,6 +68,7 @@ const WeekendDutyManager: React.FC = () => {
                 <span className="text-sm text-slate-600 flex-1 min-w-0 truncate">{fmt(d)}</span>
                 <select
                   value={valueFor(d)}
+                  aria-label={`EOT duty unit for ${fmt(d)}`}
                   onChange={e => setFor(d, e.target.value)}
                   className="px-3 py-2 min-h-[40px] border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                 >

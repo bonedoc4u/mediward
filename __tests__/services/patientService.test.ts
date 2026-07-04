@@ -18,7 +18,7 @@ vi.mock('../../lib/supabase', () => {
         return Promise.resolve(mockState.result).then(onFulfilled);
       },
     };
-    for (const m of ['select', 'neq', 'order', 'limit', 'eq', 'upsert', 'delete', 'insert']) {
+    for (const m of ['select', 'neq', 'order', 'limit', 'eq', 'upsert', 'delete', 'insert', 'update', 'is', 'not', 'maybeSingle', 'range']) {
       b[m] = vi.fn().mockReturnValue(b);
     }
     return b;
@@ -101,7 +101,7 @@ beforeEach(() => {
         return Promise.resolve(mockState.result).then(onFulfilled);
       },
     };
-    for (const m of ['select', 'neq', 'order', 'limit', 'eq', 'upsert', 'delete', 'insert']) {
+    for (const m of ['select', 'neq', 'order', 'limit', 'eq', 'upsert', 'delete', 'insert', 'update', 'is', 'not', 'maybeSingle', 'range']) {
       b[m] = vi.fn().mockReturnValue(b);
     }
     return b;
@@ -179,12 +179,13 @@ describe('fetchActivePatients', () => {
   });
 
   it('applies unit filter when unit is provided', async () => {
-    const builder = { select: vi.fn(), neq: vi.fn(), order: vi.fn(), limit: vi.fn(), eq: vi.fn(), then: (fn: any) => Promise.resolve({ data: [], error: null }).then(fn) };
+    const builder = { select: vi.fn(), neq: vi.fn(), order: vi.fn(), limit: vi.fn(), eq: vi.fn(), is: vi.fn(), then: (fn: any) => Promise.resolve({ data: [], error: null }).then(fn) };
     builder.select.mockReturnValue(builder);
     builder.neq.mockReturnValue(builder);
     builder.order.mockReturnValue(builder);
     builder.limit.mockReturnValue(builder);
     builder.eq.mockReturnValue(builder);
+    builder.is.mockReturnValue(builder);
     vi.mocked(supabase.from).mockReturnValue(builder as any);
 
     await fetchActivePatients('OR1');
@@ -198,6 +199,7 @@ describe('fetchActivePatients', () => {
       neq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       eq: eqSpy,
       then: (fn: any) => Promise.resolve({ data: [], error: null }).then(fn),
     };
@@ -219,6 +221,9 @@ describe('fetchAllPatients', () => {
       neq: neqSpy,
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      range: vi.fn().mockReturnThis(),
       then: (fn: any) => Promise.resolve({ data: [], error: null }).then(fn),
     };
     vi.mocked(supabase.from).mockReturnValue(builder);

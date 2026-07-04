@@ -35,13 +35,14 @@ describe('getTriagePriority', () => {
     expect(getTriagePriority(p)).toBe(0);
   });
 
-  it('assigns 1 to POD 0 (day of surgery)', () => {
-    const p = makePatient({ pod: 0 });
+  // POD is 1-based across the app: day of surgery = POD 1 (commit 27919b2).
+  it('assigns 1 to POD 1 (day of surgery)', () => {
+    const p = makePatient({ pod: 1 });
     expect(getTriagePriority(p)).toBe(1);
   });
 
-  it('assigns 2 to POD 1 (first post-op day)', () => {
-    const p = makePatient({ pod: 1 });
+  it('assigns 2 to POD 2 (first day after surgery)', () => {
+    const p = makePatient({ pod: 2 });
     expect(getTriagePriority(p)).toBe(2);
   });
 
@@ -65,13 +66,13 @@ describe('getTriagePriority', () => {
     expect(getTriagePriority(p)).toBe(6);
   });
 
-  it('Critical overrides POD 0 (Critical is always top)', () => {
-    const p = makePatient({ patientStatus: PatientStatus.Critical, pod: 0 });
+  it('Critical overrides POD 1 (Critical is always top)', () => {
+    const p = makePatient({ patientStatus: PatientStatus.Critical, pod: 1 });
     expect(getTriagePriority(p)).toBe(0);
   });
 
-  it('POD 0 takes priority over PAC Pending', () => {
-    const p = makePatient({ pod: 0, pacStatus: PacStatus.Pending });
+  it('POD 1 takes priority over PAC Pending', () => {
+    const p = makePatient({ pod: 1, pacStatus: PacStatus.Pending });
     expect(getTriagePriority(p)).toBe(1);
   });
 
@@ -89,14 +90,16 @@ describe('getTriageBorderClass', () => {
     expect(getTriageBorderClass(p)).toContain('red');
   });
 
-  it('returns amber border for POD 0', () => {
-    const p = makePatient({ pod: 0 });
-    expect(getTriageBorderClass(p)).toContain('amber');
+  // Post-op border is teal since commit 27919b2 (amber → teal, so post-op is
+  // clearly distinct from pre-op PAC Pending orange).
+  it('returns teal border for POD 1 (day of surgery)', () => {
+    const p = makePatient({ pod: 1 });
+    expect(getTriageBorderClass(p)).toContain('teal');
   });
 
-  it('returns amber border for POD 1', () => {
-    const p = makePatient({ pod: 1 });
-    expect(getTriageBorderClass(p)).toContain('amber');
+  it('returns teal border for POD 2', () => {
+    const p = makePatient({ pod: 2 });
+    expect(getTriageBorderClass(p)).toContain('teal');
   });
 
   it('returns orange border for PAC Pending', () => {

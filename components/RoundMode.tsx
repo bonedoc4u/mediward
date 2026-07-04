@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp, useConfig, usePatients } from '../contexts/AppContext';
-import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacFlowData, PacStatus } from '../types';
+import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacStatus } from '../types';
 import { getStatusColor, sortByBed } from '../utils/calculations';
 import { generateId } from '../utils/sanitize';
 import { getSmartAlerts } from '../utils/smartAlerts';

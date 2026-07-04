@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { enqueue, getQueue, dequeue, incrementAttempts, getQueueSize } from '../services/syncQueue';
+import {
+  enqueue, getQueue, dequeue, incrementAttempts, getQueueSize,
+  clearMainQueue, clearDeadLetterQueue,
+} from '../services/syncQueue';
 
 beforeEach(() => {
-  // Clear localStorage queue before each test
+  // The queue is an in-memory cache mirrored to storage — clearing
+  // localStorage alone leaks state between tests.
+  clearMainQueue();
+  clearDeadLetterQueue();
   localStorage.removeItem('mediward_sync_queue');
 });
 

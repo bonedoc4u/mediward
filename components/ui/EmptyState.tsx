@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Users, FileText, Settings, CreditCard, Search,
-  Plus, RefreshCw, type LucideIcon,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface EmptyStateProps {
