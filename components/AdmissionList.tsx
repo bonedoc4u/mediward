@@ -6,7 +6,7 @@ import { Patient } from '../types';
 import { localYmd, todayYmd } from '../utils/dates';
 
 interface Props {
-  onAddPatient?: (source: 'OPD' | 'Casualty') => void;
+  onAddPatient?: (source: 'OPD' | 'Casualty', doa?: string) => void;
   onEditPatient?: (patient: Patient) => void;
   onDeletePatient?: (patient: Patient) => void;
 }
@@ -455,7 +455,7 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
         patients={opdPatients}
         date={selectedDate}
         unit={user?.unit}
-        onAdd={onAddPatient ? () => onAddPatient('OPD') : undefined}
+        onAdd={onAddPatient ? () => onAddPatient('OPD', selectedDate) : undefined}
         onEdit={onEditPatient}
         onDelete={onDeletePatient}
       />
@@ -466,7 +466,7 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
         patients={casualtyPatients}
         date={selectedDate}
         unit={user?.unit}
-        onAdd={onAddPatient ? () => onAddPatient('Casualty') : undefined}
+        onAdd={onAddPatient ? () => onAddPatient('Casualty', selectedDate) : undefined}
         onEdit={onEditPatient}
         onDelete={onDeletePatient}
       />
@@ -490,14 +490,14 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
             <div className="flex gap-2 mt-4">
               <button
                 type="button"
-                onClick={() => onAddPatient('OPD')}
+                onClick={() => onAddPatient('OPD', selectedDate)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg"
               >
                 <Plus className="w-4 h-4" /> Add OPD
               </button>
               <button
                 type="button"
-                onClick={() => onAddPatient('Casualty')}
+                onClick={() => onAddPatient('Casualty', selectedDate)}
                 className="flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-lg"
               >
                 <Plus className="w-4 h-4" /> Add Casualty

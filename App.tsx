@@ -293,6 +293,9 @@ const App: React.FC = () => {
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [addModalSource, setAddModalSource] = useState<AdmissionSource | undefined>();
+  // When adding from an admission list of a specific date, DOA defaults to
+  // that date rather than today.
+  const [addModalDoa, setAddModalDoa] = useState<string | undefined>();
 
   const handleSavePatient = useCallback((patient: Patient) => {
     if (editingPatient) {
@@ -304,9 +307,10 @@ const App: React.FC = () => {
     setIsAddPatientModalOpen(false);
   }, [editingPatient, updatePatient, addPatient]);
 
-  const openAddModal = useCallback((source?: AdmissionSource) => {
+  const openAddModal = useCallback((source?: AdmissionSource, doa?: string) => {
     setEditingPatient(null);
     setAddModalSource(source);
+    setAddModalDoa(doa);
     setIsAddPatientModalOpen(true);
     setIsMobileMenuOpen(false);
   }, []);
@@ -541,7 +545,7 @@ const App: React.FC = () => {
       case 'admissions':
         return (
           <AdmissionList
-            onAddPatient={can(user, 'patient:add') ? (src) => openAddModal(src) : undefined}
+            onAddPatient={can(user, 'patient:add') ? (src, doa) => openAddModal(src, doa) : undefined}
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
             onDeletePatient={can(user, 'patient:delete') ? (p) => deletePatient(p.ipNo) : undefined}
           />
@@ -828,6 +832,7 @@ const App: React.FC = () => {
           onSave={handleSavePatient}
           initialData={editingPatient}
           defaultAdmissionSource={editingPatient ? undefined : addModalSource}
+          defaultDoa={editingPatient ? undefined : addModalDoa}
           viewingUnit={
             editingPatient ? undefined
             : ((user?.role === 'admin' || user?.role === 'superadmin') && selectedUnit && selectedUnit !== 'all') ? selectedUnit

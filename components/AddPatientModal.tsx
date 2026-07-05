@@ -19,6 +19,8 @@ interface Props {
   initialData?: Patient | null;
   /** Pre-select OPD or Casualty when opening for a new patient from the Admission List view. */
   defaultAdmissionSource?: AdmissionSource;
+  /** Pre-fill DOA when adding from an admission list of a specific date (defaults to today). */
+  defaultDoa?: string;
   /** Admin's currently-viewed unit — pre-fills unit and filters wards accordingly. */
   viewingUnit?: string;
 }
@@ -102,7 +104,7 @@ async function compressImageBase64(
   });
 }
 
-const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, defaultAdmissionSource, viewingUnit }) => {
+const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, defaultAdmissionSource, defaultDoa, viewingUnit }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
   const { comorbidityMap, saveComorbidityMap } = useComorbidityPresets();
@@ -176,7 +178,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           ...(defaultAdmissionSource ? { admissionSource: defaultAdmissionSource } : {}),
           // Reset date to today so a stale OCR-filled date from a previous session
           // doesn't silently put the patient under the wrong admission-list day.
-          doa: todayYmd(),
+          doa: defaultDoa ?? todayYmd(),
         };
       }
     } catch { /* ignore */ }
@@ -191,7 +193,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       mobile: '',
       diagnosis: '',
       modeOfInjury: '',
-      doa: todayYmd(),
+      doa: defaultDoa ?? todayYmd(),
       procedure: '',
       dos: '',
       pacStatus: PacStatus.Pending,
@@ -309,7 +311,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ...prev,
       ipNo: '', name: '', age: '', gender: Gender.Male,
       mobile: '', diagnosis: '', modeOfInjury: '',
-      doa: todayYmd(),
+      doa: defaultDoa ?? todayYmd(),
     }));
     setSelectedComorbidities([]);
     setStepRaw(1);
@@ -512,7 +514,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
               // Apply admission source from the button that opened the modal.
               ...(defaultAdmissionSource ? { admissionSource: defaultAdmissionSource } : {}),
               // Reset to today so a stale OCR date from a prior session is cleared.
-              doa: todayYmd(),
+              doa: defaultDoa ?? todayYmd(),
             };
             setFormData(restoredForm);
             if (parsed.selectedComorbidities) setSelectedComorbidities(parsed.selectedComorbidities);
@@ -534,7 +536,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
         mobile: '',
         diagnosis: '',
         modeOfInjury: '',
-        doa: todayYmd(),
+        doa: defaultDoa ?? todayYmd(),
         procedure: '',
         dos: '',
         pacStatus: PacStatus.Pending,
