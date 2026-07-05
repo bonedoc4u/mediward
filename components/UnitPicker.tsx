@@ -89,7 +89,7 @@ const UnitPicker: React.FC<Props> = ({
                 <span className="text-white font-bold text-sm">{unit}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white">Unit {unit}</p>
+                <p className="font-semibold text-white">{unit}</p>
                 {stat ? (
                   <div className="flex items-center gap-3 mt-1">
                     <span className="flex items-center gap-1 text-xs text-slate-300">
