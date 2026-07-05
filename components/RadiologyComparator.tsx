@@ -4,7 +4,9 @@ import { useAuth } from '../contexts/AppContext';
 import {
   ImageIcon, Camera, X,
   CloudUpload, FileDown, Loader2, Search, ChevronDown, Leaf,
+  Crop as CropIcon,
 } from 'lucide-react';
+import ImageEditor from './radiology/ImageEditor';
 import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
 import { useSignedUrl } from '../hooks/useSignedUrl';
 import { getModality } from './radiology/modality';
@@ -266,8 +268,10 @@ const UploadSheet: React.FC<{
   allowPostOp: boolean;
   onSave: () => void;
   onCancel: () => void;
+  /** Opens the crop/rotate editor — only offered for images, not PDFs. */
+  onEdit?: () => void;
 }> = ({ isOpen, file, previewUrl, patient, isUploading, uploadError,
-        onPhaseChange, onTypeChange, phase, invType, allowPostOp, onSave, onCancel }) => {
+        onPhaseChange, onTypeChange, phase, invType, allowPostOp, onSave, onCancel, onEdit }) => {
   if (!isOpen) return null;
   const isImage = file?.type.startsWith('image/');
 
@@ -287,9 +291,18 @@ const UploadSheet: React.FC<{
             {!isUploading && (
               <button
                 onClick={onCancel}
+                aria-label="Discard image"
                 className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full"
               >
                 <X className="w-4 h-4" />
+              </button>
+            )}
+            {!isUploading && onEdit && (
+              <button
+                onClick={onEdit}
+                className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/60 hover:bg-black/80 text-white text-xs font-semibold px-3 py-2 rounded-full"
+              >
+                <CropIcon className="w-3.5 h-3.5" /> Crop / Rotate
               </button>
             )}
           </div>
@@ -401,6 +414,7 @@ const RadiologyComparator: React.FC<Props> = ({
   const [isUploading, setIsUploading]     = useState(false);
   const [uploadError, setUploadError]     = useState<string | null>(null);
   const [lightboxInv, setLightboxInv]     = useState<Investigation | null>(null);
+  const [showEditor, setShowEditor]       = useState(false);
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const isNativePlatform = Capacitor.isNativePlatform();
@@ -516,6 +530,7 @@ const RadiologyComparator: React.FC<Props> = ({
     setSelectedFile(null);
     setPreviewUrl(null);
     setShowUploadForm(false);
+    setShowEditor(false);
     setUploadError(null);
     if (fileInputRef.current)  fileInputRef.current.value  = '';
   };
@@ -667,7 +682,22 @@ const RadiologyComparator: React.FC<Props> = ({
         onTypeChange={setInvType}
         onSave={handleSave}
         onCancel={handleCancelUpload}
+        onEdit={selectedFile?.type.startsWith('image/') && previewUrl ? () => setShowEditor(true) : undefined}
       />
+
+      {/* Crop / rotate / straighten editor */}
+      {showEditor && previewUrl && (
+        <ImageEditor
+          src={previewUrl}
+          onClose={() => setShowEditor(false)}
+          onApply={(edited) => {
+            if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+            setSelectedFile(edited);
+            setPreviewUrl(URL.createObjectURL(edited));
+            setShowEditor(false);
+          }}
+        />
+      )}
 
       {/* Fullscreen lightbox */}
       {lightboxInv && (
