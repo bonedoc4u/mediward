@@ -2,13 +2,13 @@ import React, { useMemo, useState, useEffect, useRef, lazy, Suspense } from 'rea
 import { useApp, useConfig } from '../contexts/AppContext';
 import { PatientStatus } from '../types';
 import { can } from '../utils/permissions';
-import { getLabTrend } from '../utils/calculations';
+import { getLabTrend, needsPac } from '../utils/calculations';
 import {
   ArrowLeft, Phone, MessageCircle, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   FileJson, Download, Pill, ClipboardList, Droplets, Bandage,
-  Calculator, Send, X, ChevronDown, Home, ArrowRightLeft, Pencil, Plus,
+  Calculator, Send, X, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBoundary from './ErrorBoundary';
@@ -255,10 +255,16 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
               <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
               {patient.patientStatus === PatientStatus.Review ? 'Needs Review' : patient.patientStatus}
             </span>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border ${pacBadge.bg} ${pacBadge.text} ${pacBadge.border}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${pacBadge.dot}`} />
-              {patient.pacStatus}
-            </span>
+            {needsPac(patient) ? (
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border ${pacBadge.bg} ${pacBadge.text} ${pacBadge.border}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${pacBadge.dot}`} />
+                {patient.pacStatus}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border bg-emerald-500/20 text-emerald-100 border-emerald-300/40">
+                <Leaf className="w-3 h-3" aria-hidden="true" /> Conservative
+              </span>
+            )}
           </div>
         </div>
 
@@ -434,7 +440,8 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         </div>
       )}
 
-      {/* ─── PAC STATUS CARD ───────────────────────────────────────────── */}
+      {/* ─── PAC STATUS CARD (not applicable to conservative patients) ── */}
+      {needsPac(patient) && (
       <button
         onClick={() => navigateTo('pac')}
         className={`w-full text-left bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3 flex items-center gap-4 hover:border-slate-200 active:scale-[0.99] transition-all`}
@@ -453,6 +460,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         </div>
         <HeartPulse className="w-5 h-5 text-slate-300 shrink-0" />
       </button>
+      )}
 
       {/* ─── COMORBIDITIES & ALLERGIES (inline-editable) ───────────────── */}
       <ComorbiditiesSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />

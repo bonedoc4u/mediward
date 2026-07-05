@@ -197,3 +197,22 @@ describe('groupByWard', () => {
     expect(groupByWard([])).toEqual({});
   });
 });
+
+// ─── Conservative patients: PAC not applicable ───────────────────────────────
+
+describe('conservative management — PAC does not apply', () => {
+  it('PAC Pending does NOT raise triage priority for conservative patients', () => {
+    const p = makePatient({ pacStatus: PacStatus.Pending, management: 'conservative' });
+    expect(getTriagePriority(p)).toBe(5); // stable, not 3
+  });
+
+  it('PAC Pending does NOT give the orange border for conservative patients', () => {
+    const p = makePatient({ pacStatus: PacStatus.Pending, management: 'conservative' });
+    expect(getTriageBorderClass(p)).toContain('slate');
+  });
+
+  it('surgical (default) patients keep PAC urgency', () => {
+    const p = makePatient({ pacStatus: PacStatus.Pending });
+    expect(getTriagePriority(p)).toBe(3);
+  });
+});
