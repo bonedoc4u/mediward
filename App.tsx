@@ -4,6 +4,7 @@ import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
 import { can } from './utils/permissions';
+import { todayYmd } from './utils/dates';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
 import LoginPage from './components/LoginPage';
@@ -185,12 +186,12 @@ const App: React.FC = () => {
     currentView, navigateTo, navParams,
     isMobileMenuOpen, setIsMobileMenuOpen, isTransitioning,
   } = useUI();
-  const { preOpModuleName, procedureListName, department, hospitalName, unitOptions } = useConfig();
+  const { preOpModuleName, procedureListName, department, hospitalName, unitOptions, isLoadingConfig } = useConfig();
 
   const resolvedUnits = unitOptions.length > 0 ? unitOptions : ['OR1', 'OR2', 'OR3', 'OR4', 'OR5'];
 
   const unitStats = useMemo<Record<string, UnitStat>>(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayYmd();
     const active = patients.filter(p => p.patientStatus !== PatientStatus.Discharged && p.patientStatus !== PatientStatus.WentHome);
     const stats: Record<string, UnitStat> = {
       all: {
@@ -464,6 +465,17 @@ const App: React.FC = () => {
 
   // ─── Unit Picker (admin must choose a unit on every fresh login) ───
   if (user?.role === 'admin' && !selectedUnit) {
+    // Never offer placeholder units: with a cold cache the real unit list
+    // (hospital_config.units) arrives async — picking a default like
+    // "Unit 1" would filter every patient out.
+    if (isLoadingConfig) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-3 text-slate-300">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
+          <p className="text-sm">Loading your department…</p>
+        </div>
+      );
+    }
     const deptLabel = department || 'Dept. of Orthopaedics';
     return (
       <>
