@@ -214,9 +214,14 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   });
 
   const setStep = (s: number) => {
-    try {
-      sessionStorage.setItem(STEP_KEY, JSON.stringify({ step: s, formData }));
-    } catch { /* ignore */ }
+    // Draft persistence is for NEW admissions only — writing while editing an
+    // existing patient leaks their details into the next "Add Patient" if the
+    // app reloads before the close-wipe runs.
+    if (!initialData) {
+      try {
+        sessionStorage.setItem(STEP_KEY, JSON.stringify({ step: s, formData }));
+      } catch { /* ignore */ }
+    }
     setStepRaw(s);
   };
 
@@ -267,7 +272,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const [customAllergyInput, setCustomAllergyInput] = useState('');
 
   useEffect(() => {
-    if (!initialData) {
+    // isOpen guard + dep: when the modal closes, this effect's cleanup cancels
+    // any pending debounce. Without it, a timer scheduled in the last 500ms of
+    // typing fired AFTER the close-wipe removed STEP_KEY, re-writing the
+    // just-saved patient as a "draft" — the next Add Patient then opened
+    // prefilled with the previous patient's details.
+    if (isOpen && !initialData) {
       const timer = setTimeout(() => {
         try {
           sessionStorage.setItem(STEP_KEY, JSON.stringify({
@@ -278,7 +288,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [formData, step, selectedComorbidities, drugAllergies, initialData]);
+  }, [formData, step, selectedComorbidities, drugAllergies, initialData, isOpen]);
 
   // ── Scan Slip (OCR) ──────────────────────────────────────────────────────────
   const scanInputRef = useRef<HTMLInputElement>(null);
