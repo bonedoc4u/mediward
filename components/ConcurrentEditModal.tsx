@@ -56,7 +56,12 @@ const ConcurrentEditModal: React.FC<Props> = ({ conflict, onResolve }) => {
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      {/* Tapping outside keeps the server version — mobile users have no
+          Escape key, so the backdrop must be an exit too. */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => onResolve('remote')}
+      />
 
       <div
         ref={dialogRef}
@@ -116,6 +121,7 @@ const ConcurrentEditModal: React.FC<Props> = ({ conflict, onResolve }) => {
         {/* Actions */}
         <div className="px-6 pb-6 pt-2 flex flex-col sm:flex-row gap-3">
           <button
+            type="button"
             onClick={() => onResolve('remote')}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-300 rounded-xl text-slate-700 font-medium hover:bg-slate-50 transition-colors text-sm"
           >
@@ -123,6 +129,7 @@ const ConcurrentEditModal: React.FC<Props> = ({ conflict, onResolve }) => {
             Use server version
           </button>
           <button
+            type="button"
             onClick={() => onResolve('local')}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors text-sm"
           >
