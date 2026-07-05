@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useRef, useLayoutEffect, memo } from 'react';
 import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass } from '../utils/calculations';
+import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home, FileDown } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
 import { exportWardListPDF } from '../utils/exportWardList';
 import { toast } from '../utils/toast';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
@@ -115,7 +115,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         (p.bed || '').includes(searchTerm) ||
         (p.ipNo || '').includes(searchTerm);
 
-      const matchesPending = filterPending ? p.pacStatus === PacStatus.Pending : true;
+      const matchesPending = filterPending ? (needsPac(p) && p.pacStatus === PacStatus.Pending) : true;
       const matchesSurgery = filterSurgeryToday ? (p.dos === today || p.plannedDos === today) : true;
       const matchesPod01 = filterPod01 ? (() => { const d = calcPod(p.dos, today); return d === 1 || d === 2; })() : true;
       const matchesOverdue = filterOverdueTodos ? p.todos.some(t => !t.isDone) : true;
@@ -448,7 +448,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   <tr
                     key={patient.ipNo}
                     className={`border-b last:border-0 hover:bg-slate-50 transition-colors ${getTriageBorderClass(patient)} ${
-                      !patient.dos && patient.pacStatus === PacStatus.Pending ? 'bg-red-50/30' : ''
+                      !patient.dos && needsPac(patient) && patient.pacStatus === PacStatus.Pending ? 'bg-red-50/30' : ''
                     } ${patient.patientStatus === PatientStatus.Discharged ? 'opacity-60 bg-slate-50' : ''} ${
                       highlightIpNo === patient.ipNo ? 'row-highlight' : ''
                     }`}
@@ -500,12 +500,18 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     </td>
                     <td className="px-6 py-4 space-y-2">
                       {!patient.dos && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.pacStatus)} flex items-center gap-1 w-fit`}>
-                          {patient.pacStatus === PacStatus.Pending
-                            ? <AlertCircle className="w-3 h-3 shrink-0" aria-label="PAC Pending" />
-                            : <CheckCircle2 className="w-3 h-3 shrink-0" aria-label="PAC Fit" />}
-                          {patient.pacStatus}
-                        </span>
+                        needsPac(patient) ? (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.pacStatus)} flex items-center gap-1 w-fit`}>
+                            {patient.pacStatus === PacStatus.Pending
+                              ? <AlertCircle className="w-3 h-3 shrink-0" aria-label="PAC Pending" />
+                              : <CheckCircle2 className="w-3 h-3 shrink-0" aria-label="PAC Fit" />}
+                            {patient.pacStatus}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1 w-fit">
+                            <Leaf className="w-3 h-3 shrink-0" aria-hidden="true" /> Conservative
+                          </span>
+                        )
                       )}
                       {patient.patientStatus !== PatientStatus.Fit && (
                         <span className={`px-2 py-1 rounded-full text-xs font-medium border ${patient.patientStatus === PatientStatus.Discharged ? 'bg-slate-100 text-slate-600 border-slate-200' : getStatusColor(patient.patientStatus)} block w-fit`}>
@@ -652,7 +658,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 ) : (
                   <div
                     className={`p-4 space-y-3 bg-white border border-slate-200 rounded-lg mb-2 ${getTriageBorderClass(item.patient)} ${
-                      !item.patient.dos && item.patient.pacStatus === PacStatus.Pending ? 'bg-red-50/20' : ''
+                      !item.patient.dos && needsPac(item.patient) && item.patient.pacStatus === PacStatus.Pending ? 'bg-red-50/20' : ''
                     } ${highlightIpNo === item.patient.ipNo ? 'row-highlight' : ''}`}
                   >
                     <div className="flex justify-between items-start">
@@ -713,11 +719,17 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     <div className="flex items-center justify-between">
                       <div className="flex flex-wrap gap-1.5">
                         {!item.patient.dos && (
-                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>
-                            {item.patient.pacStatus === 'PAC Pending' && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
-                            {item.patient.pacStatus === 'PAC Fit' && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
-                            {item.patient.pacStatus}
-                          </span>
+                          needsPac(item.patient) ? (
+                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>
+                              {item.patient.pacStatus === 'PAC Pending' && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
+                              {item.patient.pacStatus === 'PAC Fit' && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
+                              {item.patient.pacStatus}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+                              <Leaf className="w-3 h-3" aria-hidden="true" /> Conservative
+                            </span>
+                          )
                         )}
                         {item.patient.patientStatus !== PatientStatus.Fit && (
                           <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.patientStatus)}`}>

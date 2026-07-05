@@ -4,6 +4,7 @@ import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
 import { can } from './utils/permissions';
+import { needsPac } from './utils/calculations';
 import { todayYmd } from './utils/dates';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
@@ -196,7 +197,7 @@ const App: React.FC = () => {
     const stats: Record<string, UnitStat> = {
       all: {
         total: active.length,
-        pacPending: active.filter(p => p.pacStatus === PacStatus.Pending).length,
+        pacPending: active.filter(p => needsPac(p) && p.pacStatus === PacStatus.Pending).length,
         surgeryToday: active.filter(p => p.dos === today || p.plannedDos === today).length,
       },
     };
@@ -204,7 +205,7 @@ const App: React.FC = () => {
       const unitPts = active.filter(p => p.unit === u);
       stats[u] = {
         total: unitPts.length,
-        pacPending: unitPts.filter(p => p.pacStatus === PacStatus.Pending).length,
+        pacPending: unitPts.filter(p => needsPac(p) && p.pacStatus === PacStatus.Pending).length,
         surgeryToday: unitPts.filter(p => p.dos === today || p.plannedDos === today).length,
       };
     });

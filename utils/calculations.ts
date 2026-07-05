@@ -113,11 +113,16 @@ export const getLabTrend = (labResults: LabResult[], type: LabType): LabTrendDat
 
 // ─── Triage Priority ───
 // Returns a sort key: lower = more urgent. Tiebreaker is bed number.
+/** Conservatively-managed patients aren't operated, so PAC does not apply:
+ *  no PAC badge, no PAC-pending urgency, filters and alerts skip them. */
+export const needsPac = (p: Patient): boolean =>
+  (p.management ?? 'surgical_fixation') !== 'conservative';
+
 export const getTriagePriority = (p: Patient): number => {
   if (p.patientStatus === PatientStatus.Critical) return 0;
   if (p.pod === 1) return 1;
   if (p.pod === 2) return 2;
-  if (p.pacStatus === PacStatus.Pending) return 3;
+  if (needsPac(p) && p.pacStatus === PacStatus.Pending) return 3;
   if (p.patientStatus === PatientStatus.Review) return 4;
   if (p.patientStatus === PatientStatus.DischargeReady) return 6;
   return 5;
@@ -128,7 +133,7 @@ export const getTriageBorderClass = (p: Patient): string => {
   if (p.patientStatus === PatientStatus.WentHome)   return 'border-l-4 border-l-violet-400';
   if (p.patientStatus === PatientStatus.Critical)   return 'border-l-4 border-l-red-500';
   if (p.pod !== undefined && p.pod <= 2)            return 'border-l-4 border-l-teal-500';
-  if (p.pacStatus === PacStatus.Pending)            return 'border-l-4 border-l-orange-500';
+  if (needsPac(p) && p.pacStatus === PacStatus.Pending) return 'border-l-4 border-l-orange-500';
   if (p.patientStatus === PatientStatus.DischargeReady) return 'border-l-4 border-l-emerald-400';
   return 'border-l-4 border-l-slate-100';
 };
@@ -256,8 +261,8 @@ export function generateNotifications(patients: Patient[]): AppNotification[] {
       }
     }
 
-    // 4. PAC Pending for > 3 days
-    if (p.pacStatus === 'PAC Pending' && !p.dos) {
+    // 4. PAC Pending for > 3 days (not applicable to conservative patients)
+    if (needsPac(p) && p.pacStatus === 'PAC Pending' && !p.dos) {
       const admDate = new Date(p.doa);
       const daysSinceAdm = Math.floor((today.getTime() - admDate.getTime()) / (1000 * 60 * 60 * 24));
       if (daysSinceAdm >= 3) {

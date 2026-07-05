@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Patient, PacStatus } from '../types';
 import { Scissors, HeartPulse, AlertTriangle, ListChecks, ClipboardList, FileDown } from 'lucide-react';
 import { todayYmd } from '../utils/dates';
+import { needsPac } from '../utils/calculations';
 
 /** Compute post-op day from the surgery date (dos). Returns undefined if no surgery yet or surgery is in the future. */
 export function calcPod(dos: string | undefined, today: string): number | undefined {
@@ -116,7 +117,7 @@ const HandoverSummary: React.FC<Props> = ({
     const surgeryToday = patients.filter(p => p.dos === today || p.plannedDos === today);
     // calcPod is 1-based (day of surgery = POD 1) — d===0 never matched.
     const pod01 = patients.filter(p => { const d = calcPod(p.dos, today); return d === 1 || d === 2; });
-    const pacPending = patients.filter(p => p.pacStatus === PacStatus.Pending);
+    const pacPending = patients.filter(p => needsPac(p) && p.pacStatus === PacStatus.Pending);
     const overdueTodos = patients.filter(p => p.todos.some(t => !t.isDone));
 
     return { surgeryToday, pod01, pacPending, overdueTodos };
