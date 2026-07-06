@@ -3,24 +3,24 @@ import { toast, ToastItem } from '../utils/toast';
 import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 const ICONS = {
-  success: <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />,
-  error:   <XCircle    className="w-5 h-5 text-red-500 shrink-0" />,
-  info:    <Info       className="w-5 h-5 text-blue-500 shrink-0" />,
-  warning: <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />,
+  success: <CheckCircle className="w-5 h-5 text-vital-normal shrink-0" />,
+  error:   <XCircle    className="w-5 h-5 text-vital-critical shrink-0" />,
+  info:    <Info       className="w-5 h-5 text-vital-low shrink-0" />,
+  warning: <AlertTriangle className="w-5 h-5 text-vital-warning shrink-0" />,
 };
 
 const STYLES = {
-  success: 'border-green-200 bg-green-50',
-  error:   'border-red-200 bg-red-50',
-  info:    'border-blue-200 bg-blue-50',
-  warning: 'border-amber-200 bg-amber-50',
+  success: 'border-vital-normal-border bg-vital-normal-surface',
+  error:   'border-vital-critical-border bg-vital-critical-surface',
+  info:    'border-vital-low-border bg-vital-low-surface',
+  warning: 'border-vital-warning-border bg-vital-warning-surface',
 };
 
 const TEXT = {
-  success: 'text-green-900',
-  error:   'text-red-900',
-  info:    'text-blue-900',
-  warning: 'text-amber-900',
+  success: 'text-vital-normal-fg',
+  error:   'text-vital-critical-fg',
+  info:    'text-vital-low-fg',
+  warning: 'text-vital-warning-fg',
 };
 
 const ToastContainer: React.FC = () => {
@@ -43,7 +43,7 @@ const ToastContainer: React.FC = () => {
           <p className={`text-sm font-medium flex-1 ${TEXT[t.type]}`}>{t.message}</p>
           <button
             onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
-            className="text-slate-400 hover:text-slate-600 shrink-0"
+            className="text-ink-faint hover:text-ink-muted shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
