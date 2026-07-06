@@ -68,7 +68,8 @@ function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
 }
 
 // Sortable Row Component
-const SortableRow = ({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) => {
+/** Exported for tests. */
+export const SortableRow = ({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) => {
   const {
     attributes,
     listeners,
@@ -84,7 +85,10 @@ const SortableRow = ({ id, children, className }: { id: string, children: React.
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 1000 : 'auto',
     position: isDragging ? 'relative' as const : undefined,
-    touchAction: 'none', // Essential for touch dragging
+    // touch-action must NOT be set here: an ancestor's touch-action:none blocks
+    // horizontal scroll (of the overflow-x-auto table wrapper) for every descendant
+    // touch, not just the drag handle's. The handle's own `touch-none` class
+    // (data-drag-handle cell below) is what dnd-kit's TouchSensor actually needs.
   };
 
   // Clone children to inject listeners into the drag handle
