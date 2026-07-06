@@ -62,7 +62,7 @@ const ComorbiditiesSection: React.FC<Props> = ({ patient, canEdit, onUpdate }) =
             )}
           </div>
         ) : (
-          <p className="text-sm text-slate-400 italic">None recorded</p>
+          <p className="text-sm text-ink-faint italic">None recorded</p>
         )
       }
       edit={
@@ -77,13 +77,13 @@ const ComorbiditiesSection: React.FC<Props> = ({ patient, canEdit, onUpdate }) =
 
 // ── Read-only chip row ──
 const TONE = {
-  slate: 'bg-slate-100 text-slate-700',
-  red: 'bg-red-50 text-red-700 border border-red-200',
+  slate: 'bg-surface-sunken text-ink',
+  red: 'bg-vital-critical-surface text-vital-critical-fg border border-vital-critical-border',
 } as const;
 
 const ChipRow: React.FC<{ label: string; items: string[]; tone: keyof typeof TONE; labelOf?: (item: string) => string }> = ({ label, items, tone, labelOf }) => (
   <div>
-    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{label}</p>
+    <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint mb-1">{label}</p>
     <div className="flex flex-wrap gap-1.5">
       {items.map(c => (
         <span key={c} title={c} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${TONE[tone]}`}>{labelOf ? labelOf(c) : c}</span>
@@ -115,7 +115,7 @@ const ChipEditor: React.FC<{
 
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint mb-1">{label}</p>
 
       {/* Selected chips */}
       {items.length > 0 && (
@@ -123,7 +123,7 @@ const ChipEditor: React.FC<{
           {items.map(c => (
             <span key={c} title={c} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${TONE[tone]}`}>
               {shortOf(c)}
-              <button onClick={() => onChange(items.filter(i => i !== c))} aria-label={`Remove ${c}`} className="hover:text-red-600">
+              <button onClick={() => onChange(items.filter(i => i !== c))} aria-label={`Remove ${c}`} className="hover:text-vital-critical-fg">
                 <X className="w-3 h-3" />
               </button>
             </span>
@@ -140,7 +140,7 @@ const ChipEditor: React.FC<{
               type="button"
               title={p.full}
               onClick={() => add(p.full)}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-line bg-surface-card text-ink-muted hover:border-accent hover:text-accent-fg hover:bg-accent-soft transition-colors"
             >
               <Plus className="w-3 h-3" /> <span className="font-semibold font-mono">{p.short}</span>
             </button>
@@ -155,9 +155,9 @@ const ChipEditor: React.FC<{
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(text); } }}
           placeholder={placeholder}
-          className="flex-1 px-3 py-2 min-h-[40px] border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+          className="flex-1 px-3 py-2 min-h-[40px] border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         />
-        <button onClick={() => add(text)} disabled={!text.trim()} aria-label={`Add to ${label}`} className="w-10 h-10 flex items-center justify-center bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white rounded-lg transition-colors shrink-0">
+        <button onClick={() => add(text)} disabled={!text.trim()} aria-label={`Add to ${label}`} className="w-10 h-10 flex items-center justify-center bg-accent hover:bg-accent-pressed disabled:opacity-30 text-white rounded-lg transition-colors shrink-0">
           <Plus className="w-4 h-4" />
         </button>
       </div>

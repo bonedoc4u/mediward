@@ -29,20 +29,20 @@ const WoundCare        = lazy(() => import('./WoundCare'));
 
 // ─── Status Badge Config ──────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, { bg: string; text: string; dot: string }> = {
-  'Fit':        { bg: 'bg-green-100',   text: 'text-green-800',   dot: 'bg-green-500'  },
-  'Review':     { bg: 'bg-amber-100',   text: 'text-amber-800',   dot: 'bg-amber-500'  },
-  'Critical':   { bg: 'bg-red-100',     text: 'text-red-800',     dot: 'bg-red-500'    },
-  'Went Home':  { bg: 'bg-violet-100',  text: 'text-violet-800',  dot: 'bg-violet-500' },
-  'Discharged': { bg: 'bg-blue-100',    text: 'text-blue-800',    dot: 'bg-blue-500'   },
-  'Stable':     { bg: 'bg-green-100',   text: 'text-green-800',   dot: 'bg-green-500'  },
+  'Fit':        { bg: 'bg-vital-normal-surface',  text: 'text-vital-normal-fg',  dot: 'bg-vital-normal'  },
+  'Review':     { bg: 'bg-vital-warning-surface', text: 'text-vital-warning-fg', dot: 'bg-vital-warning' },
+  'Critical':   { bg: 'bg-vital-critical-surface',text: 'text-vital-critical-fg',dot: 'bg-vital-critical'},
+  'Went Home':  { bg: 'bg-accent-soft',           text: 'text-accent-fg',        dot: 'bg-accent'        },
+  'Discharged': { bg: 'bg-surface-sunken',        text: 'text-ink-muted',        dot: 'bg-ink-faint'     },
+  'Stable':     { bg: 'bg-vital-normal-surface',  text: 'text-vital-normal-fg',  dot: 'bg-vital-normal'  },
 };
-const DEFAULT_STATUS = { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' };
+const DEFAULT_STATUS = { bg: 'bg-surface-sunken', text: 'text-ink-muted', dot: 'bg-ink-faint' };
 
 const PAC_BADGE: Record<string, { bg: string; text: string; border: string; dot: string; icon: string }> = {
-  'PAC Fit':     { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', icon: '✓' },
-  'PAC Pending': { bg: 'bg-slate-50',   text: 'text-slate-600',   border: 'border-slate-200',   dot: 'bg-slate-400',   icon: '…' },
-  'PAC Unfit':   { bg: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-200',     dot: 'bg-red-500',     icon: '✕' },
-  'PAC Review':  { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-500',   icon: '?' },
+  'PAC Fit':     { bg: 'bg-vital-normal-surface',  text: 'text-vital-normal-fg',  border: 'border-vital-normal-border',  dot: 'bg-vital-normal',  icon: '✓' },
+  'PAC Pending': { bg: 'bg-surface',               text: 'text-ink-muted',       border: 'border-line',                 dot: 'bg-ink-faint',     icon: '…' },
+  'PAC Unfit':   { bg: 'bg-vital-critical-surface',text: 'text-vital-critical-fg',border: 'border-vital-critical-border',dot: 'bg-vital-critical',icon: '✕' },
+  'PAC Review':  { bg: 'bg-vital-warning-surface', text: 'text-vital-warning-fg', border: 'border-vital-warning-border', dot: 'bg-vital-warning', icon: '?' },
 };
 
 function formatDateChip(iso: string | undefined): string {
@@ -62,11 +62,11 @@ const DateBottomSheet: React.FC<{
   return (
     <div className="fixed inset-0 z-[80] flex flex-col justify-end sm:items-center sm:justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl px-5 pt-5 pb-10 sm:pb-6 animate-[slideUp_0.25s_ease-out] sm:animate-none">
-        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5 sm:hidden" />
+      <div className="relative w-full sm:max-w-md bg-surface-card rounded-t-3xl sm:rounded-3xl shadow-2xl px-5 pt-5 pb-10 sm:pb-6 animate-[slideUp_0.25s_ease-out] sm:animate-none">
+        <div className="w-10 h-1 bg-surface-sunken rounded-full mx-auto mb-5 sm:hidden" />
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-bold text-slate-800">{label}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+          <h3 className="text-base font-bold text-ink">{label}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-full text-ink-faint hover:text-ink hover:bg-surface-sunken transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -75,12 +75,12 @@ const DateBottomSheet: React.FC<{
           value={date}
           onChange={e => setDate(e.target.value)}
           max={todayYmd()}
-          className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl text-base text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-4"
+          className="w-full px-4 py-3.5 border border-line rounded-2xl text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
           autoFocus
         />
         <button
           onClick={() => { onSave(date); onClose(); }}
-          className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-2xl transition-colors"
+          className="w-full py-3.5 bg-accent hover:bg-accent-pressed text-white text-sm font-bold rounded-2xl transition-colors"
         >
           Confirm Date
         </button>
@@ -146,10 +146,10 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
   if (!patient) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+      <div className="flex flex-col items-center justify-center py-20 text-ink-faint">
         <AlertCircle className="w-12 h-12 mb-3 opacity-50" />
         <p className="text-lg font-medium">Patient not found</p>
-        <button onClick={dismiss} className="mt-4 text-teal-600 hover:underline text-sm flex items-center gap-1">
+        <button onClick={dismiss} className="mt-4 text-accent-fg hover:underline text-sm flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> {inSheet ? 'Close' : 'Back to dashboard'}
         </button>
       </div>
@@ -189,9 +189,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
   };
 
   const TrendIcon = ({ trend }: { trend: string }) => {
-    if (trend === 'up')    return <TrendingUp   className="w-3.5 h-3.5 text-red-500" />;
-    if (trend === 'down')  return <TrendingDown  className="w-3.5 h-3.5 text-green-500" />;
-    if (trend === 'equal') return <Minus         className="w-3.5 h-3.5 text-slate-400" />;
+    if (trend === 'up')    return <TrendingUp   className="w-3.5 h-3.5 text-vital-critical" />;
+    if (trend === 'down')  return <TrendingDown  className="w-3.5 h-3.5 text-vital-normal" />;
+    if (trend === 'equal') return <Minus         className="w-3.5 h-3.5 text-ink-faint" />;
     return null;
   };
 
@@ -212,12 +212,12 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       />
 
       {/* ─── DARK HEADER CARD ──────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-b-3xl overflow-hidden mb-4 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-2 pb-6">
+      <div className="bg-accent rounded-b-3xl overflow-hidden mb-4 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-2 pb-6">
 
         {/* Back / close — sits top-left, clear of the status badges top-right */}
         <button
           onClick={dismiss}
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded"
+          className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
         >
           <ArrowLeft className="w-4 h-4" /> {inSheet ? 'Close' : 'Dashboard'}
         </button>
@@ -230,21 +230,21 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                 onClick={() => setShowMoveBed(true)}
                 aria-label={patient.bed ? `Change bed (currently ${patient.bed})` : 'Assign bed'}
                 title="Tap to assign / change bed"
-                className="relative bg-white/10 hover:bg-white/20 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold text-white border border-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
+                className="relative bg-white/10 hover:bg-white/20 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold font-mono text-white border border-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
               >
                 {patient.bed || <Plus className="w-5 h-5 text-white/70" />}
-                <span className="absolute -bottom-1 -right-1 bg-teal-500 rounded-full p-0.5 border-2 border-slate-900">
-                  <Pencil className="w-2.5 h-2.5 text-white" />
+                <span className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 border-2 border-accent">
+                  <Pencil className="w-2.5 h-2.5 text-accent" />
                 </span>
               </button>
             ) : (
-              <div className="bg-white/10 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold text-white border border-white/20">
+              <div className="bg-white/10 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold font-mono text-white border border-white/20">
                 {patient.bed || '—'}
               </div>
             )}
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-white tracking-tight truncate">{patient.name}</h1>
-              <p className="text-slate-400 text-xs mt-0.5">
+              <p className="text-white/70 text-xs mt-0.5">
                 {patient.age}y · {patient.gender} · IP {patient.ipNo} · {patient.ward}
               </p>
             </div>
@@ -261,24 +261,25 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                 {patient.pacStatus}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border bg-emerald-500/20 text-emerald-100 border-emerald-300/40">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border bg-vital-normal/20 text-white border-vital-normal/40">
                 <Leaf className="w-3 h-3" aria-hidden="true" /> Conservative
               </span>
             )}
           </div>
         </div>
 
-        {/* POD + Admitted metric chips */}
+        {/* POD + Admitted metric chips — same white/10 treatment for both: a saturated
+            green POD chip didn't read well against the new solid accent header. */}
         <div className="flex gap-3 mt-4">
           {patient.pod !== undefined && (
-            <div className="flex-1 bg-green-500/20 border border-green-400/25 rounded-2xl px-4 py-3 text-center">
-              <p className="text-green-300 text-[10px] font-bold uppercase tracking-widest">Post-Op Day</p>
-              <p className="text-3xl font-black text-green-200 leading-tight mt-0.5">{patient.pod}</p>
+            <div className="flex-1 bg-white/10 border border-white/15 rounded-2xl px-4 py-3 text-center">
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Post-Op Day</p>
+              <p className="text-3xl font-black font-mono text-white leading-tight mt-0.5">{patient.pod}</p>
             </div>
           )}
           <div className={`${patient.pod !== undefined ? 'flex-1' : 'flex-1'} bg-white/10 border border-white/15 rounded-2xl px-4 py-3 text-center`}>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Admitted</p>
-            <p className="text-3xl font-black text-white leading-tight mt-0.5">{daysSinceAdmission}d</p>
+            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Admitted</p>
+            <p className="text-3xl font-black font-mono text-white leading-tight mt-0.5">{daysSinceAdmission}d</p>
           </div>
         </div>
       </div>
@@ -290,21 +291,21 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       <RadiologyPanel patient={patient} onOpenFull={() => navigateTo('radiology', { id: patient.ipNo })} />
 
       {/* ─── DIAGNOSIS + PROCEDURE CARD ────────────────────────────────── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-3">
-        <div className="border-l-4 border-teal-500 px-4 py-4 space-y-3.5">
+      <div className="bg-surface-card rounded-2xl shadow-sm border border-line overflow-hidden mb-3">
+        <div className="border-l-4 border-accent px-4 py-4 space-y-3.5">
 
           {/* Diagnosis */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Diagnosis</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-1.5">Diagnosis</p>
             {canEdit ? (
               <div className="flex items-start gap-2">
                 {isDiagCode && (
                   <button
                     onClick={() => setDiagExpanded(!diagExpanded)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-teal-50 border border-teal-200 rounded-lg shrink-0 mt-0.5"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-accent-soft border border-accent rounded-lg shrink-0 mt-0.5"
                   >
-                    <span className="font-mono text-sm font-bold text-teal-700 leading-none">{editDiagnosis}</span>
-                    <ChevronDown className={`w-3.5 h-3.5 text-teal-500 transition-transform ${diagExpanded ? 'rotate-180' : ''}`} />
+                    <span className="font-mono text-sm font-bold text-accent-fg leading-none">{editDiagnosis}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-accent-fg transition-transform ${diagExpanded ? 'rotate-180' : ''}`} />
                   </button>
                 )}
                 <input
@@ -318,22 +319,22 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                       setEditDiagnosis(patient.diagnosis);
                     }
                   }}
-                  className={`flex-1 text-[18px] font-semibold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-400 focus:bg-teal-50/20 outline-none py-0.5 transition-colors leading-snug placeholder:text-slate-300 placeholder:text-sm placeholder:font-normal ${isDiagCode && !diagExpanded ? 'hidden' : 'block'}`}
+                  className={`flex-1 text-[18px] font-semibold text-ink bg-transparent border-b border-transparent hover:border-line focus:border-accent focus:bg-accent-soft/40 outline-none py-0.5 transition-colors leading-snug placeholder:text-ink-faint placeholder:text-sm placeholder:font-normal ${isDiagCode && !diagExpanded ? 'hidden' : 'block'}`}
                 />
                 {isDiagCode && !diagExpanded && (
-                  <span className="text-[11px] text-slate-400 italic self-center">tap to expand/edit</span>
+                  <span className="text-[11px] text-ink-faint italic self-center">tap to expand/edit</span>
                 )}
               </div>
             ) : (
-              <p className="text-[18px] font-semibold text-slate-900 leading-snug">{patient.diagnosis}</p>
+              <p className="text-[18px] font-semibold text-ink leading-snug">{patient.diagnosis}</p>
             )}
           </div>
 
-          <div className="h-px bg-slate-100" />
+          <div className="h-px bg-line" />
 
           {/* Procedure */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">Procedure</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-1.5">Procedure</p>
             {canEdit ? (
               <input
                 value={editProcedure}
@@ -344,12 +345,12 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                     updatePatient({ ...patient, procedure: trimmed || undefined });
                   }
                 }}
-                className="w-full text-[18px] font-semibold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-teal-400 focus:bg-teal-50/20 outline-none py-0.5 transition-colors leading-snug placeholder:text-slate-300 placeholder:text-sm placeholder:font-normal"
+                className="w-full text-[18px] font-semibold text-ink bg-transparent border-b border-transparent hover:border-line focus:border-accent focus:bg-accent-soft/40 outline-none py-0.5 transition-colors leading-snug placeholder:text-ink-faint placeholder:text-sm placeholder:font-normal"
                 placeholder="Enter procedure (optional)"
               />
             ) : (
-              <p className="text-[18px] font-semibold text-slate-900 leading-snug">
-                {patient.procedure || <span className="text-slate-400 italic text-base font-normal">Pending</span>}
+              <p className="text-[18px] font-semibold text-ink leading-snug">
+                {patient.procedure || <span className="text-ink-faint italic text-base font-normal">Pending</span>}
               </p>
             )}
           </div>
@@ -360,25 +361,25 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       <div className="grid grid-cols-2 gap-3 mb-3">
 
         {/* Treatment segmented control */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-3 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Treatment</p>
-          <div className="flex gap-0.5 p-0.5 bg-slate-100 rounded-xl" style={{ height: 36 }}>
+        <div className="bg-surface-card rounded-2xl shadow-sm border border-line px-3 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-2">Treatment</p>
+          <div className="flex gap-0.5 p-0.5 bg-surface-sunken rounded-xl" style={{ height: 36 }}>
             <button
               onClick={() => canEdit && updatePatient({ ...patient, management: 'surgical_fixation' })}
-              className={`flex-1 text-xs font-bold rounded-lg transition-all leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+              className={`flex-1 text-xs font-bold rounded-lg transition-all leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 (patient.management ?? 'surgical_fixation') === 'surgical_fixation'
-                  ? 'bg-teal-600 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-ink-muted hover:text-ink'
               }`}
             >
               Surgical
             </button>
             <button
               onClick={() => canEdit && updatePatient({ ...patient, management: 'conservative' })}
-              className={`flex-1 text-xs font-bold rounded-lg transition-all leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 ${
+              className={`flex-1 text-xs font-bold rounded-lg transition-all leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 patient.management === 'conservative'
-                  ? 'bg-teal-600 text-white shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-ink-muted hover:text-ink'
               }`}
             >
               Conserv.
@@ -387,22 +388,22 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         </div>
 
         {/* Date chips */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-3 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Dates</p>
+        <div className="bg-surface-card rounded-2xl shadow-sm border border-line px-3 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-2">Dates</p>
           <div className="flex gap-2">
             <button
               onClick={() => canEdit && setEditingDate('doa')}
-              className="flex-1 flex flex-col px-2 py-1.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-xl transition-colors text-left group"
+              className="flex-1 flex flex-col px-2 py-1.5 bg-surface hover:bg-accent-soft border border-line hover:border-accent rounded-xl transition-colors text-left group"
             >
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-teal-600">DOA</span>
-              <span className="text-[11px] font-semibold text-slate-800 leading-none mt-0.5">{formatDateChip(patient.doa)}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-ink-faint group-hover:text-accent-fg">DOA</span>
+              <span className="text-[11px] font-semibold font-mono text-ink leading-none mt-0.5">{formatDateChip(patient.doa)}</span>
             </button>
             <button
               onClick={() => canEdit && setEditingDate('dos')}
-              className="flex-1 flex flex-col px-2 py-1.5 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-xl transition-colors text-left group"
+              className="flex-1 flex flex-col px-2 py-1.5 bg-surface hover:bg-accent-soft border border-line hover:border-accent rounded-xl transition-colors text-left group"
             >
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-teal-600">DOS</span>
-              <span className="text-[11px] font-semibold text-slate-800 leading-none mt-0.5">{formatDateChip(patient.dos) || <span className="text-slate-300">Pending</span>}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-ink-faint group-hover:text-accent-fg">DOS</span>
+              <span className="text-[11px] font-semibold font-mono text-ink leading-none mt-0.5">{formatDateChip(patient.dos) || <span className="text-ink-faint">Pending</span>}</span>
             </button>
           </div>
         </div>
@@ -413,20 +414,22 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── CONTACT CARD ──────────────────────────────────────────────── */}
       {patient.mobile && (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Contact</p>
+        <div className="bg-surface-card rounded-2xl shadow-sm border border-line px-4 py-3 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint mb-2">Contact</p>
           <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800">{patient.mobile}</p>
-              <p className="text-[11px] text-slate-400">Patient / Guardian</p>
+              <p className="text-sm font-semibold text-ink">{patient.mobile}</p>
+              <p className="text-[11px] text-ink-faint">Patient / Guardian</p>
             </div>
             <a
               href={`tel:${mobileNumber}`}
-              className="flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors shrink-0"
+              className="flex items-center justify-center w-10 h-10 bg-accent-soft hover:bg-accent-soft border border-accent rounded-xl transition-colors shrink-0"
               aria-label="Call"
             >
-              <Phone className="w-4.5 h-4.5 text-teal-600" />
+              <Phone className="w-4.5 h-4.5 text-accent-fg" />
             </a>
+            {/* WhatsApp keeps its brand green intentionally — recognizable third-party
+                affordance, not one of this app's clinical-state colors. */}
             <a
               href={`https://wa.me/${mobileNumber.startsWith('91') ? mobileNumber : '91' + mobileNumber}`}
               target="_blank"
@@ -444,21 +447,21 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       {needsPac(patient) && (
       <button
         onClick={() => navigateTo('pac')}
-        className={`w-full text-left bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3 flex items-center gap-4 hover:border-slate-200 active:scale-[0.99] transition-all`}
+        className={`w-full text-left bg-surface-card rounded-2xl shadow-sm border border-line px-4 py-3 mb-3 flex items-center gap-4 hover:border-accent active:scale-[0.99] transition-all`}
       >
         <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl font-black border-2 ${pacBadge.bg} ${pacBadge.border} ${pacBadge.text} shrink-0`}>
           {pacBadge.icon}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">PAC / Pre-Op Clearance</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint">PAC / Pre-Op Clearance</p>
           <p className={`text-base font-bold mt-0.5 ${pacBadge.text}`}>{patient.pacStatus}</p>
           {patient.pacChecklist && (
-            <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+            <p className="text-[11px] text-ink-faint mt-0.5 truncate">
               {Object.values(patient.pacChecklist).filter(Boolean).length} items completed
             </p>
           )}
         </div>
-        <HeartPulse className="w-5 h-5 text-slate-300 shrink-0" />
+        <HeartPulse className="w-5 h-5 text-ink-faint shrink-0" />
       </button>
       )}
 
@@ -467,32 +470,32 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mx-1 px-1 scrollbar-hide">
-        <button onClick={() => setShowScoring(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
+        <button onClick={() => setShowScoring(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-accent hover:bg-accent-pressed text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
           <Calculator className="w-4 h-4" /><span>Scores</span>
         </button>
-        <button onClick={() => setShowReferral(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
+        <button onClick={() => setShowReferral(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-accent hover:bg-accent-pressed text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
           <Send className="w-4 h-4" /><span>Refer</span>
         </button>
-        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
-          <ClipboardCheck className="w-4 h-4 text-blue-500" /> Daily Rounds
+        <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
+          <ClipboardCheck className="w-4 h-4 text-accent-fg" /> Daily Rounds
         </button>
-        <button onClick={() => navigateTo('labs', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
-          <Droplet className="w-4 h-4 text-blue-500" /> Lab Trends
+        <button onClick={() => navigateTo('labs', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
+          <Droplet className="w-4 h-4 text-accent-fg" /> Lab Trends
         </button>
-        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
-          <FileImage className="w-4 h-4 text-blue-500" /> Radiology
+        <button onClick={() => navigateTo('radiology', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
+          <FileImage className="w-4 h-4 text-accent-fg" /> Radiology
         </button>
-        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
-          <HeartPulse className="w-4 h-4 text-blue-500" /> PAC Status
+        <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
+          <HeartPulse className="w-4 h-4 text-accent-fg" /> PAC Status
         </button>
         {canEdit && (
-          <button onClick={() => setShowMoveBed(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-700 whitespace-nowrap">
-            <ArrowRightLeft className="w-4 h-4 text-blue-500" /> Move bed
+          <button onClick={() => setShowMoveBed(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
+            <ArrowRightLeft className="w-4 h-4 text-accent-fg" /> Move bed
           </button>
         )}
         {can(user, 'investigations:write') && (
-          <button onClick={() => setShowFhirExport(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-xl shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-xs font-bold text-teal-700 whitespace-nowrap">
-            <FileJson className="w-4 h-4 text-teal-600" /> FHIR
+          <button onClick={() => setShowFhirExport(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-accent-soft rounded-xl shadow-sm border border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-accent-fg whitespace-nowrap">
+            <FileJson className="w-4 h-4 text-accent-fg" /> FHIR
           </button>
         )}
         <button
@@ -505,25 +508,25 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
             a.click();
             URL.revokeObjectURL(url);
           }}
-          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-slate-50 rounded-xl shadow-sm border border-slate-200 hover:bg-slate-100 transition-colors text-xs font-bold text-slate-600 whitespace-nowrap"
+          className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-sunken rounded-xl shadow-sm border border-line hover:bg-accent-soft transition-colors text-xs font-bold text-ink-muted whitespace-nowrap"
         >
-          <Download className="w-4 h-4 text-slate-500" /> Export
+          <Download className="w-4 h-4 text-ink-muted" /> Export
         </button>
         {isAlreadyDischarged ? (
-          <button onClick={() => navigateTo('discharge', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-teal-50 rounded-xl shadow-sm border border-teal-200 hover:bg-teal-100 transition-colors text-xs font-bold text-teal-700 whitespace-nowrap">
-            <FileText className="w-4 h-4 text-teal-600" /> Discharge Summary
+          <button onClick={() => navigateTo('discharge', { id: patient.ipNo })} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-accent-soft rounded-xl shadow-sm border border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-accent-fg whitespace-nowrap">
+            <FileText className="w-4 h-4 text-accent-fg" /> Discharge Summary
           </button>
         ) : patient.patientStatus === PatientStatus.WentHome ? (
-          <button onClick={handleReturnToWard} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-violet-50 rounded-xl shadow-sm border border-violet-200 hover:bg-violet-100 transition-colors text-xs font-bold text-violet-700 whitespace-nowrap">
-            <ArrowLeft className="w-4 h-4 text-violet-500" /> Return to Ward
+          <button onClick={handleReturnToWard} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-accent-soft rounded-xl shadow-sm border border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-accent-fg whitespace-nowrap">
+            <ArrowLeft className="w-4 h-4 text-accent-fg" /> Return to Ward
           </button>
         ) : canDischarge ? (
           <>
-            <button onClick={() => setShowWentHomeConfirm(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-violet-50 rounded-xl shadow-sm border border-violet-200 hover:bg-violet-100 transition-colors text-xs font-bold text-violet-700 whitespace-nowrap">
-              <Home className="w-4 h-4 text-violet-500" /> Went Home
+            <button onClick={() => setShowWentHomeConfirm(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-accent-soft rounded-xl shadow-sm border border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-accent-fg whitespace-nowrap">
+              <Home className="w-4 h-4 text-accent-fg" /> Went Home
             </button>
-            <button onClick={() => setShowDischargeConfirm(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-red-50 rounded-xl shadow-sm border border-red-200 hover:bg-red-100 transition-colors text-xs font-bold text-red-700 whitespace-nowrap">
-              <LogOut className="w-4 h-4 text-red-500" /> Discharge
+            <button onClick={() => setShowDischargeConfirm(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-vital-critical-surface rounded-xl shadow-sm border border-vital-critical-border hover:opacity-90 transition-colors text-xs font-bold text-vital-critical-fg whitespace-nowrap">
+              <LogOut className="w-4 h-4 text-vital-critical" /> Discharge
             </button>
           </>
         ) : null}
@@ -532,7 +535,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       {/* ─── DELETE RECORD ─────────────────────────────────────────────── */}
       {canDelete && (
         <div className="flex justify-end mb-4">
-          <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors">
+          <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-vital-critical-fg border border-vital-critical-border rounded-xl hover:bg-vital-critical-surface transition-colors">
             <Trash2 className="w-3.5 h-3.5" /> Delete Record
           </button>
         </div>
@@ -540,7 +543,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── OPTIONAL TABS (Medications / Nursing / I/O etc.) ──────────── */}
       {(showMedicationChart || showNursingNotes || showIntakeOutput || showBloodTransfusion || showWoundCare) && (
-        <div role="tablist" className="flex gap-1 border-b border-slate-200 bg-white rounded-t-2xl px-2 pt-2 overflow-x-auto scrollbar-hide mb-0">
+        <div role="tablist" className="flex gap-1 border-b border-line bg-surface-card rounded-t-2xl px-2 pt-2 overflow-x-auto scrollbar-hide mb-0">
           {([
             { key: 'overview',    label: 'Overview',    icon: <Activity className="w-4 h-4" />,       always: true  },
             { key: 'medications', label: 'Medications', icon: <Pill className="w-4 h-4" />,           always: false, enabled: showMedicationChart  },
@@ -558,8 +561,8 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                 onClick={() => setActiveTab(tab.key)}
                 className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] text-sm font-medium rounded-t-xl transition-colors border-b-2 -mb-px whitespace-nowrap ${
                   activeTab === tab.key
-                    ? 'border-teal-500 text-teal-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                    ? 'border-accent text-accent-fg'
+                    : 'border-transparent text-ink-muted hover:text-ink'
                 }`}
               >
                 {tab.icon} {tab.label}
@@ -570,45 +573,45 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* Tab content */}
       {showMedicationChart && activeTab === 'medications' && (
-        <div className="bg-white rounded-b-2xl shadow-sm border border-t-0 border-slate-200 p-5">
+        <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Medication chart failed to load.">
-            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
               <MedicationChart patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} drugAllergies={patient.drugAllergies ?? []} />
             </Suspense>
           </ErrorBoundary>
         </div>
       )}
       {showNursingNotes && activeTab === 'nursing' && (
-        <div className="bg-white rounded-b-2xl shadow-sm border border-t-0 border-slate-200 p-5">
+        <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Nursing notes failed to load.">
-            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
               <NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
             </Suspense>
           </ErrorBoundary>
         </div>
       )}
       {showIntakeOutput && activeTab === 'io' && (
-        <div className="bg-white rounded-b-2xl shadow-sm border border-t-0 border-slate-200 p-5">
+        <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Intake/Output chart failed to load.">
-            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
               <IntakeOutput patientIpNo={patient.ipNo} />
             </Suspense>
           </ErrorBoundary>
         </div>
       )}
       {showBloodTransfusion && activeTab === 'transfusion' && (
-        <div className="bg-white rounded-b-2xl shadow-sm border border-t-0 border-slate-200 p-5">
+        <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Blood transfusion records failed to load.">
-            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
               <BloodTransfusion patientIpNo={patient.ipNo} />
             </Suspense>
           </ErrorBoundary>
         </div>
       )}
       {showWoundCare && activeTab === 'wound' && (
-        <div className="bg-white rounded-b-2xl shadow-sm border border-t-0 border-slate-200 p-5">
+        <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Wound care records failed to load.">
-            <Suspense fallback={<div className="text-center py-8 text-slate-400 text-sm">Loading…</div>}>
+            <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
               <WoundCare patientIpNo={patient.ipNo} />
             </Suspense>
           </ErrorBoundary>
@@ -620,28 +623,28 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <>
           {/* Lab Summary */}
           {activeLabTypes.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mt-3">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3 text-sm">
-                <Activity className="w-4 h-4 text-teal-500" /> Lab Summary
+            <div className="bg-surface-card rounded-2xl shadow-sm border border-line p-4 mt-3">
+              <h3 className="font-bold text-ink flex items-center gap-2 mb-3 text-sm">
+                <Activity className="w-4 h-4 text-accent-fg" /> Lab Summary
               </h3>
               <div className="grid grid-cols-2 gap-2">
                 {activeLabTypes.map(lt => {
                   const data  = getLabTrend(patient.labResults, lt.name);
                   const isHigh = lt.alertHigh !== null && data.latest !== undefined && data.latest > lt.alertHigh;
                   return (
-                    <div key={lt.name} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div key={lt.name} className="bg-surface rounded-xl p-3 border border-line">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">{lt.name}</span>
+                        <span className="text-[10px] font-bold text-ink-muted uppercase">{lt.name}</span>
                         <TrendIcon trend={data.trend} />
                       </div>
                       {data.latest !== undefined ? (
                         <>
-                          <span className={`text-xl font-bold ${isHigh ? 'text-red-600' : 'text-slate-800'}`}>{data.latest}</span>
-                          <span className="text-xs text-slate-400 ml-1">{lt.unit}</span>
-                          {data.latestDate && <p className="text-xs text-slate-400 mt-0.5">{data.latestDate}</p>}
+                          <span className={`text-xl font-bold font-mono ${isHigh ? 'text-vital-critical-fg' : 'text-ink'}`}>{data.latest}</span>
+                          <span className="text-xs text-ink-faint ml-1">{lt.unit}</span>
+                          {data.latestDate && <p className="text-xs text-ink-faint mt-0.5">{data.latestDate}</p>}
                         </>
                       ) : (
-                        <span className="text-sm text-slate-400">No data</span>
+                        <span className="text-sm text-ink-faint">No data</span>
                       )}
                     </div>
                   );
@@ -652,21 +655,21 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
           {/* Active Orders */}
           {patient.todos.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mt-3">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3 text-sm">
-                <CheckSquare className="w-4 h-4 text-teal-500" /> Orders ({pendingTodos.length} pending)
+            <div className="bg-surface-card rounded-2xl shadow-sm border border-line p-4 mt-3">
+              <h3 className="font-bold text-ink flex items-center gap-2 mb-3 text-sm">
+                <CheckSquare className="w-4 h-4 text-accent-fg" /> Orders ({pendingTodos.length} pending)
               </h3>
               <div className="space-y-1.5">
                 {pendingTodos.map(t => (
-                  <div key={t.id} className="flex items-center gap-2 p-2 bg-amber-50 rounded-xl border border-amber-100">
-                    <div className="w-2 h-2 bg-amber-400 rounded-full shrink-0" />
-                    <span className="text-sm text-slate-700">{t.task}</span>
+                  <div key={t.id} className="flex items-center gap-2 p-2 bg-vital-warning-surface rounded-xl border border-vital-warning-border">
+                    <div className="w-2 h-2 bg-vital-warning rounded-full shrink-0" />
+                    <span className="text-sm text-ink">{t.task}</span>
                   </div>
                 ))}
                 {completedTodos.map(t => (
-                  <div key={t.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="w-2 h-2 bg-green-400 rounded-full shrink-0" />
-                    <span className="text-sm text-slate-400 line-through">{t.task}</span>
+                  <div key={t.id} className="flex items-center gap-2 p-2 bg-surface rounded-xl border border-line">
+                    <div className="w-2 h-2 bg-vital-normal rounded-full shrink-0" />
+                    <span className="text-sm text-ink-faint line-through">{t.task}</span>
                   </div>
                 ))}
               </div>
@@ -677,21 +680,21 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
           {/* Rounds History */}
           {patient.dailyRounds.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mt-3">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-3 text-sm">
-                <ClipboardCheck className="w-4 h-4 text-teal-500" /> Rounds History
+            <div className="bg-surface-card rounded-2xl shadow-sm border border-line p-4 mt-3">
+              <h3 className="font-bold text-ink flex items-center gap-2 mb-3 text-sm">
+                <ClipboardCheck className="w-4 h-4 text-accent-fg" /> Rounds History
               </h3>
               <div className="space-y-2">
                 {patient.dailyRounds
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                   .slice(0, 5)
                   .map(round => (
-                    <div key={round.date} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div key={round.date} className="bg-surface rounded-xl p-3 border border-line">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-teal-600">{round.date}</span>
-                        <span className="text-xs text-slate-400">{round.todos.filter(t => t.isDone).length}/{round.todos.length} done</span>
+                        <span className="text-xs font-bold text-accent-fg">{round.date}</span>
+                        <span className="text-xs text-ink-faint">{round.todos.filter(t => t.isDone).length}/{round.todos.length} done</span>
                       </div>
-                      <p className="text-sm text-slate-700">{round.note || 'No note recorded'}</p>
+                      <p className="text-sm text-ink">{round.note || 'No note recorded'}</p>
                     </div>
                   ))}
               </div>

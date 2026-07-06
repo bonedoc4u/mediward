@@ -46,9 +46,9 @@ const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
   const pendingCount = useMemo(() => studies.filter(isReportPending).length, [studies]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3">
+    <div className="bg-surface-card rounded-2xl shadow-sm border border-line px-4 py-3 mb-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint flex items-center gap-1.5">
           <FileImage className="w-3.5 h-3.5" /> Radiology ({studies.length})
           {pendingCount > 0 && (
             <span className="normal-case tracking-normal font-semibold text-vital-warning-fg">
@@ -58,7 +58,7 @@ const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
         </p>
         <button
           onClick={onOpenFull}
-          className="flex items-center gap-1 text-xs font-semibold text-teal-600 hover:text-teal-700 min-h-11 px-2 rounded-lg hover:bg-teal-50 transition-colors"
+          className="flex items-center gap-1 text-xs font-semibold text-accent-fg hover:text-accent-pressed min-h-11 px-2 rounded-lg hover:bg-accent-soft transition-colors"
         >
           {studies.length > 0 ? 'View all' : 'Add'} <ChevronRight className="w-3.5 h-3.5" />
         </button>
@@ -67,7 +67,7 @@ const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
       {studies.length === 0 ? (
         <button
           onClick={onOpenFull}
-          className="w-full flex flex-col items-center justify-center gap-1.5 min-h-24 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+          className="w-full flex flex-col items-center justify-center gap-1.5 min-h-24 rounded-xl border-2 border-dashed border-line text-ink-muted hover:border-line hover:text-ink hover:bg-surface transition-colors"
         >
           <Plus className="w-5 h-5" />
           <span className="text-xs font-semibold">Add imaging</span>
