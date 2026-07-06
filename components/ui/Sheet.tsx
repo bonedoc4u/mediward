@@ -47,7 +47,7 @@ const SheetContent = React.forwardRef<
       <SheetOverlay />
       <DialogPrimitive.Content
         ref={ref}
-        className={`fixed z-[81] bg-white shadow-2xl outline-none flex flex-col ${position} ${className}`}
+        className={`fixed z-[81] bg-surface-card shadow-2xl outline-none flex flex-col ${position} ${className}`}
         {...props}
       >
         {children}
