@@ -38,6 +38,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource-variable/dm-sans": "^5.2.8",
+    "@fontsource/dm-mono": "^5.2.7",
     "@radix-ui/react-dialog": "^1.1.18",
     "@sentry/react": "^10.62.0",
     "@supabase/supabase-js": "^2.98.0",

@@ -1,6 +1,9 @@
 @import "tailwindcss";
 /* Self-hosted DM Sans variable font — no Google CDN, no DPDP exposure */
 @import "@fontsource-variable/dm-sans";
+/* Self-hosted DM Mono — clinical numbers only (vitals, doses, beds, IP nos) */
+@import "@fontsource/dm-mono/400.css";
+@import "@fontsource/dm-mono/500.css";
 
 /* ── Semantic clinical colour tokens (Tailwind 4 @theme) ──────────
  * Usage: text-vital-critical / bg-vital-critical-surface / border-vital-critical-border
@@ -37,6 +40,25 @@
   --color-chart-hr:     #db2777; /* pink-600   */
   --color-chart-spo2:   #0891b2; /* cyan-600   */
   --color-chart-temp:   #7c3aed; /* violet-600 */
+
+  /* ── Scrub Teal chrome tokens (2026-07-06 restyle) ──────────────
+   * Chrome is monochrome ink+teal; ONLY vital-* above may be saturated. */
+  --color-surface:         #f7f9f9; /* app background            */
+  --color-surface-card:    #ffffff; /* cards, sheets, modals     */
+  --color-surface-sunken:  #eef2f2; /* chips, wells, skeletons   */
+  --color-ink:             #1e2a2e; /* primary text  ~14.9:1     */
+  --color-ink-muted:       #5b6b70; /* secondary     ~5.4:1      */
+  --color-ink-faint:       #8c989c; /* disabled/placeholder ONLY */
+  --color-accent:          #337b77; /* scrub teal, fills ≥3:1    */
+  --color-accent-fg:       #2a6763; /* teal as text  ≥4.5:1      */
+  --color-accent-soft:     #e4efee; /* selection tint            */
+  --color-accent-pressed:  #28615e; /* pressed/hover fill        */
+  --color-line:            #dce4e4; /* all borders & dividers    */
+
+  --font-mono: 'DM Mono', ui-monospace, 'Cascadia Mono', monospace;
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --shadow-card: 0 1px 2px 0 rgb(30 42 46 / 0.06), 0 1px 3px 0 rgb(30 42 46 / 0.04);
 }
 
 /* ── Global CSS custom properties ─────────────────────────────── */
