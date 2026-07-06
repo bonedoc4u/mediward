@@ -35,4 +35,16 @@ describe('SortableRow (OT list, iOS horizontal-scroll regression)', () => {
     // Only the handle cell should carry it; the row must not.
     expect(row.style.touchAction).not.toBe('none');
   });
+
+  it('disables native text selection on the row so a scroll-attempt drag cannot select text across cells', () => {
+    const { getByRole } = renderRow();
+    const row = getByRole('row');
+
+    // Once the row allows normal touch panning again (previous fix), an
+    // imprecise tap/drag near a picker can be interpreted by iOS Safari as a
+    // text-selection drag across the row's plain-text cells instead of a tap.
+    // user-select: none is safe here — it has no effect on the internals of
+    // <input>/<textarea> elements (they manage their own selection natively).
+    expect(row.style.userSelect).toBe('none');
+  });
 });
