@@ -65,8 +65,10 @@ for text will be contrast-verified computationally (≥4.5:1) before Phase 1 com
 
 ### Phase 1 — tokens + shared primitives
 - Extend `@theme` in `index.css` with the tokens above; add DM Mono import.
-- Restyle shared primitives in `components/ui/` (Sheet, BottomSheetPicker,
-  PatientStatusBadge, EmptyState, QueryError, buttons/dialogs/toasts) to consume tokens.
+- Restyle shared primitives to consume tokens: all of `components/ui/` (Sheet,
+  BottomSheetPicker, PatientStatusBadge, EmptyState, QueryError, Skeleton,
+  KeyboardAwareView) plus the shared top-level `ConfirmDialog.tsx` and
+  `ToastContainer.tsx`.
 - No screen-level components touched.
 
 ### Phase 2 — ward list
