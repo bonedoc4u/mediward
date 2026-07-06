@@ -17,32 +17,32 @@ const CONFIG: Record<PatientStatus, {
   [PatientStatus.Fit]: {
     label: 'Fit',
     Icon: CheckCircle2,
-    classes: 'bg-green-100 text-green-800 border-green-300',
+    classes: 'bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border',
   },
   [PatientStatus.Review]: {
     label: 'Review',
     Icon: Eye,
-    classes: 'bg-purple-100 text-purple-800 border-purple-300',
+    classes: 'bg-vital-warning-surface text-vital-warning-fg border-vital-warning-border',
   },
   [PatientStatus.Critical]: {
     label: 'Critical',
     Icon: AlertCircle,
-    classes: 'bg-red-100 text-red-800 border-red-300',
+    classes: 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border',
   },
   [PatientStatus.WentHome]: {
     label: 'Went Home',
     Icon: Home,
-    classes: 'bg-violet-100 text-violet-800 border-violet-300',
+    classes: 'bg-accent-soft text-accent-fg border-accent',
   },
   [PatientStatus.DischargeReady]: {
     label: 'Discharge Ready',
     Icon: HeartPulse,
-    classes: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    classes: 'bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border',
   },
   [PatientStatus.Discharged]: {
     label: 'Discharged',
     Icon: LogOut,
-    classes: 'bg-slate-100 text-slate-600 border-slate-200',
+    classes: 'bg-surface-sunken text-ink-muted border-line',
   },
 };
 
