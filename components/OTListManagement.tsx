@@ -89,6 +89,15 @@ export const SortableRow = ({ id, children, className }: { id: string, children:
     // horizontal scroll (of the overflow-x-auto table wrapper) for every descendant
     // touch, not just the drag handle's. The handle's own `touch-none` class
     // (data-drag-handle cell below) is what dnd-kit's TouchSensor actually needs.
+    //
+    // But allowing normal panning again means an imprecise tap/drag near a
+    // picker can be read by iOS Safari as a text-selection drag across the
+    // row's plain-text cells. Suppress that at the row level — safe for the
+    // <input>/<textarea> cells nested inside, since user-select has no effect
+    // on a form control's own internals (it manages its own text selection).
+    WebkitUserSelect: 'none' as const,
+    userSelect: 'none' as const,
+    WebkitTouchCallout: 'none' as const,
   };
 
   // Clone children to inject listeners into the drag handle
