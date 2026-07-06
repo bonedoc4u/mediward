@@ -3,7 +3,7 @@ import { Skeleton } from '../ui/Skeleton';
 
 export function PatientCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3" aria-hidden="true">
+    <div className="bg-surface-card rounded-xl border border-line p-4 space-y-3" aria-hidden="true">
       <div className="flex items-start justify-between">
         <div className="space-y-1.5 flex-1">
           <Skeleton className="h-5 w-40" />

@@ -17,17 +17,18 @@ const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : be
 
 // ─── NEWS2 Badge ─────────────────────────────────────────────────────────────
 function getNews2Config(score: number): { label: string; badge: string; dot: string } {
-  if (score >= 7) return { label: `N2: ${score}`, badge: 'bg-red-100 text-red-800 border-red-300 animate-pulse font-bold', dot: 'bg-red-500' };
-  if (score >= 5) return { label: `N2: ${score}`, badge: 'bg-orange-100 text-orange-800 border-orange-300 font-bold', dot: 'bg-orange-500' };
-  if (score >= 2) return { label: `N2: ${score}`, badge: 'bg-amber-100 text-amber-800 border-amber-200', dot: 'bg-amber-400' };
-  return { label: `N2: ${score}`, badge: 'bg-green-100 text-green-800 border-green-200', dot: 'bg-green-500' };
+  // Escalation stays legible without orange: pulse+bold red > bold red > amber > green
+  if (score >= 7) return { label: `N2: ${score}`, badge: 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border animate-pulse font-bold', dot: 'bg-vital-critical' };
+  if (score >= 5) return { label: `N2: ${score}`, badge: 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border font-bold', dot: 'bg-vital-critical' };
+  if (score >= 2) return { label: `N2: ${score}`, badge: 'bg-vital-warning-surface text-vital-warning-fg border-vital-warning-border', dot: 'bg-vital-warning' };
+  return { label: `N2: ${score}`, badge: 'bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border', dot: 'bg-vital-normal' };
 }
 
 function News2Badge({ vitals, compact = false }: { vitals?: VitalSigns[]; compact?: boolean }) {
   const latest = vitals?.[0];
   if (!latest || latest.news2Score == null) {
     return compact ? null : (
-      <span className="px-1.5 py-0.5 rounded text-[10px] border bg-slate-50 text-slate-400 border-slate-200" title="No vitals recorded">
+      <span className="px-1.5 py-0.5 rounded text-[10px] border bg-surface text-ink-faint border-line" title="No vitals recorded">
         <Heart className="w-2.5 h-2.5 inline mr-0.5 opacity-50" />N2—
       </span>
     );
@@ -187,14 +188,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       className={`shrink-0 w-[90px] md:w-auto md:flex-1 flex flex-col items-center justify-center p-2 md:p-4 rounded-xl border transition-all duration-200 ${
         selectedWard === ward
           ? `${activeClass} shadow-md scale-[1.02]`
-          : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-sm'
+          : 'bg-surface-card border-line hover:border-accent hover:shadow-sm'
       }`}
     >
-      <div className={`p-1.5 md:p-2 rounded-full mb-1 md:mb-2 ${selectedWard === ward ? 'bg-white/20' : 'bg-slate-100'}`}>
+      <div className={`p-1.5 md:p-2 rounded-full mb-1 md:mb-2 ${selectedWard === ward ? 'bg-white/20' : 'bg-surface-sunken'}`}>
         <Icon className={`w-4 h-4 md:w-5 md:h-5 ${selectedWard === ward ? 'text-white' : colorClass}`} />
       </div>
-      <span className={`text-xs md:text-sm font-bold truncate w-full text-center ${selectedWard === ward ? 'text-white' : 'text-slate-700'}`}>{ward === 'All' ? 'All' : ward}</span>
-      <span className={`text-[10px] md:text-xs ${selectedWard === ward ? 'text-white/80' : 'text-slate-600'}`}>{count} pts</span>
+      <span className={`text-xs md:text-sm font-bold truncate w-full text-center ${selectedWard === ward ? 'text-white' : 'text-ink'}`}>{ward === 'All' ? 'All' : ward}</span>
+      <span className={`text-[10px] md:text-xs ${selectedWard === ward ? 'text-white/80' : 'text-ink-muted'}`}>{count} pts</span>
     </button>
   );
 
@@ -265,33 +266,33 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
     return (
       <div className="space-y-3">
         {filteredPatients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400">
+          <div className="flex flex-col items-center justify-center py-20 text-center text-ink-faint">
             <Home className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-base font-semibold text-slate-600">No patients went home</p>
+            <p className="text-base font-semibold text-ink-muted">No patients went home</p>
             <p className="text-sm mt-1">Patients temporarily sent home will appear here.</p>
           </div>
         ) : (
           filteredPatients.map(p => (
             <div
               key={p.ipNo}
-              className="bg-white rounded-xl border border-slate-200 border-l-4 border-l-violet-400 p-4 flex items-center gap-4 cursor-pointer hover:shadow-sm hover:border-violet-300 transition-all active:scale-[0.99]"
+              className="bg-surface-card rounded-xl border border-line border-l-4 border-l-accent p-4 flex items-center gap-4 cursor-pointer hover:shadow-sm hover:border-accent transition-all active:scale-[0.99]"
               onClick={() => onViewPatient?.(p.ipNo)}
             >
-              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-surface-sunken flex items-center justify-center text-sm font-bold font-mono text-ink shrink-0">
                 {p.bed}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-900 truncate">{p.name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{p.age}y · {p.gender} · IP {p.ipNo}</p>
-                <p className="text-xs text-slate-600 mt-1 break-words">{p.diagnosis}</p>
+                <p className="text-sm font-bold text-ink truncate">{p.name}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{p.age}y · {p.gender} · IP {p.ipNo}</p>
+                <p className="text-xs text-ink-muted mt-1 break-words">{p.diagnosis}</p>
               </div>
               <div className="shrink-0 flex flex-col items-end gap-1.5">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 text-violet-800 border border-violet-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-accent-soft text-accent-fg border border-accent">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                   Went Home
                 </span>
                 {p.doa && (
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-[10px] text-ink-faint">
                     DOA {new Date(p.doa).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                   </span>
                 )}
@@ -327,15 +328,15 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       {/* Ward Selection Tabs — rendered from ward_config */}
       <div className="flex overflow-x-auto gap-2 pb-1 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0">
-        <WardTab ward="All" icon={Layers} count={counts.All} colorClass="text-slate-600" activeClass="bg-slate-800 border-slate-900 text-white" />
+        <WardTab ward="All" icon={Layers} count={counts.All} colorClass="text-ink-muted" activeClass="bg-ink border-ink text-white" />
         {activeConfigWards.map((w, i) => {
           const NON_ICU_STYLES = [
-            { icon: BedDouble,   colorClass: 'text-teal-600',   activeClass: 'bg-teal-600 border-blue-700 text-white' },
-            { icon: Stethoscope, colorClass: 'text-indigo-600', activeClass: 'bg-indigo-600 border-indigo-700 text-white' },
-            { icon: BedDouble,   colorClass: 'text-teal-600',   activeClass: 'bg-teal-600 border-teal-700 text-white' },
+            { icon: BedDouble,   colorClass: 'text-accent-fg', activeClass: 'bg-accent border-accent-pressed text-white' },
+            { icon: Stethoscope, colorClass: 'text-accent-fg', activeClass: 'bg-accent border-accent-pressed text-white' },
+            { icon: BedDouble,   colorClass: 'text-accent-fg', activeClass: 'bg-accent border-accent-pressed text-white' },
           ];
           const style = icuWardNames.has(w.name)
-            ? { icon: Activity, colorClass: 'text-red-600', activeClass: 'bg-red-600 border-red-700 text-white' }
+            ? { icon: Activity, colorClass: 'text-accent-fg', activeClass: 'bg-accent border-accent-pressed text-white' }
             : NON_ICU_STYLES[i % NON_ICU_STYLES.length];
           return (
             <WardTab key={w.name} ward={w.name} icon={style.icon}
@@ -347,21 +348,21 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       </div>
 
       {/* Controls */}
-      <div className="bg-white p-3 md:p-4 rounded-lg shadow-sm border border-slate-200 sticky top-0 z-10">
+      <div className="bg-surface-card p-3 md:p-4 rounded-lg shadow-sm border border-line sticky top-0 z-10">
         <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
           <div className="relative w-full xl:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
             <input
               type="text"
               placeholder="Search Name, Bed, IP No, Diagnosis..."
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              className="w-full pl-10 pr-4 py-2 border border-line rounded-md focus:ring-2 focus:ring-accent focus:outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="flex flex-wrap gap-2 w-full xl:w-auto">
             {(viewMode === 'home' || viewMode === 'master') && onAddPatient && (
-              <button onClick={onAddPatient} className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
+              <button onClick={onAddPatient} className="flex items-center gap-2 bg-accent hover:bg-accent-pressed text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
                 <UserPlus className="w-4 h-4" /> Add Patient
               </button>
             )}
@@ -370,7 +371,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 onClick={handleExportPdf}
                 disabled={exporting}
                 aria-label="Export ward list as PDF"
-                className="flex items-center gap-2 bg-white border border-slate-300 hover:border-teal-400 hover:text-teal-700 text-slate-700 px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-surface-card border border-line hover:border-accent hover:text-accent-fg text-ink px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
               >
                 {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
                 {exporting ? 'Exporting…' : 'Export PDF'}
@@ -378,14 +379,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             )}
             <button
               onClick={() => setFilterPending(!filterPending)}
-              className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-lg font-medium text-sm border transition-colors ${filterPending ? 'bg-red-50 text-red-700 border-red-200' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+              className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-lg font-medium text-sm border transition-colors ${filterPending ? 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border' : 'border-line text-ink-muted hover:bg-surface'}`}
             >
               <Filter className="w-4 h-4" /> PAC Pending
             </button>
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg font-medium text-xs border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
+                className="flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg font-medium text-xs border border-line text-ink-muted hover:bg-surface-sunken transition-colors"
               >
                 ✕ Clear
               </button>
@@ -411,15 +412,15 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         const criticalCount = isIcuWard ? wardPatients.length : 0;
         return (
         <div key={ward} className="space-y-2">
-          <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border ${isIcuWard ? 'bg-red-50 text-red-800 border-red-100' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+          <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border ${isIcuWard ? 'bg-accent-soft text-ink border-line' : 'bg-surface-sunken text-ink border-line'}`}>
             <Layout className="w-4 h-4" />
             <h3 className="font-bold uppercase tracking-wide text-sm">{ward}</h3>
             <span className="text-xs font-normal opacity-70">({wardPatients.length})</span>
             {isIcuWard && criticalCount > 0 && (
-              <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
+              <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border px-2 py-0.5 rounded-full">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vital-critical opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-vital-critical" />
                 </span>
                 CRITICAL
               </span>
@@ -427,9 +428,9 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           </div>
 
           {/* Desktop Table (md and up) */}
-          <div className="hidden md:block bg-white rounded-lg shadow-sm border border-slate-200 overflow-x-auto">
+          <div className="hidden md:block bg-surface-card rounded-lg shadow-sm border border-line overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+              <thead className="text-xs text-ink-muted uppercase bg-surface border-b border-line">
                 <tr>
                   <th className="px-6 py-3 min-w-[56px]">Bed</th>
                   <th className="px-6 py-3 min-w-[160px]">Patient</th>
@@ -447,33 +448,33 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 {wardPatients.map((patient) => (
                   <tr
                     key={patient.ipNo}
-                    className={`border-b last:border-0 hover:bg-slate-50 transition-colors ${getTriageBorderClass(patient)} ${
-                      !patient.dos && needsPac(patient) && patient.pacStatus === PacStatus.Pending ? 'bg-red-50/30' : ''
-                    } ${patient.patientStatus === PatientStatus.Discharged ? 'opacity-60 bg-slate-50' : ''} ${
+                    className={`border-b last:border-0 hover:bg-surface transition-colors ${getTriageBorderClass(patient)} ${
+                      !patient.dos && needsPac(patient) && patient.pacStatus === PacStatus.Pending ? 'bg-vital-critical-surface/30' : ''
+                    } ${patient.patientStatus === PatientStatus.Discharged ? 'opacity-60 bg-surface' : ''} ${
                       highlightIpNo === patient.ipNo ? 'row-highlight' : ''
                     }`}
                   >
-                    <td className="px-6 py-4 font-medium text-slate-900">{shortBed(patient.bed)}</td>
+                    <td className="px-6 py-4 font-medium font-mono leading-5 text-ink">{shortBed(patient.bed)}</td>
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900 flex items-center gap-2">
+                      <div className="font-semibold text-ink flex items-center gap-2">
                         {onViewPatient ? (
-                          <button onClick={() => onViewPatient(patient.ipNo)} className="text-teal-600 hover:text-blue-800 hover:underline font-semibold text-left">
+                          <button onClick={() => onViewPatient(patient.ipNo)} className="text-accent-fg hover:text-accent-pressed hover:underline font-semibold text-left">
                             {patient.name}
                           </button>
                         ) : patient.name}
                         {patient.patientStatus === PatientStatus.Discharged && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200 text-slate-600 uppercase tracking-wide">Discharged</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-surface-sunken text-ink-muted uppercase tracking-wide">Discharged</span>
                         )}
                         {patient.dailyRounds.some(r => r.date === today) && (
                           <span title="Rounded today">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-vital-normal shrink-0" />
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1">
+                      <div className="text-xs text-ink-muted flex flex-wrap items-center gap-1">
                         <span>{patient.age} / {patient.gender} • IP: {patient.ipNo}</span>
                       </div>
-                      <div className="text-xs text-teal-600">{patient.mobile}</div>
+                      <div className="text-xs text-accent-fg">{patient.mobile}</div>
                     </td>
                     {showNews2 && (
                       <td className="px-4 py-4 text-center">
@@ -481,21 +482,21 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </td>
                     )}
                     <td className="px-4 py-3 max-w-[280px]">
-                      <span className="block whitespace-normal break-words text-sm text-slate-700">{patient.diagnosis}</span>
+                      <span className="block whitespace-normal break-words text-sm text-ink">{patient.diagnosis}</span>
                       {getSmartAlerts(patient).map((a, i) => (
                         <span key={i} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded mt-1 mr-1 ${
-                          a.type === 'critical' ? 'bg-red-100 text-red-700' :
-                          a.type === 'warning'  ? 'bg-amber-100 text-amber-700' :
-                                                  'bg-blue-100 text-blue-700'
+                          a.type === 'critical' ? 'bg-vital-critical-surface text-vital-critical-fg' :
+                          a.type === 'warning'  ? 'bg-vital-warning-surface text-vital-warning-fg' :
+                                                  'bg-vital-low-surface text-vital-low-fg'
                         }`}>⚡ {a.message}</span>
                       ))}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {patient.comorbidities.map(c => (
-                          <span key={c} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">{c}</span>
+                          <span key={c} className="px-2 py-0.5 bg-surface-sunken text-ink-muted rounded text-xs">{c}</span>
                         ))}
-                        {patient.comorbidities.length === 0 && <span className="text-slate-500">—</span>}
+                        {patient.comorbidities.length === 0 && <span className="text-ink-muted">—</span>}
                       </div>
                     </td>
                     <td className="px-6 py-4 space-y-2">
@@ -508,13 +509,13 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                             {patient.pacStatus}
                           </span>
                         ) : (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1 w-fit">
+                          <span className="px-2 py-1 rounded-full text-xs font-medium border bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border flex items-center gap-1 w-fit">
                             <Leaf className="w-3 h-3 shrink-0" aria-hidden="true" /> Conservative
                           </span>
                         )
                       )}
                       {patient.patientStatus !== PatientStatus.Fit && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${patient.patientStatus === PatientStatus.Discharged ? 'bg-slate-100 text-slate-600 border-slate-200' : getStatusColor(patient.patientStatus)} block w-fit`}>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium border ${patient.patientStatus === PatientStatus.Discharged ? 'bg-surface-sunken text-ink-muted border-line' : getStatusColor(patient.patientStatus)} block w-fit`}>
                           {patient.patientStatus === PatientStatus.Review ? 'Needs Review' : patient.patientStatus}
                         </span>
                       )}
@@ -522,25 +523,25 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     {viewMode !== 'pending' && (
                       <td className="px-6 py-4 text-center">
                         {calcPod(patient.dos, today) !== undefined ? (
-                          <div className="inline-block p-2 rounded-lg border-2 border-green-500 bg-green-50">
-                            <span className="block text-[10px] uppercase font-bold text-green-700 leading-none mb-0.5">POD</span>
-                            <span className="font-bold text-lg text-green-800 leading-none">{calcPod(patient.dos, today)}</span>
+                          <div className="inline-block p-2 rounded-lg border-2 border-vital-normal bg-vital-normal-surface">
+                            <span className="block text-[10px] uppercase font-bold text-vital-normal-fg leading-none mb-0.5">POD</span>
+                            <span className="font-bold font-mono text-lg text-vital-normal-fg leading-none">{calcPod(patient.dos, today)}</span>
                           </div>
                         ) : (
-                          <span className="text-slate-500">-</span>
+                          <span className="text-ink-muted">-</span>
                         )}
                       </td>
                     )}
                     <td className="px-6 py-4">
-                      {patient.procedure || <span className="text-slate-400 text-xs italic">—</span>}
-                      {patient.dos && <div className="text-xs text-slate-500 font-medium">DOS: {patient.dos}</div>}
+                      {patient.procedure || <span className="text-ink-faint text-xs italic">—</span>}
+                      {patient.dos && <div className="text-xs text-ink-muted font-medium">DOS: {patient.dos}</div>}
                     </td>
                     {viewMode === 'pending' && (
                       <td className="px-6 py-4">
                         {patient.plannedDos ? (
                           <button
                             onClick={() => { setAssigningDateIp(patient.ipNo); setAssigningDateValue(patient.plannedDos ?? ''); }}
-                            className="flex items-center gap-1.5 px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded text-xs font-semibold transition-colors"
+                            className="flex items-center gap-1.5 px-2 py-1 bg-accent-soft hover:bg-accent-soft text-accent-fg border border-accent rounded text-xs font-semibold transition-colors"
                             title="Change planned date"
                           >
                             <CalendarCheck className="w-3.5 h-3.5" />
@@ -549,14 +550,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         ) : onAssignDate ? (
                           <button
                             onClick={() => { setAssigningDateIp(patient.ipNo); setAssigningDateValue(''); }}
-                            className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-teal-50 text-slate-500 hover:text-teal-600 border border-dashed border-slate-300 hover:border-teal-300 rounded text-xs transition-colors"
+                            className="flex items-center gap-1.5 px-2 py-1 bg-surface hover:bg-accent-soft text-ink-muted hover:text-accent-fg border border-dashed border-line hover:border-accent rounded text-xs transition-colors"
                             title="Assign surgery date"
                           >
                             <CalendarClock className="w-3.5 h-3.5" />
                             Assign date
                           </button>
                         ) : (
-                          <span className="text-slate-300 text-xs">—</span>
+                          <span className="text-ink-faint text-xs">—</span>
                         )}
                       </td>
                     )}
@@ -566,7 +567,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           {onViewPatient && (
                             <button
                               onClick={() => onViewPatient(patient.ipNo)}
-                              className="p-2 hover:bg-blue-100 rounded-full text-slate-400 hover:text-teal-600 transition-colors"
+                              className="p-2 hover:bg-accent-soft rounded-full text-ink-faint hover:text-accent-fg transition-colors"
                               title="View Details"
                               aria-label={`View details for ${patient.name}`}
                             >
@@ -576,7 +577,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           {onEditPatient && (
                             <button
                               onClick={() => onEditPatient(patient)}
-                              className="p-2 hover:bg-slate-200 rounded-full text-slate-500 hover:text-teal-600 transition-colors"
+                              className="p-2 hover:bg-surface-sunken rounded-full text-ink-muted hover:text-accent-fg transition-colors"
                               title="Edit"
                               aria-label={`Edit ${patient.name}`}
                             >
@@ -602,13 +603,13 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         <div className="md:hidden">
           <button
             onClick={onStartRounds}
-            className="w-full flex items-center justify-between bg-gradient-to-r from-teal-700 to-teal-800 text-white p-4 rounded-xl shadow-md active:scale-[0.98] transition-transform"
+            className="w-full flex items-center justify-between bg-accent text-white p-4 rounded-xl shadow-md active:scale-[0.98] transition-transform"
           >
             <div>
               <p className="font-bold text-sm">Start Ward Rounds</p>
               <p className="text-white/75 text-xs mt-0.5">{filteredPatients.length} patients · tap to begin</p>
             </div>
-            <ChevronRight className="w-5 h-5 text-teal-300" />
+            <ChevronRight className="w-5 h-5 text-white/70" />
           </button>
         </div>
       )}
@@ -641,15 +642,15 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 }}
               >
                 {item.kind === 'ward-header' ? (
-                  <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border mb-2 ${item.isIcu ? 'bg-red-50 text-red-800 border-red-100' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                  <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border mb-2 ${item.isIcu ? 'bg-accent-soft text-ink border-line' : 'bg-surface-sunken text-ink border-line'}`}>
                     <Layout className="w-4 h-4" />
                     <h3 className="font-bold uppercase tracking-wide text-sm">{item.ward}</h3>
                     <span className="text-xs font-normal opacity-70">({item.count})</span>
                     {item.isIcu && (
-                      <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
+                      <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border px-2 py-0.5 rounded-full">
                         <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vital-critical opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-vital-critical" />
                         </span>
                         CRITICAL
                       </span>
@@ -657,25 +658,25 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   </div>
                 ) : (
                   <div
-                    className={`p-4 space-y-3 bg-white border border-slate-200 rounded-lg mb-2 ${getTriageBorderClass(item.patient)} ${
-                      !item.patient.dos && needsPac(item.patient) && item.patient.pacStatus === PacStatus.Pending ? 'bg-red-50/20' : ''
+                    className={`p-4 space-y-3 bg-surface-card border border-line rounded-lg mb-2 ${getTriageBorderClass(item.patient)} ${
+                      !item.patient.dos && needsPac(item.patient) && item.patient.pacStatus === PacStatus.Pending ? 'bg-vital-critical-surface/20' : ''
                     } ${highlightIpNo === item.patient.ipNo ? 'row-highlight' : ''}`}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
-                        <span className={`text-white text-sm font-bold w-10 h-10 shrink-0 flex items-center justify-center rounded-lg ${item.isIcu ? 'bg-red-700' : 'bg-slate-800'}`}>
+                        <span className={`text-white text-sm font-bold font-mono w-10 h-10 shrink-0 flex items-center justify-center rounded-lg ${item.isIcu ? 'bg-ink' : 'bg-accent'}`}>
                           {shortBed(item.patient.bed)}
                         </span>
                         <div>
-                          <h3 className="font-bold text-slate-900 flex items-center gap-1.5 max-w-[160px] truncate" title={item.patient.name}>
+                          <h3 className="font-bold text-ink flex items-center gap-1.5 max-w-[160px] truncate" title={item.patient.name}>
                             <span className="truncate">{item.patient.name}</span>
                             {item.patient.dailyRounds.some(r => r.date === today) && (
                               <span title="Rounded today">
-                                <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
+                                <CheckCircle2 className="w-3 h-3 text-vital-normal shrink-0" />
                               </span>
                             )}
                           </h3>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-ink-muted">
                             {item.patient.age}y • {item.patient.gender} • {item.patient.ipNo}
                           </div>
                         </div>
@@ -683,24 +684,24 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       <div className="flex items-center gap-1.5 shrink-0">
                         {showNews2 && <News2Badge vitals={item.patient.vitals} compact />}
                         {calcPod(item.patient.dos, today) !== undefined && (
-                          <div className="text-xs font-bold uppercase text-slate-500 border-2 border-green-500 bg-green-50 p-1.5 rounded text-center">
-                            <span className="text-green-700 block text-[9px]">POD</span>
-                            <span className="text-lg text-green-800 block leading-none">{calcPod(item.patient.dos, today)}</span>
+                          <div className="text-xs font-bold uppercase text-ink-muted border-2 border-vital-normal bg-vital-normal-surface p-1.5 rounded text-center">
+                            <span className="text-vital-normal-fg block text-[9px]">POD</span>
+                            <span className="text-lg font-mono text-vital-normal-fg block leading-none">{calcPod(item.patient.dos, today)}</span>
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="text-sm border-t border-slate-100 pt-2">
-                      <p className="font-medium text-slate-800 break-words">{item.patient.diagnosis}</p>
-                      {item.patient.procedure && <p className="text-xs text-slate-500 mt-0.5">{item.patient.procedure}</p>}
+                    <div className="text-sm border-t border-line pt-2">
+                      <p className="font-medium text-ink break-words">{item.patient.diagnosis}</p>
+                      {item.patient.procedure && <p className="text-xs text-ink-muted mt-0.5">{item.patient.procedure}</p>}
                     </div>
                     {/* Planned date row — pending view only */}
                     {viewMode === 'pending' && (
-                      <div className="flex items-center gap-2 border-t border-slate-100 pt-2">
+                      <div className="flex items-center gap-2 border-t border-line pt-2">
                         {item.patient.plannedDos ? (
                           <button
                             onClick={() => { setAssigningDateIp(item.patient.ipNo); setAssigningDateValue(item.patient.plannedDos ?? ''); }}
-                            className="flex items-center gap-1.5 px-2 py-1 bg-violet-50 text-violet-700 border border-violet-200 rounded text-xs font-semibold"
+                            className="flex items-center gap-1.5 px-2 py-1 bg-accent-soft text-accent-fg border border-accent rounded text-xs font-semibold"
                           >
                             <CalendarCheck className="w-3.5 h-3.5" />
                             {item.patient.plannedDos}
@@ -708,7 +709,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         ) : onAssignDate ? (
                           <button
                             onClick={() => { setAssigningDateIp(item.patient.ipNo); setAssigningDateValue(''); }}
-                            className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 text-slate-500 border border-dashed border-slate-300 rounded text-xs"
+                            className="flex items-center gap-1.5 px-2 py-1 bg-surface text-ink-muted border border-dashed border-line rounded text-xs"
                           >
                             <CalendarClock className="w-3.5 h-3.5" />
                             Assign surgery date
@@ -726,7 +727,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                               {item.patient.pacStatus}
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border">
                               <Leaf className="w-3 h-3" aria-hidden="true" /> Conservative
                             </span>
                           )
@@ -743,7 +744,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {onAddLab && (
                           <button
                             onClick={(e) => { e.stopPropagation(); setQuickLabIp(item.patient.ipNo); setQuickLabType(''); setQuickLabValue(''); }}
-                            className="w-11 h-11 flex items-center justify-center bg-teal-50 hover:bg-teal-100 rounded-lg text-teal-700 transition-colors"
+                            className="w-11 h-11 flex items-center justify-center bg-accent-soft hover:bg-accent-soft rounded-lg text-accent-fg transition-colors"
                             title="Quick Lab Entry"
                             aria-label={`Add lab result for ${item.patient.name}`}
                           >
@@ -753,7 +754,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {onEditPatient && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onEditPatient(item.patient); }}
-                            className="w-11 h-11 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 transition-colors"
+                            className="w-11 h-11 flex items-center justify-center bg-surface-sunken hover:bg-accent-soft rounded-lg text-ink-muted transition-colors"
                             title="Edit"
                             aria-label={`Edit ${item.patient.name}`}
                           >
@@ -763,7 +764,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         {onViewPatient && (
                           <button
                             onClick={() => onViewPatient(item.patient.ipNo)}
-                            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors"
+                            className="px-3 py-1.5 bg-accent hover:bg-accent-pressed text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors"
                             aria-label={`View details for ${item.patient.name}`}
                           >
                             <ExternalLink className="w-3.5 h-3.5" /> View
@@ -785,7 +786,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           <button
             onClick={onLoadMore}
             disabled={isLoadingMore}
-            className="flex items-center gap-2 px-5 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-60 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-5 py-2 rounded-lg border border-line bg-surface-card text-ink text-sm font-medium hover:bg-surface disabled:opacity-60 transition-colors shadow-sm"
           >
             {isLoadingMore
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
@@ -795,7 +796,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       )}
 
       {wardsToDisplay.length === 0 && (
-        <div className="bg-white rounded-xl border border-slate-200">
+        <div className="bg-surface-card rounded-xl border border-line">
           {hasActiveFilters ? (
             <NoSearchResults query={searchTerm || 'current filters'} />
           ) : (
@@ -823,13 +824,13 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       {/* ─── Quick Lab Entry bottom panel — mobile only ─── */}
       {quickLabIp && onAddLab && (
-        <div className="md:hidden fixed left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200" style={{ bottom: 'calc(var(--bottom-nav-height, 56px) + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)))' }}>
+        <div className="md:hidden fixed left-0 right-0 z-40 bg-surface-card border-t border-line shadow-2xl px-4 py-4 animate-in slide-in-from-bottom-4 duration-200" style={{ bottom: 'calc(var(--bottom-nav-height, 56px) + var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)))' }}>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="font-semibold text-sm text-slate-800">Quick Lab Entry</p>
-              <p className="text-xs text-slate-500">{patients.find(p => p.ipNo === quickLabIp)?.name ?? quickLabIp}</p>
+              <p className="font-semibold text-sm text-ink">Quick Lab Entry</p>
+              <p className="text-xs text-ink-muted">{patients.find(p => p.ipNo === quickLabIp)?.name ?? quickLabIp}</p>
             </div>
-            <button onClick={() => setQuickLabIp(null)} className="text-slate-400 hover:text-slate-600 p-1">
+            <button onClick={() => setQuickLabIp(null)} className="text-ink-faint hover:text-ink-muted p-1">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -843,19 +844,19 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 ...labTypes.filter(l => l.active).map(lt => ({ value: lt.name, label: `${lt.name} (${lt.unit})` })),
               ]}
               onChange={val => setQuickLabType(val)}
-              triggerClassName="flex-1 min-h-[44px] p-2 border border-slate-300 rounded text-sm flex items-center justify-between gap-1 bg-white"
+              triggerClassName="flex-1 min-h-[44px] p-2 border border-line rounded text-sm flex items-center justify-between gap-1 bg-surface-card"
             />
             <input
               type="number"
               placeholder="Value"
               value={quickLabValue}
               onChange={e => setQuickLabValue(e.target.value)}
-              className="w-20 min-h-[44px] p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+              className="w-20 min-h-[44px] p-2 border border-line rounded text-sm font-mono focus:ring-2 focus:ring-accent outline-none"
             />
             <button
               onClick={handleQuickLab}
               disabled={!quickLabType || !quickLabValue || quickLabSaving}
-              className="px-3 min-h-[44px] bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
+              className="px-3 min-h-[44px] bg-accent hover:bg-accent-pressed text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors"
             >
               {quickLabSaving ? '…' : 'Save'}
             </button>
