@@ -25,17 +25,17 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-        <Icon className="w-8 h-8 text-slate-400" aria-hidden="true" />
+      <div className="w-16 h-16 rounded-2xl bg-surface-sunken flex items-center justify-center mb-4">
+        <Icon className="w-8 h-8 text-ink-faint" aria-hidden="true" />
       </div>
-      <p className="text-slate-800 font-semibold text-base mb-1">{title}</p>
-      {body && <p className="text-sm text-slate-500 max-w-xs mb-6">{body}</p>}
+      <p className="text-ink font-semibold text-base mb-1">{title}</p>
+      {body && <p className="text-sm text-ink-muted max-w-xs mb-6">{body}</p>}
       {(primaryLabel || secondaryLabel) && (
         <div className="flex flex-col sm:flex-row gap-2 mt-2">
           {primaryLabel && onPrimary && (
             <button
               onClick={onPrimary}
-              className="px-5 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors min-h-[44px]"
+              className="px-5 py-2.5 bg-accent text-white rounded-control text-sm font-medium hover:bg-accent-pressed transition-colors min-h-[44px]"
             >
               {primaryLabel}
             </button>
@@ -43,7 +43,7 @@ export function EmptyState({
           {secondaryLabel && onSecondary && (
             <button
               onClick={onSecondary}
-              className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors min-h-[44px]"
+              className="px-5 py-2.5 bg-surface-sunken text-ink rounded-control text-sm font-medium hover:bg-accent-soft transition-colors min-h-[44px]"
             >
               {secondaryLabel}
             </button>
