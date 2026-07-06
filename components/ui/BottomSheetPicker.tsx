@@ -41,9 +41,9 @@ const BottomSheetPicker: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  const defaultTrigger = `w-full flex items-center justify-between gap-2 p-2 border border-slate-300
-    rounded text-sm bg-white focus:outline-none text-slate-700
-    disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed`;
+  const defaultTrigger = `w-full flex items-center justify-between gap-2 p-2 border border-line
+    rounded text-sm bg-surface-card focus:outline-none text-ink
+    disabled:bg-surface disabled:text-ink-faint disabled:cursor-not-allowed`;
 
   return (
     <>
@@ -55,10 +55,10 @@ const BottomSheetPicker: React.FC<Props> = ({
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className={selected ? '' : 'text-slate-400'}>
+        <span className={selected ? '' : 'text-ink-faint'}>
           {selected ? selected.label : placeholder}
         </span>
-        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+        <ChevronDown className="w-4 h-4 text-ink-faint shrink-0" />
       </button>
 
       {open && (
@@ -79,18 +79,18 @@ const BottomSheetPicker: React.FC<Props> = ({
             ref={sheetRef}
             role="listbox"
             aria-label={title ?? placeholder}
-            className="relative w-full max-w-lg bg-white rounded-t-2xl md:rounded-2xl
+            className="relative w-full max-w-lg bg-surface-card rounded-t-2xl md:rounded-card
                        shadow-2xl animate-in slide-in-from-bottom duration-300
                        max-h-[70vh] flex flex-col"
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1 shrink-0 md:hidden">
-              <div className="w-10 h-1 bg-slate-200 rounded-full" />
+              <div className="w-10 h-1 bg-surface-sunken rounded-full" />
             </div>
 
             {title && (
-              <div className="px-5 pt-3 pb-2 shrink-0 border-b border-slate-100">
-                <p className="text-sm font-semibold text-slate-700">{title}</p>
+              <div className="px-5 pt-3 pb-2 shrink-0 border-b border-line">
+                <p className="text-sm font-semibold text-ink">{title}</p>
               </div>
             )}
 
@@ -103,20 +103,20 @@ const BottomSheetPicker: React.FC<Props> = ({
                   aria-selected={opt.value === value}
                   onClick={() => { onChange(opt.value); setOpen(false); }}
                   className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors
-                    hover:bg-teal-50 active:bg-teal-100 ${opt.value === value ? 'bg-teal-50' : ''}`}
+                    hover:bg-accent-soft active:bg-accent-soft ${opt.value === value ? 'bg-accent-soft' : ''}`}
                 >
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium leading-snug ${
-                      opt.value === value ? 'text-teal-700' : 'text-slate-800'
+                      opt.value === value ? 'text-accent-fg' : 'text-ink'
                     }`}>
                       {opt.label}
                     </p>
                     {opt.description && (
-                      <p className="text-xs text-slate-400 mt-0.5 leading-snug">{opt.description}</p>
+                      <p className="text-xs text-ink-muted mt-0.5 leading-snug">{opt.description}</p>
                     )}
                   </div>
                   {opt.value === value && (
-                    <Check className="w-4 h-4 text-teal-600 shrink-0" />
+                    <Check className="w-4 h-4 text-accent-fg shrink-0" />
                   )}
                 </button>
               ))}
