@@ -39,10 +39,10 @@ const BottomSheet: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-2xl shadow-2xl
+      <div className="relative w-full max-w-lg bg-surface-card rounded-t-2xl shadow-2xl
                       animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+          <div className="w-10 h-1 bg-surface-sunken rounded-full" />
         </div>
         {children}
       </div>
@@ -74,12 +74,12 @@ const AddEntrySheet: React.FC<{
   };
 
   const borderClass = isHigh
-    ? 'border-red-300 focus-within:border-red-400'
+    ? 'border-vital-critical-border focus-within:border-vital-critical'
     : isLow
-    ? 'border-blue-300 focus-within:border-blue-400'
-    : 'border-slate-200 focus-within:border-teal-400';
+    ? 'border-vital-low-border focus-within:border-vital-low'
+    : 'border-line focus-within:border-accent';
 
-  const hintClass = isHigh ? 'text-red-500' : isLow ? 'text-blue-500' : 'text-slate-400';
+  const hintClass = isHigh ? 'text-vital-critical-fg' : isLow ? 'text-vital-low-fg' : 'text-ink-faint';
 
   const hintText = isHigh
     ? `↑ Above normal (>${param?.refMax})`
@@ -92,14 +92,14 @@ const AddEntrySheet: React.FC<{
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose}>
       <div className="p-5 space-y-4 pb-8">
-        <h3 className="text-base font-semibold text-slate-900">Add {param?.name} entry</h3>
+        <h3 className="text-base font-semibold text-ink">Add {param?.name} entry</h3>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+          <label className="text-[10px] font-medium tracking-widest uppercase text-ink-muted">
             Value ({param?.unit})
           </label>
-          <div className={`flex items-center bg-white border rounded-xl overflow-hidden
-                           focus-within:ring-2 focus-within:ring-teal-500/20 transition-all ${borderClass}`}>
+          <div className={`flex items-center bg-surface-card border rounded-xl overflow-hidden
+                           focus-within:ring-2 focus-within:ring-accent/20 transition-all ${borderClass}`}>
             <input
               type="number"
               inputMode="decimal"
@@ -107,15 +107,15 @@ const AddEntrySheet: React.FC<{
               onChange={e => setValue(e.target.value)}
               placeholder="0.0"
               autoFocus
-              className="flex-1 px-4 py-3 text-2xl font-bold outline-none bg-transparent text-slate-900"
+              className="flex-1 px-4 py-3 text-2xl font-bold font-mono outline-none bg-transparent text-ink"
             />
-            <span className="px-4 text-sm text-slate-400 font-medium">{param?.unit}</span>
+            <span className="px-4 text-sm text-ink-faint font-medium">{param?.unit}</span>
           </div>
           <p className={`text-[10px] font-medium ${hintClass}`}>{hintText}</p>
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+          <label className="text-[10px] font-medium tracking-widest uppercase text-ink-muted">
             Date of test
           </label>
           <input
@@ -123,16 +123,16 @@ const AddEntrySheet: React.FC<{
             value={date}
             onChange={e => setDate(e.target.value)}
             max={todayYmd()}
-            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5
-                       text-sm font-semibold text-slate-700 focus:outline-none
-                       focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400"
+            className="w-full bg-surface-card border border-line rounded-xl px-4 py-2.5
+                       text-sm font-semibold text-ink focus:outline-none
+                       focus:ring-2 focus:ring-accent/20 focus:border-accent"
           />
         </div>
 
         <button
           onClick={handleSave}
           disabled={!isValid}
-          className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-40
+          className="w-full py-3 bg-accent hover:bg-accent-pressed disabled:opacity-40
                      text-white font-semibold rounded-xl transition-colors"
         >
           Save entry
@@ -161,40 +161,42 @@ const LabChartCard: React.FC<{
     : 'flat'
     : null;
 
-  const strokeColor = isHigh ? '#DC2626' : isLow ? '#2563EB' : '#0D9488';
-  const borderClass = isHigh ? 'border-red-200' : isLow ? 'border-blue-200' : 'border-slate-200';
-  const valueClass  = isHigh ? 'text-red-600'  : isLow ? 'text-blue-600'   : 'text-slate-900';
+  const strokeColor = isHigh ? 'var(--color-vital-critical)' : isLow ? 'var(--color-vital-low)' : 'var(--color-vital-normal)';
+  const borderClass = isHigh ? 'border-vital-critical-border' : isLow ? 'border-vital-low-border' : 'border-line';
+  const valueClass  = isHigh ? 'text-vital-critical-fg' : isLow ? 'text-vital-low-fg' : 'text-ink';
 
   const refAreaY1 = param.refMin ?? 0;
   const refAreaY2 = param.refMax;
 
   const TrendIcon = trendDir === 'down' ? TrendingDown : trendDir === 'up' ? TrendingUp : Minus;
-  const trendColor = trendDir === 'down' ? 'text-teal-600' : trendDir === 'up' ? 'text-red-500' : 'text-slate-400';
+  // down = improving toward/within normal range, up = worsening — reuse the vital-* semantics
+  // rather than brand teal, so trend color means the same thing everywhere in the app.
+  const trendColor = trendDir === 'down' ? 'text-vital-normal' : trendDir === 'up' ? 'text-vital-critical' : 'text-ink-faint';
 
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
   return (
-    <div className={`bg-white rounded-xl border p-3 flex flex-col gap-1 ${borderClass}`}>
+    <div className={`bg-surface-card rounded-xl border p-3 flex flex-col gap-1 ${borderClass}`}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+        <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wide">
           {param.name}
         </span>
         <div className="flex items-center gap-1">
-          {isHigh   && <span className="text-[9px] font-bold bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded-full">HIGH</span>}
-          {isLow    && <span className="text-[9px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full">LOW</span>}
-          {isNormal && <span className="text-[9px] font-bold bg-green-50 text-green-600 border border-green-200 px-1.5 py-0.5 rounded-full">NL</span>}
-          {!latest  && <span className="text-[9px] font-bold bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded-full">No data</span>}
+          {isHigh   && <span className="text-[9px] font-bold bg-vital-critical-surface text-vital-critical-fg border border-vital-critical-border px-1.5 py-0.5 rounded-full">HIGH</span>}
+          {isLow    && <span className="text-[9px] font-bold bg-vital-low-surface text-vital-low-fg border border-vital-low-border px-1.5 py-0.5 rounded-full">LOW</span>}
+          {isNormal && <span className="text-[9px] font-bold bg-vital-normal-surface text-vital-normal-fg border border-vital-normal-border px-1.5 py-0.5 rounded-full">NL</span>}
+          {!latest  && <span className="text-[9px] font-bold bg-surface-sunken text-ink-faint px-1.5 py-0.5 rounded-full">No data</span>}
         </div>
       </div>
 
       {/* Value row */}
       <div className="flex items-baseline gap-1">
-        <span className={`text-2xl font-bold leading-none ${valueClass}`}>
+        <span className={`text-2xl font-bold font-mono leading-none ${valueClass}`}>
           {latest ? latest.value : '—'}
         </span>
-        <span className="text-[10px] text-slate-400">{param.unit}</span>
+        <span className="text-[10px] text-ink-faint">{param.unit}</span>
         {trendDir && (
           <span className={`ml-1 ${trendColor}`}>
             <TrendIcon className="w-3.5 h-3.5 inline" />
@@ -213,17 +215,17 @@ const LabChartCard: React.FC<{
                   <stop offset="95%" stopColor={strokeColor} stopOpacity={0}    />
                 </linearGradient>
               </defs>
-              <ReferenceArea y1={refAreaY1} y2={refAreaY2} fill="#D1FAE5" fillOpacity={0.5} strokeOpacity={0} />
+              <ReferenceArea y1={refAreaY1} y2={refAreaY2} fill="var(--color-vital-normal-surface)" fillOpacity={0.8} strokeOpacity={0} />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 8, fill: '#94A3B8' }}
+                tick={{ fontSize: 8, fill: 'var(--color-ink-muted)' }}
                 tickFormatter={fmtDate}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis hide domain={['auto', 'auto']} />
               <Tooltip
-                contentStyle={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '0.5px solid #E2E8F0' }}
+                contentStyle={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '0.5px solid var(--color-line)' }}
                 formatter={(v) => [`${v} ${param.unit}`, param.name]}
                 labelFormatter={(d) => fmtDate(String(d))}
               />
@@ -239,9 +241,9 @@ const LabChartCard: React.FC<{
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center gap-1 text-slate-300">
+          <div className="h-full flex flex-col items-center justify-center gap-1 text-ink-faint">
             <Activity className="w-5 h-5" />
-            <p className="text-[10px] text-slate-400">
+            <p className="text-[10px] text-ink-faint">
               {entries.length === 0 ? 'No entries yet' : 'Need 2+ entries for chart'}
             </p>
           </div>
@@ -250,13 +252,13 @@ const LabChartCard: React.FC<{
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-1">
-        <span className="text-[9px] text-slate-400 font-mono">
+        <span className="text-[9px] text-ink-faint font-mono">
           Ref: {param.refMin != null ? `${param.refMin}–` : '<'}{param.refMax} {param.unit}
         </span>
         <button
           onClick={() => onAddEntry(param.id)}
-          className="flex items-center gap-1 text-[10px] font-semibold text-teal-600
-                     hover:text-teal-800 transition-colors"
+          className="flex items-center gap-1 text-[10px] font-semibold text-accent-fg
+                     hover:text-accent-pressed transition-colors"
         >
           <Plus className="w-3 h-3" /> Add entry
         </button>
@@ -287,57 +289,57 @@ const PatientPicker: React.FC<{
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-xl
-                   px-4 py-3 text-left hover:border-teal-400 transition-colors"
+        className="w-full flex items-center gap-3 bg-surface-card border border-line rounded-xl
+                   px-4 py-3 text-left hover:border-accent transition-colors"
       >
         {selected ? (
           <>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">{selected.name}</p>
-              <p className="text-[11px] text-slate-400">Bed {selected.bed} · IP: {selected.ipNo}</p>
+              <p className="text-sm font-semibold text-ink truncate">{selected.name}</p>
+              <p className="text-[11px] text-ink-faint">Bed {selected.bed} · IP: {selected.ipNo}</p>
             </div>
           </>
         ) : (
           <div className="flex items-center gap-2 flex-1">
-            <Search className="w-4 h-4 text-slate-400" />
-            <span className="text-sm text-slate-400">Search patient…</span>
+            <Search className="w-4 h-4 text-ink-faint" />
+            <span className="text-sm text-ink-faint">Search patient…</span>
           </div>
         )}
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-slate-200
+        <div className="absolute top-full mt-1 left-0 right-0 bg-surface-card border border-line
                         rounded-xl shadow-xl z-30 max-h-64 overflow-hidden flex flex-col">
-          <div className="p-2 border-b border-slate-100">
-            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
-              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <div className="p-2 border-b border-line">
+            <div className="flex items-center gap-2 bg-surface rounded-lg px-3 py-2">
+              <Search className="w-3.5 h-3.5 text-ink-faint shrink-0" />
               <input
                 autoFocus
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Name, bed or IP no."
-                className="flex-1 text-sm bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+                className="flex-1 text-sm bg-transparent outline-none text-ink placeholder:text-ink-faint"
               />
             </div>
           </div>
           <div className="overflow-y-auto flex-1">
             {filtered.length === 0 ? (
-              <p className="text-center text-xs text-slate-400 py-6">No patients found</p>
+              <p className="text-center text-xs text-ink-faint py-6">No patients found</p>
             ) : (
               filtered.map(p => (
                 <button
                   key={p.ipNo}
                   onClick={() => { onSelect(p.ipNo); setOpen(false); setSearch(''); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-left
-                              hover:bg-teal-50 transition-colors ${p.ipNo === selectedId ? 'bg-teal-50' : ''}`}
+                              hover:bg-accent-soft transition-colors ${p.ipNo === selectedId ? 'bg-accent-soft' : ''}`}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-bold text-slate-500">{p.bed}</span>
+                  <div className="w-8 h-8 rounded-lg bg-surface-sunken flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold font-mono text-ink-muted">{p.bed}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
-                    <p className="text-[10px] text-slate-400">IP: {p.ipNo} · {p.ward}</p>
+                    <p className="text-sm font-semibold text-ink truncate">{p.name}</p>
+                    <p className="text-[10px] text-ink-faint">IP: {p.ipNo} · {p.ward}</p>
                   </div>
                 </button>
               ))
@@ -383,8 +385,8 @@ const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = 
   return (
     <div className="flex flex-col gap-4">
       {/* Patient picker */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+      <div className="bg-surface-card rounded-xl border border-line p-4 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint mb-2">
           Select Patient
         </p>
         <PatientPicker
@@ -395,25 +397,25 @@ const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = 
       </div>
 
       {!selectedPatient ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50
-                        rounded-xl border-2 border-dashed border-slate-200 p-16 text-center">
-          <Activity className="w-10 h-10 text-slate-200 mb-3" />
-          <p className="text-sm font-semibold text-slate-500">Select a patient above</p>
-          <p className="text-xs text-slate-400 mt-1">Lab trends will appear here</p>
+        <div className="flex-1 flex flex-col items-center justify-center bg-surface
+                        rounded-xl border-2 border-dashed border-line p-16 text-center">
+          <Activity className="w-10 h-10 text-ink-faint mb-3" />
+          <p className="text-sm font-semibold text-ink-muted">Select a patient above</p>
+          <p className="text-xs text-ink-faint mt-1">Lab trends will appear here</p>
         </div>
       ) : (
         <>
           {/* Patient header */}
-          <div className="bg-slate-900 rounded-xl p-4 flex items-center gap-3">
+          <div className="bg-accent rounded-xl p-4 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{selectedPatient.name}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">
+              <p className="text-[11px] text-white/70 mt-0.5">
                 {selectedPatient.age}y {selectedPatient.gender} · Bed {selectedPatient.bed} · IP: {selectedPatient.ipNo}
               </p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-[10px] text-slate-400">{selectedPatient.ward}</p>
-              <p className="text-[10px] text-teal-400 font-semibold mt-0.5">
+              <p className="text-[10px] text-white/70">{selectedPatient.ward}</p>
+              <p className="text-[10px] text-white font-semibold mt-0.5">
                 {Object.values(entriesByParam).reduce((n, e) => n + e.length, 0)} entries
               </p>
             </div>
@@ -432,9 +434,9 @@ const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = 
           </div>
 
           {/* Add investigation hook */}
-          <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl
-                             text-xs font-semibold text-slate-400 hover:border-teal-300
-                             hover:text-teal-500 transition-colors flex items-center justify-center gap-2">
+          <button className="w-full py-3 border-2 border-dashed border-line rounded-xl
+                             text-xs font-semibold text-ink-faint hover:border-accent
+                             hover:text-accent-fg transition-colors flex items-center justify-center gap-2">
             <Plus className="w-3.5 h-3.5" /> Add investigation
           </button>
         </>

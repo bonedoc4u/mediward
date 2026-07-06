@@ -19,24 +19,24 @@ interface Props {
 
 const StickyPatientHeader: React.FC<Props> = ({ patient, statusLabel, statusColor, visible }) => (
   <div
-    className={`sticky top-0 z-30 -mx-4 sm:-mx-8 px-4 sm:px-8 bg-white/95 backdrop-blur border-b border-slate-200
+    className={`sticky top-0 z-30 -mx-4 sm:-mx-8 px-4 sm:px-8 bg-surface-card/95 backdrop-blur border-b border-line
                 flex items-center gap-3 transition-all duration-200 ${
       visible ? 'py-2 opacity-100 translate-y-0' : 'py-0 h-0 opacity-0 -translate-y-full pointer-events-none overflow-hidden'
     }`}
   >
-    <div className="w-9 h-9 shrink-0 rounded-lg bg-slate-900 text-white flex items-center justify-center text-sm font-bold">
+    <div className="w-9 h-9 shrink-0 rounded-lg bg-ink text-white flex items-center justify-center text-sm font-bold font-mono">
       {patient.bed}
     </div>
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
-        <p className="text-sm font-bold text-slate-900 truncate">{patient.name}</p>
+        <p className="text-sm font-bold text-ink truncate">{patient.name}</p>
         {patient.pod !== undefined && (
-          <span className="shrink-0 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded-full">
+          <span className="shrink-0 text-[10px] font-bold text-vital-normal-fg bg-vital-normal-surface border border-vital-normal-border px-1.5 py-0.5 rounded-full">
             POD {patient.pod}
           </span>
         )}
       </div>
-      <p className="text-[11px] text-slate-500 truncate">
+      <p className="text-[11px] text-ink-muted truncate">
         {patient.age}y · {patient.gender} · IP {patient.ipNo} · {patient.diagnosis}
       </p>
     </div>

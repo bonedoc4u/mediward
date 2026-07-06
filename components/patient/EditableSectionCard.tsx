@@ -46,16 +46,16 @@ const EditableSectionCard: React.FC<Props> = ({ title, icon, canEdit, view, edit
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 mb-3">
+    <div className="bg-surface-card rounded-2xl shadow-sm border border-line px-4 py-3 mb-3">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint flex items-center gap-1.5">
           {icon}{title}
         </p>
         {canEdit && !editing && (
           <button
             onClick={() => setEditing(true)}
             aria-label={`Edit ${title}`}
-            className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
+            className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-ink-faint hover:text-accent-fg hover:bg-accent-soft transition-colors"
           >
             <Pencil className="w-4 h-4" />
           </button>
@@ -66,18 +66,18 @@ const EditableSectionCard: React.FC<Props> = ({ title, icon, canEdit, view, edit
         <div className="space-y-3">
           {edit}
           {error && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-xs text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border rounded-lg px-3 py-2">{error}</p>
           )}
           <div className="flex gap-2">
             <button
               onClick={handleCancel}
-              className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold text-ink-muted border border-line rounded-xl hover:bg-surface transition-colors"
             >
               <X className="w-4 h-4" /> Cancel
             </button>
             <button
               onClick={handleSave}
-              className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors"
+              className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold text-white bg-accent hover:bg-accent-pressed rounded-xl transition-colors"
             >
               <Check className="w-4 h-4" /> Save
             </button>

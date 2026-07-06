@@ -17,7 +17,7 @@ interface Props {
 }
 
 const INPUT =
-  'w-full px-3 py-2.5 min-h-[44px] border border-slate-200 rounded-xl text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent';
+  'w-full px-3 py-2.5 min-h-[44px] border border-line rounded-xl text-sm text-ink bg-surface-card focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent';
 
 interface Draft {
   name: string;
@@ -116,8 +116,8 @@ const DemographicsSection: React.FC<Props> = ({ patient, canEdit, onUpdate }) =>
 
 const Field: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="min-w-0">
-    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-    <p className="text-sm font-medium text-slate-800 truncate">{value}</p>
+    <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">{label}</p>
+    <p className="text-sm font-medium text-ink truncate">{value}</p>
   </div>
 );
 
