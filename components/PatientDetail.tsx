@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef, lazy, Suspense } from 'rea
 import { useApp, useConfig } from '../contexts/AppContext';
 import { PatientStatus } from '../types';
 import { can } from '../utils/permissions';
-import { getLabTrend, needsPac } from '../utils/calculations';
+import { getLabTrend, needsPac, wardOptionsForPatient } from '../utils/calculations';
 import {
   ArrowLeft, Phone, MessageCircle, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
@@ -164,6 +164,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
   const statusBadge        = STATUS_BADGE[patient.patientStatus] ?? DEFAULT_STATUS;
   const pacBadge           = PAC_BADGE[patient.pacStatus] ?? PAC_BADGE['PAC Pending'];
   const isDiagCode         = /^[#A-Z]\w{2,}$/.test(editDiagnosis.trim());
+  const moveBedWardOptions = wardOptionsForPatient(wards, patient.unit);
 
   const handleDischarge = () => {
     updatePatient({ ...patient, patientStatus: PatientStatus.Discharged, dod: todayYmd() });
@@ -747,7 +748,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       {showMoveBed && (
         <MoveBedSheet
           patient={patient}
-          wardOptions={wards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder).map(w => w.name)}
+          wardOptions={moveBedWardOptions.map(w => w.name)}
           onSave={(bed, ward) => updatePatient({ ...patient, bed, ward })}
           onClose={() => setShowMoveBed(false)}
         />

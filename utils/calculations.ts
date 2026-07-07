@@ -1,4 +1,4 @@
-import { Patient, LabResult, LabType, AppNotification, PatientStatus, PacStatus, News2Detail } from '../types';
+import { Patient, LabResult, LabType, AppNotification, PatientStatus, PacStatus, News2Detail, WardConfig } from '../types';
 // Note: Ward display order is now driven by ward_config.sort_order in ConfigContext.
 import { generateId } from './sanitize';
 import { localYmd } from './otSchedule';
@@ -162,6 +162,17 @@ export const sortByBed = (a: Patient, b: Patient): number => {
   if (!isNaN(numA)) return -1;
   if (!isNaN(numB)) return 1;
   return a.bed.localeCompare(b.bed);
+};
+
+/**
+ * Active wards a patient may be moved to: those serving the patient's own
+ * unit, plus shared wards (no `unit` restriction) and ICU. Falls back to
+ * every active ward when the patient has no unit assigned.
+ */
+export const wardOptionsForPatient = (wards: WardConfig[], patientUnit: string | undefined): WardConfig[] => {
+  const active = [...wards].filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (!patientUnit) return active;
+  return active.filter(w => !w.unit?.length || w.unit.includes(patientUnit) || w.isIcu);
 };
 
 export const groupByWard = (patients: Patient[]): Record<string, Patient[]> => {
