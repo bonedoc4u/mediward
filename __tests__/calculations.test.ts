@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, getStatusColor, sortByBed } from '../utils/calculations';
-import type { Patient } from '../types';
+import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient } from '../utils/calculations';
+import type { Patient, WardConfig } from '../types';
 
 /** Minimal Patient stub — sortByBed only reads `bed`. */
 const bedPatient = (bed: string): Patient => ({ bed } as Patient);
@@ -73,5 +73,39 @@ describe('getStatusColor', () => {
 
   it('is case-insensitive', () => {
     expect(getStatusColor('pac fit')).toBe(getStatusColor('PAC Fit'));
+  });
+});
+
+describe('wardOptionsForPatient (Move Bed ward picker)', () => {
+  const ward = (name: string, overrides: Partial<WardConfig> = {}): WardConfig => ({
+    id: name, name, sortOrder: 0, isIcu: false, active: true, ...overrides,
+  });
+
+  const wards: WardConfig[] = [
+    ward('OR1 Ward', { unit: ['OR1'], sortOrder: 1 }),
+    ward('OR2 Ward', { unit: ['OR2'], sortOrder: 2 }),
+    ward('Shared Ward', { sortOrder: 3 }),          // no unit = shared, all units
+    ward('ICU', { isIcu: true, sortOrder: 4 }),      // ICU always included
+    ward('Inactive OR1 Ward', { unit: ['OR1'], active: false, sortOrder: 5 }),
+  ];
+
+  it("only includes wards that serve the patient's unit, plus shared and ICU wards", () => {
+    const names = wardOptionsForPatient(wards, 'OR1').map(w => w.name);
+    expect(names).toEqual(['OR1 Ward', 'Shared Ward', 'ICU']);
+  });
+
+  it('excludes wards belonging to a different unit', () => {
+    const names = wardOptionsForPatient(wards, 'OR1').map(w => w.name);
+    expect(names).not.toContain('OR2 Ward');
+  });
+
+  it('excludes inactive wards even if they match the unit', () => {
+    const names = wardOptionsForPatient(wards, 'OR1').map(w => w.name);
+    expect(names).not.toContain('Inactive OR1 Ward');
+  });
+
+  it('returns every active ward when the patient has no unit assigned', () => {
+    const names = wardOptionsForPatient(wards, undefined).map(w => w.name);
+    expect(names).toEqual(['OR1 Ward', 'OR2 Ward', 'Shared Ward', 'ICU']);
   });
 });
