@@ -80,8 +80,12 @@ BEGIN
     'Pre-op Clearance', 'Procedure List'
   );
 
-  INSERT INTO app_users (id, email, name, role, hospital_id, password_hash, ward, unit)
-  VALUES (p_auth_user_id, lower(p_admin_email), p_admin_name, 'admin', v_hospital_id, '', null, null)
+  -- NOTE: password_hash column was dropped (20260626204206_drop_sha256_password_hash).
+  -- The live function has since diverged further (invite codes) — see
+  -- supabase/migrations/20260706073451_fix_register_hospital_dropped_password_hash.sql
+  -- for the current deployed definition.
+  INSERT INTO app_users (id, email, name, role, hospital_id, ward, unit)
+  VALUES (p_auth_user_id, lower(p_admin_email), p_admin_name, 'admin', v_hospital_id, null, null)
   ON CONFLICT (email) DO UPDATE SET
     hospital_id = v_hospital_id,
     role        = 'admin',

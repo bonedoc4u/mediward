@@ -35,6 +35,7 @@
     "android",
     "ios",
     "e2e",              // Playwright tests use their own tsconfig
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "supabase/functions" // Deno runtime (Deno globals, URL imports) — not app code
   ]
 }

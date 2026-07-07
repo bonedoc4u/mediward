@@ -17,6 +17,7 @@ export default tseslint.config(
       'public/**',
       '.claude/**',   // local agent skills, not app code
       'scripts/**',   // Node build helpers (CommonJS)
+      'supabase/functions/**', // Deno edge functions — different runtime/globals
       '*.config.js',
       '*.config.ts',
       'playwright.config.ts',
