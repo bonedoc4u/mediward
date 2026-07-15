@@ -256,8 +256,8 @@ const PatientPicker: React.FC<{
 // ─── Upload Bottom Sheet ──────────────────────────────────────────────────────
 const UploadSheet: React.FC<{
   isOpen: boolean;
-  file: File | null;
-  previewUrl: string | null;
+  files: File[];
+  previewUrls: string[];
   patient: Patient;
   isUploading: boolean;
   uploadError: string | null;
@@ -268,12 +268,13 @@ const UploadSheet: React.FC<{
   allowPostOp: boolean;
   onSave: () => void;
   onCancel: () => void;
-  /** Opens the crop/rotate editor — only offered for images, not PDFs. */
+  onRemoveFile: (index: number) => void;
+  /** Opens the crop/rotate editor — only offered for a single image, not PDFs or batches. */
   onEdit?: () => void;
-}> = ({ isOpen, file, previewUrl, patient, isUploading, uploadError,
-        onPhaseChange, onTypeChange, phase, invType, allowPostOp, onSave, onCancel, onEdit }) => {
+}> = ({ isOpen, files, previewUrls, patient, isUploading, uploadError,
+        onPhaseChange, onTypeChange, phase, invType, allowPostOp, onSave, onCancel, onRemoveFile, onEdit }) => {
   if (!isOpen) return null;
-  const isImage = file?.type.startsWith('image/');
+  const isSingleImage = files.length === 1 && files[0].type.startsWith('image/');
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
@@ -284,10 +285,11 @@ const UploadSheet: React.FC<{
           <div className="w-10 h-1 bg-slate-200 rounded-full" />
         </div>
 
-        {/* Preview */}
-        {isImage && previewUrl && (
+        {/* Preview — single image gets a large preview; a batch gets a thumbnail strip
+            so each file can be reviewed/removed before the shared modality+phase is saved. */}
+        {isSingleImage ? (
           <div className="relative bg-black h-48 mx-4 rounded-xl overflow-hidden mb-4">
-            <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+            <img src={previewUrls[0]} alt="Preview" className="w-full h-full object-contain" />
             {!isUploading && (
               <button
                 onClick={onCancel}
@@ -306,10 +308,31 @@ const UploadSheet: React.FC<{
               </button>
             )}
           </div>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto px-4 mb-4 pb-1">
+            {files.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="relative shrink-0 w-20 h-20 bg-slate-900 rounded-lg overflow-hidden">
+                {f.type.startsWith('image/')
+                  ? <img src={previewUrls[i]} alt={f.name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center text-slate-400 text-[9px] font-semibold px-1 text-center break-all">{f.name}</div>}
+                {!isUploading && (
+                  <button
+                    onClick={() => onRemoveFile(i)}
+                    aria-label={`Remove ${f.name}`}
+                    className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         )}
 
         <div className="px-5 pb-8 space-y-4">
-          <h3 className="text-base font-semibold text-slate-900">Upload investigation</h3>
+          <h3 className="text-base font-semibold text-slate-900">
+            Upload {files.length > 1 ? `${files.length} investigations` : 'investigation'}
+          </h3>
           <p className="text-xs text-slate-400">{patient.name} · Bed {patient.bed}</p>
 
           {/* Phase toggle — hidden for conservative patients (post-op not applicable) */}
@@ -380,14 +403,14 @@ const UploadSheet: React.FC<{
             </button>
             <button
               onClick={onSave}
-              disabled={isUploading}
+              disabled={isUploading || files.length === 0}
               className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-60
                          text-white font-semibold rounded-xl transition-colors
                          flex items-center justify-center gap-2"
             >
               {isUploading
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
-                : 'Save'
+                : files.length > 1 ? `Save ${files.length}` : 'Save'
               }
             </button>
           </div>
@@ -405,9 +428,10 @@ const RadiologyComparator: React.FC<Props> = ({
 
   const [selectedPatientId, setSelectedPatientId] = useState(initialPatientId || '');
 
-  // Upload state
-  const [selectedFile, setSelectedFile]   = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl]       = useState<string | null>(null);
+  // Upload state — a batch of files sharing one modality + phase (ward-round friendly:
+  // e.g. 3 X-ray views taken together don't need 3 separate prompts).
+  const [selectedFiles, setSelectedFiles]   = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls]       = useState<string[]>([]);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [invType, setInvType]             = useState('X-Ray');
   const [uploadPhase, setUploadPhase]     = useState<RadPhase>('preop');
@@ -425,9 +449,9 @@ const RadiologyComparator: React.FC<Props> = ({
 
   useEffect(() => {
     return () => {
-      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+      previewUrls.forEach(url => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
     };
-  }, [previewUrl]);
+  }, [previewUrls]);
 
   const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
   const investigations  = selectedPatient?.investigations ?? [];
@@ -464,9 +488,8 @@ const RadiologyComparator: React.FC<Props> = ({
       const res  = await fetch(photo.webPath);
       const blob = await res.blob();
       const file = new File([blob], `scan_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      setSelectedFiles(prev => [...prev, file]);
+      setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
       setShowUploadForm(true);
       setUploadError(null);
     } catch (err) {
@@ -482,53 +505,85 @@ const RadiologyComparator: React.FC<Props> = ({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try { validateImageFile(file); } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Invalid file');
-      e.target.value = '';
-      return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const validFiles: File[] = [];
+    let firstError: string | null = null;
+    for (const file of files) {
+      try { validateImageFile(file); validFiles.push(file); }
+      catch (err) { firstError ??= err instanceof Error ? err.message : 'Invalid file'; }
     }
-    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-    setSelectedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    setShowUploadForm(true);
-    setUploadError(null);
+
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles]);
+      setPreviewUrls(prev => [...prev, ...validFiles.map(f => URL.createObjectURL(f))]);
+      setShowUploadForm(true);
+    }
+    setUploadError(firstError);
+    e.target.value = '';
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviewUrls(prev => {
+      if (prev[index]?.startsWith('blob:')) URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleSave = async () => {
-    if (!selectedPatientId || !selectedFile) return;
+    if (!selectedPatientId || selectedFiles.length === 0) return;
     if (!user?.hospitalId) {
       setUploadError('Session error — please log out and log in again.');
       return;
     }
     setIsUploading(true);
     setUploadError(null);
-    try {
-      const fileToUpload = await compressImage(selectedFile);
-      const imageUrl = await uploadInvestigationImage(fileToUpload, user.hospitalId, selectedPatientId);
-      const newInv: Investigation = {
-        id: generateId(),
-        date: todayYmd(),
-        type: invType,
-        findings: '',
-        imageUrl,
-        // Conservative patients can't file post-op — guard against stale phase state
-        phase: showPostOp ? uploadPhase : 'preop',
-      };
-      onAddInvestigation(selectedPatientId, newInv);
-      handleCancelUpload();
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
-    } finally {
-      setIsUploading(false);
+
+    const failed: { file: File; message: string }[] = [];
+    for (const file of selectedFiles) {
+      try {
+        const fileToUpload = await compressImage(file);
+        const imageUrl = await uploadInvestigationImage(fileToUpload, user.hospitalId, selectedPatientId);
+        const newInv: Investigation = {
+          id: generateId(),
+          date: todayYmd(),
+          type: invType,
+          findings: '',
+          imageUrl,
+          // Conservative patients can't file post-op — guard against stale phase state
+          phase: showPostOp ? uploadPhase : 'preop',
+        };
+        onAddInvestigation(selectedPatientId, newInv);
+      } catch (err) {
+        failed.push({ file, message: err instanceof Error ? err.message : 'Upload failed' });
+      }
     }
+
+    if (failed.length === 0) {
+      handleCancelUpload();
+    } else {
+      // Keep only the failed files in the sheet so the user can see what didn't
+      // make it and retry, instead of silently losing uploads on a partial failure.
+      const failedFiles = failed.map(f => f.file);
+      const keptIndexes  = selectedFiles.map((f, i) => failedFiles.includes(f) ? i : -1).filter(i => i !== -1);
+      previewUrls.forEach((url, i) => { if (!keptIndexes.includes(i) && url.startsWith('blob:')) URL.revokeObjectURL(url); });
+      setSelectedFiles(keptIndexes.map(i => selectedFiles[i]));
+      setPreviewUrls(keptIndexes.map(i => previewUrls[i]));
+
+      const successCount = selectedFiles.length - failed.length;
+      setUploadError(
+        `${successCount} of ${selectedFiles.length} uploaded. Failed: ${failed.map(f => f.file.name).join(', ')} (${failed[0].message})`,
+      );
+    }
+    setIsUploading(false);
   };
 
   const handleCancelUpload = () => {
-    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-    setSelectedFile(null);
-    setPreviewUrl(null);
+    previewUrls.forEach(url => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
+    setSelectedFiles([]);
+    setPreviewUrls([]);
     setShowUploadForm(false);
     setShowEditor(false);
     setUploadError(null);
@@ -554,8 +609,9 @@ const RadiologyComparator: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Hidden file input for gallery / file picker */}
-      <input type="file" accept="image/*,.pdf" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+      {/* Hidden file input for gallery / file picker — multiple lets a batch of
+          views (e.g. 3 X-ray angles) be picked in one go */}
+      <input type="file" accept="image/*,.pdf" multiple className="hidden" ref={fileInputRef} onChange={handleFileChange} />
 
       {/* Patient picker */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
@@ -670,8 +726,8 @@ const RadiologyComparator: React.FC<Props> = ({
       {/* Upload bottom sheet */}
       <UploadSheet
         isOpen={showUploadForm}
-        file={selectedFile}
-        previewUrl={previewUrl}
+        files={selectedFiles}
+        previewUrls={previewUrls}
         patient={selectedPatient!}
         isUploading={isUploading}
         uploadError={uploadError}
@@ -682,18 +738,20 @@ const RadiologyComparator: React.FC<Props> = ({
         onTypeChange={setInvType}
         onSave={handleSave}
         onCancel={handleCancelUpload}
-        onEdit={selectedFile?.type.startsWith('image/') && previewUrl ? () => setShowEditor(true) : undefined}
+        onRemoveFile={handleRemoveFile}
+        // Crop/rotate only makes sense for a single image at a time
+        onEdit={selectedFiles.length === 1 && selectedFiles[0].type.startsWith('image/') ? () => setShowEditor(true) : undefined}
       />
 
-      {/* Crop / rotate / straighten editor */}
-      {showEditor && previewUrl && (
+      {/* Crop / rotate / straighten editor — only reachable when exactly one file is queued */}
+      {showEditor && previewUrls[0] && (
         <ImageEditor
-          src={previewUrl}
+          src={previewUrls[0]}
           onClose={() => setShowEditor(false)}
           onApply={(edited) => {
-            if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
-            setSelectedFile(edited);
-            setPreviewUrl(URL.createObjectURL(edited));
+            if (previewUrls[0]?.startsWith('blob:')) URL.revokeObjectURL(previewUrls[0]);
+            setSelectedFiles([edited]);
+            setPreviewUrls([URL.createObjectURL(edited)]);
             setShowEditor(false);
           }}
         />
