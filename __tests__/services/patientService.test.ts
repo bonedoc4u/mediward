@@ -270,6 +270,27 @@ describe('upsertPatient', () => {
     mockState.result = { data: null, error: null };
     await expect(upsertPatient(makePatient())).resolves.toBeUndefined();
   });
+
+  it('throws CONCURRENT_EDIT when the conditional update matches 0 rows', async () => {
+    mockState.result = { data: [], error: null };
+    await expect(upsertPatient(makePatient({ updatedAt: '2024-01-15T08:00:00Z' })))
+      .rejects.toThrow('CONCURRENT_EDIT:IP001');
+  });
+
+  it('force-save resolves when the unconditional update actually affects a row', async () => {
+    mockState.result = { data: [{ ip_no: 'IP001' }], error: null };
+    await expect(upsertPatient(makePatient(), true)).resolves.toBeUndefined();
+  });
+
+  it('force-save throws FORCE_SAVE_BLOCKED instead of reporting silent success when RLS zeroes out the write', async () => {
+    // Regression: RLS (e.g. an orphaned session where get_my_hospital_id() is NULL)
+    // can make an unconditional UPDATE match 0 rows without Postgres raising an
+    // error. Before this fix, forceUpdate never checked `data`, so the caller
+    // believed the force-save succeeded even though nothing was written.
+    mockState.result = { data: [], error: null };
+    await expect(upsertPatient(makePatient(), true))
+      .rejects.toThrow('FORCE_SAVE_BLOCKED:IP001');
+  });
 });
 
 // ─── removePatient ────────────────────────────────────────────────────────────
