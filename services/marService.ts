@@ -45,13 +45,14 @@ export async function addMedicationPrescription(
 }
 
 export async function stopMedication(medicationId: string): Promise<void> {
-  await supabase.from('medications_prescribed').update({ active: false }).eq('id', medicationId);
+  const { error } = await supabase.from('medications_prescribed').update({ active: false }).eq('id', medicationId);
+  if (error) throw new Error(`stopMedication (${medicationId}): ${error.message}`);
 }
 
 export async function recordAdministration(
   admin: Omit<MedAdministration, 'id'>
 ): Promise<void> {
-  await supabase.from('med_administrations').insert({
+  const { error } = await supabase.from('med_administrations').insert({
     hospital_id: admin.hospitalId,
     medication_id: admin.medicationId,
     patient_ip_no: admin.patientIpNo,
@@ -62,6 +63,7 @@ export async function recordAdministration(
     dose_given: admin.doseGiven ?? null,
     notes: admin.notes ?? null,
   });
+  if (error) throw new Error(`recordAdministration (${admin.medicationId}): ${error.message}`);
 }
 
 export async function fetchAdministrations(patientIpNo: string, date: string, hospitalId?: string): Promise<MedAdministration[]> {

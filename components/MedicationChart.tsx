@@ -10,6 +10,7 @@ import { fetchMedications, addMedicationPrescription, stopMedication, recordAdmi
 import { Plus, X, CheckCircle2, Clock, AlertCircle, XCircle, Pill, Save } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { todayYmd } from '../utils/dates';
+import { toast } from '../utils/toast';
 
 const ROUTES: MedRoute[] = ['Oral','IV','IM','SC','Topical','Inhaled','PR','SL'];
 const FREQUENCIES = ['Once daily','Twice daily','Three times daily','Four times daily','Every 6h','Every 8h','Every 12h','Once (stat)','At bedtime','As needed (PRN)'];
@@ -75,15 +76,20 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId, drugAllergi
   };
 
   const handleRecord = async (med: PrescribedMedication, status: MedAdminStatus) => {
-    await recordAdministration({
-      hospitalId, medicationId: med.id, patientIpNo,
-      administeredAt: status === 'given' ? new Date().toISOString() : undefined,
-      administeredBy: status === 'given' ? (user?.name ?? user?.email) : undefined,
-      status,
-    });
-    // Refresh admins
-    const updated = await fetchAdministrations(patientIpNo, today, hospitalId);
-    setAdmins(updated);
+    try {
+      await recordAdministration({
+        hospitalId, medicationId: med.id, patientIpNo,
+        administeredAt: status === 'given' ? new Date().toISOString() : undefined,
+        administeredBy: status === 'given' ? (user?.name ?? user?.email) : undefined,
+        status,
+      });
+      // Refresh admins
+      const updated = await fetchAdministrations(patientIpNo, today, hospitalId);
+      setAdmins(updated);
+    } catch (err) {
+      console.error('[MedicationChart] recordAdministration failed:', err);
+      toast.error(`Failed to record dose for ${med.drugName} — please try again.`);
+    }
   };
 
   const getLatestAdmin = (medId: string) =>
@@ -239,9 +245,12 @@ const MedicationChart: React.FC<Props> = ({ patientIpNo, hospitalId, drugAllergi
                     </button>
                   ))}
                   <button
-                    onClick={() => stopMedication(med.id).then(() =>
-                      setMedications(prev => prev.filter(m => m.id !== med.id))
-                    )}
+                    onClick={() => stopMedication(med.id)
+                      .then(() => setMedications(prev => prev.filter(m => m.id !== med.id)))
+                      .catch(err => {
+                        console.error('[MedicationChart] stopMedication failed:', err);
+                        toast.error(`Failed to stop ${med.drugName} — please try again.`);
+                      })}
                     className="ml-auto px-2 py-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 transition-colors"
                   >
                     Stop

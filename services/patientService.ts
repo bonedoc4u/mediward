@@ -426,15 +426,25 @@ export async function fetchPatientById(ipNo: string, hospitalId?: string): Promi
  * If the patient has an `updatedAt` timestamp (i.e. it was loaded from the DB),
  * we use a conditional update. If another user saved between our load and save,
  * the condition fails (0 rows updated) and we throw a CONCURRENT_EDIT error.
+ *
+ * Bug #14: RLS can silently zero out an UPDATE (e.g. get_my_hospital_id() returns
+ * NULL for a stale/orphaned session) without Postgres raising an error — the row
+ * simply doesn't match the policy. The conditional branch already catches this via
+ * `data.length === 0`; the force branch must too, or a "force-save" can silently
+ * write nothing while the caller reports success.
  */
 export async function upsertPatient(patient: Patient, forceUpdate = false): Promise<void> {
   if (forceUpdate) {
-    // Unconditional UPDATE — bypasses optimistic lock for conflict resolution
-    const { error } = await supabase
+    // Unconditional UPDATE — bypasses optimistic lock, but RLS can still block it
+    const { data, error } = await supabase
       .from('patients')
       .update(patientToRow(patient))
-      .eq('ip_no', patient.ipNo);
+      .eq('ip_no', patient.ipNo)
+      .select('ip_no');
     if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
+    if (!data || data.length === 0) {
+      throw new Error(`FORCE_SAVE_BLOCKED:${patient.ipNo}`);
+    }
   } else if (patient.updatedAt) {
     // Existing patient: conditional update to detect concurrent edits
     const { data, error } = await supabase

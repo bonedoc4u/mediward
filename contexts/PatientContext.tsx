@@ -977,7 +977,16 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
           } catch { /* non-blocking — local state will still work */ }
         })
-        .catch(() => toast.error('Force-save failed. Please try again.'));
+        .catch(err => {
+          if (err instanceof Error && err.message.startsWith('FORCE_SAVE_BLOCKED:')) {
+            // RLS rejected the write (e.g. session no longer resolves to a hospital) —
+            // nothing was saved. Say so plainly instead of the generic retry message,
+            // since "try again" won't help without a fresh login.
+            toast.error(`${forced.name} was NOT saved — your session may have expired. Log out and back in, then retry.`);
+            return;
+          }
+          toast.error('Force-save failed. Please try again.');
+        });
     } else {
       // Keep remote: update local state to the server's version
       setPatients(prev => {
