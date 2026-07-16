@@ -546,8 +546,10 @@ export interface Patient {
    * Keys and schema are defined by the specialty template for this patient's department.
    */
   specialtyData?: Record<string, unknown>;
-  /** Server-side timestamp of last DB update — used for concurrent-edit detection. */
+  /** Server-side timestamp of last DB update — legacy concurrent-edit lock key, superseded by `version`. */
   updatedAt?: string;
+  /** Server-maintained optimistic-lock counter (`patients.version`, bumped by a DB trigger on every UPDATE). Primary concurrent-edit detection key — must be refreshed from the save response after every write. */
+  version?: number;
   /** Hospital this patient belongs to — required for multi-tenant RLS and cross-user visibility. */
   hospitalId?: string;
   /** DPDP Act 2023: ISO timestamp when informed consent was obtained. */

@@ -92,6 +92,7 @@ interface PatientRow {
   vitals?: VitalSigns[] | null;
   created_at: string;
   updated_at: string;
+  version: number;
   consent_given_at: string | null;
   consent_version: string | null;
   // Joined relations from normalized tables
@@ -218,6 +219,7 @@ function rowToPatient(row: PatientRow): Patient {
     specialty:        row.specialty        ?? undefined,
     specialtyData:    row.specialty_data   ?? undefined,
     updatedAt:       row.updated_at,
+    version:         row.version ?? undefined,
     hospitalId:      row.hospital_id,
     consentGivenAt:  row.consent_given_at ?? undefined,
     consentVersion:  row.consent_version  ?? undefined,
@@ -283,7 +285,7 @@ const PATIENT_LIST_SELECT = [
   'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'admission_source',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'management',
-  'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
+  'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
   'rounds(date, note, todos)',
   'imaging(id, date, type, findings, image_url, phase)',
 ].join(', ');
@@ -295,7 +297,7 @@ const PATIENT_SELECT = [
   'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'admission_source',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
-  'discharge_summary', 'created_at', 'updated_at', 'consent_given_at', 'consent_version',
+  'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url, phase)',
   'rounds(date, note, todos)',
@@ -423,48 +425,63 @@ export async function fetchPatientById(ipNo: string, hospitalId?: string): Promi
  * Uses ip_no as the conflict key — safe to call on both create and update.
  *
  * Bug #9: Concurrent edit detection.
- * If the patient has an `updatedAt` timestamp (i.e. it was loaded from the DB),
- * we use a conditional update. If another user saved between our load and save,
- * the condition fails (0 rows updated) and we throw a CONCURRENT_EDIT error.
+ * The `patients` table has a trigger (`increment_patient_version`) that bumps a
+ * `version` column on every UPDATE. We use it as the optimistic-lock key: an
+ * existing patient does a conditional update `WHERE version = <cached version>`.
+ * If another user saved between our load and save, the condition fails (0 rows
+ * updated) and we throw a CONCURRENT_EDIT error. The caller MUST update its
+ * cached patient with the returned version after a successful save — otherwise
+ * every save after the first will compare against a stale version and produce a
+ * false conflict against no one but itself (see PatientContext.updatePatient).
+ * Falls back to `updated_at` for patients cached before `version` existed on the
+ * client (older offline queue entries, pre-migration localStorage cache).
  *
  * Bug #14: RLS can silently zero out an UPDATE (e.g. get_my_hospital_id() returns
  * NULL for a stale/orphaned session) without Postgres raising an error — the row
  * simply doesn't match the policy. The conditional branch already catches this via
  * `data.length === 0`; the force branch must too, or a "force-save" can silently
  * write nothing while the caller reports success.
+ *
+ * Returns the row's new version so the caller can keep its cache in sync.
  */
-export async function upsertPatient(patient: Patient, forceUpdate = false): Promise<void> {
+export async function upsertPatient(patient: Patient, forceUpdate = false): Promise<number | undefined> {
   if (forceUpdate) {
     // Unconditional UPDATE — bypasses optimistic lock, but RLS can still block it
     const { data, error } = await supabase
       .from('patients')
       .update(patientToRow(patient))
       .eq('ip_no', patient.ipNo)
-      .select('ip_no');
+      .select('version');
     if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
     if (!data || data.length === 0) {
       throw new Error(`FORCE_SAVE_BLOCKED:${patient.ipNo}`);
     }
-  } else if (patient.updatedAt) {
+    return data[0].version as number;
+  } else if (patient.version != null || patient.updatedAt) {
     // Existing patient: conditional update to detect concurrent edits
-    const { data, error } = await supabase
+    let q = supabase
       .from('patients')
       .update(patientToRow(patient))
-      .eq('ip_no', patient.ipNo)
-      .eq('updated_at', patient.updatedAt)
-      .select('ip_no');
+      .eq('ip_no', patient.ipNo);
+    q = patient.version != null
+      ? q.eq('version', patient.version)
+      : q.eq('updated_at', patient.updatedAt as string);
+    const { data, error } = await q.select('version');
 
     if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
     if (!data || data.length === 0) {
       throw new Error(`CONCURRENT_EDIT:${patient.ipNo}`);
     }
+    return data[0].version as number;
   } else {
     // New patient: plain insert
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('patients')
-      .insert(patientToRow(patient));
+      .insert(patientToRow(patient))
+      .select('version');
 
     if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
+    return data?.[0]?.version as number | undefined;
   }
 }
 
