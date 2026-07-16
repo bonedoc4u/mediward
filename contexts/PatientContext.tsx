@@ -354,7 +354,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                          String((remote  as unknown as Record<string, unknown>)[k] ?? ''),
                   );
                   if (!hasRealDiff) {
-                    await upsertPatient({ ...withHid, updatedAt: remote.updatedAt });
+                    await upsertPatient({ ...withHid, version: remote.version, updatedAt: remote.updatedAt });
                   } else {
                     throw new Error(
                       `${withHid.name || withHid.ipNo}: offline edit not applied — record was changed on another device.`,
@@ -677,6 +677,21 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [hasLoadedAll, user?.unit]);
 
   // ─── Patient CRUD ───
+
+  // Every successful save MUST refresh the cached patient's version — the DB
+  // bumps `version` on every UPDATE via trigger, and upsertPatient's optimistic
+  // lock compares against this cached value. Skipping this step means the NEXT
+  // save (even seconds later, same user, same session) compares against a
+  // stale version and gets misreported as a peer conflict against no one.
+  const applyServerVersion = useCallback((ipNo: string, version: number | undefined) => {
+    if (version == null) return;
+    setPatients(prev => {
+      const next = prev.map(p => p.ipNo === ipNo ? { ...p, version } : p);
+      saveActiveCache(next, effectiveHospitalId);
+      return next;
+    });
+  }, [effectiveHospitalId]);
+
   const updatePatient = useCallback((updatedPatient: Patient) => {
     // Sanitize user-editable text fields (same protection as addPatient)
     const sanitized = {
@@ -694,12 +709,16 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
     const isDischarge = sanitized.patientStatus === 'Discharged';
     upsertPatient(sanitized)
-      .then(() => { toast.success(`${sanitized.name} updated`); if (isDischarge) hapticSuccess(); })
+      .then(newVersion => {
+        applyServerVersion(sanitized.ipNo, newVersion);
+        toast.success(`${sanitized.name} updated`);
+        if (isDischarge) hapticSuccess();
+      })
       .catch(err => {
         console.error('[Patients] updatePatient failed:', err);
         if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT:')) {
-          // Fetch remote to compare; if only the timestamp diverged (no real field change)
-          // silently adopt the server's updatedAt and retry — no dialog needed.
+          // Fetch remote to compare; if only the version/timestamp diverged (no real
+          // field change) silently adopt the server's version and retry — no dialog needed.
           const MEANINGFUL_KEYS = [
             'bed', 'ward', 'diagnosis', 'patientStatus', 'pacStatus',
             'procedure', 'dos', 'dod', 'pod', 'management', 'unit',
@@ -713,13 +732,18 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               k => String(sanitized[k] ?? '') !== String(remote[k] ?? ''),
             );
             if (!hasRealDiff) {
-              // Only timestamps diverged (e.g. trigger or background sync touched updated_at).
-              // Re-save with the server's updatedAt so the conditional check passes.
-              upsertPatient({ ...sanitized, updatedAt: remote.updatedAt })
-                .then(() => { toast.success(`${sanitized.name} updated`); if (isDischarge) hapticSuccess(); })
+              // Only the version/timestamp diverged (e.g. our own prior save on this
+              // patient bumped it and our cache was never refreshed). Re-save with the
+              // server's version so the conditional check passes.
+              upsertPatient({ ...sanitized, version: remote.version, updatedAt: remote.updatedAt })
+                .then(newVersion => {
+                  applyServerVersion(sanitized.ipNo, newVersion);
+                  toast.success(`${sanitized.name} updated`);
+                  if (isDischarge) hapticSuccess();
+                })
                 .catch(() => {
-                  // Enqueue with the remote's updatedAt so the next replay passes the conditional check
-                  enqueue('upsert_patient', { ...sanitized, updatedAt: remote.updatedAt });
+                  // Enqueue with the remote's version so the next replay passes the conditional check
+                  enqueue('upsert_patient', { ...sanitized, version: remote.version, updatedAt: remote.updatedAt });
                   toast.warning('Saved locally — will sync when online.');
                 });
               return;
@@ -746,7 +770,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       logAuditEvent(user.id, user.name, 'UPDATE', 'patient', sanitized.ipNo,
         `Updated: ${sanitized.name} (Bed ${sanitized.bed})`);
     }
-  }, [user]);
+  }, [user, applyServerVersion]);
 
   const addPatient = useCallback((patient: Patient) => {
     const p = {
@@ -765,7 +789,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return next;
     });
     upsertPatient(p)
-      .then(() => { toast.success(`${p.name} admitted to Bed ${p.bed}`); hapticSuccess(); })
+      .then(newVersion => {
+        applyServerVersion(p.ipNo, newVersion);
+        toast.success(`${p.name} admitted to Bed ${p.bed}`);
+        hapticSuccess();
+      })
       .catch(err => {
         console.error('[Patients] addPatient failed:', err);
         if (isAuthError(err)) {
@@ -803,7 +831,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       logAuditEvent(user.id, user.name, 'CREATE', 'patient', p.ipNo,
         `Admitted: ${p.name} to Bed ${p.bed}`);
     }
-  }, [user]);
+  }, [user, applyServerVersion]);
 
   const deletePatient = useCallback((ipNo: string) => {
     const p = patients.find(pt => pt.ipNo === ipNo);
@@ -962,8 +990,8 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       upsertPatient(forced, true)
         .then(async () => {
           toast.success(`${forced.name} saved (overwrite).`);
-          // Re-fetch to restore the server's updated_at, preventing
-          // subsequent saves from bypassing optimistic locking (Bug #3 fix)
+          // Re-fetch to restore the server's version/updated_at, preventing
+          // subsequent saves from comparing against a stale lock value (Bug #3 fix)
           try {
             const refreshed = await fetchPatientById(forced.ipNo, user?.hospitalId);
             if (refreshed) {

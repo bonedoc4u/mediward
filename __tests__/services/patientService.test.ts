@@ -266,7 +266,7 @@ describe('upsertPatient', () => {
     await expect(upsertPatient(makePatient())).rejects.toThrow('unique constraint');
   });
 
-  it('resolves without throwing on success', async () => {
+  it('resolves without throwing on success (new patient insert, no version yet)', async () => {
     mockState.result = { data: null, error: null };
     await expect(upsertPatient(makePatient())).resolves.toBeUndefined();
   });
@@ -278,8 +278,8 @@ describe('upsertPatient', () => {
   });
 
   it('force-save resolves when the unconditional update actually affects a row', async () => {
-    mockState.result = { data: [{ ip_no: 'IP001' }], error: null };
-    await expect(upsertPatient(makePatient(), true)).resolves.toBeUndefined();
+    mockState.result = { data: [{ version: 3 }], error: null };
+    await expect(upsertPatient(makePatient(), true)).resolves.toBe(3);
   });
 
   it('force-save throws FORCE_SAVE_BLOCKED instead of reporting silent success when RLS zeroes out the write', async () => {
@@ -290,6 +290,37 @@ describe('upsertPatient', () => {
     mockState.result = { data: [], error: null };
     await expect(upsertPatient(makePatient(), true))
       .rejects.toThrow('FORCE_SAVE_BLOCKED:IP001');
+  });
+
+  // Regression: patients.updated_at is bumped by a DB trigger on every UPDATE, but the
+  // client never refreshed its cached updated_at after a successful save — so a second
+  // edit in the same session always failed its optimistic-lock check against itself,
+  // misreported as a peer conflict. version (also trigger-maintained) is now the lock key
+  // and the caller is expected to persist the returned value after every save.
+  describe('version-based optimistic lock', () => {
+    it('locks on version (not updated_at) when the patient has a cached version', async () => {
+      mockState.result = { data: [{ version: 6 }], error: null };
+      const result = await upsertPatient(makePatient({ version: 5, updatedAt: 'stale-timestamp' }));
+      expect(result).toBe(6);
+      // eq() is called for ip_no then version — confirm 'version' was used, not 'updated_at'
+      const builder = vi.mocked(supabase.from).mock.results[0].value;
+      expect(builder.eq).toHaveBeenCalledWith('version', 5);
+      expect(builder.eq).not.toHaveBeenCalledWith('updated_at', 'stale-timestamp');
+    });
+
+    it('falls back to updated_at when no version is cached (pre-migration patient)', async () => {
+      mockState.result = { data: [{ version: 2 }], error: null };
+      const result = await upsertPatient(makePatient({ updatedAt: '2024-01-15T08:00:00Z' }));
+      expect(result).toBe(2);
+      const builder = vi.mocked(supabase.from).mock.results[0].value;
+      expect(builder.eq).toHaveBeenCalledWith('updated_at', '2024-01-15T08:00:00Z');
+    });
+
+    it('returns the new version on a plain insert', async () => {
+      mockState.result = { data: [{ version: 1 }], error: null };
+      const result = await upsertPatient(makePatient());
+      expect(result).toBe(1);
+    });
   });
 });
 
