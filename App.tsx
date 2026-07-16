@@ -907,6 +907,7 @@ const App: React.FC = () => {
       {/* ─── Concurrent Edit Conflict Modal ─── */}
       {concurrentEditConflict && (
         <ConcurrentEditModal
+          key={concurrentEditConflict.localPatient.ipNo}
           conflict={concurrentEditConflict}
           onResolve={resolveConcurrentEdit}
         />

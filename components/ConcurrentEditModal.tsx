@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { GitMerge, Save, RefreshCw, X } from 'lucide-react';
 import { ConcurrentEditConflict } from '../contexts/PatientContext';
 
@@ -54,8 +55,21 @@ const ConcurrentEditModal: React.FC<Props> = ({ conflict, onResolve }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onResolve]);
 
-  return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+  // This dialog is rendered in-tree wherever a patient save happens to fail
+  // (a save button, an inline edit sheet, a round-mode form), so it can end up
+  // nested under whichever fixed-position ancestor was open at that moment.
+  // A portal to <body> plus the app's highest z-index guarantees it's always
+  // the actual top hit-test target — not just the topmost-looking element —
+  // and the scroll lock stops the page underneath from intercepting a touch
+  // that was meant to land on a button.
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
       {/* Tapping outside keeps the server version — mobile users have no
           Escape key, so the backdrop must be an exit too. */}
       <div
@@ -146,7 +160,8 @@ const ConcurrentEditModal: React.FC<Props> = ({ conflict, onResolve }) => {
           <X className="w-5 h-5" />
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
