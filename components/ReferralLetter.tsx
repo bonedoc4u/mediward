@@ -5,6 +5,17 @@
 import React, { useState } from 'react';
 import { X, Download, FileText } from 'lucide-react';
 import { Patient } from '../types';
+import { FRACTURE_REGIONS, capitalizeSide } from '../utils/fractureClassifications';
+
+/** "Neck of Femur (Right): Garden IV, Pauwels III" per fracture, joined with "; ". */
+function formatFractures(patient: Patient): string {
+  return (patient.fractures ?? []).map(f => {
+    const label = FRACTURE_REGIONS.find(r => r.key === f.region)?.label ?? f.region;
+    const side = f.side ? ` (${capitalizeSide(f.side)})` : '';
+    const classifications = f.classifications.map(c => `${c.system} ${c.grade}`).join(', ');
+    return `${label}${side}${classifications ? `: ${classifications}` : ''}`;
+  }).join('; ');
+}
 
 interface Props {
   patient: Patient;
@@ -25,7 +36,8 @@ const ReferralLetter: React.FC<Props> = ({ patient, hospitalName, referringDocto
     `${patient.name}, ${patient.age}Y/${patient.gender}, IP No: ${patient.ipNo}\n` +
     `Admitted: ${patient.doa}\nDiagnosis: ${patient.diagnosis}\n` +
     (patient.comorbidities?.length ? `Comorbidities: ${patient.comorbidities.join(', ')}\n` : '') +
-    (patient.procedure ? `Procedure: ${patient.procedure}\n` : '')
+    (patient.procedure ? `Procedure: ${patient.procedure}\n` : '') +
+    ((patient.fractures ?? []).length > 0 ? `Fracture Classification: ${formatFractures(patient)}\n` : '')
   );
   const [specificRequests, setSpecificRequests] = useState('');
   const [saving, setSaving] = useState(false);

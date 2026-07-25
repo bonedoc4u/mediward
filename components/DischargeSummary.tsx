@@ -8,6 +8,17 @@ import {
 } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { todayYmd } from '../utils/dates';
+import { FRACTURE_REGIONS, capitalizeSide } from '../utils/fractureClassifications';
+
+/** "Neck of Femur (Right): Garden IV, Pauwels III" per fracture, joined with "; ". */
+function formatFractures(patient: Patient): string {
+  return (patient.fractures ?? []).map(f => {
+    const label = FRACTURE_REGIONS.find(r => r.key === f.region)?.label ?? f.region;
+    const side = f.side ? ` (${capitalizeSide(f.side)})` : '';
+    const classifications = f.classifications.map(c => `${c.system} ${c.grade}`).join(', ');
+    return `${label}${side}${classifications ? `: ${classifications}` : ''}`;
+  }).join('; ');
+}
 
 // ─── Auto-generate hospital course from patient data ───
 function buildDefaultCourse(patient: Patient): string {
@@ -765,6 +776,11 @@ const DischargeForm: React.FC<{
       bodyText(patient.procedure + (patient.dos ? `  (Date: ${patient.dos})` : ''));
     }
 
+    if ((patient.fractures ?? []).length > 0) {
+      sectionHeader('FRACTURE CLASSIFICATION');
+      bodyText(formatFractures(patient));
+    }
+
     if (patient.comorbidities.length > 0) {
       sectionHeader('COMORBIDITIES');
       bodyText(patient.comorbidities.join(', '));
@@ -959,6 +975,14 @@ const DischargeForm: React.FC<{
             <DocField
               label={`Procedure / Operation Done${patient.dos ? ` (Date: ${patient.dos})` : ''}`}
               value={patient.procedure}
+              readOnly
+            />
+          )}
+
+          {(patient.fractures ?? []).length > 0 && (
+            <DocField
+              label="Fracture Classification"
+              value={formatFractures(patient)}
               readOnly
             />
           )}

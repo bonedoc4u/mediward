@@ -469,6 +469,24 @@ export interface PriorSurgery {
   dos: string;
 }
 
+// ─── Fracture Classification ─────────────────────────────────────────────────
+/** One classification assigned to a fracture, e.g. { system: "Garden", grade: "IV" }.
+ *  A single fracture can carry several of these at once (Garden + Pauwels + AO/OTA
+ *  are complementary systems doctors commonly record together, not alternatives). */
+export interface FractureClassificationEntry {
+  system: string;
+  grade: string;
+}
+
+/** One distinct fracture on a patient. A polytrauma patient can have several. */
+export interface Fracture {
+  id: string;
+  /** Key into the static reference dataset in utils/fractureClassifications.ts, e.g. "nof". */
+  region: string;
+  side?: 'left' | 'right' | 'bilateral';
+  classifications: FractureClassificationEntry[];
+}
+
 // ─── PAC Flowchart ───────────────────────────────────────────────────────────
 /** One sub-task within a PAC branch (e.g. "Echocardiogram", "Correct Hb to 10") */
 export interface PacFlowItem {
@@ -564,6 +582,9 @@ export interface Patient {
    * have zero entries (only one surgery, ever).
    */
   priorSurgeries?: PriorSurgery[];
+  /** Classified fractures — see the Fracture interface. Most patients have one
+   *  entry (or zero, if their diagnosis isn't a classified fracture type). */
+  fractures?: Fracture[];
   /** Hospital this patient belongs to — required for multi-tenant RLS and cross-user visibility. */
   hospitalId?: string;
   /** DPDP Act 2023: ISO timestamp when informed consent was obtained. */
