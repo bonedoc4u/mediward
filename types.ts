@@ -462,6 +462,13 @@ export interface DischargeSummary {
  *  Conservative patients are excluded from the pending (pre-op) list. */
 export type ManagementPlan = 'surgical_fixation' | 'conservative';
 
+// ─── Prior Surgery Archive ───────────────────────────────────────────────────────
+/** A superseded surgery, archived when a later surgery overwrites `procedure`/`dos`. */
+export interface PriorSurgery {
+  procedure: string;
+  dos: string;
+}
+
 // ─── PAC Flowchart ───────────────────────────────────────────────────────────
 /** One sub-task within a PAC branch (e.g. "Echocardiogram", "Correct Hb to 10") */
 export interface PacFlowItem {
@@ -550,6 +557,13 @@ export interface Patient {
   updatedAt?: string;
   /** Server-maintained optimistic-lock counter (`patients.version`, bumped by a DB trigger on every UPDATE). Primary concurrent-edit detection key — must be refreshed from the save response after every write. */
   version?: number;
+  /**
+   * Archive of superseded surgeries. `procedure`/`dos` always represent the
+   * CURRENT/most-recent surgery; when a new one is recorded over an existing
+   * one, the old {procedure, dos} pair is pushed here first. Most patients
+   * have zero entries (only one surgery, ever).
+   */
+  priorSurgeries?: PriorSurgery[];
   /** Hospital this patient belongs to — required for multi-tenant RLS and cross-user visibility. */
   hospitalId?: string;
   /** DPDP Act 2023: ISO timestamp when informed consent was obtained. */
