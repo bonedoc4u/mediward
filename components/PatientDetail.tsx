@@ -8,9 +8,10 @@ import {
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   FileJson, Download, Pill, ClipboardList, Droplets, Bandage,
-  Calculator, Send, X, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
+  Calculator, Send, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import DateBottomSheet from './ui/DateBottomSheet';
 import ErrorBoundary from './ErrorBoundary';
 import DemographicsSection from './patient/DemographicsSection';
 import ComorbiditiesSection from './patient/ComorbiditiesSection';
@@ -50,44 +51,6 @@ function formatDateChip(iso: string | undefined): string {
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 }
-
-// ─── Date Bottom Sheet ────────────────────────────────────────────────────────
-const DateBottomSheet: React.FC<{
-  label: string;
-  value: string;
-  onSave: (v: string) => void;
-  onClose: () => void;
-}> = ({ label, value, onSave, onClose }) => {
-  const [date, setDate] = useState(value);
-  return (
-    <div className="fixed inset-0 z-[80] flex flex-col justify-end sm:items-center sm:justify-center sm:p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-surface-card rounded-t-3xl sm:rounded-3xl shadow-2xl px-5 pt-5 pb-10 sm:pb-6 animate-[slideUp_0.25s_ease-out] sm:animate-none">
-        <div className="w-10 h-1 bg-surface-sunken rounded-full mx-auto mb-5 sm:hidden" />
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-bold text-ink">{label}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-full text-ink-faint hover:text-ink hover:bg-surface-sunken transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <input
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          max={todayYmd()}
-          className="w-full px-4 py-3.5 border border-line rounded-2xl text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
-          autoFocus
-        />
-        <button
-          onClick={() => { onSave(date); onClose(); }}
-          className="w-full py-3.5 bg-accent hover:bg-accent-pressed text-white text-sm font-bold rounded-2xl transition-colors"
-        >
-          Confirm Date
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface PatientDetailProps {
