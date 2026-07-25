@@ -7,8 +7,8 @@ import {
   ArrowLeft, Phone, MessageCircle, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
-  FileJson, Download, Pill, ClipboardList, Droplets, Bandage,
-  Calculator, Send, X, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
+  Download, Pill, ClipboardList, Droplets, Bandage,
+  Send, X, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import ErrorBoundary from './ErrorBoundary';
@@ -17,8 +17,6 @@ import ComorbiditiesSection from './patient/ComorbiditiesSection';
 import RadiologyPanel from './patient/RadiologyPanel';
 import StickyPatientHeader from './patient/StickyPatientHeader';
 import MoveBedSheet from './patient/MoveBedSheet';
-import FHIRExportModal from './FHIRExportModal';
-import ScoringTools from './ScoringTools';
 import ReferralLetter from './ReferralLetter';
 import { todayYmd } from '../utils/dates';
 const MedicationChart  = lazy(() => import('./MedicationChart'));
@@ -109,8 +107,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
   const [showDischargeConfirm,  setShowDischargeConfirm]  = useState(false);
   const [showWentHomeConfirm,   setShowWentHomeConfirm]   = useState(false);
   const [showDeleteConfirm,     setShowDeleteConfirm]     = useState(false);
-  const [showFhirExport,       setShowFhirExport]       = useState(false);
-  const [showScoring,          setShowScoring]           = useState(false);
   const [showReferral,         setShowReferral]          = useState(false);
   const [activeTab,            setActiveTab]             = useState<'overview' | 'medications' | 'nursing' | 'io' | 'transfusion' | 'wound'>('overview');
   const [editingDate,          setEditingDate]           = useState<'doa' | 'dos' | null>(null);
@@ -471,9 +467,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mx-1 px-1 scrollbar-hide">
-        <button onClick={() => setShowScoring(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-accent hover:bg-accent-pressed text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
-          <Calculator className="w-4 h-4" /><span>Scores</span>
-        </button>
         <button onClick={() => setShowReferral(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-accent hover:bg-accent-pressed text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
           <Send className="w-4 h-4" /><span>Refer</span>
         </button>
@@ -492,11 +485,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         {canEdit && (
           <button onClick={() => setShowMoveBed(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
             <ArrowRightLeft className="w-4 h-4 text-accent-fg" /> Move bed
-          </button>
-        )}
-        {can(user, 'investigations:write') && (
-          <button onClick={() => setShowFhirExport(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-accent-soft rounded-xl shadow-sm border border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-accent-fg whitespace-nowrap">
-            <FileJson className="w-4 h-4 text-accent-fg" /> FHIR
           </button>
         )}
         <button
@@ -733,8 +721,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         onCancel={() => setShowDeleteConfirm(false)}
       />
 
-      {showFhirExport && <FHIRExportModal patient={patient} onClose={() => setShowFhirExport(false)} />}
-      {showScoring    && <ScoringTools onClose={() => setShowScoring(false)} />}
       {showReferral   && (
         <ReferralLetter
           patient={patient}
