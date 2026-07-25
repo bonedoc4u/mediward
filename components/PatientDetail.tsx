@@ -16,6 +16,7 @@ import ErrorBoundary from './ErrorBoundary';
 import DemographicsSection from './patient/DemographicsSection';
 import ComorbiditiesSection from './patient/ComorbiditiesSection';
 import SurgicalHistorySection from './patient/SurgicalHistorySection';
+import FractureClassificationSection from './patient/FractureClassificationSection';
 import RadiologyPanel from './patient/RadiologyPanel';
 import StickyPatientHeader from './patient/StickyPatientHeader';
 import MoveBedSheet from './patient/MoveBedSheet';
@@ -431,6 +432,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── SURGICAL HISTORY (second-surgery support) ─────────────────── */}
       <SurgicalHistorySection patient={patient} canEdit={canEdit} onUpdate={updatePatient} onAddSurgery={addSurgery} />
+
+      {/* ─── FRACTURE CLASSIFICATION ─────────────────────────────────── */}
+      <FractureClassificationSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />
 
       {/* ─── QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mx-1 px-1 scrollbar-hide">
