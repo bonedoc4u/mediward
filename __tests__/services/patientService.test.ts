@@ -63,6 +63,7 @@ const makeRow = (overrides: Record<string, any> = {}) => ({
   todos: [],
   pac_checklist: null,
   prior_surgeries: null,
+  fractures: null,
   pre_op_checklist: null,
   discharge_summary: null,
   created_at: '2024-01-15T08:00:00Z',
@@ -223,6 +224,24 @@ describe('priorSurgeries mapping', () => {
     mockState.result = { data: [makeRow({ prior_surgeries: surgeries })], error: null };
     const patients = await fetchActivePatients();
     expect(patients[0].priorSurgeries).toEqual(surgeries);
+  });
+});
+
+describe('fractures mapping', () => {
+  it('maps fractures to an empty array when null', async () => {
+    mockState.result = { data: [makeRow({ fractures: null })], error: null };
+    const patients = await fetchActivePatients();
+    expect(patients[0].fractures).toEqual([]);
+  });
+
+  it('maps fractures rows through unchanged', async () => {
+    const fractures = [{
+      id: 'f1', region: 'nof', side: 'right',
+      classifications: [{ system: 'Garden', grade: 'IV' }],
+    }];
+    mockState.result = { data: [makeRow({ fractures })], error: null };
+    const patients = await fetchActivePatients();
+    expect(patients[0].fractures).toEqual(fractures);
   });
 });
 

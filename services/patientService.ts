@@ -9,7 +9,7 @@ import { supabase } from '../lib/supabase';
 import {
   Patient, DailyRound, Investigation, LabResult, ToDoItem,
   PacChecklistItem, PreOpChecklist, DischargeSummary, DamaSummary, DeathSummary, VitalSigns,
-  ManagementPlan, PacFlowData, PriorSurgery,
+  ManagementPlan, PacFlowData, PriorSurgery, Fracture,
 } from '../types';
 
 // ─── Joined row shapes from normalized rounds / vitals tables ─────
@@ -77,6 +77,7 @@ interface PatientRow {
   dod: string | null;
   pod: number | null;
   prior_surgeries: PriorSurgery[] | null;
+  fractures: Fracture[] | null;
   pac_status: string;
   patient_status: string;
   // Still present in DB (legacy JSONB) — used as fallback when normalized tables have no data
@@ -195,6 +196,7 @@ function rowToPatient(row: PatientRow): Patient {
     dod:              row.dod              ?? undefined,
     pod:              row.pod              ?? undefined,
     priorSurgeries:   Array.isArray(row.prior_surgeries) ? row.prior_surgeries : [],
+    fractures:        Array.isArray(row.fractures) ? row.fractures : [],
     pacStatus:        row.pac_status       as Patient['pacStatus'],
     patientStatus:    row.patient_status   as Patient['patientStatus'],
     dailyRounds,
@@ -257,6 +259,7 @@ function patientToRow(patient: Patient) {
     dod:               patient.dod              ?? null,
     pod:               patient.pod              ?? null,
     prior_surgeries:   patient.priorSurgeries    ?? [],
+    fractures:         patient.fractures         ?? [],
     pac_status:        patient.pacStatus        ?? 'PAC Pending',
     patient_status:    patient.patientStatus    ?? 'Fit',
     todos:             patient.todos            ?? [],
@@ -285,7 +288,7 @@ function patientToRow(patient: Patient) {
 const PATIENT_LIST_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'admission_source',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
   'management',
   'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
@@ -297,7 +300,7 @@ const PATIENT_LIST_SELECT = [
 const PATIENT_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'admission_source',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
   'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
