@@ -39,16 +39,17 @@ scheduling, because both list filters hard-exclude on `!p.dos`.
   2's date. Not fixing this now — narrow blast radius, separate concern.
 - No arbitrary reordering/editing of surgical history — `priorSurgeries` entries are
   archival records, not independently editable after the fact.
-- **Pre-Op Prep and PAC Management do not yet recognize a planned second surgery.**
-  `hasPendingSurgery()` was adopted by the OT pending list and ward "Pending" view
-  (so a second surgery correctly gets scheduled), but `PreOpPrep.tsx` and
-  `PacManagement.tsx` still gate on the old bare "no DOS yet" check — a patient
-  with surgery 1 done and surgery 2 planned won't appear in either. Deliberately
-  out of scope here: a correct fix isn't a filter swap, since `pacStatus` and
-  `preOpChecklist` are scalar fields carried over from surgery 1 and would show
-  stale "PAC Fit" / already-completed-checklist state for a surgery that hasn't
-  actually been cleared. Making the pre-op workflow itself per-surgery is a
-  separate design question and a follow-up feature, not a bug in this branch.
+- ~~Pre-Op Prep and PAC Management do not yet recognize a planned second surgery~~
+  — **closed.** `PreOpPrep.tsx` and `PacManagement.tsx` now use `hasPendingSurgery()`
+  too, matching the OT pending list and ward "Pending" view. Since `pacStatus`,
+  `pacFlow`, and `preOpChecklist` are scalar (not archived per-surgery like
+  `procedure`/`dos`), showing the patient again wasn't enough on its own — it would
+  have surfaced surgery 1's stale "PAC Fit" / completed-checklist state against a
+  procedure nothing has actually been assessed for. "Plan next surgery"
+  (`SurgicalHistorySection.tsx`) and `buildSurgeryUpdate` (the "Add another surgery"
+  path) both now reset these three fields to a fresh not-yet-cleared state, so the
+  existing "initialize from template if empty" logic already in both screens kicks
+  in naturally — no new initialization code needed.
 
 ## Data model
 

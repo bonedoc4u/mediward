@@ -42,16 +42,28 @@ describe('SurgicalHistorySection', () => {
     expect(onAddSurgery).toHaveBeenCalledWith('IP001', 'Revision fixation', '2026-08-01');
   });
 
-  it('"Plan next surgery" calls onUpdate with only plannedDos changed', () => {
+  it('"Plan next surgery" calls onUpdate with plannedDos set and PAC/pre-op state reset', () => {
+    // Regression: pacStatus/pacFlow/preOpChecklist are scalar, not archived per
+    // surgery — without resetting them here, a patient already PAC Fit and
+    // checklisted for surgery 1 would show as cleared for surgery 2 too.
     const onUpdate = vi.fn();
-    const patient = makePatient({ dos: '2026-06-01', procedure: 'DHS fixation' });
+    const patient = makePatient({
+      dos: '2026-06-01', procedure: 'DHS fixation', pacStatus: PacStatus.Fit,
+      preOpChecklist: [{ id: '0', task: 'Consent', isDone: true }],
+    });
     render(<SurgicalHistorySection patient={patient} canEdit onUpdate={onUpdate} onAddSurgery={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /plan next surgery/i }));
     fireEvent.change(screen.getByLabelText('Plan next surgery date'), { target: { value: '2026-09-01' } });
     fireEvent.click(screen.getByRole('button', { name: /confirm date/i }));
 
-    expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({ ipNo: 'IP001', plannedDos: '2026-09-01' }));
+    expect(onUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      ipNo: 'IP001',
+      plannedDos: '2026-09-01',
+      pacStatus: PacStatus.Pending,
+      pacFlow: undefined,
+      preOpChecklist: undefined,
+    }));
   });
 
   it('does not show "Add another surgery" when canEdit is false', () => {

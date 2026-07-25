@@ -7,7 +7,7 @@
  */
 import React, { useState } from 'react';
 import { CalendarClock, Plus } from 'lucide-react';
-import { Patient } from '../../types';
+import { Patient, PacStatus } from '../../types';
 import DateBottomSheet from '../ui/DateBottomSheet';
 import AddSurgerySheet from './AddSurgerySheet';
 
@@ -67,7 +67,16 @@ const SurgicalHistorySection: React.FC<Props> = ({ patient, canEdit, onUpdate, o
           label="Plan next surgery date"
           value={patient.plannedDos ?? ''}
           max="9999-12-31"
-          onSave={val => onUpdate({ ...patient, plannedDos: val || undefined })}
+          onSave={val => onUpdate({
+            ...patient,
+            plannedDos: val || undefined,
+            // A second surgery starts its own pre-op/PAC workflow from scratch —
+            // without this, the patient would show as already PAC Fit and fully
+            // checklisted for a procedure nothing has actually been assessed for.
+            pacStatus: PacStatus.Pending,
+            pacFlow: undefined,
+            preOpChecklist: undefined,
+          })}
           onClose={() => setShowPlanNext(false)}
         />
       )}
