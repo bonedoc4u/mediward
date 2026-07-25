@@ -15,6 +15,7 @@ import DateBottomSheet from './ui/DateBottomSheet';
 import ErrorBoundary from './ErrorBoundary';
 import DemographicsSection from './patient/DemographicsSection';
 import ComorbiditiesSection from './patient/ComorbiditiesSection';
+import SurgicalHistorySection from './patient/SurgicalHistorySection';
 import RadiologyPanel from './patient/RadiologyPanel';
 import StickyPatientHeader from './patient/StickyPatientHeader';
 import MoveBedSheet from './patient/MoveBedSheet';
@@ -63,7 +64,7 @@ interface PatientDetailProps {
 }
 
 const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inSheet }) => {
-  const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
+  const { navParams, navigateTo, patients, updatePatient, addSurgery, deletePatient, user } = useApp();
   const effectiveId = patientId ?? navParams.id;
   // In a sheet we close it; on the full route we navigate back to the dashboard.
   const dismiss = onClose ?? (() => navigateTo('dashboard'));
@@ -431,6 +432,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── COMORBIDITIES & ALLERGIES (inline-editable) ───────────────── */}
       <ComorbiditiesSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />
+
+      {/* ─── SURGICAL HISTORY (second-surgery support) ─────────────────── */}
+      <SurgicalHistorySection patient={patient} canEdit={canEdit} onUpdate={updatePatient} onAddSurgery={addSurgery} />
 
       {/* ─── QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mx-1 px-1 scrollbar-hide">
