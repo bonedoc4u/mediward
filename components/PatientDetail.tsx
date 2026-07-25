@@ -724,7 +724,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
           value={(editingDate === 'doa' ? patient.doa : patient.dos) ?? ''}
           onSave={val => updatePatient(
             editingDate === 'doa'
-              ? { ...patient, doa: val as string }
+              ? { ...patient, doa: val || undefined } as Parameters<typeof updatePatient>[0]
               : { ...patient, dos: val || undefined, plannedDos: undefined },
           )}
           onClose={() => setEditingDate(null)}
