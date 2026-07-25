@@ -38,6 +38,19 @@ describe('FRACTURE_REGIONS', () => {
     expect(nof!.systems.find(s => s.name === 'Garden')!.grades).toEqual(['I', 'II', 'III', 'IV']);
     expect(nof!.aoOtaBone).toEqual({ boneCode: '3', segment: '1' });
   });
+
+  it('ankle uses the distinct malleolar segment "4", not pilon\'s segment "3"', () => {
+    // Regression pin: this exact region entry was twice found reverted to
+    // segment '3' during implementation (matching pilon, anatomically
+    // adjacent but a different official AO/OTA segment). The generic
+    // buildAoOtaCode tests above only prove the composer function works —
+    // they don't catch this region's OWN data entry regressing.
+    const ankle = FRACTURE_REGIONS.find(r => r.key === 'ankle');
+    expect(ankle).toBeDefined();
+    expect(ankle!.aoOtaBone).toEqual({ boneCode: '4', segment: '4' });
+    const pilon = FRACTURE_REGIONS.find(r => r.key === 'pilon');
+    expect(pilon!.aoOtaBone).toEqual({ boneCode: '4', segment: '3' });
+  });
 });
 
 describe('GUSTILO_ANDERSON', () => {

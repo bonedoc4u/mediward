@@ -193,7 +193,8 @@ export const FRACTURE_REGIONS: FractureRegionDef[] = [
       { name: 'Weber (Danis-Weber)', grades: ['A', 'B', 'C'] },
       { name: 'Lauge-Hansen', grades: ['Supination-Adduction', 'Supination-External Rotation', 'Pronation-Abduction', 'Pronation-External Rotation'] },
     ],
-    aoOtaBone: { boneCode: '4', segment: '3' },
+    // Malleolar segment is "4" (44-series), distinct from pilon's "3" (43-series).
+    aoOtaBone: { boneCode: '4', segment: '4' },
   },
   {
     key: 'talus_neck', label: 'Talus (Neck)', group: 'Foot & Ankle',
