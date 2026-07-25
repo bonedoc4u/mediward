@@ -8,12 +8,14 @@ import {
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   Download, Pill, ClipboardList, Droplets, Bandage,
-  Send, X, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
+  Send, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import DateBottomSheet from './ui/DateBottomSheet';
 import ErrorBoundary from './ErrorBoundary';
 import DemographicsSection from './patient/DemographicsSection';
 import ComorbiditiesSection from './patient/ComorbiditiesSection';
+import SurgicalHistorySection from './patient/SurgicalHistorySection';
 import RadiologyPanel from './patient/RadiologyPanel';
 import StickyPatientHeader from './patient/StickyPatientHeader';
 import MoveBedSheet from './patient/MoveBedSheet';
@@ -49,44 +51,6 @@ function formatDateChip(iso: string | undefined): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-// ─── Date Bottom Sheet ────────────────────────────────────────────────────────
-const DateBottomSheet: React.FC<{
-  label: string;
-  value: string;
-  onSave: (v: string) => void;
-  onClose: () => void;
-}> = ({ label, value, onSave, onClose }) => {
-  const [date, setDate] = useState(value);
-  return (
-    <div className="fixed inset-0 z-[80] flex flex-col justify-end sm:items-center sm:justify-center sm:p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-surface-card rounded-t-3xl sm:rounded-3xl shadow-2xl px-5 pt-5 pb-10 sm:pb-6 animate-[slideUp_0.25s_ease-out] sm:animate-none">
-        <div className="w-10 h-1 bg-surface-sunken rounded-full mx-auto mb-5 sm:hidden" />
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-bold text-ink">{label}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-full text-ink-faint hover:text-ink hover:bg-surface-sunken transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <input
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-          max={todayYmd()}
-          className="w-full px-4 py-3.5 border border-line rounded-2xl text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
-          autoFocus
-        />
-        <button
-          onClick={() => { onSave(date); onClose(); }}
-          className="w-full py-3.5 bg-accent hover:bg-accent-pressed text-white text-sm font-bold rounded-2xl transition-colors"
-        >
-          Confirm Date
-        </button>
-      </div>
-    </div>
-  );
-};
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 interface PatientDetailProps {
   /** When provided (sheet / deep-link), overrides the router's navParams.id. */
@@ -98,7 +62,7 @@ interface PatientDetailProps {
 }
 
 const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inSheet }) => {
-  const { navParams, navigateTo, patients, updatePatient, deletePatient, user } = useApp();
+  const { navParams, navigateTo, patients, updatePatient, addSurgery, deletePatient, user } = useApp();
   const effectiveId = patientId ?? navParams.id;
   // In a sheet we close it; on the full route we navigate back to the dashboard.
   const dismiss = onClose ?? (() => navigateTo('dashboard'));
@@ -465,6 +429,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       {/* ─── COMORBIDITIES & ALLERGIES (inline-editable) ───────────────── */}
       <ComorbiditiesSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />
 
+      {/* ─── SURGICAL HISTORY (second-surgery support) ─────────────────── */}
+      <SurgicalHistorySection patient={patient} canEdit={canEdit} onUpdate={updatePatient} onAddSurgery={addSurgery} />
+
       {/* ─── QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mx-1 px-1 scrollbar-hide">
         <button onClick={() => setShowReferral(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-accent hover:bg-accent-pressed text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
@@ -745,7 +712,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <DateBottomSheet
           label={editingDate === 'doa' ? 'Date of Admission' : 'Date of Surgery'}
           value={(editingDate === 'doa' ? patient.doa : patient.dos) ?? ''}
-          onSave={val => updatePatient({ ...patient, [editingDate === 'doa' ? 'doa' : 'dos']: val || undefined })}
+          onSave={val => updatePatient(
+            editingDate === 'doa'
+              ? { ...patient, doa: val || undefined } as Parameters<typeof updatePatient>[0]
+              : { ...patient, dos: val || undefined, plannedDos: undefined },
+          )}
           onClose={() => setEditingDate(null)}
         />
       )}

@@ -26,7 +26,7 @@ function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number)
   }) as T;
 }
 import { Patient, LabResult, Investigation, DailyRound, VitalSigns } from '../types';
-import { enrichPatientData } from '../utils/calculations';
+import { enrichPatientData, buildSurgeryUpdate } from '../utils/calculations';
 import { sanitizeInput } from '../utils/sanitize';
 import { logAuditEvent } from '../services/auditLog';
 import {
@@ -75,6 +75,10 @@ interface PatientContextType {
   hasLoadedAll: boolean;
   loadAllPatients: () => Promise<void>;
   updatePatient: (patient: Patient) => void;
+  /** Records a new (possibly second) surgery: archives the current procedure/dos
+   *  into priorSurgeries (if one exists), sets the new ones as current, clears
+   *  plannedDos. No-op if the patient isn't found. */
+  addSurgery: (ipNo: string, newProcedure: string, newDos: string) => void;
   addPatient: (patient: Patient) => void;
   deletePatient: (ipNo: string) => void;
   addLabResult: (patientId: string, result: LabResult) => void;
@@ -772,6 +776,12 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [user, applyServerVersion]);
 
+  const addSurgery = useCallback((ipNo: string, newProcedure: string, newDos: string) => {
+    const patient = patients.find(p => p.ipNo === ipNo);
+    if (!patient) return;
+    updatePatient({ ...patient, ...buildSurgeryUpdate(patient, newProcedure, newDos) });
+  }, [patients, updatePatient]);
+
   const addPatient = useCallback((patient: Patient) => {
     const p = {
       ...patient,
@@ -1039,6 +1049,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     hasLoadedAll,
     loadAllPatients,
     updatePatient,
+    addSurgery,
     addPatient,
     deletePatient,
     addLabResult,
@@ -1055,7 +1066,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }), [
     patients, isLoadingPatients, isStale, cacheTimestamp,
     hasMore, isLoadingMore, loadMorePatients,
-    hasLoadedAll, loadAllPatients, updatePatient, addPatient, deletePatient,
+    hasLoadedAll, loadAllPatients, updatePatient, addSurgery, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation, getPatient,
     saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
     realtimeStatus, forceReconnect, sessionExpired,
