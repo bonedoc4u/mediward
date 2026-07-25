@@ -722,7 +722,11 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <DateBottomSheet
           label={editingDate === 'doa' ? 'Date of Admission' : 'Date of Surgery'}
           value={(editingDate === 'doa' ? patient.doa : patient.dos) ?? ''}
-          onSave={val => updatePatient({ ...patient, [editingDate === 'doa' ? 'doa' : 'dos']: val || undefined })}
+          onSave={val => updatePatient(
+            editingDate === 'doa'
+              ? { ...patient, doa: val as string }
+              : { ...patient, dos: val || undefined, plannedDos: undefined },
+          )}
           onClose={() => setEditingDate(null)}
         />
       )}
