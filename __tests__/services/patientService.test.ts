@@ -62,6 +62,7 @@ const makeRow = (overrides: Record<string, any> = {}) => ({
   daily_rounds: [],
   todos: [],
   pac_checklist: null,
+  prior_surgeries: null,
   pre_op_checklist: null,
   discharge_summary: null,
   created_at: '2024-01-15T08:00:00Z',
@@ -207,6 +208,21 @@ describe('fetchActivePatients', () => {
 
     await fetchActivePatients();
     expect(eqSpy).not.toHaveBeenCalledWith('unit', expect.anything());
+  });
+});
+
+describe('priorSurgeries mapping', () => {
+  it('maps prior_surgeries to an empty array when null', async () => {
+    mockState.result = { data: [makeRow({ prior_surgeries: null })], error: null };
+    const patients = await fetchActivePatients();
+    expect(patients[0].priorSurgeries).toEqual([]);
+  });
+
+  it('maps prior_surgeries rows through unchanged', async () => {
+    const surgeries = [{ procedure: 'DHS fixation', dos: '2026-06-01' }];
+    mockState.result = { data: [makeRow({ prior_surgeries: surgeries })], error: null };
+    const patients = await fetchActivePatients();
+    expect(patients[0].priorSurgeries).toEqual(surgeries);
   });
 });
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useLayoutEffect, memo } from 'react';
 import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac } from '../utils/calculations';
+import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac, hasPendingSurgery } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
 import { exportWardListPDF } from '../utils/exportWardList';
@@ -105,7 +105,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         if (p.patientStatus === PatientStatus.Discharged) return false;
       } else if (viewMode === 'pending') {
         if (p.patientStatus === PatientStatus.Discharged) return false;
-        if (p.dos) return false;
+        if (!hasPendingSurgery(p)) return false;
         // Conservative patients don't need surgery — exclude from the pending/pre-op list
         if ((p.management ?? 'surgical_fixation') === 'conservative') return false;
       }

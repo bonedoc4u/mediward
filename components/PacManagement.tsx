@@ -1,6 +1,6 @@
 import React from 'react';
 import { Patient, PacStatus, PacFlowData } from '../types';
-import { sortByBed, needsPac } from '../utils/calculations';
+import { sortByBed, needsPac, hasPendingSurgery } from '../utils/calculations';
 import { Check, HeartPulse } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import PacFlowChart from './PacFlowChart';
@@ -23,7 +23,7 @@ const getStatusBadge = (status: PacStatus) => {
 const PacManagement: React.FC<Props> = ({ patients, onUpdatePatient }) => {
   // Show patients awaiting surgery (no DOS yet, not discharged)
   const pendingPatients = patients
-    .filter(p => needsPac(p) && !p.dos && p.patientStatus !== 'Discharged')
+    .filter(p => needsPac(p) && hasPendingSurgery(p) && p.patientStatus !== 'Discharged')
     .sort(sortByBed);
 
   const handleFlowChange = (patient: Patient, updated: PacFlowData) => {

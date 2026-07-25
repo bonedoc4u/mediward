@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient } from '../utils/calculations';
+import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate } from '../utils/calculations';
+import { PacStatus } from '../types';
 import type { Patient, WardConfig } from '../types';
 
 /** Minimal Patient stub — sortByBed only reads `bed`. */
@@ -107,5 +108,85 @@ describe('wardOptionsForPatient (Move Bed ward picker)', () => {
   it('returns every active ward when the patient has no unit assigned', () => {
     const names = wardOptionsForPatient(wards, undefined).map(w => w.name);
     expect(names).toEqual(['OR1 Ward', 'OR2 Ward', 'Shared Ward', 'ICU']);
+  });
+});
+
+describe('hasPendingSurgery (OT pending-list / ward "Pending" view membership)', () => {
+  it('is true when the patient has never been operated', () => {
+    expect(hasPendingSurgery({ dos: undefined, plannedDos: undefined } as Patient)).toBe(true);
+  });
+
+  it('is true when not yet operated but a date is already planned', () => {
+    expect(hasPendingSurgery({ dos: undefined, plannedDos: '2026-08-01' } as Patient)).toBe(true);
+  });
+
+  it('is false once operated with no further surgery planned', () => {
+    expect(hasPendingSurgery({ dos: '2026-06-01', plannedDos: undefined } as Patient)).toBe(false);
+  });
+
+  it('is true once operated AND a second surgery has been planned', () => {
+    // Regression: this patient was previously permanently excluded from the
+    // pending list because both filters hard-checked `!p.dos`.
+    expect(hasPendingSurgery({ dos: '2026-06-01', plannedDos: '2026-08-01' } as Patient)).toBe(true);
+  });
+});
+
+describe('buildSurgeryUpdate (recording a new/second surgery)', () => {
+  it('sets the new procedure and dos, and clears plannedDos', () => {
+    const patient = { procedure: undefined, dos: undefined, plannedDos: '2026-06-01', priorSurgeries: undefined } as Patient;
+    const result = buildSurgeryUpdate(patient, 'DHS fixation', '2026-06-01');
+    expect(result).toEqual({
+      procedure: 'DHS fixation',
+      dos: '2026-06-01',
+      plannedDos: undefined,
+      priorSurgeries: [],
+      pacStatus: PacStatus.Pending,
+      pacFlow: undefined,
+      preOpChecklist: undefined,
+    });
+  });
+
+  it('archives the current procedure/dos into priorSurgeries when a surgery already existed', () => {
+    const patient = {
+      procedure: 'DHS fixation', dos: '2026-06-01', plannedDos: '2026-07-20', priorSurgeries: undefined,
+    } as Patient;
+    const result = buildSurgeryUpdate(patient, 'Implant removal', '2026-07-20');
+    expect(result).toEqual({
+      procedure: 'Implant removal',
+      dos: '2026-07-20',
+      plannedDos: undefined,
+      priorSurgeries: [{ procedure: 'DHS fixation', dos: '2026-06-01' }],
+      pacStatus: PacStatus.Pending,
+      pacFlow: undefined,
+      preOpChecklist: undefined,
+    });
+  });
+
+  it('resets pacStatus/pacFlow/preOpChecklist so a second surgery does not inherit stale clearance from the first', () => {
+    // Regression: without this reset, a patient who was PAC Fit and fully
+    // checklisted for surgery 1 would show as already cleared for surgery 2,
+    // even though nothing has actually been assessed for the new procedure.
+    const patient = {
+      procedure: 'DHS fixation', dos: '2026-06-01', plannedDos: undefined,
+      pacStatus: PacStatus.Fit,
+      pacFlow: { seenByAnaesthesia: true, branches: [{ id: '1', name: 'Cardiology', isDone: true, items: [] }] },
+      preOpChecklist: [{ id: '0', task: 'Consent', isDone: true }],
+    } as unknown as Patient;
+    const result = buildSurgeryUpdate(patient, 'Implant removal', '2026-08-01');
+    expect(result.pacStatus).toBe(PacStatus.Pending);
+    expect(result.pacFlow).toBeUndefined();
+    expect(result.preOpChecklist).toBeUndefined();
+  });
+
+  it('appends to existing priorSurgeries rather than overwriting the list', () => {
+    const patient = {
+      procedure: 'Implant removal', dos: '2026-07-20', plannedDos: undefined,
+      priorSurgeries: [{ procedure: 'DHS fixation', dos: '2026-06-01' }],
+    } as Patient;
+    const result = buildSurgeryUpdate(patient, 'Revision fixation', '2026-09-01');
+    expect(result.priorSurgeries).toEqual([
+      { procedure: 'DHS fixation', dos: '2026-06-01' },
+      { procedure: 'Implant removal', dos: '2026-07-20' },
+    ]);
   });
 });

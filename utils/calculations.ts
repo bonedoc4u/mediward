@@ -118,6 +118,40 @@ export const getLabTrend = (labResults: LabResult[], type: LabType): LabTrendDat
 export const needsPac = (p: Patient): boolean =>
   (p.management ?? 'surgical_fixation') !== 'conservative';
 
+/** Should this patient appear in the OT pending list / ward "Pending" view?
+ *  True if never operated, OR already operated but a further surgery has an
+ *  outstanding planned date. Safe only because plannedDos is guaranteed to be
+ *  cleared the moment its surgery is recorded (see buildSurgeryUpdate) — a
+ *  stale leftover plannedDos would otherwise wrongly resurrect a fully-done
+ *  patient into these lists. */
+export const hasPendingSurgery = (p: Patient): boolean => !p.dos || !!p.plannedDos;
+
+/** Computes the field updates for recording a new (possibly second) surgery.
+ *  If the patient already has a current surgery (`dos` set), it is archived
+ *  into `priorSurgeries` before being overwritten — this is what lets a
+ *  second surgery become "current" without losing the first surgery's data.
+ *
+ *  Also resets pacStatus/pacFlow/preOpChecklist to a fresh "not yet cleared"
+ *  state: these are scalar, not archived per-surgery, so without a reset a
+ *  patient who was PAC Fit and fully checklisted for surgery 1 would show as
+ *  already cleared for surgery 2 — a false assurance nothing has actually
+ *  been checked for the new procedure. */
+export const buildSurgeryUpdate = (
+  patient: Patient,
+  newProcedure: string,
+  newDos: string,
+): Pick<Patient, 'procedure' | 'dos' | 'plannedDos' | 'priorSurgeries' | 'pacStatus' | 'pacFlow' | 'preOpChecklist'> => ({
+  procedure: newProcedure,
+  dos: newDos,
+  plannedDos: undefined,
+  priorSurgeries: patient.dos
+    ? [...(patient.priorSurgeries ?? []), { procedure: patient.procedure ?? '', dos: patient.dos }]
+    : (patient.priorSurgeries ?? []),
+  pacStatus: PacStatus.Pending,
+  pacFlow: undefined,
+  preOpChecklist: undefined,
+});
+
 export const getTriagePriority = (p: Patient): number => {
   if (p.patientStatus === PatientStatus.Critical) return 0;
   if (p.pod === 1) return 1;
