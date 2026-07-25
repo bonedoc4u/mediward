@@ -161,7 +161,9 @@ export const FRACTURE_REGIONS: FractureRegionDef[] = [
       { name: 'Russell-Taylor', grades: ['IA', 'IB', 'IIA', 'IIB'] },
       { name: 'Seinsheimer', grades: ['I', 'II', 'III', 'IV', 'V'] },
     ],
-    aoOtaBone: { boneCode: '3', segment: '1' },
+    // Segment 2 (diaphyseal), not 1 — subtrochanteric is the proximal-most
+    // part of the femoral shaft per AO/OTA, distinct from intertrochanteric.
+    aoOtaBone: { boneCode: '3', segment: '2' },
   },
 
   // ── Lower Limb ──────────────────────────────────────────────────────────
