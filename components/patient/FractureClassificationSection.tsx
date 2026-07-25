@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { Bone, Plus, X } from 'lucide-react';
 import { Patient, Fracture } from '../../types';
-import { FRACTURE_REGIONS } from '../../utils/fractureClassifications';
+import { FRACTURE_REGIONS, capitalizeSide } from '../../utils/fractureClassifications';
 import { generateId } from '../../utils/sanitize';
 import AddFractureSheet from './AddFractureSheet';
 import AddClassificationSheet from './AddClassificationSheet';
@@ -66,7 +66,7 @@ const FractureClassificationSection: React.FC<Props> = ({ patient, canEdit, onUp
             <li key={f.id} className="border border-line rounded-xl p-2.5">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-sm font-semibold text-ink">
-                  {regionLabel(f.region)}{f.side ? ` (${f.side})` : ''}
+                  {regionLabel(f.region)}{f.side ? ` (${capitalizeSide(f.side)})` : ''}
                 </span>
                 {canEdit && (
                   <button onClick={() => handleRemoveFracture(f.id)} aria-label={`Remove ${regionLabel(f.region)}`} className="text-ink-faint hover:text-vital-critical-fg">

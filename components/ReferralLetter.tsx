@@ -5,13 +5,13 @@
 import React, { useState } from 'react';
 import { X, Download, FileText } from 'lucide-react';
 import { Patient } from '../types';
-import { FRACTURE_REGIONS } from '../utils/fractureClassifications';
+import { FRACTURE_REGIONS, capitalizeSide } from '../utils/fractureClassifications';
 
 /** "Neck of Femur (Right): Garden IV, Pauwels III" per fracture, joined with "; ". */
 function formatFractures(patient: Patient): string {
   return (patient.fractures ?? []).map(f => {
     const label = FRACTURE_REGIONS.find(r => r.key === f.region)?.label ?? f.region;
-    const side = f.side ? ` (${f.side})` : '';
+    const side = f.side ? ` (${capitalizeSide(f.side)})` : '';
     const classifications = f.classifications.map(c => `${c.system} ${c.grade}`).join(', ');
     return `${label}${side}${classifications ? `: ${classifications}` : ''}`;
   }).join('; ');

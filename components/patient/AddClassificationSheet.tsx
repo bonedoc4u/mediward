@@ -118,6 +118,7 @@ const AddClassificationSheet: React.FC<Props> = ({ region, onSave, onClose }) =>
               type="text"
               value={aoFreeText}
               onChange={e => setAoFreeText(e.target.value)}
+              maxLength={20}
               placeholder="e.g. 62-B1"
               className="w-full px-4 py-3.5 border border-line rounded-2xl text-base text-ink focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
             />

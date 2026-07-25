@@ -50,6 +50,11 @@ export function buildAoOtaCode(bone: AoOtaBone, type: string, group: string): st
   return `${bone.boneCode}${bone.segment}-${type}${group}`;
 }
 
+/** "right" -> "Right", for display in clinical paperwork. */
+export function capitalizeSide(side: string): string {
+  return side.charAt(0).toUpperCase() + side.slice(1);
+}
+
 export const REGION_GROUPS = ['Upper Limb', 'Pelvis & Hip', 'Lower Limb', 'Foot & Ankle', 'Spine'] as const;
 
 export const FRACTURE_REGIONS: FractureRegionDef[] = [

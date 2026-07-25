@@ -15,7 +15,7 @@
 - No new RLS policy needed (same `patients` table, same existing tenant-scoped policies).
 - The new field is optional/additive — no existing Patient object literal needs to change.
 - Small, focused commits — one task per commit.
-- AO/OTA is structured (bone + segment + type + group picker) ONLY for the 15 regions listed with `aoOtaBone` set in Task 2's reference data. Everywhere else, AO/OTA is a free-text input. Do not invent AO/OTA numeric codes for regions without `aoOtaBone` set.
+- AO/OTA is structured (bone + segment + type + group picker) ONLY for the 16 regions listed with `aoOtaBone` set in Task 2's reference data. Everywhere else, AO/OTA is a free-text input. Do not invent AO/OTA numeric codes for regions without `aoOtaBone` set.
 
 ---
 
@@ -141,12 +141,12 @@ describe('FRACTURE_REGIONS', () => {
     FRACTURE_REGIONS.forEach(r => expect(REGION_GROUPS).toContain(r.group));
   });
 
-  it('exactly 15 regions have structured AO/OTA metadata (the four classic long bones)', () => {
+  it('exactly 16 regions have structured AO/OTA metadata (the four classic long bones)', () => {
     const withAo = FRACTURE_REGIONS.filter(r => r.aoOtaBone);
-    expect(withAo.length).toBe(15);
+    expect(withAo.length).toBe(16);
     withAo.forEach(r => {
       expect(['1', '2', '3', '4']).toContain(r.aoOtaBone!.boneCode);
-      expect(['1', '2', '3']).toContain(r.aoOtaBone!.segment);
+      expect(['1', '2', '3', '4']).toContain(r.aoOtaBone!.segment);
     });
   });
 
