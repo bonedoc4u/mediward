@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { validateImageFile, isPdfPath } from '../../services/storageService';
+import { describe, it, expect, vi } from 'vitest';
+
+const mockUpload = vi.hoisted(() => vi.fn().mockResolvedValue({ error: null }));
+vi.mock('../../lib/supabase', () => ({
+  supabase: { storage: { from: () => ({ upload: mockUpload }) } },
+}));
+
+import { validateImageFile, isPdfPath, uploadInvestigationImage } from '../../services/storageService';
 
 const makeFile = (type: string, sizeBytes: number, name = 'test-file'): File => {
   const blob = new Blob([new Uint8Array(sizeBytes)], { type });
@@ -39,5 +45,21 @@ describe('isPdfPath', () => {
 
   it('returns false for an empty path', () => {
     expect(isPdfPath('')).toBe(false);
+  });
+});
+
+describe('uploadInvestigationImage', () => {
+  it('stores a PDF culture report with a .pdf extension, not .jpg', async () => {
+    // Regression coverage for the exact bug shape this feature depends on:
+    // if compressImage's PDF bypass or the ext-derivation ternary ever
+    // regressed, a culture report would silently get a .jpg path and
+    // isPdfPath() would then wrongly treat it as an image everywhere it's read.
+    const path = await uploadInvestigationImage(
+      makeFile('application/pdf', 1024, 'culture-report.pdf'),
+      'hospital-1',
+      'IP001',
+    );
+    expect(path).toMatch(/^hospital-1\/IP001\/.+\.pdf$/);
+    expect(isPdfPath(path)).toBe(true);
   });
 });
