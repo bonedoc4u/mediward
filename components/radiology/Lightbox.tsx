@@ -4,9 +4,10 @@
  * and the patient-detail Radiology panel.
  */
 import React from 'react';
-import { X, ImageIcon, Loader2 } from 'lucide-react';
+import { X, ImageIcon, Loader2, ExternalLink } from 'lucide-react';
 import { Investigation } from '../../types';
 import { useSignedUrl } from '../../hooks/useSignedUrl';
+import { isPdfPath } from '../../services/storageService';
 import { getModality } from './modality';
 
 const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, onClose }) => {
@@ -40,18 +41,31 @@ const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, 
         </button>
       </div>
 
-      {/* Image */}
+      {/* Image / PDF */}
       <div className="flex-1 flex items-center justify-center p-4 overflow-hidden" onClick={onClose}>
         {inv.imageUrl ? (
           signedUrl ? (
-            <img
-              src={signedUrl}
-              alt={inv.type}
-              className="max-w-full max-h-full object-contain select-none"
-              style={{ touchAction: 'pinch-zoom' }}
-              onClick={e => e.stopPropagation()}
-              draggable={false}
-            />
+            isPdfPath(inv.imageUrl) ? (
+              <a
+                href={signedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="flex flex-col items-center gap-3 text-white/80 hover:text-white transition-colors"
+              >
+                <ExternalLink className="w-12 h-12" />
+                <span className="text-sm font-semibold">Open PDF in new tab</span>
+              </a>
+            ) : (
+              <img
+                src={signedUrl}
+                alt={inv.type}
+                className="max-w-full max-h-full object-contain select-none"
+                style={{ touchAction: 'pinch-zoom' }}
+                onClick={e => e.stopPropagation()}
+                draggable={false}
+              />
+            )
           ) : (
             <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
           )
