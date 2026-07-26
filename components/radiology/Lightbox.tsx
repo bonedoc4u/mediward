@@ -4,9 +4,10 @@
  * and the patient-detail Radiology panel.
  */
 import React from 'react';
-import { X, ImageIcon, Loader2 } from 'lucide-react';
+import { X, ImageIcon, Loader2, ExternalLink } from 'lucide-react';
 import { Investigation } from '../../types';
 import { useSignedUrl } from '../../hooks/useSignedUrl';
+import { isPdfPath } from '../../services/storageService';
 import { getModality } from './modality';
 
 const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, onClose }) => {
@@ -40,20 +41,42 @@ const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, 
         </button>
       </div>
 
-      {/* Image */}
+      {/* Image / PDF */}
       <div className="flex-1 flex items-center justify-center p-4 overflow-hidden" onClick={onClose}>
         {inv.imageUrl ? (
-          signedUrl ? (
-            <img
-              src={signedUrl}
-              alt={inv.type}
-              className="max-w-full max-h-full object-contain select-none"
-              style={{ touchAction: 'pinch-zoom' }}
-              onClick={e => e.stopPropagation()}
-              draggable={false}
-            />
+          isPdfPath(inv.imageUrl) ? (
+            // Show the PDF's identity immediately — unlike an image, there's
+            // nothing to wait to render, so don't show the image-loading spinner
+            // just because the signed URL (needed only for the href) isn't back yet.
+            <div className="flex flex-col items-center gap-3 text-white/80">
+              <ExternalLink className="w-12 h-12" />
+              {signedUrl ? (
+                <a
+                  href={signedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="text-sm font-semibold hover:text-white transition-colors"
+                >
+                  Open PDF in new tab
+                </a>
+              ) : (
+                <span className="text-sm font-semibold text-white/50">Preparing link…</span>
+              )}
+            </div>
           ) : (
-            <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
+            signedUrl ? (
+              <img
+                src={signedUrl}
+                alt={inv.type}
+                className="max-w-full max-h-full object-contain select-none"
+                style={{ touchAction: 'pinch-zoom' }}
+                onClick={e => e.stopPropagation()}
+                draggable={false}
+              />
+            ) : (
+              <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
+            )
           )
         ) : (
           <div className="text-white/30 text-center">

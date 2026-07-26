@@ -7,7 +7,7 @@ import {
   Crop as CropIcon,
 } from 'lucide-react';
 import ImageEditor from './radiology/ImageEditor';
-import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile } from '../services/storageService';
+import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile, isPdfPath } from '../services/storageService';
 import { useSignedUrl } from '../hooks/useSignedUrl';
 import { getModality } from './radiology/modality';
 import Lightbox from './radiology/Lightbox';
@@ -50,9 +50,11 @@ const ImageCard: React.FC<{
     >
       <div className={`h-[72px] flex items-center justify-center relative ${cfg.bg}`}>
         {inv.imageUrl
-          ? (signedUrl
-              ? <img src={signedUrl} alt={inv.type} className="w-full h-full object-cover" />
-              : <Loader2 className="w-5 h-5 text-white/30 animate-spin" />)
+          ? (isPdfPath(inv.imageUrl)
+              ? <Icon className="w-7 h-7 text-white/60" />
+              : (signedUrl
+                  ? <img src={signedUrl} alt={inv.type} className="w-full h-full object-cover" />
+                  : <Loader2 className="w-5 h-5 text-white/30 animate-spin" />))
           : <Icon className="w-7 h-7 text-white/25" />
         }
         {onDelete && (
@@ -126,7 +128,10 @@ const SectionHeader: React.FC<{
           diagnosis: patient.diagnosis,
           dos: patient.dos,
         },
-        scans.map(s => ({
+        // PDF attachments (e.g. Culture Reports) can't be embedded as images in
+        // this X-ray comparison export — exclude them rather than showing a
+        // misleading "Image unavailable" page for a report that does exist.
+        scans.filter(s => !isPdfPath(s.imageUrl)).map(s => ({
           type: s.type,
           region: s.findings,
           date: s.date,
@@ -375,11 +380,12 @@ const UploadSheet: React.FC<{
               title="Modality"
               value={invType}
               options={[
-                { value: 'X-Ray',  label: 'X-Ray' },
-                { value: 'CT',     label: 'CT Scan' },
-                { value: 'MRI',    label: 'MRI' },
-                { value: 'USG',    label: 'Ultrasound (USG)' },
-                { value: 'Report', label: 'Report / Document' },
+                { value: 'X-Ray',          label: 'X-Ray' },
+                { value: 'CT',             label: 'CT Scan' },
+                { value: 'MRI',            label: 'MRI' },
+                { value: 'USG',            label: 'Ultrasound (USG)' },
+                { value: 'Culture Report', label: 'Culture Report' },
+                { value: 'Report',         label: 'Report / Document' },
               ]}
               onChange={onTypeChange}
               disabled={isUploading}

@@ -1,7 +1,8 @@
 /**
- * RadiologyPanel.tsx — pinned, always-visible imaging strip under the patient
- * header. For an ortho ward, imaging is the most-consulted data, so it sits
- * above everything and needs no tab click.
+ * RadiologyPanel.tsx — pinned, always-visible imaging/report strip under the
+ * patient header. For an ortho ward, imaging is the most-consulted data, so
+ * it sits above everything and needs no tab click. Also holds non-imaging
+ * report attachments (e.g. Culture Reports) uploaded via the same flow.
  *
  * Visual model: a negatoscope (X-ray viewing box) — films sit on one dark
  * neutral strip, newest first, captions etched beneath. Colour appears only
@@ -16,6 +17,7 @@ import React, { useMemo, useState } from 'react';
 import { FileImage, Plus, ChevronRight } from 'lucide-react';
 import { Patient, Investigation } from '../../types';
 import { useSignedUrl } from '../../hooks/useSignedUrl';
+import { isPdfPath } from '../../services/storageService';
 import { getModality } from '../radiology/modality';
 import Lightbox from '../radiology/Lightbox';
 
@@ -49,7 +51,7 @@ const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
     <div className="bg-surface-card rounded-2xl shadow-sm border border-line px-4 py-3 mb-3">
       <div className="flex items-center justify-between mb-2">
         <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint flex items-center gap-1.5">
-          <FileImage className="w-3.5 h-3.5" /> Radiology ({studies.length})
+          <FileImage className="w-3.5 h-3.5" /> Imaging & Reports ({studies.length})
           {pendingCount > 0 && (
             <span className="normal-case tracking-normal font-semibold text-vital-warning-fg">
               · {pendingCount} report{pendingCount > 1 ? 's' : ''} pending
@@ -70,7 +72,7 @@ const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
           className="w-full flex flex-col items-center justify-center gap-1.5 min-h-24 rounded-xl border-2 border-dashed border-line text-ink-muted hover:border-line hover:text-ink hover:bg-surface transition-colors"
         >
           <Plus className="w-5 h-5" />
-          <span className="text-xs font-semibold">Add imaging</span>
+          <span className="text-xs font-semibold">Add imaging or report</span>
         </button>
       ) : (
         <div className="rounded-xl bg-slate-900 overflow-hidden">
@@ -102,9 +104,11 @@ const StudyCard: React.FC<{ inv: Investigation; phase: Phase; onClick: () => voi
       {/* Film: dark well; radiographs read best on dark. Pulse while the signed URL resolves. */}
       <div className="h-24 rounded-lg overflow-hidden bg-slate-800 flex items-center justify-center">
         {inv.imageUrl
-          ? (signedUrl
-              ? <img src={signedUrl} alt={inv.type} className="w-full h-full object-cover" />
-              : <div className="w-full h-full animate-pulse bg-slate-700/60" />)
+          ? (isPdfPath(inv.imageUrl)
+              ? <Icon className="w-6 h-6 text-slate-300" />
+              : (signedUrl
+                  ? <img src={signedUrl} alt={inv.type} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full animate-pulse bg-slate-700/60" />))
           : <Icon className="w-6 h-6 text-slate-600" />}
       </div>
 
