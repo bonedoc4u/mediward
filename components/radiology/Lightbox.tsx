@@ -44,19 +44,28 @@ const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, 
       {/* Image / PDF */}
       <div className="flex-1 flex items-center justify-center p-4 overflow-hidden" onClick={onClose}>
         {inv.imageUrl ? (
-          signedUrl ? (
-            isPdfPath(inv.imageUrl) ? (
-              <a
-                href={signedUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                className="flex flex-col items-center gap-3 text-white/80 hover:text-white transition-colors"
-              >
-                <ExternalLink className="w-12 h-12" />
-                <span className="text-sm font-semibold">Open PDF in new tab</span>
-              </a>
-            ) : (
+          isPdfPath(inv.imageUrl) ? (
+            // Show the PDF's identity immediately — unlike an image, there's
+            // nothing to wait to render, so don't show the image-loading spinner
+            // just because the signed URL (needed only for the href) isn't back yet.
+            <div className="flex flex-col items-center gap-3 text-white/80">
+              <ExternalLink className="w-12 h-12" />
+              {signedUrl ? (
+                <a
+                  href={signedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="text-sm font-semibold hover:text-white transition-colors"
+                >
+                  Open PDF in new tab
+                </a>
+              ) : (
+                <span className="text-sm font-semibold text-white/50">Preparing link…</span>
+              )}
+            </div>
+          ) : (
+            signedUrl ? (
               <img
                 src={signedUrl}
                 alt={inv.type}
@@ -65,9 +74,9 @@ const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, 
                 onClick={e => e.stopPropagation()}
                 draggable={false}
               />
+            ) : (
+              <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
             )
-          ) : (
-            <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
           )
         ) : (
           <div className="text-white/30 text-center">
