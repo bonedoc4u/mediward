@@ -12,7 +12,8 @@
 import { supabase } from '../lib/supabase';
 import { generateId } from '../utils/sanitize';
 
-// Allowed image MIME types — anything else is rejected before upload
+// Allowed image MIME types, plus PDF for scanned/exported reports (e.g. culture
+// reports) — anything else is rejected before upload
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -20,6 +21,7 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/gif',
   'image/heic',
   'image/heif',
+  'application/pdf',
 ]);
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB pre-compression limit
@@ -35,11 +37,16 @@ const _urlCache = new Map<string, CachedUrl>();
 /** Validate MIME type against allowlist. Throws with user-friendly message on failure. */
 export function validateImageFile(file: File): void {
   if (!ALLOWED_MIME_TYPES.has(file.type)) {
-    throw new Error(`Unsupported file type "${file.type}". Please upload a JPEG, PNG, or WebP image.`);
+    throw new Error(`Unsupported file type "${file.type}". Please upload a JPEG, PNG, WebP image, or PDF.`);
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
     throw new Error(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum is 10 MB.`);
   }
+}
+
+/** Is the stored path/URL a PDF? Used to render a file icon instead of an image tag. */
+export function isPdfPath(pathOrUrl: string): boolean {
+  return pathOrUrl.toLowerCase().endsWith('.pdf');
 }
 
 /**
@@ -48,7 +55,7 @@ export function validateImageFile(file: File): void {
  * Falls back to original file if canvas is unavailable (SSR / test environments).
  */
 async function compressImage(file: File): Promise<File> {
-  if (file.type === 'image/gif') return file;
+  if (file.type === 'image/gif' || file.type === 'application/pdf') return file;
 
   return new Promise<File>((resolve) => {
     const img = new Image();
