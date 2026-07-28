@@ -885,7 +885,7 @@ const App: React.FC = () => {
                 <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-teal-600 rounded-full" />
               )}
               <tab.icon className="w-5 h-5" />
-              <span className="text-[10px] font-semibold leading-none">{tab.label}</span>
+              <span className="text-[10px] font-semibold leading-none truncate max-w-full px-0.5">{tab.label}</span>
             </button>
           ))}
           <button

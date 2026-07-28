@@ -43,7 +43,7 @@ const SOURCE_STYLE: Record<SourceSection, { badge: string; header: string; addBt
 /** Small tappable thumbnail strip of a patient's investigations — reuses the
  * same signed-URL resolution and fullscreen viewer already built for
  * radiology/culture reports, so X-rays, PDFs, etc. all just work here too. */
-const InvestigationThumb: React.FC<{ inv: Investigation; onClick: () => void }> = ({ inv, onClick }) => {
+export const InvestigationThumb: React.FC<{ inv: Investigation; onClick: () => void }> = ({ inv, onClick }) => {
   const cfg = getModality(inv.type);
   const Icon = cfg.Icon;
   const signedUrl = useSignedUrl(inv.imageUrl);
@@ -62,7 +62,7 @@ const InvestigationThumb: React.FC<{ inv: Investigation; onClick: () => void }> 
   );
 };
 
-const InvestigationThumbs: React.FC<{ investigations: Investigation[] }> = ({ investigations }) => {
+export const InvestigationThumbs: React.FC<{ investigations: Investigation[] }> = ({ investigations }) => {
   const [lightboxInv, setLightboxInv] = useState<Investigation | null>(null);
   if (investigations.length === 0) return null;
 
