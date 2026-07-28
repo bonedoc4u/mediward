@@ -300,7 +300,7 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
           ? patient.todos.filter(t => t.task?.trim())
           : (patient.dailyRounds?.find(r => r.date === selectedDate)?.todos ?? []);
 
-        const est = 14 + (displayTodos.length || 1) * 5.5 + 8;
+        const est = 16 + (displayTodos.length || 1) * 5.5;
         if (y + est > ph - 15) { doc.addPage(); y = 20; }
         if (idx % 2 === 0) {
           doc.setFillColor(248, 250, 252);
@@ -309,21 +309,13 @@ const DailyRounds: React.FC<Props> = ({ patients, onUpdatePatient, onSaveRound }
 
         doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42);
         doc.text(`Bed ${patient.bed}  —  ${patient.name}`, m + 2, y);
-        if (patient.pod !== undefined) {
-          doc.setFontSize(9); doc.setTextColor(37, 99, 235);
-          doc.text(`POD ${patient.pod}`, pw - m - 2, y, { align: 'right' });
-        }
         y += 5.5;
 
         doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(71, 85, 105);
-        doc.text(`${patient.age}y / ${patient.gender}  |  IP: ${patient.ipNo}  |  ${patient.pacStatus}`, m + 2, y); y += 4.5;
+        doc.text(`${patient.age}y / ${patient.gender}  |  IP: ${patient.ipNo}`, m + 2, y); y += 4.5;
 
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(30, 30, 30);
-        doc.text('Dx:', m + 2, y); doc.setFont('helvetica', 'normal');
-        const dxLines = doc.splitTextToSize(patient.diagnosis + (patient.procedure ? `  |  ${patient.procedure}` : ''), pw - m * 2 - 14);
-        doc.text(dxLines, m + 10, y); y += dxLines.length * 4.5 + 1;
-
-        doc.setFont('helvetica', 'bold'); doc.text('Orders / To-Do:', m + 2, y); y += 4.5;
+        doc.text('Orders / To-Do:', m + 2, y); y += 4.5;
         doc.setFont('helvetica', 'normal');
         if (!displayTodos.length) {
           doc.setFontSize(8); doc.setTextColor(150, 150, 150);
