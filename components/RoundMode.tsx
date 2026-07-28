@@ -8,7 +8,7 @@ import { hapticTap } from '../utils/capacitorInit';
 import {
   ChevronLeft, ChevronRight, X, CheckSquare, Square,
   AlertTriangle, Calendar, ClipboardCheck, Save, Plus, Scissors, Leaf, HeartPulse,
-  LogOut, Check
+  LogOut, Check, Trash2
 } from 'lucide-react';
 import PacFlowChart from './PacFlowChart';
 import { RoundModeOfflineBanner } from './RoundModeOfflineBanner';
@@ -203,6 +203,12 @@ const RoundMode: React.FC = () => {
       todos: patient.todos.map(t => t.id === todoId ? { ...t, isDone: !t.isDone } : t),
     };
     updatePatient(updatedPatient);
+  }, [patient, updatePatient]);
+
+  // ─── Delete todo ───
+  const handleDeleteTodo = useCallback((todoId: string) => {
+    if (!patient) return;
+    updatePatient({ ...patient, todos: patient.todos.filter(t => t.id !== todoId) });
   }, [patient, updatePatient]);
 
   // ─── Add new todo ───
@@ -706,24 +712,40 @@ const RoundMode: React.FC = () => {
 
             <div className="space-y-1.5 mb-2">
               {pendingTodos.map(todo => (
-                <button
-                  key={todo.id}
-                  onClick={() => handleToggleTodo(todo.id)}
-                  className="w-full flex items-center gap-2.5 text-sm text-left p-2.5 rounded-lg hover:bg-slate-50 transition-colors text-slate-700 border border-slate-200"
-                >
-                  <Square className="w-4 h-4 text-slate-400 shrink-0" />
-                  {todo.task}
-                </button>
+                <div key={todo.id} className="flex items-center rounded-lg border border-slate-200 overflow-hidden">
+                  <button
+                    onClick={() => handleToggleTodo(todo.id)}
+                    className="flex-1 min-w-0 flex items-center gap-2.5 text-sm text-left p-2.5 min-h-11 hover:bg-slate-50 transition-colors text-slate-700"
+                  >
+                    <Square className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="truncate">{todo.task}</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTodo(todo.id)}
+                    aria-label={`Delete task: ${todo.task}`}
+                    className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-slate-300 hover:text-red-500 active:text-red-600 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))}
               {doneTodos.map(todo => (
-                <button
-                  key={todo.id}
-                  onClick={() => handleToggleTodo(todo.id)}
-                  className="w-full flex items-center gap-2.5 text-sm text-left p-2.5 rounded-lg hover:bg-slate-50 transition-colors text-slate-400 line-through border border-slate-100"
-                >
-                  <CheckSquare className="w-4 h-4 text-green-500 shrink-0" />
-                  {todo.task}
-                </button>
+                <div key={todo.id} className="flex items-center rounded-lg border border-slate-100 overflow-hidden">
+                  <button
+                    onClick={() => handleToggleTodo(todo.id)}
+                    className="flex-1 min-w-0 flex items-center gap-2.5 text-sm text-left p-2.5 min-h-11 hover:bg-slate-50 transition-colors text-slate-400 line-through"
+                  >
+                    <CheckSquare className="w-4 h-4 text-green-500 shrink-0" />
+                    <span className="truncate">{todo.task}</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTodo(todo.id)}
+                    aria-label={`Delete task: ${todo.task}`}
+                    className="shrink-0 min-w-11 min-h-11 flex items-center justify-center text-slate-300 hover:text-red-500 active:text-red-600 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))}
             </div>
             {/* Add new todo — Enter submits and refocuses for next item */}
