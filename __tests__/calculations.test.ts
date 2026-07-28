@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate } from '../utils/calculations';
+import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort } from '../utils/calculations';
 import { PacStatus } from '../types';
 import type { Patient, WardConfig } from '../types';
 
@@ -188,5 +188,53 @@ describe('buildSurgeryUpdate (recording a new/second surgery)', () => {
       { procedure: 'DHS fixation', dos: '2026-06-01' },
       { procedure: 'Implant removal', dos: '2026-07-20' },
     ]);
+  });
+});
+
+describe('getAdmissionDayCohort (Admission List day cohort / Next-Previous patient navigation)', () => {
+  const p = (ipNo: string, doa: string, unit?: string): Patient => ({ ipNo, doa, unit } as Patient);
+
+  it('includes only patients admitted on the given date', () => {
+    const patients = [p('1', '2026-07-28'), p('2', '2026-07-27'), p('3', '2026-07-28')];
+    const cohort = getAdmissionDayCohort(patients, '2026-07-28').map(x => x.ipNo);
+    expect(cohort).toEqual(['1', '3']);
+  });
+
+  it('sorts by IP number ascending (earliest-admitted first)', () => {
+    const patients = [p('10', '2026-07-28'), p('2', '2026-07-28'), p('1', '2026-07-28')];
+    const cohort = getAdmissionDayCohort(patients, '2026-07-28').map(x => x.ipNo);
+    expect(cohort).toEqual(['1', '2', '10']);
+  });
+
+  it('falls back to lexicographic sort when an IP number is non-numeric', () => {
+    const patients = [p('B2', '2026-07-28'), p('A1', '2026-07-28'), p('3', '2026-07-28')];
+    const cohort = getAdmissionDayCohort(patients, '2026-07-28').map(x => x.ipNo);
+    expect(cohort).toEqual(['3', 'A1', 'B2']);
+  });
+
+  it('deduplicates by IP number', () => {
+    const patients = [p('1', '2026-07-28', 'OR1'), p('1', '2026-07-28', 'OR1')];
+    const cohort = getAdmissionDayCohort(patients, '2026-07-28').map(x => x.ipNo);
+    expect(cohort).toEqual(['1']);
+  });
+
+  it('excludes patients belonging to a different unit for a unit-scoped user', () => {
+    const patients = [p('1', '2026-07-28', 'OR1'), p('2', '2026-07-28', 'OR2')];
+    const cohort = getAdmissionDayCohort(patients, '2026-07-28', 'OR1').map(x => x.ipNo);
+    expect(cohort).toEqual(['1']);
+  });
+
+  it('includes every unit for an admin/ICU user (no unit passed)', () => {
+    const patients = [p('1', '2026-07-28', 'OR1'), p('2', '2026-07-28', 'OR2')];
+    const cohort = getAdmissionDayCohort(patients, '2026-07-28').map(x => x.ipNo);
+    expect(cohort).toEqual(['1', '2']);
+  });
+
+  it('keeps patients with no unit assigned visible to a unit-scoped user', () => {
+    // Deliberate current behaviour: only excludes a patient when BOTH the
+    // viewer and the patient have a unit and they differ (`if (unit && p.unit && ...)`).
+    const patients = [p('1', '2026-07-28', undefined)];
+    const cohort = getAdmissionDayCohort(patients, '2026-07-28', 'OR1').map(x => x.ipNo);
+    expect(cohort).toEqual(['1']);
   });
 });

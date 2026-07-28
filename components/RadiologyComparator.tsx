@@ -443,7 +443,10 @@ const RadiologyComparator: React.FC<Props> = ({
   const [uploadPhase, setUploadPhase]     = useState<RadPhase>('preop');
   const [isUploading, setIsUploading]     = useState(false);
   const [uploadError, setUploadError]     = useState<string | null>(null);
-  const [lightboxInv, setLightboxInv]     = useState<Investigation | null>(null);
+  // Next/Previous in the Lightbox browses within whichever section (pre-op or
+  // post-op) the clicked thumbnail belongs to, not the patient's full list —
+  // matches the visual grouping the user clicked from.
+  const [lightboxSource, setLightboxSource] = useState<{ scans: Investigation[]; index: number } | null>(null);
   const [showEditor, setShowEditor]       = useState(false);
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
@@ -667,11 +670,11 @@ const RadiologyComparator: React.FC<Props> = ({
           <div className="bg-white rounded-xl border border-blue-100 p-4">
             <SectionHeader phase="preop" count={preOpScans.length} patient={selectedPatient} scans={preOpScans} />
             <div className="grid grid-cols-3 gap-2">
-              {preOpScans.map(inv => (
+              {preOpScans.map((inv, i) => (
                 <ImageCard
                   key={inv.id}
                   inv={inv}
-                  onClick={() => setLightboxInv(inv)}
+                  onClick={() => setLightboxSource({ scans: preOpScans, index: i })}
                   onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                 />
               ))}
@@ -684,11 +687,11 @@ const RadiologyComparator: React.FC<Props> = ({
             <div className="bg-white rounded-xl border border-teal-100 p-4">
               <SectionHeader phase="postop" count={postOpScans.length} patient={selectedPatient} scans={postOpScans} />
               <div className="grid grid-cols-3 gap-2">
-                {postOpScans.map(inv => (
+                {postOpScans.map((inv, i) => (
                   <ImageCard
                     key={inv.id}
                     inv={inv}
-                    onClick={() => setLightboxInv(inv)}
+                    onClick={() => setLightboxSource({ scans: postOpScans, index: i })}
                     onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                   />
                 ))}
@@ -764,8 +767,12 @@ const RadiologyComparator: React.FC<Props> = ({
       )}
 
       {/* Fullscreen lightbox */}
-      {lightboxInv && (
-        <Lightbox inv={lightboxInv} onClose={() => setLightboxInv(null)} />
+      {lightboxSource && (
+        <Lightbox
+          investigations={lightboxSource.scans}
+          initialIndex={lightboxSource.index}
+          onClose={() => setLightboxSource(null)}
+        />
       )}
     </div>
   );

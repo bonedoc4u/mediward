@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { ClipboardList, Plus, Pencil, ChevronLeft, ChevronRight, Trash2, AlertTriangle, FileDown, Loader2 } from 'lucide-react';
+import { ClipboardList, Plus, Pencil, ChevronLeft, ChevronRight, Trash2, AlertTriangle, FileDown, Loader2, Table2, LayoutGrid, Eye } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Patient, Investigation } from '../types';
 import { localYmd, todayYmd } from '../utils/dates';
+import { getAdmissionDayCohort } from '../utils/calculations';
 import { exportAdmissionListPDF } from '../utils/exportAdmissionList';
 import { toast } from '../utils/toast';
 import { getModality } from './radiology/modality';
@@ -15,6 +16,21 @@ interface Props {
   onAddPatient?: (source: 'OPD' | 'Casualty', doa?: string) => void;
   onEditPatient?: (patient: Patient) => void;
   onDeletePatient?: (patient: Patient) => void;
+  onViewPatient?: (ipNo: string) => void;
+}
+
+type ViewMode = 'table' | 'cards';
+const VIEW_MODE_KEY = 'mediward_admission_view_mode';
+
+function loadViewMode(): ViewMode {
+  try {
+    const raw = localStorage.getItem(VIEW_MODE_KEY);
+    return raw === 'table' || raw === 'cards' ? raw : 'cards';
+  } catch { return 'cards'; }
+}
+
+function saveViewMode(mode: ViewMode) {
+  try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore */ }
 }
 
 function todayStr() {
@@ -63,17 +79,19 @@ export const InvestigationThumb: React.FC<{ inv: Investigation; onClick: () => v
 };
 
 export const InvestigationThumbs: React.FC<{ investigations: Investigation[] }> = ({ investigations }) => {
-  const [lightboxInv, setLightboxInv] = useState<Investigation | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   if (investigations.length === 0) return null;
 
   return (
     <>
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        {investigations.map(inv => (
-          <InvestigationThumb key={inv.id} inv={inv} onClick={() => setLightboxInv(inv)} />
+        {investigations.map((inv, i) => (
+          <InvestigationThumb key={inv.id} inv={inv} onClick={() => setLightboxIndex(i)} />
         ))}
       </div>
-      {lightboxInv && <Lightbox inv={lightboxInv} onClose={() => setLightboxInv(null)} />}
+      {lightboxIndex !== null && (
+        <Lightbox investigations={investigations} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+      )}
     </>
   );
 };
@@ -83,10 +101,12 @@ const AdmissionListTable: React.FC<{
   patients: Patient[];
   date: string;
   unit?: string;
+  viewMode: ViewMode;
   onAdd?: () => void;
   onEdit?: (p: Patient) => void;
   onDelete?: (p: Patient) => void;
-}> = ({ source, patients, date, unit, onAdd, onEdit, onDelete }) => {
+  onView?: (ipNo: string) => void;
+}> = ({ source, patients, date, unit, viewMode, onAdd, onEdit, onDelete, onView }) => {
   const style = SOURCE_STYLE[source];
   const [confirmIpNo, setConfirmIpNo] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -155,8 +175,9 @@ const AdmissionListTable: React.FC<{
         </div>
       ) : (
         <>
-          {/* Desktop: fixed-width table (also the layout the PDF export mirrors) */}
-          <div className="hidden md:block overflow-x-auto bg-white">
+          {viewMode === 'table' && (
+          /* Compact table (also the layout the PDF export mirrors) */
+          <div className="overflow-x-auto bg-white">
             {/* table-fixed forces the browser to honour the colgroup widths strictly.
                 Without it, the auto layout expands Name and squeezes Diagnosis. */}
             <table className="w-full min-w-[860px] text-sm table-fixed">
@@ -185,7 +206,15 @@ const AdmissionListTable: React.FC<{
                   <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
                     <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
                     <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
-                    <td className="px-3 py-3 font-semibold text-slate-800 break-words">{p.name}</td>
+                    <td className="px-3 py-3 font-semibold break-words">
+                      {onView ? (
+                        <button type="button" onClick={() => onView(p.ipNo)} className="min-h-11 flex items-center text-accent-fg hover:text-accent-pressed hover:underline text-left">
+                          {p.name}
+                        </button>
+                      ) : (
+                        <span className="text-slate-800">{p.name}</span>
+                      )}
+                    </td>
                     <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
                       {p.age}<span className="text-slate-400 mx-0.5">/</span>
                       <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
@@ -198,25 +227,35 @@ const AdmissionListTable: React.FC<{
                           <button
                             type="button"
                             onClick={() => handleConfirmDelete(p)}
-                            className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                            className="flex items-center gap-1 px-2 min-h-11 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
                           >
                             <AlertTriangle className="w-3 h-3" /> Delete
                           </button>
                           <button
                             type="button"
                             onClick={() => setConfirmIpNo(null)}
-                            className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                            className="px-2 min-h-11 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
                           >
                             Cancel
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
+                          {onView && (
+                            <button
+                              type="button"
+                              onClick={() => onView(p.ipNo)}
+                              className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-accent-fg hover:bg-accent-soft rounded-lg transition-colors"
+                              title="View details"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {onEdit && (
                             <button
                               type="button"
                               onClick={() => onEdit(p)}
-                              className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                              className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                               title="Edit patient"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -226,7 +265,7 @@ const AdmissionListTable: React.FC<{
                             <button
                               type="button"
                               onClick={() => handleDeleteClick(p)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Remove from list"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -240,17 +279,25 @@ const AdmissionListTable: React.FC<{
               </tbody>
             </table>
           </div>
+          )}
 
-          {/* Mobile: card list with inline imaging thumbnails — for walking
-              through admissions + X-rays with the unit chief before rounds */}
-          <div className="md:hidden divide-y divide-slate-100 bg-white">
+          {viewMode === 'cards' && (
+          /* Card list with inline imaging thumbnails — for walking through
+              admissions + X-rays with the unit chief before rounds */
+          <div className="divide-y divide-slate-100 bg-white">
             {patients.map((p, idx) => (
               <div key={p.ipNo} className={`p-3 space-y-2 ${confirmIpNo === p.ipNo ? 'bg-red-50' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-xs text-slate-400 font-mono shrink-0">#{idx + 1}</span>
-                      <span className="font-semibold text-slate-800 truncate">{p.name}</span>
+                      {onView ? (
+                        <button type="button" onClick={() => onView(p.ipNo)} className="font-semibold text-accent-fg hover:text-accent-pressed hover:underline truncate text-left">
+                          {p.name}
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-slate-800 truncate">{p.name}</span>
+                      )}
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5">
                       <span className="font-mono">IP {p.ipNo}</span> · {p.age}/
@@ -278,6 +325,16 @@ const AdmissionListTable: React.FC<{
                       </>
                     ) : (
                       <>
+                        {onView && (
+                          <button
+                            type="button"
+                            onClick={() => onView(p.ipNo)}
+                            aria-label={`View ${p.name}'s full details`}
+                            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-accent-fg hover:bg-accent-soft rounded-lg transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
                         {onEdit && (
                           <button
                             type="button"
@@ -307,6 +364,7 @@ const AdmissionListTable: React.FC<{
               </div>
             ))}
           </div>
+          )}
         </>
       )}
     </div>
@@ -315,9 +373,11 @@ const AdmissionListTable: React.FC<{
 
 const OtherAdmissionsTable: React.FC<{
   patients: Patient[];
+  viewMode: ViewMode;
   onEdit?: (p: Patient) => void;
   onDelete?: (p: Patient) => void;
-}> = ({ patients, onEdit, onDelete }) => {
+  onView?: (ipNo: string) => void;
+}> = ({ patients, viewMode, onEdit, onDelete, onView }) => {
   const [confirmIpNo, setConfirmIpNo] = useState<string | null>(null);
   return (
     <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -325,7 +385,8 @@ const OtherAdmissionsTable: React.FC<{
         <span className="text-sm font-semibold">Other admissions (no source set)</span>
         <span className="text-xs text-slate-400">{patients.length}</span>
       </div>
-      <div className="hidden md:block overflow-x-auto bg-white">
+      {viewMode === 'table' && (
+      <div className="overflow-x-auto bg-white">
         <table className="w-full min-w-[860px] text-sm table-fixed">
           <colgroup>
             <col className="w-10" />
@@ -352,7 +413,15 @@ const OtherAdmissionsTable: React.FC<{
               <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
                 <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
                 <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
-                <td className="px-3 py-3 font-semibold text-slate-800 break-words">{p.name}</td>
+                <td className="px-3 py-3 font-semibold break-words">
+                  {onView ? (
+                    <button type="button" onClick={() => onView(p.ipNo)} className="min-h-11 flex items-center text-accent-fg hover:text-accent-pressed hover:underline text-left">
+                      {p.name}
+                    </button>
+                  ) : (
+                    <span className="text-slate-800">{p.name}</span>
+                  )}
+                </td>
                 <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
                   {p.age}<span className="text-slate-400 mx-0.5">/</span>
                   <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
@@ -363,25 +432,31 @@ const OtherAdmissionsTable: React.FC<{
                   {confirmIpNo === p.ipNo ? (
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => { setConfirmIpNo(null); onDelete?.(p); }}
-                        className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                        className="flex items-center gap-1 px-2 min-h-11 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
                         <AlertTriangle className="w-3 h-3" /> Delete
                       </button>
                       <button type="button" onClick={() => setConfirmIpNo(null)}
-                        className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors">
+                        className="px-2 min-h-11 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors">
                         Cancel
                       </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1">
+                      {onView && (
+                        <button type="button" onClick={() => onView(p.ipNo)}
+                          className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-accent-fg hover:bg-accent-soft rounded-lg transition-colors" title="View details">
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       {onEdit && (
                         <button type="button" onClick={() => onEdit(p)}
-                          className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Edit">
+                          className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Edit">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                       )}
                       {onDelete && (
                         <button type="button" onClick={() => setConfirmIpNo(p.ipNo)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove from list">
+                          className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove from list">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -393,15 +468,23 @@ const OtherAdmissionsTable: React.FC<{
           </tbody>
         </table>
       </div>
+      )}
 
-      <div className="md:hidden divide-y divide-slate-100 bg-white">
+      {viewMode === 'cards' && (
+      <div className="divide-y divide-slate-100 bg-white">
         {patients.map((p, idx) => (
           <div key={p.ipNo} className={`p-3 space-y-2 ${confirmIpNo === p.ipNo ? 'bg-red-50' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-xs text-slate-400 font-mono shrink-0">#{idx + 1}</span>
-                  <span className="font-semibold text-slate-800 truncate">{p.name}</span>
+                  {onView ? (
+                    <button type="button" onClick={() => onView(p.ipNo)} className="font-semibold text-accent-fg hover:text-accent-pressed hover:underline truncate text-left">
+                      {p.name}
+                    </button>
+                  ) : (
+                    <span className="font-semibold text-slate-800 truncate">{p.name}</span>
+                  )}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
                   <span className="font-mono">IP {p.ipNo}</span> · {p.age}/
@@ -423,6 +506,12 @@ const OtherAdmissionsTable: React.FC<{
                   </>
                 ) : (
                   <>
+                    {onView && (
+                      <button type="button" onClick={() => onView(p.ipNo)} aria-label={`View ${p.name}'s full details`}
+                        className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-accent-fg hover:bg-accent-soft rounded-lg transition-colors">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    )}
                     {onEdit && (
                       <button type="button" onClick={() => onEdit(p)} aria-label={`Edit ${p.name}`}
                         className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">
@@ -444,35 +533,33 @@ const OtherAdmissionsTable: React.FC<{
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 };
 
-const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeletePatient }) => {
+const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeletePatient, onViewPatient }) => {
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  // Remembered across sessions — a chief walkthrough on a laptop wants cards
+  // with imaging; a quick check on a phone might want the denser table.
+  // Applies to every section uniformly (not toggled per OPD/Casualty/Other).
+  const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode);
+  const changeViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    saveViewMode(mode);
+  };
   const { patients } = usePatients();
   const { user } = useAuth();
 
   const isToday = selectedDate === todayStr();
 
-  // Filter by date and unit, deduplicate, then sort by IP No ascending
-  // so the earliest-admitted patient is always SL 1.
-  const dayPatients = useMemo(() => {
-    const seen = new Set<string>();
-    return patients
-      .filter(p => {
-        if (p.doa !== selectedDate) return false;
-        if (user?.unit && p.unit && p.unit !== user.unit) return false;
-        if (seen.has(p.ipNo)) return false;
-        seen.add(p.ipNo);
-        return true;
-      })
-      .sort((a, b) => {
-        const an = parseInt(a.ipNo, 10);
-        const bn = parseInt(b.ipNo, 10);
-        return isNaN(an) || isNaN(bn) ? a.ipNo.localeCompare(b.ipNo) : an - bn;
-      });
-  }, [patients, selectedDate, user?.unit]);
+  // Same logic App.tsx uses to compute Next/Previous-patient navigation when
+  // viewing a patient's detail from this list — kept in one shared place
+  // (utils/calculations.ts) so the two can't drift out of sync.
+  const dayPatients = useMemo(
+    () => getAdmissionDayCohort(patients, selectedDate, user?.unit),
+    [patients, selectedDate, user?.unit],
+  );
 
   const byIpAsc = (a: Patient, b: Patient) => parseInt(a.ipNo, 10) - parseInt(b.ipNo, 10);
 
@@ -484,7 +571,7 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
     <div className="space-y-4 pb-24">
       {/* Header bar */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-        {/* Row 1: title */}
+        {/* Row 1: title + view toggle */}
         <div className="flex items-center gap-2">
           <ClipboardList className="w-5 h-5 text-teal-600 shrink-0" />
           <div className="flex-1 min-w-0">
@@ -492,6 +579,32 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
             {user?.unit && (
               <p className="text-xs text-slate-500">{user.unit}</p>
             )}
+          </div>
+          <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => changeViewMode('cards')}
+              aria-pressed={viewMode === 'cards'}
+              aria-label="Card view with imaging"
+              title="Card view with imaging"
+              className={`min-w-11 min-h-11 flex items-center justify-center rounded-md transition-colors ${
+                viewMode === 'cards' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => changeViewMode('table')}
+              aria-pressed={viewMode === 'table'}
+              aria-label="Compact table view"
+              title="Compact table view"
+              className={`min-w-11 min-h-11 flex items-center justify-center rounded-md transition-colors ${
+                viewMode === 'table' ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Table2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -558,9 +671,11 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
         patients={opdPatients}
         date={selectedDate}
         unit={user?.unit}
+        viewMode={viewMode}
         onAdd={onAddPatient ? () => onAddPatient('OPD', selectedDate) : undefined}
         onEdit={onEditPatient}
         onDelete={onDeletePatient}
+        onView={onViewPatient}
       />
 
       {/* Casualty section */}
@@ -569,15 +684,19 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
         patients={casualtyPatients}
         date={selectedDate}
         unit={user?.unit}
+        viewMode={viewMode}
         onAdd={onAddPatient ? () => onAddPatient('Casualty', selectedDate) : undefined}
         onEdit={onEditPatient}
         onDelete={onDeletePatient}
+        onView={onViewPatient}
       />
 
       {/* Patients without a source */}
       {otherPatients.length > 0 && (
         <OtherAdmissionsTable
           patients={otherPatients}
+          viewMode={viewMode}
+          onView={onViewPatient}
           onEdit={onEditPatient}
           onDelete={onDeletePatient}
         />

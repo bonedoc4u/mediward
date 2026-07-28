@@ -14,15 +14,26 @@ interface Props {
   open: boolean;
   patientId?: string;
   onClose: () => void;
+  onPrevPatient?: () => void;
+  onNextPatient?: () => void;
 }
 
-const PatientSheet: React.FC<Props> = ({ open, patientId, onClose }) => (
+const PatientSheet: React.FC<Props> = ({ open, patientId, onClose, onPrevPatient, onNextPatient }) => (
   <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
     <SheetContent side="right" hideClose aria-describedby={undefined}>
       {/* Radix requires a title for a11y; the visible name lives in the header. */}
       <SheetTitle className="sr-only">Patient details</SheetTitle>
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8">
-        {patientId && <PatientDetail patientId={patientId} onClose={onClose} inSheet />}
+        {patientId && (
+          <PatientDetail
+            key={patientId}
+            patientId={patientId}
+            onClose={onClose}
+            inSheet
+            onPrevPatient={onPrevPatient}
+            onNextPatient={onNextPatient}
+          />
+        )}
       </div>
     </SheetContent>
   </Sheet>

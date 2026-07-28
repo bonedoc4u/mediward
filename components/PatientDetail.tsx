@@ -8,7 +8,7 @@ import {
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   Download, Pill, ClipboardList, Droplets, Bandage,
-  Send, ChevronDown, Home, ArrowRightLeft, Pencil, Plus, Leaf,
+  Send, ChevronDown, ChevronLeft, ChevronRight, Home, ArrowRightLeft, Pencil, Plus, Leaf,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import DateBottomSheet from './ui/DateBottomSheet';
@@ -60,9 +60,15 @@ interface PatientDetailProps {
   onClose?: () => void;
   /** Layout hint — trims chrome the sheet already provides (e.g. its own close). */
   inSheet?: boolean;
+  /** Move to the previous/next patient in whatever cohort this detail view
+   *  was opened from (e.g. Admission List's same-day patients), without
+   *  returning to the list first. Omitted entirely when the caller has no
+   *  such cohort to page through. */
+  onPrevPatient?: () => void;
+  onNextPatient?: () => void;
 }
 
-const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inSheet }) => {
+const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inSheet, onPrevPatient, onNextPatient }) => {
   const { navParams, navigateTo, patients, updatePatient, addSurgery, deletePatient, user } = useApp();
   const effectiveId = patientId ?? navParams.id;
   // In a sheet we close it; on the full route we navigate back to the dashboard.
@@ -176,13 +182,38 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       {/* ─── DARK HEADER CARD ──────────────────────────────────────────── */}
       <div className="bg-accent rounded-b-3xl overflow-hidden mb-4 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-2 pb-6">
 
-        {/* Back / close — sits top-left, clear of the status badges top-right */}
-        <button
-          onClick={dismiss}
-          className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
-        >
-          <ArrowLeft className="w-4 h-4" /> {inSheet ? 'Close' : 'Dashboard'}
-        </button>
+        {/* Back / close — sits top-left, clear of the status badges top-right.
+            Prev/Next (only when opened from a page-able list, e.g. Admission
+            List) sit top-right of this row so a chief walkthrough can page
+            through the day's patients without returning to the list each time. */}
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={dismiss}
+            className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
+          >
+            <ArrowLeft className="w-4 h-4" /> {inSheet ? 'Close' : 'Dashboard'}
+          </button>
+          {(onPrevPatient || onNextPatient) && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onPrevPatient}
+                disabled={!onPrevPatient}
+                aria-label="Previous patient"
+                className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={onNextPatient}
+                disabled={!onNextPatient}
+                aria-label="Next patient"
+                className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Name row + Status badges */}
         <div className="flex items-start justify-between gap-3 mb-1.5">
