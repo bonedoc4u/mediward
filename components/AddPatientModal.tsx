@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeyboardAwareView } from './ui/KeyboardAwareView';
 import { Patient, Gender, PacStatus, PatientStatus, Ward, AdmissionSource } from '../types';
-import { useConfig, useAuth } from '../contexts/AppContext';
+import { useConfig, useAuth, usePatients } from '../contexts/AppContext';
 import { X, Save, UserPlus, Pencil, Loader2, ScanLine, Settings2, AlertTriangle } from 'lucide-react';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { supabase } from '../lib/supabase';
@@ -107,7 +107,20 @@ async function compressImageBase64(
 const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData, defaultAdmissionSource, defaultDoa, viewingUnit }) => {
   const { wards, unitOptions } = useConfig();
   const { user } = useAuth();
+  const { renamePatientIpNo } = usePatients();
   const { comorbidityMap, saveComorbidityMap } = useComorbidityPresets();
+
+  // ─── "Fix IP number" — edit mode only; the field itself stays locked ───
+  const [showFixIpNo, setShowFixIpNo] = useState(false);
+  const [newIpNoValue, setNewIpNoValue] = useState('');
+  const [fixIpNoBusy, setFixIpNoBusy] = useState(false);
+  const [fixIpNoError, setFixIpNoError] = useState<string | null>(null);
+  // Tracks the patient's current optimistic-lock version independently of
+  // initialData (a snapshot taken when the modal opened, never refreshed).
+  // A rename bumps the DB version via trigger — if Save later sent
+  // initialData's stale value, upsertPatient's conditional update would
+  // match 0 rows and get misreported as a conflict with another user.
+  const [currentVersion, setCurrentVersion] = useState<number | undefined>(initialData?.version);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
@@ -201,6 +214,23 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       admissionSource: defaultAdmissionSource ?? '',
     };
   });
+
+  const handleFixIpNo = async () => {
+    const trimmed = newIpNoValue.trim();
+    if (!trimmed || trimmed === formData.ipNo) return;
+    setFixIpNoBusy(true);
+    setFixIpNoError(null);
+    try {
+      const newVersion = await renamePatientIpNo(formData.ipNo, trimmed);
+      setFormData(prev => ({ ...prev, ipNo: trimmed }));
+      setCurrentVersion(newVersion);
+      setShowFixIpNo(false);
+    } catch (err) {
+      setFixIpNoError(err instanceof Error ? err.message : 'Failed to change IP number.');
+    } finally {
+      setFixIpNoBusy(false);
+    }
+  };
 
   const [step, setStepRaw] = useState<number>(() => {
     if (initialData) return 1;
@@ -584,6 +614,9 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ward: formData.ward,
       unit: (!isAdmin && user?.unit) ? user.unit : (formData.unit || undefined),
       ipNo: formData.ipNo,
+      // Overrides initialData's version — which is a snapshot from when the
+      // modal opened and never refreshes — in case "Fix IP number" bumped it.
+      version: currentVersion,
       name: formData.name,
       age: parseInt(formData.age) || 0,
       gender: formData.gender,
@@ -832,6 +865,54 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                     disabled={!!initialData}
                     onChange={e => setFormData({...formData, ipNo: e.target.value})}
                   />
+                  {initialData && (
+                    !showFixIpNo ? (
+                      <button
+                        type="button"
+                        onClick={() => { setShowFixIpNo(true); setNewIpNoValue(formData.ipNo); setFixIpNoError(null); }}
+                        className="mt-1 text-xs font-semibold text-teal-600 hover:text-teal-800"
+                      >
+                        Fix IP number
+                      </button>
+                    ) : (
+                      <div className="mt-1.5 p-2.5 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                        <p className="text-[11px] text-amber-800 leading-snug">
+                          This permanently changes the patient's IP number and moves all their linked
+                          labs, imaging, and rounds to the new number. Cannot be undone.
+                        </p>
+                        <input
+                          type="text"
+                          value={newIpNoValue}
+                          onChange={e => setNewIpNoValue(e.target.value)}
+                          placeholder="New IP number"
+                          disabled={fixIpNoBusy}
+                          className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-amber-500 outline-none disabled:opacity-50"
+                        />
+                        {fixIpNoError && (
+                          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{fixIpNoError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleFixIpNo}
+                            disabled={fixIpNoBusy || !newIpNoValue.trim() || newIpNoValue.trim() === formData.ipNo}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white text-xs font-bold rounded-lg transition-colors"
+                          >
+                            {fixIpNoBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            Confirm change
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowFixIpNo(false); setFixIpNoError(null); }}
+                            disabled={fixIpNoBusy}
+                            className="px-3 py-2 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">

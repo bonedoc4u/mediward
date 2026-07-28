@@ -17,6 +17,9 @@ vi.mock('../contexts/AppContext', () => ({
   useAuth: () => ({
     user: { id: 'u1', name: 'Test Doc', role: 'resident', unit: 'OR2', hospitalId: 'h1' },
   }),
+  usePatients: () => ({
+    renamePatientIpNo: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 vi.mock('../hooks/useComorbidityPresets', () => ({
   useComorbidityPresets: () => ({ comorbidityMap: {}, saveComorbidityMap: vi.fn() }),

@@ -520,6 +520,26 @@ export async function restorePatient(ipNo: string): Promise<void> {
 }
 
 /**
+ * Correct a patient's IP number after the fact. ip_no is the primary key and
+ * is referenced by 12 clinical tables, so this cannot go through a normal
+ * update — it calls the rename_patient_ip_no SECURITY DEFINER RPC, which
+ * validates hospital ownership and new-number uniqueness, then updates
+ * patients.ip_no inside one transaction (the FKs cascade every linked
+ * record). Throws with a message suitable for direct display to the user.
+ * Returns the patient's new `version` (bumped by the rename) — the caller
+ * MUST apply this to its cached patient or the next save on this patient
+ * will be misreported as a conflict with another user.
+ */
+export async function renamePatientIpNo(oldIpNo: string, newIpNo: string): Promise<number | undefined> {
+  const { data, error } = await supabase.rpc('rename_patient_ip_no', {
+    p_old_ip_no: oldIpNo,
+    p_new_ip_no: newIpNo,
+  });
+  if (error) throw new Error(error.message);
+  return data as number | undefined;
+}
+
+/**
  * DPDP Act 2023 — Right to Erasure (§13)
  * Anonymises all PII fields for a patient record and deletes linked
  * labs, imaging, rounds and nursing_notes rows.

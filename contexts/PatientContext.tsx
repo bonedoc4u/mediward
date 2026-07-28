@@ -32,7 +32,7 @@ import { logAuditEvent } from '../services/auditLog';
 import {
   fetchActivePatients, fetchActivePatientsPage, fetchAllPatients,
   upsertPatient, removePatient, PATIENT_PAGE_SIZE,
-  fetchPatientById,
+  fetchPatientById, renamePatientIpNo as renamePatientIpNoService,
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
@@ -81,6 +81,14 @@ interface PatientContextType {
   addSurgery: (ipNo: string, newProcedure: string, newDos: string) => void;
   addPatient: (patient: Patient) => void;
   deletePatient: (ipNo: string) => void;
+  /** Corrects a patient's IP number after the fact (e.g. a typo caught after
+   *  admission). Unlike other mutations, this awaits the server result before
+   *  touching local state — a duplicate/permission failure must not appear
+   *  to succeed. Throws with a user-displayable message on failure. Returns
+   *  the patient's new `version` — callers holding their own snapshot of the
+   *  patient (e.g. an open edit form) MUST apply it before their next save,
+   *  or that save will be misreported as a conflict with another user. */
+  renamePatientIpNo: (oldIpNo: string, newIpNo: string) => Promise<number | undefined>;
   addLabResult: (patientId: string, result: LabResult) => void;
   addInvestigation: (patientId: string, inv: Investigation) => void;
   deleteInvestigation: (patientId: string, invId: string) => void;
@@ -560,19 +568,36 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   return next;
                 });
               } else {
+                // patients.ip_no is the primary key; REPLICA IDENTITY DEFAULT
+                // means an UPDATE that changes it carries the OLD ip_no in
+                // payload.old (needed to identify which row changed) — so we
+                // detect a rename by comparing values, not by presence alone.
+                const oldIpNo = (payload.old as { ip_no?: string } | null)?.ip_no;
+                const renamed = !!oldIpNo && oldIpNo !== fresh.ipNo;
                 setPatients(prev => {
+                  const currentEntry = prev.find(p => p.ipNo === fresh.ipNo);
+                  const oldEntry = renamed ? prev.find(p => p.ipNo === oldIpNo) : undefined;
+                  const source = currentEntry ?? oldEntry;
+                  // Neither this patient's current nor (for a rename) former key
+                  // is in this device's list at all — e.g. a colleague edited a
+                  // patient outside this device's loaded page or unit filter.
+                  // Stay a no-op, same as before a rename could ever occur here;
+                  // the INSERT branch above is what handles a genuinely new
+                  // patient entering this device's scope.
+                  if (!source) return prev;
+                  // Merge: keep locally-loaded sub-records (labs, imaging, rounds)
+                  const merged = {
+                    ...fresh,
+                    labResults:     source.labResults,
+                    investigations: source.investigations,
+                    dailyRounds:    source.dailyRounds,
+                    vitals:         source.vitals,
+                  };
+                  const withoutStaleEntry = oldEntry ? prev.filter(p => p.ipNo !== oldIpNo) : prev;
                   const next = enrichPatientData(
-                    prev.map(p => {
-                      if (p.ipNo !== fresh.ipNo) return p;
-                      // Merge: keep locally-loaded sub-records (labs, imaging, rounds)
-                      return {
-                        ...fresh,
-                        labResults:     p.labResults,
-                        investigations: p.investigations,
-                        dailyRounds:    p.dailyRounds,
-                        vitals:         p.vitals,
-                      };
-                    }),
+                    currentEntry
+                      ? withoutStaleEntry.map(p => p.ipNo === fresh.ipNo ? merged : p)
+                      : [merged, ...withoutStaleEntry],
                   );
                   debouncedSaveActiveCache(next, effectiveHospitalId);
                   return next;
@@ -861,6 +886,26 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [user, patients]);
 
+  const renamePatientIpNo = useCallback(async (oldIpNo: string, newIpNo: string) => {
+    // Await the server result first — a duplicate/permission failure must
+    // reject cleanly, not appear to have applied. The RPC logs its own audit
+    // entry server-side (atomic with the rename), so no client-side
+    // logAuditEvent call here — that would double-log.
+    const newVersion = await renamePatientIpNoService(oldIpNo, newIpNo);
+    setPatients(prev => {
+      const next = enrichPatientData(
+        prev.map(p => p.ipNo === oldIpNo ? { ...p, ipNo: newIpNo, version: newVersion ?? p.version } : p),
+      );
+      saveActiveCache(next, effectiveHospitalId);
+      return next;
+    });
+    // The caller (e.g. AddPatientModal, still holding a pre-rename snapshot
+    // in its own local state) MUST apply this too — otherwise its next Save
+    // sends the stale version and gets a false "modified by another user"
+    // conflict, since the DB's version was just bumped by this rename.
+    return newVersion;
+  }, [effectiveHospitalId]);
+
   const addLabResult = useCallback((patientId: string, result: LabResult) => {
     setPatients(prev => {
       const next = prev.map(p =>
@@ -1052,6 +1097,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addSurgery,
     addPatient,
     deletePatient,
+    renamePatientIpNo,
     addLabResult,
     addInvestigation,
     deleteInvestigation,
@@ -1067,7 +1113,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     patients, isLoadingPatients, isStale, cacheTimestamp,
     hasMore, isLoadingMore, loadMorePatients,
     hasLoadedAll, loadAllPatients, updatePatient, addSurgery, addPatient, deletePatient,
-    addLabResult, addInvestigation, deleteInvestigation, getPatient,
+    renamePatientIpNo, addLabResult, addInvestigation, deleteInvestigation, getPatient,
     saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
     realtimeStatus, forceReconnect, sessionExpired,
   ]);
