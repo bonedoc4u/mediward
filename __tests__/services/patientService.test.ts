@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockState = vi.hoisted(() => ({
   result: { data: [] as any[] | null, error: null as any },
-  rpcResult: { error: null as any },
+  rpcResult: { data: null as any, error: null as any },
 }));
 
 vi.mock('../../lib/supabase', () => {
@@ -100,7 +100,7 @@ const makePatient = (overrides: Partial<Patient> = {}): Patient => ({
 
 beforeEach(() => {
   mockState.result = { data: [], error: null };
-  mockState.rpcResult = { error: null };
+  mockState.rpcResult = { data: null, error: null };
   vi.clearAllMocks();
   // Re-apply the chainable mock after clearAllMocks resets spies
   const createBuilder = () => {
@@ -391,7 +391,7 @@ describe('removePatient', () => {
 
 describe('renamePatientIpNo', () => {
   it('calls the rename_patient_ip_no RPC with the old and new IP numbers', async () => {
-    mockState.rpcResult = { error: null };
+    mockState.rpcResult = { data: 5, error: null };
     await renamePatientIpNo('IP001', 'IP999');
     expect(supabase.rpc).toHaveBeenCalledWith('rename_patient_ip_no', {
       p_old_ip_no: 'IP001',
@@ -399,13 +399,16 @@ describe('renamePatientIpNo', () => {
     });
   });
 
-  it('resolves without throwing on success', async () => {
-    mockState.rpcResult = { error: null };
-    await expect(renamePatientIpNo('IP001', 'IP999')).resolves.toBeUndefined();
+  it('resolves with the new post-rename version on success', async () => {
+    // The version is bumped by the DB trigger on every UPDATE; the caller
+    // MUST apply it, or the next save on this patient would be misreported
+    // as a conflict with another user (stale optimistic-lock comparison).
+    mockState.rpcResult = { data: 7, error: null };
+    await expect(renamePatientIpNo('IP001', 'IP999')).resolves.toBe(7);
   });
 
   it('surfaces the server error message (e.g. duplicate IP, permission denied)', async () => {
-    mockState.rpcResult = { error: { message: 'IP number IP999 is already in use' } };
+    mockState.rpcResult = { data: null, error: { message: 'IP number IP999 is already in use' } };
     await expect(renamePatientIpNo('IP001', 'IP999')).rejects.toThrow('IP number IP999 is already in use');
   });
 });

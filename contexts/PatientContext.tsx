@@ -565,19 +565,30 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   return next;
                 });
               } else {
+                // patients.ip_no is the primary key; REPLICA IDENTITY DEFAULT means
+                // an UPDATE that changes it carries the OLD ip_no in payload.old
+                // (needed to identify which row changed). A plain field edit does
+                // NOT change the identity column, so payload.old is absent there —
+                // this only ever fires for a real rename.
+                const oldIpNo = (payload.old as { ip_no?: string } | null)?.ip_no;
                 setPatients(prev => {
+                  const renamed = oldIpNo && oldIpNo !== fresh.ipNo;
+                  const source = prev.find(p => p.ipNo === fresh.ipNo)
+                    ?? (renamed ? prev.find(p => p.ipNo === oldIpNo) : undefined);
+                  // Merge: keep locally-loaded sub-records (labs, imaging, rounds)
+                  const merged = source ? {
+                    ...fresh,
+                    labResults:     source.labResults,
+                    investigations: source.investigations,
+                    dailyRounds:    source.dailyRounds,
+                    vitals:         source.vitals,
+                  } : fresh;
+                  const withoutStaleEntry = renamed ? prev.filter(p => p.ipNo !== oldIpNo) : prev;
+                  const hasCurrentEntry = withoutStaleEntry.some(p => p.ipNo === fresh.ipNo);
                   const next = enrichPatientData(
-                    prev.map(p => {
-                      if (p.ipNo !== fresh.ipNo) return p;
-                      // Merge: keep locally-loaded sub-records (labs, imaging, rounds)
-                      return {
-                        ...fresh,
-                        labResults:     p.labResults,
-                        investigations: p.investigations,
-                        dailyRounds:    p.dailyRounds,
-                        vitals:         p.vitals,
-                      };
-                    }),
+                    hasCurrentEntry
+                      ? withoutStaleEntry.map(p => p.ipNo === fresh.ipNo ? merged : p)
+                      : [merged, ...withoutStaleEntry],
                   );
                   debouncedSaveActiveCache(next, effectiveHospitalId);
                   return next;
@@ -871,10 +882,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // reject cleanly, not appear to have applied. The RPC logs its own audit
     // entry server-side (atomic with the rename), so no client-side
     // logAuditEvent call here — that would double-log.
-    await renamePatientIpNoService(oldIpNo, newIpNo);
+    const newVersion = await renamePatientIpNoService(oldIpNo, newIpNo);
     setPatients(prev => {
       const next = enrichPatientData(
-        prev.map(p => p.ipNo === oldIpNo ? { ...p, ipNo: newIpNo } : p),
+        prev.map(p => p.ipNo === oldIpNo ? { ...p, ipNo: newIpNo, version: newVersion ?? p.version } : p),
       );
       saveActiveCache(next, effectiveHospitalId);
       return next;

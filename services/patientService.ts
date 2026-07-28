@@ -526,13 +526,17 @@ export async function restorePatient(ipNo: string): Promise<void> {
  * validates hospital ownership and new-number uniqueness, then updates
  * patients.ip_no inside one transaction (the FKs cascade every linked
  * record). Throws with a message suitable for direct display to the user.
+ * Returns the patient's new `version` (bumped by the rename) — the caller
+ * MUST apply this to its cached patient or the next save on this patient
+ * will be misreported as a conflict with another user.
  */
-export async function renamePatientIpNo(oldIpNo: string, newIpNo: string): Promise<void> {
-  const { error } = await supabase.rpc('rename_patient_ip_no', {
+export async function renamePatientIpNo(oldIpNo: string, newIpNo: string): Promise<number | undefined> {
+  const { data, error } = await supabase.rpc('rename_patient_ip_no', {
     p_old_ip_no: oldIpNo,
     p_new_ip_no: newIpNo,
   });
   if (error) throw new Error(error.message);
+  return data as number | undefined;
 }
 
 /**
