@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockState = vi.hoisted(() => ({
   result: { data: [] as any[] | null, error: null as any },
+  rpcResult: { error: null as any },
 }));
 
 vi.mock('../../lib/supabase', () => {
@@ -25,7 +26,10 @@ vi.mock('../../lib/supabase', () => {
   };
 
   return {
-    supabase: { from: vi.fn().mockImplementation(createBuilder) },
+    supabase: {
+      from: vi.fn().mockImplementation(createBuilder),
+      rpc: vi.fn().mockImplementation(() => Promise.resolve(mockState.rpcResult)),
+    },
   };
 });
 
@@ -35,6 +39,7 @@ import {
   fetchAllPatients,
   upsertPatient,
   removePatient,
+  renamePatientIpNo,
 } from '../../services/patientService';
 import { Patient, PatientStatus, PacStatus, Gender } from '../../types';
 
@@ -95,6 +100,7 @@ const makePatient = (overrides: Partial<Patient> = {}): Patient => ({
 
 beforeEach(() => {
   mockState.result = { data: [], error: null };
+  mockState.rpcResult = { error: null };
   vi.clearAllMocks();
   // Re-apply the chainable mock after clearAllMocks resets spies
   const createBuilder = () => {
@@ -109,6 +115,7 @@ beforeEach(() => {
     return b;
   };
   vi.mocked(supabase.from).mockImplementation(createBuilder as any);
+  vi.mocked(supabase.rpc).mockImplementation(() => Promise.resolve(mockState.rpcResult) as any);
 });
 
 // ─── fetchActivePatients ──────────────────────────────────────────────────────
@@ -377,5 +384,28 @@ describe('removePatient', () => {
   it('resolves without throwing on success', async () => {
     mockState.result = { data: null, error: null };
     await expect(removePatient('IP001')).resolves.toBeUndefined();
+  });
+});
+
+// ─── renamePatientIpNo ────────────────────────────────────────────────────────
+
+describe('renamePatientIpNo', () => {
+  it('calls the rename_patient_ip_no RPC with the old and new IP numbers', async () => {
+    mockState.rpcResult = { error: null };
+    await renamePatientIpNo('IP001', 'IP999');
+    expect(supabase.rpc).toHaveBeenCalledWith('rename_patient_ip_no', {
+      p_old_ip_no: 'IP001',
+      p_new_ip_no: 'IP999',
+    });
+  });
+
+  it('resolves without throwing on success', async () => {
+    mockState.rpcResult = { error: null };
+    await expect(renamePatientIpNo('IP001', 'IP999')).resolves.toBeUndefined();
+  });
+
+  it('surfaces the server error message (e.g. duplicate IP, permission denied)', async () => {
+    mockState.rpcResult = { error: { message: 'IP number IP999 is already in use' } };
+    await expect(renamePatientIpNo('IP001', 'IP999')).rejects.toThrow('IP number IP999 is already in use');
   });
 });

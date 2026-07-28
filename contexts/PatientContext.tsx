@@ -32,7 +32,7 @@ import { logAuditEvent } from '../services/auditLog';
 import {
   fetchActivePatients, fetchActivePatientsPage, fetchAllPatients,
   upsertPatient, removePatient, PATIENT_PAGE_SIZE,
-  fetchPatientById,
+  fetchPatientById, renamePatientIpNo as renamePatientIpNoService,
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
@@ -81,6 +81,11 @@ interface PatientContextType {
   addSurgery: (ipNo: string, newProcedure: string, newDos: string) => void;
   addPatient: (patient: Patient) => void;
   deletePatient: (ipNo: string) => void;
+  /** Corrects a patient's IP number after the fact (e.g. a typo caught after
+   *  admission). Unlike other mutations, this awaits the server result before
+   *  touching local state — a duplicate/permission failure must not appear
+   *  to succeed. Throws with a user-displayable message on failure. */
+  renamePatientIpNo: (oldIpNo: string, newIpNo: string) => Promise<void>;
   addLabResult: (patientId: string, result: LabResult) => void;
   addInvestigation: (patientId: string, inv: Investigation) => void;
   deleteInvestigation: (patientId: string, invId: string) => void;
@@ -861,6 +866,21 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [user, patients]);
 
+  const renamePatientIpNo = useCallback(async (oldIpNo: string, newIpNo: string) => {
+    // Await the server result first — a duplicate/permission failure must
+    // reject cleanly, not appear to have applied. The RPC logs its own audit
+    // entry server-side (atomic with the rename), so no client-side
+    // logAuditEvent call here — that would double-log.
+    await renamePatientIpNoService(oldIpNo, newIpNo);
+    setPatients(prev => {
+      const next = enrichPatientData(
+        prev.map(p => p.ipNo === oldIpNo ? { ...p, ipNo: newIpNo } : p),
+      );
+      saveActiveCache(next, effectiveHospitalId);
+      return next;
+    });
+  }, [effectiveHospitalId]);
+
   const addLabResult = useCallback((patientId: string, result: LabResult) => {
     setPatients(prev => {
       const next = prev.map(p =>
@@ -1052,6 +1072,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addSurgery,
     addPatient,
     deletePatient,
+    renamePatientIpNo,
     addLabResult,
     addInvestigation,
     deleteInvestigation,
@@ -1067,7 +1088,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     patients, isLoadingPatients, isStale, cacheTimestamp,
     hasMore, isLoadingMore, loadMorePatients,
     hasLoadedAll, loadAllPatients, updatePatient, addSurgery, addPatient, deletePatient,
-    addLabResult, addInvestigation, deleteInvestigation, getPatient,
+    renamePatientIpNo, addLabResult, addInvestigation, deleteInvestigation, getPatient,
     saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
     realtimeStatus, forceReconnect, sessionExpired,
   ]);
