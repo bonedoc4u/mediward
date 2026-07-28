@@ -39,7 +39,7 @@ export const phaseOf = (inv: Investigation, dos?: string): Phase => {
 export const isReportPending = (inv: Investigation): boolean => !inv.findings?.trim();
 
 const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
-  const [lightboxInv, setLightboxInv] = useState<Investigation | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const studies = useMemo(
     () => [...patient.investigations].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')),
@@ -77,14 +77,16 @@ const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
       ) : (
         <div className="rounded-xl bg-slate-900 overflow-hidden">
           <div className="flex gap-3 overflow-x-auto snap-x px-3 py-3 scrollbar-hide">
-            {studies.map(inv => (
-              <StudyCard key={inv.id} inv={inv} phase={phaseOf(inv, patient.dos)} onClick={() => setLightboxInv(inv)} />
+            {studies.map((inv, i) => (
+              <StudyCard key={inv.id} inv={inv} phase={phaseOf(inv, patient.dos)} onClick={() => setLightboxIndex(i)} />
             ))}
           </div>
         </div>
       )}
 
-      {lightboxInv && <Lightbox inv={lightboxInv} onClose={() => setLightboxInv(null)} />}
+      {lightboxIndex !== null && (
+        <Lightbox investigations={studies} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+      )}
     </div>
   );
 };

@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect, useRef } from 'react';
 import { useScrollRestoration, useReturnHighlight, setLastViewedPatient } from './hooks/useScrollRestoration';
+import { closeActiveLightbox } from './hooks/useLightboxBackHandler';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
 import { can } from './utils/permissions';
-import { needsPac } from './utils/calculations';
+import { needsPac, getAdmissionDayCohort } from './utils/calculations';
 import { todayYmd } from './utils/dates';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
@@ -147,7 +148,7 @@ const BASE_NAV_ITEMS_RIGHT: NavItem[] = [
 
 // Views that render a patient list and therefore support the quick-view sheet.
 // The sheet opens whenever one of these views carries a patient id in the hash.
-const SHEET_LIST_VIEWS: ViewMode[] = ['dashboard', 'pending', 'master', 'wenthome'];
+const SHEET_LIST_VIEWS: ViewMode[] = ['dashboard', 'pending', 'master', 'wenthome', 'admissions'];
 
 // ─── Loading Fallback ───
 const ViewLoader = () => (
@@ -328,6 +329,27 @@ const App: React.FC = () => {
   // Patient quick-view sheet is open when a list view carries a patient id.
   const isPatientSheetOpen = !!navParams.id && SHEET_LIST_VIEWS.includes(currentView);
 
+  // Next/Previous-patient navigation while viewing a patient's detail from
+  // Admission List — pages through that same admission day's cohort without
+  // returning to the list first. Derived from the viewed patient's own `doa`
+  // (not AdmissionList's local selectedDate state, which App.tsx has no
+  // access to) via the shared getAdmissionDayCohort helper, so the two can't
+  // silently compute a different "day's list" from each other.
+  const admissionCohort = useMemo(() => {
+    if (currentView !== 'admissions' || !navParams.id) return null;
+    const viewed = patients.find(p => p.ipNo === navParams.id);
+    if (!viewed) return null;
+    return getAdmissionDayCohort(patients, viewed.doa, user?.unit);
+  }, [currentView, navParams.id, patients, user?.unit]);
+
+  const admissionCohortIndex = admissionCohort?.findIndex(p => p.ipNo === navParams.id) ?? -1;
+  const onPrevAdmissionPatient = admissionCohort && admissionCohortIndex > 0
+    ? () => { const p = admissionCohort[admissionCohortIndex - 1]; setLastViewedPatient(p.ipNo); navigateTo('admissions', { id: p.ipNo }); }
+    : undefined;
+  const onNextAdmissionPatient = admissionCohort && admissionCohortIndex >= 0 && admissionCohortIndex < admissionCohort.length - 1
+    ? () => { const p = admissionCohort[admissionCohortIndex + 1]; setLastViewedPatient(p.ipNo); navigateTo('admissions', { id: p.ipNo }); }
+    : undefined;
+
   // ─── Per-view scroll restoration ───
   // Residents scroll long ward lists; opening a patient and coming back must
   // land on the same row. The hook records each view's offset and restores it
@@ -350,6 +372,15 @@ const App: React.FC = () => {
       // Priority: close overlays first (highest → lowest), then navigate, then exit
       if (concurrentEditConflict) {
         resolveConcurrentEdit('remote'); // dismiss conflict = keep server version
+        return;
+      }
+      // Lightbox (fullscreen X-ray/report viewer) manages its own open/close
+      // state wherever it's rendered from (Radiology panel, full Radiology
+      // screen, Admission List) — this bridge is the only way the handler
+      // below can know one is open. Without it, pressing back while viewing
+      // an image fell through to "navigate to dashboard" instead of just
+      // closing the viewer.
+      if (closeActiveLightbox()) {
         return;
       }
       if (isMobileMenuOpen) {
@@ -550,6 +581,7 @@ const App: React.FC = () => {
             onAddPatient={can(user, 'patient:add') ? (src, doa) => openAddModal(src, doa) : undefined}
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
             onDeletePatient={can(user, 'patient:delete') ? (p) => deletePatient(p.ipNo) : undefined}
+            onViewPatient={(ipNo: string) => { setLastViewedPatient(ipNo); navigateTo(currentView, { id: ipNo }); }}
           />
         );
       default:
@@ -849,6 +881,8 @@ const App: React.FC = () => {
           open={isPatientSheetOpen}
           patientId={navParams.id || undefined}
           onClose={() => navigateTo(currentView)}
+          onPrevPatient={onPrevAdmissionPatient}
+          onNextPatient={onNextAdmissionPatient}
         />
       </Suspense>
 

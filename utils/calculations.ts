@@ -199,6 +199,32 @@ export const sortByBed = (a: Patient, b: Patient): number => {
 };
 
 /**
+ * All patients admitted on a given date (Admission List's day cohort),
+ * deduplicated and sorted by IP number ascending (earliest-admitted first).
+ * Shared between components/AdmissionList.tsx (renders the list) and App.tsx
+ * (computes Next/Previous-patient navigation when viewing a patient's detail
+ * from that list) — kept here rather than exported from AdmissionList.tsx
+ * itself so App.tsx doesn't force AdmissionList's lazy-loaded chunk to load
+ * eagerly just to reuse this filter.
+ */
+export const getAdmissionDayCohort = (patients: Patient[], date: string, unit?: string): Patient[] => {
+  const seen = new Set<string>();
+  return patients
+    .filter(p => {
+      if (p.doa !== date) return false;
+      if (unit && p.unit && p.unit !== unit) return false;
+      if (seen.has(p.ipNo)) return false;
+      seen.add(p.ipNo);
+      return true;
+    })
+    .sort((a, b) => {
+      const an = parseInt(a.ipNo, 10);
+      const bn = parseInt(b.ipNo, 10);
+      return isNaN(an) || isNaN(bn) ? a.ipNo.localeCompare(b.ipNo) : an - bn;
+    });
+};
+
+/**
  * Active wards a patient may be moved to: those serving the patient's own
  * unit, plus shared wards (no `unit` restriction) and ICU. Falls back to
  * every active ward when the patient has no unit assigned.

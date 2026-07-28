@@ -1,40 +1,69 @@
 /**
  * Lightbox.tsx — full-screen study viewer with pinch-zoom (works in the
- * Capacitor webview via touch-action: pinch-zoom). Shared by RadiologyComparator
- * and the patient-detail Radiology panel.
+ * Capacitor webview via touch-action: pinch-zoom) and Next/Previous
+ * navigation through a patient's other investigations. Shared by
+ * RadiologyComparator, the patient-detail Radiology panel, and Admission List.
  */
-import React from 'react';
-import { X, ImageIcon, Loader2, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, ImageIcon, Loader2, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Investigation } from '../../types';
 import { useSignedUrl } from '../../hooks/useSignedUrl';
 import { isPdfPath } from '../../services/storageService';
 import { getModality } from './modality';
+import { registerLightboxClose, unregisterLightboxClose } from '../../hooks/useLightboxBackHandler';
 
-const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, onClose }) => {
+interface Props {
+  investigations: Investigation[];
+  initialIndex: number;
+  onClose: () => void;
+}
+
+const Lightbox: React.FC<Props> = ({ investigations, initialIndex, onClose }) => {
+  const [index, setIndex] = useState(initialIndex);
+  const inv = investigations[index];
+  const hasPrev = index > 0;
+  const hasNext = index < investigations.length - 1;
+  const goPrev = useCallback(() => setIndex(i => Math.max(0, i - 1)), []);
+  const goNext = useCallback(() => setIndex(i => Math.min(investigations.length - 1, i + 1)), [investigations.length]);
+
   const cfg = getModality(inv.type);
   const signedUrl = useSignedUrl(inv.imageUrl);
   const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
   });
 
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      else if (e.key === 'ArrowLeft') goPrev();
+      else if (e.key === 'ArrowRight') goNext();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, goPrev, goNext]);
+
+  // Android hardware back button: close this viewer instead of falling
+  // through to whatever view-level navigation would otherwise run.
+  useEffect(() => {
+    registerLightboxClose(onClose);
+    return () => unregisterLightboxClose(onClose);
   }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-[70] bg-black flex flex-col" onClick={onClose}>
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 bg-black/70 shrink-0" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-2">
-          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded ${cfg.badge}`}>{inv.type}</span>
-          <span className="text-white/50 text-xs">{fmtDate}</span>
-          {inv.findings && <span className="text-white/70 text-xs truncate max-w-[180px]">{inv.findings}</span>}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`text-[9px] font-bold uppercase px-2 py-1 rounded shrink-0 ${cfg.badge}`}>{inv.type}</span>
+          <span className="text-white/50 text-xs shrink-0">{fmtDate}</span>
+          {inv.findings && <span className="text-white/70 text-xs truncate">{inv.findings}</span>}
+          {investigations.length > 1 && (
+            <span className="text-white/40 text-xs shrink-0 tabular-nums">{index + 1}/{investigations.length}</span>
+          )}
         </div>
         <button
           onClick={onClose}
-          className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+          className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors shrink-0"
           aria-label="Close"
         >
           <X className="w-5 h-5" />
@@ -42,7 +71,25 @@ const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, 
       </div>
 
       {/* Image / PDF */}
-      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden" onClick={onClose}>
+      <div className="relative flex-1 flex items-center justify-center p-4 overflow-hidden" onClick={onClose}>
+        {hasPrev && (
+          <button
+            onClick={e => { e.stopPropagation(); goPrev(); }}
+            aria-label="Previous investigation"
+            className="absolute left-1 sm:left-3 top-1/2 -translate-y-1/2 z-10 min-w-11 min-h-11 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white/80 hover:text-white transition-colors"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+        {hasNext && (
+          <button
+            onClick={e => { e.stopPropagation(); goNext(); }}
+            aria-label="Next investigation"
+            className="absolute right-1 sm:right-3 top-1/2 -translate-y-1/2 z-10 min-w-11 min-h-11 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white/80 hover:text-white transition-colors"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
         {inv.imageUrl ? (
           isPdfPath(inv.imageUrl) ? (
             // Show the PDF's identity immediately — unlike an image, there's
@@ -86,7 +133,9 @@ const Lightbox: React.FC<{ inv: Investigation; onClose: () => void }> = ({ inv, 
         )}
       </div>
 
-      <p className="text-center text-white/30 text-xs pb-3 shrink-0">Tap anywhere to close</p>
+      <p className="text-center text-white/30 text-xs pb-3 shrink-0">
+        {investigations.length > 1 ? 'Tap anywhere to close · use the arrows to browse' : 'Tap anywhere to close'}
+      </p>
     </div>
   );
 };
