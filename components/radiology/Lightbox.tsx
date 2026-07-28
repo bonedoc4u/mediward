@@ -19,18 +19,39 @@ interface Props {
 }
 
 const Lightbox: React.FC<Props> = ({ investigations, initialIndex, onClose }) => {
-  const [index, setIndex] = useState(initialIndex);
-  const inv = investigations[index];
+  // Track the open study by id, not by raw array position: `investigations`
+  // can be a live reference (patient context re-fetch/realtime) whose order
+  // or length changes while this is open, and a stale index would silently
+  // point at a different study — or past the end of a shrunk array.
+  const [currentId, setCurrentId] = useState(() => investigations[initialIndex]?.id);
+  const index = investigations.findIndex(i => i.id === currentId);
+  const inv = index >= 0 ? investigations[index] : undefined;
   const hasPrev = index > 0;
-  const hasNext = index < investigations.length - 1;
-  const goPrev = useCallback(() => setIndex(i => Math.max(0, i - 1)), []);
-  const goNext = useCallback(() => setIndex(i => Math.min(investigations.length - 1, i + 1)), [investigations.length]);
+  const hasNext = index >= 0 && index < investigations.length - 1;
+  const goPrev = useCallback(() => {
+    setCurrentId(id => {
+      const i = investigations.findIndex(inv => inv.id === id);
+      return i > 0 ? investigations[i - 1].id : id;
+    });
+  }, [investigations]);
+  const goNext = useCallback(() => {
+    setCurrentId(id => {
+      const i = investigations.findIndex(inv => inv.id === id);
+      return i >= 0 && i < investigations.length - 1 ? investigations[i + 1].id : id;
+    });
+  }, [investigations]);
 
-  const cfg = getModality(inv.type);
-  const signedUrl = useSignedUrl(inv.imageUrl);
-  const fmtDate = new Date(inv.date).toLocaleDateString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  });
+  // The current study disappeared out from under us (e.g. deleted on another
+  // device) — close rather than render on missing data.
+  useEffect(() => {
+    if (!inv) onClose();
+  }, [inv, onClose]);
+
+  const cfg = inv ? getModality(inv.type) : null;
+  const signedUrl = useSignedUrl(inv?.imageUrl);
+  const fmtDate = inv
+    ? new Date(inv.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -48,6 +69,8 @@ const Lightbox: React.FC<Props> = ({ investigations, initialIndex, onClose }) =>
     registerLightboxClose(onClose);
     return () => unregisterLightboxClose(onClose);
   }, [onClose]);
+
+  if (!inv || !cfg) return null;
 
   return (
     <div className="fixed inset-0 z-[70] bg-black flex flex-col" onClick={onClose}>

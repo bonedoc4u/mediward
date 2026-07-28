@@ -26,6 +26,7 @@ const PatientSheet: React.FC<Props> = ({ open, patientId, onClose, onPrevPatient
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8">
         {patientId && (
           <PatientDetail
+            key={patientId}
             patientId={patientId}
             onClose={onClose}
             inSheet

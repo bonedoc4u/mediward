@@ -22,6 +22,17 @@ interface Props {
 type ViewMode = 'table' | 'cards';
 const VIEW_MODE_KEY = 'mediward_admission_view_mode';
 
+function loadViewMode(): ViewMode {
+  try {
+    const raw = localStorage.getItem(VIEW_MODE_KEY);
+    return raw === 'table' || raw === 'cards' ? raw : 'cards';
+  } catch { return 'cards'; }
+}
+
+function saveViewMode(mode: ViewMode) {
+  try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* ignore */ }
+}
+
 function todayStr() {
   return todayYmd();
 }
@@ -197,7 +208,7 @@ const AdmissionListTable: React.FC<{
                     <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
                     <td className="px-3 py-3 font-semibold break-words">
                       {onView ? (
-                        <button type="button" onClick={() => onView(p.ipNo)} className="text-accent-fg hover:text-accent-pressed hover:underline text-left">
+                        <button type="button" onClick={() => onView(p.ipNo)} className="min-h-11 flex items-center text-accent-fg hover:text-accent-pressed hover:underline text-left">
                           {p.name}
                         </button>
                       ) : (
@@ -216,25 +227,35 @@ const AdmissionListTable: React.FC<{
                           <button
                             type="button"
                             onClick={() => handleConfirmDelete(p)}
-                            className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                            className="flex items-center gap-1 px-2 min-h-11 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
                           >
                             <AlertTriangle className="w-3 h-3" /> Delete
                           </button>
                           <button
                             type="button"
                             onClick={() => setConfirmIpNo(null)}
-                            className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                            className="px-2 min-h-11 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
                           >
                             Cancel
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
+                          {onView && (
+                            <button
+                              type="button"
+                              onClick={() => onView(p.ipNo)}
+                              className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-accent-fg hover:bg-accent-soft rounded-lg transition-colors"
+                              title="View details"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {onEdit && (
                             <button
                               type="button"
                               onClick={() => onEdit(p)}
-                              className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                              className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                               title="Edit patient"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -244,7 +265,7 @@ const AdmissionListTable: React.FC<{
                             <button
                               type="button"
                               onClick={() => handleDeleteClick(p)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Remove from list"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -394,7 +415,7 @@ const OtherAdmissionsTable: React.FC<{
                 <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
                 <td className="px-3 py-3 font-semibold break-words">
                   {onView ? (
-                    <button type="button" onClick={() => onView(p.ipNo)} className="text-accent-fg hover:text-accent-pressed hover:underline text-left">
+                    <button type="button" onClick={() => onView(p.ipNo)} className="min-h-11 flex items-center text-accent-fg hover:text-accent-pressed hover:underline text-left">
                       {p.name}
                     </button>
                   ) : (
@@ -411,11 +432,11 @@ const OtherAdmissionsTable: React.FC<{
                   {confirmIpNo === p.ipNo ? (
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => { setConfirmIpNo(null); onDelete?.(p); }}
-                        className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                        className="flex items-center gap-1 px-2 min-h-11 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
                         <AlertTriangle className="w-3 h-3" /> Delete
                       </button>
                       <button type="button" onClick={() => setConfirmIpNo(null)}
-                        className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors">
+                        className="px-2 min-h-11 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors">
                         Cancel
                       </button>
                     </div>
@@ -423,19 +444,19 @@ const OtherAdmissionsTable: React.FC<{
                     <div className="flex items-center gap-1">
                       {onView && (
                         <button type="button" onClick={() => onView(p.ipNo)}
-                          className="p-1.5 text-slate-400 hover:text-accent-fg hover:bg-accent-soft rounded-lg transition-colors" title="View details">
+                          className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-accent-fg hover:bg-accent-soft rounded-lg transition-colors" title="View details">
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                       )}
                       {onEdit && (
                         <button type="button" onClick={() => onEdit(p)}
-                          className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Edit">
+                          className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors" title="Edit">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                       )}
                       {onDelete && (
                         <button type="button" onClick={() => setConfirmIpNo(p.ipNo)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove from list">
+                          className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Remove from list">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -522,12 +543,10 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
   // Remembered across sessions — a chief walkthrough on a laptop wants cards
   // with imaging; a quick check on a phone might want the denser table.
   // Applies to every section uniformly (not toggled per OPD/Casualty/Other).
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    () => (localStorage.getItem(VIEW_MODE_KEY) as ViewMode | null) || 'cards',
-  );
+  const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode);
   const changeViewMode = (mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem(VIEW_MODE_KEY, mode);
+    saveViewMode(mode);
   };
   const { patients } = usePatients();
   const { user } = useAuth();
