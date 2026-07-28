@@ -11,7 +11,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Capacitor } from '@capacitor/core';
 import { Patient } from '../types';
-import { calculatePOD, sortByBed } from './calculations';
+import { sortByBed } from './calculations';
 
 export interface WardSection {
   name: string;
@@ -53,22 +53,15 @@ export async function exportWardListPDF(opts: ExportOptions): Promise<void> {
       doc.text([hospitalName, department].filter(Boolean).join('  ·  '), MARGIN, y);
     }
 
-    const rows = [...section.patients].sort(sortByBed).map(p => {
-      const pod = calculatePOD(p.dos);
-      return [
-        shortBed(p.bed),
-        `${p.name}\nIP ${p.ipNo}`,
-        `${p.age} / ${p.gender?.[0] ?? ''}`,
-        p.diagnosis || '—',
-        (p.comorbidities ?? []).join(', ') || '—',
-        p.procedure || '—',
-        pod !== undefined ? String(pod) : '',
-        '', // Notes — blank space to write in
-      ];
-    });
+    const rows = [...section.patients].sort(sortByBed).map(p => [
+      shortBed(p.bed),
+      `${p.name}\nIP ${p.ipNo}`,
+      `${p.age} / ${p.gender?.[0] ?? ''}`,
+      '', // Notes — blank space to write in
+    ]);
 
     autoTable(doc, {
-      head: [['Bed', 'Name / IP No', 'Age/Sex', 'Diagnosis', 'Comorbidities', 'Procedure', 'POD', 'Notes']],
+      head: [['Bed', 'Name / IP No', 'Age/Sex', 'Notes']],
       body: rows,
       startY: y + 4,
       margin: { left: MARGIN, right: MARGIN, top: MARGIN + 12 },
@@ -93,14 +86,10 @@ export async function exportWardListPDF(opts: ExportOptions): Promise<void> {
         minCellHeight: 7,
       },
       columnStyles: {
-        0: { cellWidth: 13, halign: 'center', fontStyle: 'bold' }, // Bed
-        1: { cellWidth: 40 },                                      // Name / IP
-        2: { cellWidth: 15, halign: 'center' },                    // Age/Sex
-        3: { cellWidth: 55 },                                      // Diagnosis
-        4: { cellWidth: 34 },                                      // Comorbidities
-        5: { cellWidth: 42 },                                      // Procedure
-        6: { cellWidth: 12, halign: 'center', fontStyle: 'bold', textColor: [15, 118, 110] }, // POD
-        // Notes takes the remaining ~66mm of the printable width
+        0: { cellWidth: 15, halign: 'center', fontStyle: 'bold' }, // Bed
+        1: { cellWidth: 55 },                                      // Name / IP
+        2: { cellWidth: 18, halign: 'center' },                    // Age/Sex
+        // Notes takes the remaining ~189mm of the printable width
       },
       didParseCell: data => {
         // Patient name bold, IP number lighter (both share one cell)
