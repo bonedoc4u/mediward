@@ -84,8 +84,11 @@ interface PatientContextType {
   /** Corrects a patient's IP number after the fact (e.g. a typo caught after
    *  admission). Unlike other mutations, this awaits the server result before
    *  touching local state — a duplicate/permission failure must not appear
-   *  to succeed. Throws with a user-displayable message on failure. */
-  renamePatientIpNo: (oldIpNo: string, newIpNo: string) => Promise<void>;
+   *  to succeed. Throws with a user-displayable message on failure. Returns
+   *  the patient's new `version` — callers holding their own snapshot of the
+   *  patient (e.g. an open edit form) MUST apply it before their next save,
+   *  or that save will be misreported as a conflict with another user. */
+  renamePatientIpNo: (oldIpNo: string, newIpNo: string) => Promise<number | undefined>;
   addLabResult: (patientId: string, result: LabResult) => void;
   addInvestigation: (patientId: string, inv: Investigation) => void;
   deleteInvestigation: (patientId: string, invId: string) => void;
@@ -565,28 +568,34 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                   return next;
                 });
               } else {
-                // patients.ip_no is the primary key; REPLICA IDENTITY DEFAULT means
-                // an UPDATE that changes it carries the OLD ip_no in payload.old
-                // (needed to identify which row changed). A plain field edit does
-                // NOT change the identity column, so payload.old is absent there —
-                // this only ever fires for a real rename.
+                // patients.ip_no is the primary key; REPLICA IDENTITY DEFAULT
+                // means an UPDATE that changes it carries the OLD ip_no in
+                // payload.old (needed to identify which row changed) — so we
+                // detect a rename by comparing values, not by presence alone.
                 const oldIpNo = (payload.old as { ip_no?: string } | null)?.ip_no;
+                const renamed = !!oldIpNo && oldIpNo !== fresh.ipNo;
                 setPatients(prev => {
-                  const renamed = oldIpNo && oldIpNo !== fresh.ipNo;
-                  const source = prev.find(p => p.ipNo === fresh.ipNo)
-                    ?? (renamed ? prev.find(p => p.ipNo === oldIpNo) : undefined);
+                  const currentEntry = prev.find(p => p.ipNo === fresh.ipNo);
+                  const oldEntry = renamed ? prev.find(p => p.ipNo === oldIpNo) : undefined;
+                  const source = currentEntry ?? oldEntry;
+                  // Neither this patient's current nor (for a rename) former key
+                  // is in this device's list at all — e.g. a colleague edited a
+                  // patient outside this device's loaded page or unit filter.
+                  // Stay a no-op, same as before a rename could ever occur here;
+                  // the INSERT branch above is what handles a genuinely new
+                  // patient entering this device's scope.
+                  if (!source) return prev;
                   // Merge: keep locally-loaded sub-records (labs, imaging, rounds)
-                  const merged = source ? {
+                  const merged = {
                     ...fresh,
                     labResults:     source.labResults,
                     investigations: source.investigations,
                     dailyRounds:    source.dailyRounds,
                     vitals:         source.vitals,
-                  } : fresh;
-                  const withoutStaleEntry = renamed ? prev.filter(p => p.ipNo !== oldIpNo) : prev;
-                  const hasCurrentEntry = withoutStaleEntry.some(p => p.ipNo === fresh.ipNo);
+                  };
+                  const withoutStaleEntry = oldEntry ? prev.filter(p => p.ipNo !== oldIpNo) : prev;
                   const next = enrichPatientData(
-                    hasCurrentEntry
+                    currentEntry
                       ? withoutStaleEntry.map(p => p.ipNo === fresh.ipNo ? merged : p)
                       : [merged, ...withoutStaleEntry],
                   );
@@ -890,6 +899,11 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       saveActiveCache(next, effectiveHospitalId);
       return next;
     });
+    // The caller (e.g. AddPatientModal, still holding a pre-rename snapshot
+    // in its own local state) MUST apply this too — otherwise its next Save
+    // sends the stale version and gets a false "modified by another user"
+    // conflict, since the DB's version was just bumped by this rename.
+    return newVersion;
   }, [effectiveHospitalId]);
 
   const addLabResult = useCallback((patientId: string, result: LabResult) => {

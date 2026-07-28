@@ -115,6 +115,12 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
   const [newIpNoValue, setNewIpNoValue] = useState('');
   const [fixIpNoBusy, setFixIpNoBusy] = useState(false);
   const [fixIpNoError, setFixIpNoError] = useState<string | null>(null);
+  // Tracks the patient's current optimistic-lock version independently of
+  // initialData (a snapshot taken when the modal opened, never refreshed).
+  // A rename bumps the DB version via trigger — if Save later sent
+  // initialData's stale value, upsertPatient's conditional update would
+  // match 0 rows and get misreported as a conflict with another user.
+  const [currentVersion, setCurrentVersion] = useState<number | undefined>(initialData?.version);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
@@ -215,8 +221,9 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
     setFixIpNoBusy(true);
     setFixIpNoError(null);
     try {
-      await renamePatientIpNo(formData.ipNo, trimmed);
+      const newVersion = await renamePatientIpNo(formData.ipNo, trimmed);
       setFormData(prev => ({ ...prev, ipNo: trimmed }));
+      setCurrentVersion(newVersion);
       setShowFixIpNo(false);
     } catch (err) {
       setFixIpNoError(err instanceof Error ? err.message : 'Failed to change IP number.');
@@ -607,6 +614,9 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       ward: formData.ward,
       unit: (!isAdmin && user?.unit) ? user.unit : (formData.unit || undefined),
       ipNo: formData.ipNo,
+      // Overrides initialData's version — which is a snapshot from when the
+      // modal opened and never refreshes — in case "Fix IP number" bumped it.
+      version: currentVersion,
       name: formData.name,
       age: parseInt(formData.age) || 0,
       gender: formData.gender,
