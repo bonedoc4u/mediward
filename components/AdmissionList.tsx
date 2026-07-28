@@ -1,9 +1,11 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { ClipboardList, Plus, Pencil, Printer, ChevronLeft, ChevronRight, Trash2, AlertTriangle, FileDown } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { ClipboardList, Plus, Pencil, ChevronLeft, ChevronRight, Trash2, AlertTriangle, FileDown, Loader2 } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Patient } from '../types';
 import { localYmd, todayYmd } from '../utils/dates';
+import { exportAdmissionListPDF } from '../utils/exportAdmissionList';
+import { toast } from '../utils/toast';
 
 interface Props {
   onAddPatient?: (source: 'OPD' | 'Casualty', doa?: string) => void;
@@ -34,76 +36,6 @@ const SOURCE_STYLE: Record<SourceSection, { badge: string; header: string; addBt
   Casualty: { badge: 'bg-orange-100 text-orange-800', header: 'bg-orange-50 border-orange-200 text-orange-800', addBtn: 'bg-orange-500 hover:bg-orange-600 text-white', accent: '#f97316' },
 };
 
-function exportSectionPdf(source: SourceSection, patients: Patient[], dateStr: string, unit?: string) {
-  const win = window.open('', '_blank', 'width=960,height=680');
-  if (!win) { alert('Allow pop-ups to export PDF'); return; }
-
-  const accent = SOURCE_STYLE[source].accent;
-  const dateLabel = fmtDisplay(dateStr);
-  const unitLabel = unit ? ` · ${unit}` : '';
-
-  const rows = patients.map((p, idx) => `
-    <tr>
-      <td style="text-align:center;color:#94a3b8">${idx + 1}</td>
-      <td style="font-family:monospace;font-size:12px">${p.ipNo}</td>
-      <td><strong>${p.name}</strong></td>
-      <td style="text-align:center;white-space:nowrap">${p.age} / ${p.gender === 'Female' ? '<span style="color:#db2777">F</span>' : '<span style="color:#2563eb">M</span>'}</td>
-      <td>${p.diagnosis || '—'}</td>
-      <td style="font-family:monospace;font-size:12px">${p.mobile || '—'}</td>
-    </tr>`).join('');
-
-  win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>${source} Admission List — ${dateLabel}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #1e293b; padding: 28px 32px; }
-    .header { border-bottom: 3px solid ${accent}; padding-bottom: 10px; margin-bottom: 16px; display: flex; align-items: flex-start; justify-content: space-between; }
-    .header h1 { font-size: 20px; color: ${accent}; }
-    .header .meta { font-size: 12px; color: #64748b; margin-top: 4px; }
-    .badge { display: inline-block; background: ${accent}22; color: ${accent}; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; margin-right: 6px; }
-    .count { font-size: 12px; color: #64748b; }
-    table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-    thead tr { background: #f8fafc; }
-    th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-    th:first-child { text-align: center; width: 36px; }
-    td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; line-height: 1.4; }
-    tr:nth-child(even) { background: #f8fafc; }
-    .footer { margin-top: 20px; font-size: 10px; color: #94a3b8; text-align: right; }
-    @media print {
-      body { padding: 12px 16px; }
-      @page { margin: 1cm; size: A4 landscape; }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <h1>MediWard — ${source} Admission List</h1>
-      <div class="meta">${dateLabel}${unitLabel}</div>
-    </div>
-    <div style="text-align:right">
-      <span class="badge">${source}</span>
-      <span class="count">${patients.length} patient${patients.length !== 1 ? 's' : ''}</span>
-    </div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Sl</th><th>IP No</th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Mobile</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="footer">Printed from MediWard · ${new Date().toLocaleString()}</div>
-  <script>window.onload = function() { window.print(); }</script>
-</body>
-</html>`);
-  win.document.close();
-}
-
 const AdmissionListTable: React.FC<{
   source: SourceSection;
   patients: Patient[];
@@ -115,6 +47,7 @@ const AdmissionListTable: React.FC<{
 }> = ({ source, patients, date, unit, onAdd, onEdit, onDelete }) => {
   const style = SOURCE_STYLE[source];
   const [confirmIpNo, setConfirmIpNo] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const handleDeleteClick = (p: Patient) => {
     setConfirmIpNo(p.ipNo);
@@ -123,6 +56,22 @@ const AdmissionListTable: React.FC<{
   const handleConfirmDelete = (p: Patient) => {
     setConfirmIpNo(null);
     onDelete?.(p);
+  };
+
+  const handleExportPdf = async () => {
+    if (patients.length === 0) {
+      toast.error(`No ${source} admissions to export for this date.`);
+      return;
+    }
+    setExporting(true);
+    try {
+      await exportAdmissionListPDF({ source, patients, dateLabel: fmtDisplay(date), unit });
+    } catch (err) {
+      console.error('[export] admission list PDF failed:', err);
+      toast.error('Could not generate the PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -138,11 +87,13 @@ const AdmissionListTable: React.FC<{
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => exportSectionPdf(source, patients, date, unit)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-current opacity-70 hover:opacity-100 transition-opacity"
+            onClick={handleExportPdf}
+            disabled={exporting}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-current opacity-70 hover:opacity-100 disabled:opacity-40 transition-opacity"
             title={`Export ${source} list as PDF`}
           >
-            <FileDown className="w-3.5 h-3.5" /> PDF
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+            PDF
           </button>
         {onAdd && (
           <button
@@ -366,15 +317,11 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
   const casualtyPatients = useMemo(() => dayPatients.filter(p => p.admissionSource === 'Casualty').sort(byIpAsc), [dayPatients]);
   const otherPatients    = useMemo(() => dayPatients.filter(p => !p.admissionSource).sort(byIpAsc),               [dayPatients]);
 
-  const handlePrint = useCallback(() => window.print(), []);
-
-
-
   return (
     <div className="space-y-4 pb-24">
       {/* Header bar */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
-        {/* Row 1: title + print */}
+        {/* Row 1: title */}
         <div className="flex items-center gap-2">
           <ClipboardList className="w-5 h-5 text-teal-600 shrink-0" />
           <div className="flex-1 min-w-0">
@@ -383,13 +330,6 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
               <p className="text-xs text-slate-500">{user.unit}</p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors shrink-0"
-          >
-            <Printer className="w-4 h-4" /> Print
-          </button>
         </div>
 
         {/* Row 2: date navigator */}
@@ -506,14 +446,6 @@ const AdmissionList: React.FC<Props> = ({ onAddPatient, onEditPatient, onDeleteP
           )}
         </div>
       )}
-
-      {/* Print styles */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .admission-print, .admission-print * { visibility: visible; }
-        }
-      `}</style>
     </div>
   );
 };
