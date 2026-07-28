@@ -214,6 +214,7 @@ const App: React.FC = () => {
 
   const mobileTabs = useMemo(() => [
     { id: 'dashboard'  as ViewMode, label: 'Ward',       icon: LayoutDashboard },
+    { id: 'admissions' as ViewMode, label: 'Admits',     icon: BookOpen        },
     { id: 'rounds'     as ViewMode, label: 'Rounds',     icon: ListChecks      },
     { id: 'otlist'     as ViewMode, label: procedureListName, icon: ClipboardList },
     { id: 'pac'        as ViewMode, label: preOpModuleName,   icon: HeartPulse    },
@@ -870,7 +871,7 @@ const App: React.FC = () => {
       <PwaInstallBanner />
 
       <nav aria-label="Main navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {mobileTabs.map(tab => (
             <button
               key={tab.id}

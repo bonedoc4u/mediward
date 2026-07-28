@@ -2,10 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { ClipboardList, Plus, Pencil, ChevronLeft, ChevronRight, Trash2, AlertTriangle, FileDown, Loader2 } from 'lucide-react';
 import { usePatients } from '../contexts/PatientContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Patient } from '../types';
+import { Patient, Investigation } from '../types';
 import { localYmd, todayYmd } from '../utils/dates';
 import { exportAdmissionListPDF } from '../utils/exportAdmissionList';
 import { toast } from '../utils/toast';
+import { getModality } from './radiology/modality';
+import { useSignedUrl } from '../hooks/useSignedUrl';
+import { isPdfPath } from '../services/storageService';
+import Lightbox from './radiology/Lightbox';
 
 interface Props {
   onAddPatient?: (source: 'OPD' | 'Casualty', doa?: string) => void;
@@ -34,6 +38,44 @@ type SourceSection = 'OPD' | 'Casualty';
 const SOURCE_STYLE: Record<SourceSection, { badge: string; header: string; addBtn: string; accent: string }> = {
   OPD:      { badge: 'bg-teal-100 text-teal-800',   header: 'bg-teal-50 border-teal-200 text-teal-800',       addBtn: 'bg-teal-600 hover:bg-teal-700 text-white',   accent: '#0d9488' },
   Casualty: { badge: 'bg-orange-100 text-orange-800', header: 'bg-orange-50 border-orange-200 text-orange-800', addBtn: 'bg-orange-500 hover:bg-orange-600 text-white', accent: '#f97316' },
+};
+
+/** Small tappable thumbnail strip of a patient's investigations — reuses the
+ * same signed-URL resolution and fullscreen viewer already built for
+ * radiology/culture reports, so X-rays, PDFs, etc. all just work here too. */
+const InvestigationThumb: React.FC<{ inv: Investigation; onClick: () => void }> = ({ inv, onClick }) => {
+  const cfg = getModality(inv.type);
+  const Icon = cfg.Icon;
+  const signedUrl = useSignedUrl(inv.imageUrl);
+  const isPdf = !!inv.imageUrl && isPdfPath(inv.imageUrl);
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={`View ${inv.type}`}
+      className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center ${cfg.bg}`}
+    >
+      {inv.imageUrl && !isPdf && signedUrl
+        ? <img src={signedUrl} alt={inv.type} className="w-full h-full object-cover" />
+        : <Icon className="w-5 h-5 text-white/70" />}
+    </button>
+  );
+};
+
+const InvestigationThumbs: React.FC<{ investigations: Investigation[] }> = ({ investigations }) => {
+  const [lightboxInv, setLightboxInv] = useState<Investigation | null>(null);
+  if (investigations.length === 0) return null;
+
+  return (
+    <>
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        {investigations.map(inv => (
+          <InvestigationThumb key={inv.id} inv={inv} onClick={() => setLightboxInv(inv)} />
+        ))}
+      </div>
+      {lightboxInv && <Lightbox inv={lightboxInv} onClose={() => setLightboxInv(null)} />}
+    </>
+  );
 };
 
 const AdmissionListTable: React.FC<{
@@ -112,90 +154,160 @@ const AdmissionListTable: React.FC<{
           No {source} admissions for this date
         </div>
       ) : (
-        <div className="overflow-x-auto bg-white">
-          {/* table-fixed forces the browser to honour the colgroup widths strictly.
-              Without it, the auto layout expands Name and squeezes Diagnosis. */}
-          <table className="w-full min-w-[860px] text-sm table-fixed">
-            <colgroup>
-              <col className="w-10" />          {/* Sl */}
-              <col className="w-[88px]" />      {/* IP No */}
-              <col className="w-[150px]" />     {/* Name */}
-              <col className="w-[72px]" />      {/* Age/Sex */}
-              <col />                           {/* Diagnosis — takes all remaining space */}
-              <col className="w-[128px]" />     {/* Mobile */}
-              <col className="w-[88px]" />      {/* Actions */}
-            </colgroup>
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                <th className="px-3 py-2.5 text-center">Sl</th>
-                <th className="px-3 py-2.5 text-left">IP No</th>
-                <th className="px-3 py-2.5 text-left">Name</th>
-                <th className="px-3 py-2.5 text-center">Age/Sex</th>
-                <th className="px-3 py-2.5 text-left">Diagnosis</th>
-                <th className="px-3 py-2.5 text-left">Mobile</th>
-                <th className="px-3 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {patients.map((p, idx) => (
-                <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
-                  <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
-                  <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
-                  <td className="px-3 py-3 font-semibold text-slate-800 break-words">{p.name}</td>
-                  <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
-                    {p.age}<span className="text-slate-400 mx-0.5">/</span>
-                    <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
-                  </td>
-                  <td className="px-3 py-3 text-slate-700 leading-snug break-words">{p.diagnosis}</td>
-                  <td className="px-3 py-3 font-mono text-slate-600 break-all">{p.mobile || '—'}</td>
-                  <td className="px-3 py-2.5">
+        <>
+          {/* Desktop: fixed-width table (also the layout the PDF export mirrors) */}
+          <div className="hidden md:block overflow-x-auto bg-white">
+            {/* table-fixed forces the browser to honour the colgroup widths strictly.
+                Without it, the auto layout expands Name and squeezes Diagnosis. */}
+            <table className="w-full min-w-[860px] text-sm table-fixed">
+              <colgroup>
+                <col className="w-10" />          {/* Sl */}
+                <col className="w-[88px]" />      {/* IP No */}
+                <col className="w-[150px]" />     {/* Name */}
+                <col className="w-[72px]" />      {/* Age/Sex */}
+                <col />                           {/* Diagnosis — takes all remaining space */}
+                <col className="w-[128px]" />     {/* Mobile */}
+                <col className="w-[88px]" />      {/* Actions */}
+              </colgroup>
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
+                  <th className="px-3 py-2.5 text-center">Sl</th>
+                  <th className="px-3 py-2.5 text-left">IP No</th>
+                  <th className="px-3 py-2.5 text-left">Name</th>
+                  <th className="px-3 py-2.5 text-center">Age/Sex</th>
+                  <th className="px-3 py-2.5 text-left">Diagnosis</th>
+                  <th className="px-3 py-2.5 text-left">Mobile</th>
+                  <th className="px-3 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {patients.map((p, idx) => (
+                  <tr key={p.ipNo} className={`transition-colors ${confirmIpNo === p.ipNo ? 'bg-red-50' : 'hover:bg-slate-50'}`}>
+                    <td className="px-3 py-3 text-center text-slate-400 font-mono text-xs">{idx + 1}</td>
+                    <td className="px-3 py-3 font-mono text-xs text-slate-600">{p.ipNo}</td>
+                    <td className="px-3 py-3 font-semibold text-slate-800 break-words">{p.name}</td>
+                    <td className="px-3 py-3 text-center whitespace-nowrap text-slate-600">
+                      {p.age}<span className="text-slate-400 mx-0.5">/</span>
+                      <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
+                    </td>
+                    <td className="px-3 py-3 text-slate-700 leading-snug break-words">{p.diagnosis}</td>
+                    <td className="px-3 py-3 font-mono text-slate-600 break-all">{p.mobile || '—'}</td>
+                    <td className="px-3 py-2.5">
+                      {confirmIpNo === p.ipNo ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmDelete(p)}
+                            className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                          >
+                            <AlertTriangle className="w-3 h-3" /> Delete
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmIpNo(null)}
+                            className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          {onEdit && (
+                            <button
+                              type="button"
+                              onClick={() => onEdit(p)}
+                              className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                              title="Edit patient"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {onDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteClick(p)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Remove from list"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: card list with inline imaging thumbnails — for walking
+              through admissions + X-rays with the unit chief before rounds */}
+          <div className="md:hidden divide-y divide-slate-100 bg-white">
+            {patients.map((p, idx) => (
+              <div key={p.ipNo} className={`p-3 space-y-2 ${confirmIpNo === p.ipNo ? 'bg-red-50' : ''}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-slate-400 font-mono shrink-0">#{idx + 1}</span>
+                      <span className="font-semibold text-slate-800 truncate">{p.name}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      <span className="font-mono">IP {p.ipNo}</span> · {p.age}/
+                      <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
+                      {p.mobile && <> · <span className="font-mono">{p.mobile}</span></>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
                     {confirmIpNo === p.ipNo ? (
-                      <div className="flex items-center gap-1">
+                      <>
                         <button
                           type="button"
                           onClick={() => handleConfirmDelete(p)}
-                          className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                          className="flex items-center gap-1 px-2 py-1.5 min-h-11 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors"
                         >
-                          <AlertTriangle className="w-3 h-3" /> Delete
+                          <AlertTriangle className="w-3.5 h-3.5" /> Delete
                         </button>
                         <button
                           type="button"
                           onClick={() => setConfirmIpNo(null)}
-                          className="px-2 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                          className="px-2 py-1.5 min-h-11 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors"
                         >
                           Cancel
                         </button>
-                      </div>
+                      </>
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <>
                         {onEdit && (
                           <button
                             type="button"
                             onClick={() => onEdit(p)}
-                            className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
-                            title="Edit patient"
+                            aria-label={`Edit ${p.name}`}
+                            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-4 h-4" />
                           </button>
                         )}
                         {onDelete && (
                           <button
                             type="button"
                             onClick={() => handleDeleteClick(p)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Remove from list"
+                            aria-label={`Remove ${p.name} from list`}
+                            className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         )}
-                      </div>
+                      </>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-700 leading-snug">{p.diagnosis || '—'}</p>
+                <InvestigationThumbs investigations={p.investigations} />
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -213,7 +325,7 @@ const OtherAdmissionsTable: React.FC<{
         <span className="text-sm font-semibold">Other admissions (no source set)</span>
         <span className="text-xs text-slate-400">{patients.length}</span>
       </div>
-      <div className="overflow-x-auto bg-white">
+      <div className="hidden md:block overflow-x-auto bg-white">
         <table className="w-full min-w-[860px] text-sm table-fixed">
           <colgroup>
             <col className="w-10" />
@@ -280,6 +392,57 @@ const OtherAdmissionsTable: React.FC<{
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="md:hidden divide-y divide-slate-100 bg-white">
+        {patients.map((p, idx) => (
+          <div key={p.ipNo} className={`p-3 space-y-2 ${confirmIpNo === p.ipNo ? 'bg-red-50' : ''}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xs text-slate-400 font-mono shrink-0">#{idx + 1}</span>
+                  <span className="font-semibold text-slate-800 truncate">{p.name}</span>
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  <span className="font-mono">IP {p.ipNo}</span> · {p.age}/
+                  <span className={p.gender === 'Female' ? 'text-pink-600' : 'text-blue-600'}>{p.gender[0]}</span>
+                  {p.mobile && <> · <span className="font-mono">{p.mobile}</span></>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {confirmIpNo === p.ipNo ? (
+                  <>
+                    <button type="button" onClick={() => { setConfirmIpNo(null); onDelete?.(p); }}
+                      className="flex items-center gap-1 px-2 py-1.5 min-h-11 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Delete
+                    </button>
+                    <button type="button" onClick={() => setConfirmIpNo(null)}
+                      className="px-2 py-1.5 min-h-11 text-slate-500 hover:text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-100 transition-colors">
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {onEdit && (
+                      <button type="button" onClick={() => onEdit(p)} aria-label={`Edit ${p.name}`}
+                        className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button type="button" onClick={() => setConfirmIpNo(p.ipNo)} aria-label={`Remove ${p.name} from list`}
+                        className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-slate-700 leading-snug">{p.diagnosis || '—'}</p>
+            <InvestigationThumbs investigations={p.investigations} />
+          </div>
+        ))}
       </div>
     </div>
   );
