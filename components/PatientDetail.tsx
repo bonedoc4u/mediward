@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef, lazy, Suspense } from 'rea
 import { useApp, useConfig } from '../contexts/AppContext';
 import { PatientStatus } from '../types';
 import { can } from '../utils/permissions';
-import { getLabTrend, needsPac, wardOptionsForPatient } from '../utils/calculations';
+import { getLabTrend, needsPac, wardOptionsForPatient, isShortDiagnosisCode } from '../utils/calculations';
 import {
   ArrowLeft, Phone, MessageCircle, Activity, FileImage,
   Droplet, ClipboardCheck, CheckSquare, HeartPulse,
@@ -130,7 +130,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
   const isAlreadyDischarged = patient.patientStatus === PatientStatus.Discharged;
   const statusBadge        = STATUS_BADGE[patient.patientStatus] ?? DEFAULT_STATUS;
   const pacBadge           = PAC_BADGE[patient.pacStatus] ?? PAC_BADGE['PAC Pending'];
-  const isDiagCode         = /^[#A-Z]\w{2,}$/.test(editDiagnosis.trim());
+  const isDiagCode         = isShortDiagnosisCode(patient.diagnosis);
   const moveBedWardOptions = wardOptionsForPatient(wards, patient.unit);
 
   const handleDischarge = () => {
@@ -304,7 +304,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                 <input
                   value={isDiagCode && !diagExpanded ? '' : editDiagnosis}
                   placeholder={isDiagCode && !diagExpanded ? 'Tap code to expand…' : 'Enter diagnosis'}
-                  onChange={e => { setEditDiagnosis(e.target.value); setDiagExpanded(false); }}
+                  onChange={e => setEditDiagnosis(e.target.value)}
                   onBlur={() => {
                     if (editDiagnosis.trim() && editDiagnosis !== patient.diagnosis) {
                       updatePatient({ ...patient, diagnosis: editDiagnosis.trim() });

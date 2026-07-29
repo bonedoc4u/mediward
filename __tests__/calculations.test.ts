@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort, reconcilePlannedDos } from '../utils/calculations';
+import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort, reconcilePlannedDos, isShortDiagnosisCode } from '../utils/calculations';
 import { PacStatus } from '../types';
 import type { Patient, WardConfig } from '../types';
 
@@ -262,5 +262,31 @@ describe('getAdmissionDayCohort (Admission List day cohort / Next-Previous patie
     const patients = [p('1', '2026-07-28', undefined)];
     const cohort = getAdmissionDayCohort(patients, '2026-07-28', 'OR1').map(x => x.ipNo);
     expect(cohort).toEqual(['1']);
+  });
+});
+
+describe('isShortDiagnosisCode (PatientDetail diagnosis chip/expand)', () => {
+  it('treats a short single-word placeholder as a code', () => {
+    expect(isShortDiagnosisCode('Left')).toBe(true);
+  });
+
+  it('treats a #-prefixed shorthand as a code', () => {
+    expect(isShortDiagnosisCode('#NOF')).toBe(true);
+  });
+
+  it('does not treat a full multi-word diagnosis as a code', () => {
+    // Regression: this must stay false for every intermediate value typed on
+    // the way to this string too — checked against the saved diagnosis only,
+    // never live keystroke-by-keystroke, so PatientDetail must not call this
+    // against a live typing buffer (see PatientDetail.tsx's isDiagCode).
+    expect(isShortDiagnosisCode('Left both bone forearm fracture')).toBe(false);
+  });
+
+  it('does not treat an empty diagnosis as a code', () => {
+    expect(isShortDiagnosisCode('')).toBe(false);
+  });
+
+  it('does not treat a 1-2 character value as a code', () => {
+    expect(isShortDiagnosisCode('Le')).toBe(false);
   });
 });

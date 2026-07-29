@@ -245,6 +245,17 @@ export const wardOptionsForPatient = (wards: WardConfig[], patientUnit: string |
   return active.filter(w => !w.unit?.length || w.unit.includes(patientUnit) || w.isIcu);
 };
 
+/**
+ * True when a diagnosis is a short placeholder code (e.g. "Left", "#NOF")
+ * rather than a full write-up — PatientDetail collapses these into a
+ * tap-to-expand chip instead of showing them as if they were the real
+ * diagnosis. Must be checked against the SAVED diagnosis, never a live
+ * typing buffer — any real diagnosis starting with one word of 3+ letters
+ * ("Left", "Right", "Fracture"...) matches this pattern for the instant
+ * between finishing that word and typing the next one.
+ */
+export const isShortDiagnosisCode = (diagnosis: string): boolean => /^[#A-Z]\w{2,}$/.test(diagnosis.trim());
+
 export const groupByWard = (patients: Patient[]): Record<string, Patient[]> => {
   const groups: Record<string, Patient[]> = {};
   patients.forEach(p => {
