@@ -126,6 +126,16 @@ export const needsPac = (p: Patient): boolean =>
  *  patient into these lists. */
 export const hasPendingSurgery = (p: Patient): boolean => !p.dos || !!p.plannedDos;
 
+/** When a surgery date is set/corrected directly (e.g. via the Edit Patient
+ *  form, rather than the dedicated "Add Surgery" action), any existing
+ *  plannedDos on or before that date refers to the surgery just recorded,
+ *  not a still-upcoming one — clear it. A plannedDos further in the future
+ *  is a genuinely separate second surgery and is left untouched. Without
+ *  this, hasPendingSurgery's invariant is violated and an already-operated
+ *  patient can be stuck showing as pending indefinitely. */
+export const reconcilePlannedDos = (plannedDos: string | undefined, newDos: string | undefined): string | undefined =>
+  (plannedDos && newDos && plannedDos <= newDos) ? undefined : plannedDos;
+
 /** Computes the field updates for recording a new (possibly second) surgery.
  *  If the patient already has a current surgery (`dos` set), it is archived
  *  into `priorSurgeries` before being overwritten — this is what lets a

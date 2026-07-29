@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort } from '../utils/calculations';
+import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort, reconcilePlannedDos } from '../utils/calculations';
 import { PacStatus } from '../types';
 import type { Patient, WardConfig } from '../types';
 
@@ -128,6 +128,32 @@ describe('hasPendingSurgery (OT pending-list / ward "Pending" view membership)',
     // Regression: this patient was previously permanently excluded from the
     // pending list because both filters hard-checked `!p.dos`.
     expect(hasPendingSurgery({ dos: '2026-06-01', plannedDos: '2026-08-01' } as Patient)).toBe(true);
+  });
+});
+
+describe('reconcilePlannedDos (Edit Patient form recording a surgery date directly)', () => {
+  it('clears plannedDos when it is on or before the newly-recorded surgery date', () => {
+    // Regression: a patient planned for surgery on 2026-07-01 whose actual
+    // operation (delayed) was entered as dos=2026-07-17 via the Edit Patient
+    // form stayed on the Pending list forever, because plannedDos was never
+    // cleared outside the dedicated "Add Surgery" action.
+    expect(reconcilePlannedDos('2026-07-01', '2026-07-17')).toBeUndefined();
+  });
+
+  it('clears plannedDos when it exactly matches the new surgery date', () => {
+    expect(reconcilePlannedDos('2026-07-17', '2026-07-17')).toBeUndefined();
+  });
+
+  it('leaves a genuinely future second-surgery plan untouched', () => {
+    expect(reconcilePlannedDos('2026-08-01', '2026-07-17')).toBe('2026-08-01');
+  });
+
+  it('returns undefined when there was no plannedDos to begin with', () => {
+    expect(reconcilePlannedDos(undefined, '2026-07-17')).toBeUndefined();
+  });
+
+  it('leaves plannedDos untouched when the surgery date is being cleared', () => {
+    expect(reconcilePlannedDos('2026-08-01', undefined)).toBe('2026-08-01');
   });
 });
 

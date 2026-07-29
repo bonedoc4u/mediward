@@ -11,6 +11,7 @@ import { useComorbidityPresets } from '../hooks/useComorbidityPresets';
 import PresetEditor from './admission/PresetEditor';
 import { validateName, validateDiagnosis, validateMobile } from '../utils/patientValidation';
 import { todayYmd } from '../utils/dates';
+import { reconcilePlannedDos } from '../utils/calculations';
 
 interface Props {
   isOpen: boolean;
@@ -608,6 +609,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       return;
     }
     setIsSubmitting(true);
+    const newDos = formData.dos || undefined;
     const patientData: Patient = {
       ...((initialData || {}) as any),
       bed: formData.bed,
@@ -628,7 +630,8 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       drugAllergies,
       doa: formData.doa,
       procedure: formData.procedure,
-      dos: formData.dos || undefined,
+      dos: newDos,
+      plannedDos: reconcilePlannedDos(initialData?.plannedDos, newDos),
       pacStatus: formData.pacStatus as PacStatus,
       patientStatus: formData.patientStatus,
       dailyRounds: initialData?.dailyRounds || [],
