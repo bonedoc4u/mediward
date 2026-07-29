@@ -14,6 +14,7 @@ import { WardConfig, LabTypeConfig, HospitalConfig, MedicationConfig, Department
 import {
   fetchWards, createWard, updateWard, deleteWard,
   fetchLabTypes, createLabType, updateLabType, deleteLabType,
+  fetchUnitChiefs, upsertUnitChief,
   fetchHospitalConfig, upsertHospitalConfig,
   fetchMedications, createMedication, updateMedication, deleteMedication,
   seedDefaultMedications,
@@ -101,7 +102,7 @@ interface ConfigContextType {
 
   /** Unit → surgeon name mapping for OT list auto-fill. */
   unitChiefs: Record<string, string>;
-  setUnitChief: (unit: string, name: string) => void;
+  setUnitChief: (unit: string, name: string) => Promise<void>;
 
   /** Hospital name (used in PDF/Excel exports). */
   hospitalName: string;
@@ -205,13 +206,16 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [templateOverride, setTemplateOverride] = useState<DepartmentTemplateOverride | null>(null);
 
-  const setUnitChief = useCallback((unit: string, name: string) => {
+  const setUnitChief = useCallback(async (unit: string, name: string) => {
+    const effectiveHospitalId = viewingHospitalId ?? user?.hospitalId;
+    if (!effectiveHospitalId) return;
+    await upsertUnitChief(effectiveHospitalId, unit, name);
     setUnitChiefsState(prev => {
       const next = { ...prev, [unit]: name };
       saveToStorage(UNIT_CHIEFS_CACHE_KEY, next);
       return next;
     });
-  }, []);
+  }, [viewingHospitalId, user?.hospitalId]);
 
   // Background fetch — re-runs when the logged-in user changes OR when a superadmin
   // switches to a different hospital workspace.
@@ -225,10 +229,11 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const hid = viewingHospitalId ?? user?.hospitalId ?? undefined;
 
     const loadAll = () => {
-      Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchHospitalConfig(hid), fetchMedications(hid)])
-        .then(([freshWards, freshLabs, freshHospital, freshMeds]) => {
+      Promise.all([fetchWards(hid), fetchLabTypes(hid), fetchUnitChiefs(hid), fetchHospitalConfig(hid), fetchMedications(hid)])
+        .then(([freshWards, freshLabs, freshChiefs, freshHospital, freshMeds]) => {
           setWards(freshWards);
           setLabTypes(freshLabs);
+          setUnitChiefsState(freshChiefs);
           setHospitalConfigState(prev => {
             // Only stamp configUpdatedAt when the config actually changes (not on first load)
             if (prev.hospitalName && prev.hospitalName !== freshHospital.hospitalName) {
@@ -243,6 +248,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (!viewingHospitalId) {
             saveToStorage(WARD_CACHE_KEY, freshWards);
             saveToStorage(LAB_CACHE_KEY, freshLabs);
+            saveToStorage(UNIT_CHIEFS_CACHE_KEY, freshChiefs);
             saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, freshHospital);
             saveToStorage(MED_CACHE_KEY, freshMeds);
           }

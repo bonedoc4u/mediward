@@ -679,7 +679,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             type="text"
             value={surgeon}
             onChange={e => setSurgeon(e.target.value)}
-            placeholder="e.g. DR. JACOB MATHEW"
+            placeholder="Surgeon name…"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
           />
         </div>

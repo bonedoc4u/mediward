@@ -130,6 +130,25 @@ export async function deleteLabType(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Unit Chiefs ───
+
+export async function fetchUnitChiefs(hospitalId?: string): Promise<Record<string, string>> {
+  let query = supabase.from('unit_chiefs').select('unit, chief_name');
+  if (hospitalId) query = query.eq('hospital_id', hospitalId);
+  const { data, error } = await query;
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  for (const row of data ?? []) map[String(row.unit)] = String(row.chief_name ?? '');
+  return map;
+}
+
+export async function upsertUnitChief(hospitalId: string, unit: string, chiefName: string): Promise<void> {
+  const { error } = await supabase
+    .from('unit_chiefs')
+    .upsert({ hospital_id: hospitalId, unit, chief_name: chiefName }, { onConflict: 'hospital_id,unit' });
+  if (error) throw error;
+}
+
 // ─── Hospital Config ───
 
 const DEFAULT_PREOP_TEMPLATE = [
