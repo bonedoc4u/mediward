@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useConfig } from '../../contexts/AppContext';
 import { Save, Plus, Building2, ClipboardList, ToggleRight, UserCheck, ShieldAlert, Layers, Zap } from 'lucide-react';
 
@@ -29,6 +29,24 @@ const FEATURE_FLAGS = [
   { id: 'rehabilitation',    label: 'Rehabilitation',          description: 'Shows the Rehabilitation section in Patient Detail (weight bearing status, physiotherapy, ROM notes, discharge plan). Hidden by default.' },
   { id: 'news2',             label: 'NEWS2 Score',             description: 'Shows the National Early Warning Score 2 column on the ward dashboard and the NEWS2 badge in Vitals. Disable for departments that do not use NEWS2.' },
 ] as const;
+
+// ─── Unit Chief input — local draft while typing, saves (a real DB write) on blur
+// only, so every keystroke doesn't fire a network request. ───
+const UnitChiefInput: React.FC<{ value: string; onSave: (name: string) => void }> = ({ value, onSave }) => {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  return (
+    <input
+      type="text"
+      value={draft}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={() => { if (draft !== value) onSave(draft); }}
+      placeholder="Surgeon name…"
+      className="flex-1 text-sm border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+    />
+  );
+};
 
 // ─── Hospital Settings panel ───
 const HospitalSettings: React.FC = () => {
@@ -399,13 +417,7 @@ const HospitalSettings: React.FC = () => {
           {unitOptions.map(unit => (
             <div key={unit} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg bg-slate-50">
               <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded w-10 text-center shrink-0">{unit}</span>
-              <input
-                type="text"
-                value={unitChiefs[unit] ?? ''}
-                onChange={e => setUnitChief(unit, e.target.value)}
-                placeholder="Surgeon name…"
-                className="flex-1 text-sm border border-slate-300 rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-              />
+              <UnitChiefInput value={unitChiefs[unit] ?? ''} onSave={name => setUnitChief(unit, name)} />
             </div>
           ))}
         </div>

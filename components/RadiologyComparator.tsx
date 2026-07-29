@@ -3,7 +3,7 @@ import { Patient, Investigation } from '../types';
 import { useAuth } from '../contexts/AppContext';
 import {
   ImageIcon, Camera, X,
-  CloudUpload, FileDown, Loader2, Search, ChevronDown, Leaf,
+  CloudUpload, FileDown, Loader2, Search, ChevronDown, ChevronRight, Leaf,
   Crop as CropIcon,
 } from 'lucide-react';
 import ImageEditor from './radiology/ImageEditor';
@@ -18,6 +18,7 @@ import { exportRadiologyPDF } from '../utils/exportRadiologyPDF';
 import { compressImage } from '../utils/imageUtils';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { todayYmd } from '../utils/dates';
+import { getAdmissionDayCohort } from '../utils/calculations';
 
 type RadPhase = 'preop' | 'postop';
 
@@ -465,6 +466,14 @@ const RadiologyComparator: React.FC<Props> = ({
   const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
   const investigations  = selectedPatient?.investigations ?? [];
 
+  // Fills the empty state before a patient is picked — same day-cohort logic
+  // Admission List uses, so a freshly admitted patient is one tap away
+  // instead of typing their name into search.
+  const todaysAdmissions = useMemo(
+    () => getAdmissionDayCohort(patients, todayYmd(), user?.unit),
+    [patients, user?.unit],
+  );
+
   // Split into pre/post — legacy scans without phase: compare date to DOS
   const { preOpScans, postOpScans } = useMemo(() => {
     const dos = selectedPatient?.dos;
@@ -631,12 +640,41 @@ const RadiologyComparator: React.FC<Props> = ({
       </div>
 
       {!selectedPatient ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50
-                        rounded-xl border-2 border-dashed border-slate-200 p-16 text-center">
-          <ImageIcon className="w-10 h-10 text-slate-200 mb-3" />
-          <p className="text-sm font-semibold text-slate-500">Select a patient above</p>
-          <p className="text-xs text-slate-400 mt-1">X-Rays, CT, MRI and reports will appear here</p>
-        </div>
+        todaysAdmissions.length > 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Today's Admissions</p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {todaysAdmissions.map(p => (
+                <button
+                  key={p.ipNo}
+                  type="button"
+                  onClick={() => onPatientSelect(p.ipNo)}
+                  className="w-full flex items-center gap-3 px-4 py-3 min-h-11 text-left hover:bg-slate-50 transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold font-mono text-slate-500">{p.bed}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
+                    <p className="text-[11px] text-slate-400">
+                      IP: {p.ipNo} · {p.investigations.length > 0 ? `${p.investigations.length} scan${p.investigations.length !== 1 ? 's' : ''}` : 'No scans yet'}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center bg-slate-50
+                          rounded-xl border-2 border-dashed border-slate-200 p-16 text-center">
+            <ImageIcon className="w-10 h-10 text-slate-200 mb-3" />
+            <p className="text-sm font-semibold text-slate-500">Select a patient above</p>
+            <p className="text-xs text-slate-400 mt-1">X-Rays, CT, MRI and reports will appear here</p>
+          </div>
+        )
       ) : (
         <>
           {/* Patient header */}
