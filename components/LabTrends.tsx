@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, LabResult } from '../types';
+import { Patient, LabResult, LabTypeConfig } from '../types';
+import { useConfig } from '../contexts/AppContext';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
-  ReferenceArea, ResponsiveContainer,
+  ReferenceLine, ResponsiveContainer,
 } from 'recharts';
 import { Activity, Plus, TrendingDown, TrendingUp, Minus, Search, ChevronDown } from 'lucide-react';
 import { todayYmd } from '../utils/dates';
@@ -12,22 +13,6 @@ interface Props {
   onAddResult: (patientId: string, result: LabResult) => void;
   initialPatientId?: string;
 }
-
-// ─── Lab Parameters ───────────────────────────────────────────────────────────
-interface LabParam {
-  id: string;
-  name: string;
-  unit: string;
-  refMin: number | null;
-  refMax: number;
-}
-
-const LAB_PARAMS: LabParam[] = [
-  { id: 'fbs',  name: 'FBS',  unit: 'mg/dL', refMin: 70,   refMax: 100 },
-  { id: 'ppbs', name: 'PPBS', unit: 'mg/dL', refMin: null, refMax: 140 },
-  { id: 'esr',  name: 'ESR',  unit: 'mm/hr', refMin: 0,    refMax: 20  },
-  { id: 'crp',  name: 'CRP',  unit: 'mg/L',  refMin: 0,    refMax: 5   },
-];
 
 interface LabEntry { id: string; date: string; value: number; }
 
@@ -53,7 +38,7 @@ const BottomSheet: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
 // ─── Add Entry Sheet ──────────────────────────────────────────────────────────
 const AddEntrySheet: React.FC<{
   isOpen: boolean;
-  param: LabParam | null;
+  param: LabTypeConfig | null;
   onClose: () => void;
   onSave: (paramId: string, entry: LabEntry) => void;
 }> = ({ isOpen, param, onClose, onSave }) => {
@@ -61,8 +46,7 @@ const AddEntrySheet: React.FC<{
   const [date, setDate]   = useState(todayYmd());
 
   const numVal  = parseFloat(value);
-  const isHigh  = !isNaN(numVal) && !!param && numVal > param.refMax;
-  const isLow   = !isNaN(numVal) && !!param && param.refMin != null && numVal < param.refMin;
+  const isHigh  = !isNaN(numVal) && !!param && param.alertHigh !== null && numVal > param.alertHigh;
   const isValid = value !== '' && !isNaN(numVal) && !!date;
 
   const handleSave = () => {
@@ -75,18 +59,14 @@ const AddEntrySheet: React.FC<{
 
   const borderClass = isHigh
     ? 'border-vital-critical-border focus-within:border-vital-critical'
-    : isLow
-    ? 'border-vital-low-border focus-within:border-vital-low'
     : 'border-line focus-within:border-accent';
 
-  const hintClass = isHigh ? 'text-vital-critical-fg' : isLow ? 'text-vital-low-fg' : 'text-ink-faint';
+  const hintClass = isHigh ? 'text-vital-critical-fg' : 'text-ink-faint';
 
   const hintText = isHigh
-    ? `↑ Above normal (>${param?.refMax})`
-    : isLow
-    ? `↓ Below normal (<${param?.refMin})`
-    : param
-    ? `Normal range: ${param.refMin != null ? `${param.refMin}–` : '<'}${param.refMax} ${param.unit}`
+    ? `↑ Above alert threshold (>${param?.alertHigh})`
+    : param?.alertHigh != null
+    ? `Alert threshold: >${param.alertHigh} ${param.unit}`
     : '';
 
   return (
@@ -144,16 +124,15 @@ const AddEntrySheet: React.FC<{
 
 // ─── Lab Chart Card ───────────────────────────────────────────────────────────
 const LabChartCard: React.FC<{
-  param: LabParam;
+  param: LabTypeConfig;
   entries: LabEntry[];
   onAddEntry: (paramId: string) => void;
 }> = ({ param, entries, onAddEntry }) => {
   const latest = entries[entries.length - 1];
   const prev   = entries[entries.length - 2];
 
-  const isHigh   = !!latest && latest.value > param.refMax;
-  const isLow    = !!latest && param.refMin != null && latest.value < param.refMin;
-  const isNormal = !!latest && !isHigh && !isLow;
+  const isHigh   = !!latest && param.alertHigh !== null && latest.value > param.alertHigh;
+  const isNormal = !!latest && !isHigh;
 
   const trendDir = prev && latest
     ? latest.value < prev.value ? 'down'
@@ -161,12 +140,9 @@ const LabChartCard: React.FC<{
     : 'flat'
     : null;
 
-  const strokeColor = isHigh ? 'var(--color-vital-critical)' : isLow ? 'var(--color-vital-low)' : 'var(--color-vital-normal)';
-  const borderClass = isHigh ? 'border-vital-critical-border' : isLow ? 'border-vital-low-border' : 'border-line';
-  const valueClass  = isHigh ? 'text-vital-critical-fg' : isLow ? 'text-vital-low-fg' : 'text-ink';
-
-  const refAreaY1 = param.refMin ?? 0;
-  const refAreaY2 = param.refMax;
+  const strokeColor = isHigh ? 'var(--color-vital-critical)' : 'var(--color-vital-normal)';
+  const borderClass = isHigh ? 'border-vital-critical-border' : 'border-line';
+  const valueClass  = isHigh ? 'text-vital-critical-fg' : 'text-ink';
 
   const TrendIcon = trendDir === 'down' ? TrendingDown : trendDir === 'up' ? TrendingUp : Minus;
   // down = improving toward/within normal range, up = worsening — reuse the vital-* semantics
@@ -185,7 +161,6 @@ const LabChartCard: React.FC<{
         </span>
         <div className="flex items-center gap-1">
           {isHigh   && <span className="text-[9px] font-bold bg-vital-critical-surface text-vital-critical-fg border border-vital-critical-border px-1.5 py-0.5 rounded-full">HIGH</span>}
-          {isLow    && <span className="text-[9px] font-bold bg-vital-low-surface text-vital-low-fg border border-vital-low-border px-1.5 py-0.5 rounded-full">LOW</span>}
           {isNormal && <span className="text-[9px] font-bold bg-vital-normal-surface text-vital-normal-fg border border-vital-normal-border px-1.5 py-0.5 rounded-full">NL</span>}
           {!latest  && <span className="text-[9px] font-bold bg-surface-sunken text-ink-faint px-1.5 py-0.5 rounded-full">No data</span>}
         </div>
@@ -215,7 +190,9 @@ const LabChartCard: React.FC<{
                   <stop offset="95%" stopColor={strokeColor} stopOpacity={0}    />
                 </linearGradient>
               </defs>
-              <ReferenceArea y1={refAreaY1} y2={refAreaY2} fill="var(--color-vital-normal-surface)" fillOpacity={0.8} strokeOpacity={0} />
+              {param.alertHigh !== null && (
+                <ReferenceLine y={param.alertHigh} stroke="var(--color-vital-critical)" strokeDasharray="3 3" strokeOpacity={0.6} />
+              )}
               <XAxis
                 dataKey="date"
                 tick={{ fontSize: 8, fill: 'var(--color-ink-muted)' }}
@@ -253,7 +230,7 @@ const LabChartCard: React.FC<{
       {/* Footer */}
       <div className="flex items-center justify-between mt-1">
         <span className="text-[9px] text-ink-faint font-mono">
-          Ref: {param.refMin != null ? `${param.refMin}–` : '<'}{param.refMax} {param.unit}
+          {param.alertHigh !== null ? `Alert: >${param.alertHigh} ${param.unit}` : 'No alert threshold'}
         </span>
         <button
           onClick={() => onAddEntry(param.id)}
@@ -353,26 +330,36 @@ const PatientPicker: React.FC<{
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = '' }) => {
+  const { labTypesByCategory } = useConfig();
   const [selectedId, setSelectedId] = useState(initialPatientId);
-  const [sheetParam, setSheetParam] = useState<LabParam | null>(null);
+  const [sheetParam, setSheetParam] = useState<LabTypeConfig | null>(null);
 
   const selectedPatient = patients.find(p => p.ipNo === selectedId);
+
+  // All active lab types this hospital has configured (Admin Settings → Lab
+  // Type Configuration), grouped by category — not a hardcoded list, so a
+  // newly-added lab type appears here immediately, matching what Admin
+  // Settings already tells the user to expect.
+  const allLabTypes = useMemo(
+    () => Array.from(labTypesByCategory.values()).flat(),
+    [labTypesByCategory],
+  );
 
   const entriesByParam = useMemo(() => {
     const results = selectedPatient?.labResults ?? [];
     const map: Record<string, LabEntry[]> = {};
-    for (const param of LAB_PARAMS) {
+    for (const param of allLabTypes) {
       map[param.id] = results
-        .filter(r => r.type.toUpperCase() === param.name)
+        .filter(r => r.type === param.name)
         .sort((a, b) => a.date.localeCompare(b.date))
         .map(r => ({ id: r.id, date: r.date, value: r.value }));
     }
     return map;
-  }, [selectedPatient]);
+  }, [selectedPatient, allLabTypes]);
 
   const handleSaveEntry = (paramId: string, entry: LabEntry) => {
     if (!selectedPatient) return;
-    const param = LAB_PARAMS.find(p => p.id === paramId);
+    const param = allLabTypes.find(p => p.id === paramId);
     if (!param) return;
     onAddResult(selectedPatient.ipNo, {
       id: entry.id,
@@ -421,24 +408,29 @@ const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = 
             </div>
           </div>
 
-          {/* 2×2 chart grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {LAB_PARAMS.map(param => (
-              <LabChartCard
-                key={param.id}
-                param={param}
-                entries={entriesByParam[param.id] ?? []}
-                onAddEntry={id => setSheetParam(LAB_PARAMS.find(p => p.id === id) ?? null)}
-              />
-            ))}
-          </div>
-
-          {/* Add investigation hook */}
-          <button className="w-full py-3 border-2 border-dashed border-line rounded-xl
-                             text-xs font-semibold text-ink-faint hover:border-accent
-                             hover:text-accent-fg transition-colors flex items-center justify-center gap-2">
-            <Plus className="w-3.5 h-3.5" /> Add investigation
-          </button>
+          {/* Chart grid, grouped by category */}
+          {allLabTypes.length === 0 ? (
+            <div className="bg-surface rounded-xl border-2 border-dashed border-line p-8 text-center">
+              <p className="text-sm font-semibold text-ink-muted">No lab types configured yet</p>
+              <p className="text-xs text-ink-faint mt-1">Add one in Admin Settings → Lab Type Configuration</p>
+            </div>
+          ) : (
+            Array.from(labTypesByCategory.entries()).map(([category, params]) => (
+              <div key={category} className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-faint">{category}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {params.map(param => (
+                    <LabChartCard
+                      key={param.id}
+                      param={param}
+                      entries={entriesByParam[param.id] ?? []}
+                      onAddEntry={id => setSheetParam(allLabTypes.find(p => p.id === id) ?? null)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
         </>
       )}
 
