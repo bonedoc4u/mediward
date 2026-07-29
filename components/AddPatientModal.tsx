@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { KeyboardAwareView } from './ui/KeyboardAwareView';
 import { Patient, Gender, PacStatus, PatientStatus, Ward, AdmissionSource } from '../types';
@@ -11,7 +11,7 @@ import { useComorbidityPresets } from '../hooks/useComorbidityPresets';
 import PresetEditor from './admission/PresetEditor';
 import { validateName, validateDiagnosis, validateMobile } from '../utils/patientValidation';
 import { todayYmd } from '../utils/dates';
-import { reconcilePlannedDos } from '../utils/calculations';
+import { reconcilePlannedDos, wardOptionsForPatient } from '../utils/calculations';
 
 interface Props {
   isOpen: boolean;
@@ -125,37 +125,17 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
-  // Effective unit for ward filtering and form default:
+  // Default unit for a brand-new patient (no unit of their own yet):
   // - non-admin → their own unit (fixed)
   // - admin viewing a specific unit → the unit the admin selected in the dashboard
-  // - admin viewing "all" → no filter (viewingUnit is undefined)
-  const effectiveUnit = user?.unit ?? (isAdmin ? viewingUnit : undefined);
-
-  const activeWards = wards
-    .filter(w => w.active)
-    .filter(w => {
-      if (!effectiveUnit) return true;
-      return !w.unit?.length || w.unit.includes(effectiveUnit) || w.isIcu;
-    })
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-  const defaultWard = activeWards[0]?.name ?? '';
+  // - admin viewing "all" → unassigned (viewingUnit is undefined)
   const defaultUnit = user?.unit ?? (viewingUnit ?? '');
 
-  useEffect(() => {
-    setFormData(prev => {
-      const wardStillValid = activeWards.some(w => w.name === prev.ward);
-      const firstWard = activeWards[0]?.name ?? '';
-      const correctUnit = !isAdmin && user?.unit ? user.unit
-                        : isAdmin && viewingUnit   ? viewingUnit
-                        : prev.unit ?? '';
-      return {
-        ...prev,
-        ward: wardStillValid ? prev.ward : (firstWard as Ward) || prev.ward,
-        unit: correctUnit,
-      };
-    });
-   
-  }, [activeWards.map(w => w.name).join(','), user?.unit]);
+  // Seed ward list for the initial form state only — scoped to the patient's
+  // own unit when editing (initialData.unit), or the default above for a new
+  // patient. Not used for rendering; see wardOptions below for that.
+  const seedWardOptions = wardOptionsForPatient(wards, (initialData?.unit ?? defaultUnit) || undefined);
+  const defaultWard = seedWardOptions[0]?.name ?? '';
 
   const STEP_KEY = 'mediward_admit_step';
 
@@ -215,6 +195,30 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
       admissionSource: defaultAdmissionSource ?? '',
     };
   });
+
+  // Ward options scoped to the patient's own unit (the currently-selected
+  // unit in this form) — not the logged-in admin's dashboard-viewing unit,
+  // which could differ from the patient being edited and would otherwise
+  // show wards from unrelated units in the picker.
+  const wardOptions = useMemo(
+    () => wardOptionsForPatient(wards, formData.unit || undefined),
+    [wards, formData.unit],
+  );
+
+  useEffect(() => {
+    setFormData(prev => {
+      const wardStillValid = wardOptions.some(w => w.name === prev.ward);
+      const firstWard = wardOptions[0]?.name ?? '';
+      const correctUnit = !isAdmin && user?.unit ? user.unit
+                        : isAdmin && viewingUnit   ? viewingUnit
+                        : prev.unit ?? '';
+      return {
+        ...prev,
+        ward: wardStillValid ? prev.ward : (firstWard as Ward) || prev.ward,
+        unit: correctUnit,
+      };
+    });
+  }, [wardOptions.map(w => w.name).join(','), user?.unit]);
 
   const handleFixIpNo = async () => {
     const trimmed = newIpNoValue.trim();
@@ -806,7 +810,7 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
           {/* ── Step 1: Location & Identity ── */}
           {step === 1 && (
             <div className="space-y-4">
-              {activeWards.length === 0 && (
+              {wardOptions.length === 0 && (
                 <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                   <span className="text-amber-500 shrink-0">⚠️</span>
                   <span>No wards configured yet. Go to <strong>Admin Settings → Wards</strong> and add your wards first.</span>
@@ -818,11 +822,11 @@ const AddPatientModal: React.FC<Props> = ({ isOpen, onClose, onSave, initialData
                   <BottomSheetPicker
                     title="Select Ward"
                     value={formData.ward}
-                    disabled={activeWards.length === 0}
+                    disabled={wardOptions.length === 0}
                     placeholder="— No wards configured —"
-                    options={activeWards.map(w => ({ value: w.name, label: w.name }))}
+                    options={wardOptions.map(w => ({ value: w.name, label: w.name }))}
                     onChange={val => {
-                      const selectedWard = activeWards.find(w => w.name === val);
+                      const selectedWard = wardOptions.find(w => w.name === val);
                       setFormData(prev => ({
                         ...prev,
                         ward: val as Ward,
