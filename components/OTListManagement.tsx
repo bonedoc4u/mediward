@@ -456,10 +456,14 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
       {/* Phone: floating button + bottom drawer (dragging onto a hidden table
           doesn't make sense once the drawer covers it, so this is a "+"-button-only
-          surface on phone — matches the drag cards' existing tap-to-add fallback) */}
+          surface on phone — matches the drag cards' existing tap-to-add fallback).
+          bottom uses --fab-bottom (index.css) instead of a fixed Tailwind
+          offset so it clears App.tsx's fixed mobile bottom-nav bar, which
+          renders after this and would otherwise paint over most of it. */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-full shadow-lg"
+        className="lg:hidden fixed right-6 z-40 flex items-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-full shadow-lg"
+        style={{ bottom: 'var(--fab-bottom)' }}
       >
         <UserPlus className="w-5 h-5" />
         Pending ({pendingPatients.length})
