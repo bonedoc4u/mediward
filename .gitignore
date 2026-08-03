@@ -16,3 +16,6 @@ android/build/
 # pnpm is the only supported package manager — never commit other lockfiles
 package-lock.json
 yarn.lock
+
+# Vitest coverage report output
+coverage/
