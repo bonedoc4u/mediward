@@ -1,0 +1,241 @@
+import React from 'react';
+import { GripVertical, Trash2 } from 'lucide-react';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
+import BottomSheetPicker from '../ui/BottomSheetPicker';
+import { OTPatient, OTType, getTableOptionsForType } from '../../utils/otListTypes';
+
+/** Exported for tests. */
+export const SortableRow = ({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 'auto',
+    position: isDragging ? 'relative' as const : undefined,
+    WebkitUserSelect: 'none' as const,
+    userSelect: 'none' as const,
+    WebkitTouchCallout: 'none' as const,
+  };
+
+  const childrenWithProps = React.Children.map(children, child => {
+    if (React.isValidElement(child) && (child.props as any)['data-drag-handle']) {
+        return React.cloneElement(child, { ...attributes, ...listeners } as any);
+    }
+    return child;
+  });
+
+  return (
+    <tr ref={setNodeRef} style={style} className={className}>
+      {childrenWithProps}
+    </tr>
+  );
+};
+
+/** Makes an entire category's <tbody> a real drop target (id = category
+ * name), so dropping onto an empty category — or a pending patient being
+ * assigned there — always registers, not just drops onto an existing row. */
+function CategoryDropZone({ category, isEmpty, children }: { category: string; isEmpty: boolean; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: category });
+  return (
+    <tbody
+      ref={setNodeRef}
+      className={`divide-y divide-slate-100 border-b-4 border-slate-100 transition-colors ${
+        isOver ? 'bg-teal-50 ring-2 ring-inset ring-teal-300' : ''
+      }`}
+    >
+      <tr className="bg-slate-100">
+        <td colSpan={13} className="p-2 px-4 font-bold text-slate-700 text-sm">
+          {category}
+        </td>
+      </tr>
+      {isEmpty ? (
+        <tr>
+          <td colSpan={13} className="p-4 text-center text-slate-400 text-xs italic">
+            Drag items here
+          </td>
+        </tr>
+      ) : children}
+    </tbody>
+  );
+}
+
+interface OTListTableProps {
+  activeTab: OTType;
+  groupedItems: Record<string, OTPatient[]>;
+  onUpdateEntry: (id: string, field: keyof OTPatient, value: string) => void;
+  onRemove: (id: string) => void;
+}
+
+const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUpdateEntry, onRemove }) => {
+  const options = getTableOptionsForType(activeTab);
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse min-w-[1200px]">
+        <thead>
+          <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+            <th className="p-4 w-12"></th>
+            <th className="p-4 w-32">Table/Category</th>
+            <th className="p-4 w-12">Seq</th>
+            <th className="p-4 w-28">IP Number</th>
+            <th className="p-4 w-20">Unit</th>
+            <th className="p-4 w-40">Name</th>
+            <th className="p-4 w-20">Age/Sex</th>
+            <th className="p-4 w-20">Ward</th>
+            <th className="p-4 w-48">Diagnosis</th>
+            <th className="p-4 w-48">Operation</th>
+            <th className="p-4 w-24">C-Arm</th>
+            <th className="p-4 w-48">Implants</th>
+            <th className="p-4 w-16"></th>
+          </tr>
+        </thead>
+        {options.map(category => (
+          <SortableContext
+              key={category}
+              id={category}
+              items={groupedItems[category] || []}
+              strategy={verticalListSortingStrategy}
+          >
+              <CategoryDropZone category={category} isEmpty={(groupedItems[category]?.length ?? 0) === 0}>
+                  {groupedItems[category]?.map((patient, index) => (
+                      <SortableRow key={patient.id} id={patient.id} className="hover:bg-slate-50 group bg-white">
+                          <td className="p-4 cursor-grab touch-none" data-drag-handle>
+                              <GripVertical className="w-4 h-4 text-slate-400" />
+                          </td>
+                          <td className="p-4">
+                              <BottomSheetPicker
+                                  title="Category"
+                                  value={patient.category || ''}
+                                  options={options.map(opt => ({ value: opt, label: opt }))}
+                                  onChange={val => onUpdateEntry(patient.id, 'category', val)}
+                                  triggerClassName="w-full text-sm font-bold text-slate-700 flex items-center gap-1 cursor-pointer p-0"
+                              />
+                          </td>
+                          <td className="p-4 text-slate-500 font-mono font-bold">
+                              {index + 1}
+                          </td>
+                          <td className="p-4">
+                              <input
+                                  type="text"
+                                  value={patient.ipNo}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'ipNo', e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 font-mono text-sm"
+                                  placeholder="IP No"
+                              />
+                          </td>
+                          <td className="p-4">
+                              <input
+                                  type="text"
+                                  value={patient.unit}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'unit', e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm"
+                                  placeholder="Unit"
+                              />
+                          </td>
+                          <td className="p-4 font-medium text-slate-900">
+                              <input
+                                  type="text"
+                                  value={patient.name}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'name', e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium"
+                                  placeholder="Name"
+                              />
+                          </td>
+                          <td className="p-4 text-slate-600">
+                              <div className="flex gap-1 items-center">
+                                  <input
+                                  type="text"
+                                  value={patient.age}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'age', e.target.value)}
+                                  className="w-8 bg-transparent border-b border-transparent focus:border-blue-500 focus:ring-0 p-0 text-center"
+                                  placeholder="Age"
+                                  />
+                                  <span className="text-slate-400">/</span>
+                                  <BottomSheetPicker
+                                      title="Gender"
+                                      value={patient.gender}
+                                      options={[{ value: 'M', label: 'M' }, { value: 'F', label: 'F' }]}
+                                      onChange={val => onUpdateEntry(patient.id, 'gender', val)}
+                                      triggerClassName="w-12 text-sm font-medium text-slate-700 flex items-center gap-0.5 cursor-pointer p-0"
+                                  />
+                              </div>
+                          </td>
+                          <td className="p-4">
+                              <input
+                                  type="text"
+                                  value={patient.ward}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'ward', e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm"
+                                  placeholder="Ward"
+                              />
+                          </td>
+                          <td className="p-4">
+                              <textarea
+                                  value={patient.diagnosis}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'diagnosis', e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none"
+                                  rows={2}
+                                  placeholder="Diagnosis"
+                              />
+                          </td>
+                          <td className="p-4">
+                              <textarea
+                                  value={patient.procedure}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'procedure', e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none"
+                                  rows={2}
+                                  placeholder="Operation"
+                              />
+                          </td>
+                          <td className="p-4">
+                              <BottomSheetPicker
+                                  title="C-Arm Required"
+                                  value={patient.cArm}
+                                  options={[{ value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }]}
+                                  onChange={val => onUpdateEntry(patient.id, 'cArm', val)}
+                                  triggerClassName="w-full text-sm font-medium text-slate-700 flex items-center gap-1 cursor-pointer p-0"
+                              />
+                          </td>
+                          <td className="p-4">
+                              <textarea
+                                  value={patient.implants}
+                                  onChange={(e) => onUpdateEntry(patient.id, 'implants', e.target.value)}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none text-slate-500"
+                                  rows={2}
+                                  placeholder="Implants..."
+                              />
+                          </td>
+                          <td className="p-4 text-right">
+                              <button
+                                  onClick={() => onRemove(patient.id)}
+                                  className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                  <Trash2 className="w-4 h-4" />
+                              </button>
+                          </td>
+                      </SortableRow>
+                  ))}
+              </CategoryDropZone>
+          </SortableContext>
+        ))}
+      </table>
+    </div>
+  );
+};
+
+export default OTListTable;
