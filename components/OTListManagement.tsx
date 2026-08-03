@@ -2,13 +2,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { UNIT_SCHEDULE, getOTCycleDates } from '../utils/otSchedule';
+import { getOTCycleDates } from '../utils/otSchedule';
+import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
+import { buildOTPatientEntry } from '../utils/otListAssign';
+import { preferRowCollision } from '../utils/otListCollision';
 import { hasPendingSurgery } from '../utils/calculations';
-import * as XLSX from 'xlsx-js-style';
-import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical, ShieldAlert } from 'lucide-react';
-import BottomSheetPicker from './ui/BottomSheetPicker';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
+import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
+import OTListTable from './otlist/OTListTable';
+import PendingSurgeryPanel from './otlist/PendingSurgeryPanel';
 import {
   DndContext,
   closestCenter,
@@ -21,100 +23,17 @@ import {
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
+  CollisionDetection,
 } from '@dnd-kit/core';
 import {
   arrayMove,
-  SortableContext,
   sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 interface OTListManagementProps {
   patients: Patient[];
   onUpdatePatient: (patient: Patient) => void;
 }
-
-interface OTPatient {
-  id: string;
-  sequence: number;
-  ipNo: string;
-  name: string;
-  age: string;
-  gender: 'M' | 'F' | string;
-  ward: string;
-  unit: string;
-  diagnosis: string;
-  procedure: string;
-  side: string;
-  anesthesia: string;
-  cArm: 'Yes' | 'No' | string;
-  implants: string;
-  remarks: string;
-  category?: string; // e.g., "Spinal Table", "Local Table"
-  otType: OTType;    // which OT list this entry belongs to
-}
-
-type OTType = 'Major' | 'Minor' | 'EOT';
-
-function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
-  const s = UNIT_SCHEDULE[unit?.toUpperCase()];
-  if (!s) return null;
-  const dow = new Date(dateStr + 'T00:00:00').getDay();
-  if (dow === s.majorDay)     return 'Major';
-  if (dow === s.minorDay)     return 'Minor';
-  if (dow === s.admissionDay) return 'EOT';
-  return null;
-}
-
-// Sortable Row Component
-/** Exported for tests. */
-export const SortableRow = ({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 1000 : 'auto',
-    position: isDragging ? 'relative' as const : undefined,
-    // touch-action must NOT be set here: an ancestor's touch-action:none blocks
-    // horizontal scroll (of the overflow-x-auto table wrapper) for every descendant
-    // touch, not just the drag handle's. The handle's own `touch-none` class
-    // (data-drag-handle cell below) is what dnd-kit's TouchSensor actually needs.
-    //
-    // But allowing normal panning again means an imprecise tap/drag near a
-    // picker can be read by iOS Safari as a text-selection drag across the
-    // row's plain-text cells. Suppress that at the row level — safe for the
-    // <input>/<textarea> cells nested inside, since user-select has no effect
-    // on a form control's own internals (it manages its own text selection).
-    WebkitUserSelect: 'none' as const,
-    userSelect: 'none' as const,
-    WebkitTouchCallout: 'none' as const,
-  };
-
-  // Clone children to inject listeners into the drag handle
-  const childrenWithProps = React.Children.map(children, child => {
-    if (React.isValidElement(child) && (child.props as any)['data-drag-handle']) {
-        return React.cloneElement(child, { ...attributes, ...listeners } as any);
-    }
-    return child;
-  });
-
-  return (
-    <tr ref={setNodeRef} style={style} className={className}>
-      {childrenWithProps}
-    </tr>
-  );
-};
 
 const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const { unitChiefs, hospitalName, department, weekendDuty } = useConfig();
@@ -144,9 +63,11 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const selectedDate    = activeTab === 'Major' ? majorDate : activeTab === 'Minor' ? minorDate : eotDate;
   const setSelectedDate = activeTab === 'Major' ? setMajorDate : activeTab === 'Minor' ? setMinorDate : setEotDate;
   const [otList, setOtList] = useState<OTPatient[]>([]);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Which category is the current resolved drag target (for the
+  // CategoryDropZone highlight — see handleDragOver for how it's resolved).
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [surgeonUnit, setSurgeonUnit] = useState(effectiveUnit);
   const [surgeon, setSurgeon] = useState('');
   const [otTime, setOtTime] = useState('8.00AM');
@@ -176,7 +97,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           if (existing.has(p.ipNo) || toAdd.some(x => x.ipNo === p.ipNo)) return;
           const unit     = (p.unit ?? '').toUpperCase();
           const otType   = getOTTypeForDate(unit, date) ?? fallbackType;
-          const category = getDefaultCategory(otType);
+          const category = getDefaultCategoryForType(otType);
           const seqBase  = prev.filter(x => x.otType === otType).length + toAdd.filter(x => x.otType === otType).length;
           toAdd.push({
             id: crypto.randomUUID(),
@@ -225,22 +146,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     !otList.some(ot => ot.ipNo === p.ipNo && ot.otType === activeTab)
   );
 
-  const filteredPending = pendingPatients.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.ipNo.includes(searchTerm)
-  );
-
-  const getTableOptions = (tab = activeTab) => {
-    if (tab === 'Major') return ['TABLE 1', 'TABLE 2'];
-    if (tab === 'Minor') return ['SPINAL TABLE', 'LOCAL TABLE'];
-    return ['SPINAL TABLE']; // EOT — single table
-  };
-
-  const getDefaultCategory = (tab = activeTab) => getTableOptions(tab)[0];
-
   // Group items by category for the active tab only
   const groupedItems = useMemo(() => {
-    const opts = getTableOptions();
+    const opts = getTableOptionsForType(activeTab);
     const groups: Record<string, OTPatient[]> = {};
     opts.forEach(opt => { groups[opt] = []; });
 
@@ -254,13 +162,29 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     return groups;
   }, [otList, activeTab]);
 
+  // closestCenter alone can resolve a drop to a category's <tbody> droppable
+  // instead of the specific row under the pointer (see utils/otListCollision
+  // for the root cause and why this must be category-aware, not just "any
+  // row anywhere" — the latter can silently assign a patient to the wrong
+  // OT table). Preferring a same-category row when one exists keeps
+  // reorders/assigns landing where the user aimed; falling back to the
+  // container is still correct for the empty-category case this mechanism
+  // exists for.
+  const collisionDetection: CollisionDetection = (args) => {
+    const collisions = closestCenter(args);
+    return preferRowCollision(collisions, otList);
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over) {
+      setDragOverCategory(null);
+      return;
+    }
 
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -268,13 +192,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     // Find the containers (categories)
     const activeItem = otList.find(i => i.id === activeId);
     const overItem = otList.find(i => i.id === overId);
-    
+
+    // Resolved drop-target category — drives the CategoryDropZone highlight
+    // for both an existing row being reordered and a pending card being
+    // assigned (neither of which is in `otList` as `activeItem` for the
+    // latter, so this is computed independently of activeItem).
+    const overCategory = overItem ? overItem.category : (getTableOptionsForType(activeTab).includes(overId) ? overId : null);
+    setDragOverCategory(overCategory ?? null);
+
     if (!activeItem) return;
 
     // If over a container (category header/empty space) or an item in a different category
     const activeCategory = activeItem.category;
-    const overCategory = overItem ? overItem.category : (getTableOptions().includes(overId) ? overId : null);
-
 
     if (activeCategory !== overCategory && overCategory) {
         setOtList((items) => {
@@ -291,14 +220,60 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setDragOverCategory(null);
+    if (!over) return;
 
-    if (active.id !== over?.id) {
+    const activeIdStr = active.id as string;
+
+    // A drag that started on a pending-panel card is an *assign*, not a
+    // reorder — build a new entry in whichever category it was dropped on.
+    if (activeIdStr.startsWith(PENDING_ID_PREFIX)) {
+      const ipNo = activeIdStr.slice(PENDING_ID_PREFIX.length);
+      const patient = patients.find(p => p.ipNo === ipNo);
+      if (!patient) return;
+
+      const overId = over.id as string;
+      const overItem = otList.find(i => i.id === overId);
+      const targetCategory = overItem
+        ? overItem.category
+        : (getTableOptionsForType(activeTab).includes(overId) ? overId : null);
+      if (!targetCategory) return;
+
+      const existingInCategory = otList.filter(i => i.otType === activeTab && i.category === targetCategory);
+      const newEntry = buildOTPatientEntry(patient, activeTab, targetCategory, existingInCategory);
+      setOtList(prev => [...prev, newEntry]);
+      return;
+    }
+
+    if (active.id !== over.id) {
       setOtList((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over?.id);
-        const newItems = arrayMove(items, oldIndex, newIndex);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        // Defensive: active.id should always resolve to a row already in
+        // `items` on this branch (the pending-prefix case returns earlier
+        // above), but if it ever didn't, bail out rather than let the
+        // `items[oldIndex]` access below produce `undefined` and crash the
+        // resequence step further down.
+        if (oldIndex === -1) return items;
 
-        const opts = getTableOptions();
+        let newItems: OTPatient[];
+        if (newIndex === -1) {
+          // `over` resolved to a category container (the tbody's own
+          // droppable id, e.g. an empty category) rather than a specific
+          // row — collisionDetection above already prefers a same-category
+          // row when one exists, so this only happens for the true
+          // empty-category case. Explicitly append the dragged item to the
+          // end of `items` instead of relying on arrayMove's implicit
+          // "negative index counts back from the end" behaviour, so this
+          // branch is visible as intentional rather than an accident of
+          // how arrayMove handles -1.
+          const movedItem = items[oldIndex];
+          newItems = [...items.filter((_, i) => i !== oldIndex), movedItem];
+        } else {
+          newItems = arrayMove(items, oldIndex, newIndex);
+        }
+
+        const opts = getTableOptionsForType(activeTab);
         const groups: Record<string, OTPatient[]> = {};
         opts.forEach(opt => { groups[opt] = []; });
 
@@ -321,27 +296,19 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     }
   };
 
-  const handleImportPatient = (patient: Patient) => {
-    const wardNumber      = patient.ward.replace(/Ward\s*/i, '').trim();
-    const defaultCategory = getDefaultCategory();
-    const existingInTab   = otList.filter(p => p.otType === activeTab && p.category === defaultCategory);
-    const maxSeq          = Math.max(0, ...existingInTab.map(p => p.sequence));
-    const newEntry: OTPatient = {
-      id: crypto.randomUUID(),
-      sequence: maxSeq + 1,
-      ipNo: patient.ipNo,
-      name: patient.name,
-      age: patient.age.toString(),
-      gender: patient.gender === 'Male' ? 'M' : patient.gender === 'Female' ? 'F' : '',
-      ward: wardNumber,
-      unit: patient.unit ?? 'OR1',
-      diagnosis: patient.diagnosis,
-      procedure: patient.procedure ?? '',
-      side: '', anesthesia: '', cArm: 'No', implants: '',
-      remarks: patient.comorbidities.join(', '),
-      category: defaultCategory,
-      otType: activeTab,
-    };
+  // A cancelled drag (Escape key, or an interrupted touch gesture) fires
+  // neither onDragEnd's "drop" path nor its "!over" early return in every
+  // case — without this, activeId/dragOverCategory could be left set,
+  // leaving the DragOverlay or the category highlight stuck until the next
+  // drag starts.
+  const handleDragCancel = () => {
+    setActiveId(null);
+    setDragOverCategory(null);
+  };
+
+  const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
+    const existingInCategory = otList.filter(p => p.otType === activeTab && p.category === category);
+    const newEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
     setOtList(prev => [...prev, newEntry]);
   };
 
@@ -356,7 +323,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   };
 
   const handleAddManualEntry = () => {
-    const defaultCategory = getDefaultCategory();
+    const defaultCategory = getDefaultCategoryForType(activeTab);
     const existingInTab   = otList.filter(p => p.otType === activeTab && p.category === defaultCategory);
     const maxSeq          = Math.max(0, ...existingInTab.map(p => p.sequence));
     const newEntry: OTPatient = {
@@ -373,259 +340,11 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   };
 
   const handleExportExcel = () => {
-    const wb = XLSX.utils.book_new();
-    const wsData: any[][] = [];
-
-    // --- Global Header Data ---
-    // Row 1: Hospital Name
-    wsData.push([hospitalName]);
-    // Row 2: Department
-    wsData.push([department]);
-    // Row 3: List Name
-    wsData.push([`${activeTab.toUpperCase()} OPERATION LIST`]);
-    
-    // Row 4: Date / Surgeon / Unit / Time — exact format matching the original
-    const dateStr = selectedDate.split('-').reverse().join('/');
-    wsData.push([`DATE:${dateStr}    SURGEON : ${surgeon}    UNIT :${surgeonUnit}               TIME:${otTime}`]);
-
-    // --- Data Preparation ---
-    let lastCategory = '';
-    let displaySequence = 1;
-
-    const exportList = [...otList].filter(p => p.otType === activeTab).sort((a, b) => {
-        if (a.category === b.category) return a.sequence - b.sequence;
-        return (a.category || '').localeCompare(b.category || '');
-    });
-
-    const colHeaders = ["SL NO", "IP NO", "UNIT", "NAME", "AGE", "WARD", "DIAGNOSIS", "OPERATION", "C ARM", "IMPLANTS"];
-
-    let currentRowIndex = 4;
-    const headerRows = [0, 1, 2, 3];
-    const categoryHeaderRows: number[] = [];
-    const dataRows: number[] = [];
-
-    exportList.forEach(patient => {
-        if (patient.category && patient.category !== lastCategory) {
-            // Category Header Row: [Category Name, SL NO, IP NO, ...]
-            wsData.push([
-                patient.category,
-                ...colHeaders
-            ]);
-            categoryHeaderRows.push(currentRowIndex);
-            currentRowIndex++;
-            lastCategory = patient.category;
-            displaySequence = 1; // Reset sequence for new table
-        }
-
-        const wardNum = patient.ward.replace(/Ward\s*/i, '').trim();
-        
-        wsData.push([
-            '', // Empty cell under Category Name
-            displaySequence++, // Use generated sequence
-            patient.ipNo,
-            patient.unit,
-            patient.name,
-            `${patient.age}/${patient.gender}`,
-            wardNum,
-            patient.diagnosis,
-            patient.procedure,
-            patient.cArm,
-            patient.implants
-        ]);
-        dataRows.push(currentRowIndex);
-        currentRowIndex++;
-    });
-
-    // Create worksheet
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    // --- Styling ---
-    // Define styles
-    const borderStyle = {
-        top: { style: "thin", color: { rgb: "000000" } },
-        bottom: { style: "thin", color: { rgb: "000000" } },
-        left: { style: "thin", color: { rgb: "000000" } },
-        right: { style: "thin", color: { rgb: "000000" } }
-    };
-
-    const globalHeaderStyle = {
-        font: { bold: true, sz: 12 },
-        alignment: { horizontal: "center", vertical: "center" },
-        fill: { fgColor: { rgb: "FFFFFF" } } // White background to match PDF
-    };
-
-    const categoryHeaderStyle = {
-        font: { bold: true },
-        alignment: { horizontal: "center", vertical: "center", wrapText: true },
-        fill: { fgColor: { rgb: "FFF2CC" } }, // Light Yellow 2
-        border: borderStyle
-    };
-
-    const dataCellStyle = {
-        font: { sz: 10 },
-        alignment: { horizontal: "center", vertical: "center", wrapText: true },
-        border: borderStyle
-    };
-
-    // Apply styles to cells
-    const range = XLSX.utils.decode_range(ws['!ref'] || "A1:A1");
-
-    for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-            const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-            if (!ws[cellRef]) continue;
-
-            // Global Headers (Rows 0-3)
-            if (headerRows.includes(R)) {
-                ws[cellRef].s = globalHeaderStyle;
-            }
-            // Category Headers
-            else if (categoryHeaderRows.includes(R)) {
-                ws[cellRef].s = categoryHeaderStyle;
-            }
-            // Data Rows
-            else if (dataRows.includes(R)) {
-                ws[cellRef].s = dataCellStyle;
-            }
-        }
-    }
-
-    // --- Merges ---
-    if (!ws['!merges']) ws['!merges'] = [];
-    // Merge global headers across all columns (A to K -> 0 to 10)
-    headerRows.forEach(r => {
-        ws['!merges']?.push({ s: { r: r, c: 0 }, e: { r: r, c: 10 } });
-    });
-
-    // --- Column Widths ---
-    ws['!cols'] = [
-        { wch: 15 }, // A: Category
-        { wch: 8 },  // B: SL NO
-        { wch: 12 }, // C: IP NO
-        { wch: 8 },  // D: UNIT
-        { wch: 25 }, // E: NAME
-        { wch: 10 }, // F: AGE/SEX
-        { wch: 8 },  // G: WARD
-        { wch: 30 }, // H: DIAGNOSIS
-        { wch: 30 }, // I: OPERATION
-        { wch: 10 }, // J: C ARM
-        { wch: 20 }  // K: IMPLANTS
-    ];
-
-    XLSX.utils.book_append_sheet(wb, ws, `${activeTab} OT List`);
-    XLSX.writeFile(wb, `${activeTab}_OT_List_${selectedDate}.xlsx`);
+    exportOTListToExcel(otList, activeTab, { hospitalName, department, selectedDate, surgeon, surgeonUnit, otTime });
   };
 
   const handleExportPDF = () => {
-    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
-    
-    // --- Header Section ---
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12); // Increased slightly for visibility
-    
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const centerX = pageWidth / 2;
-    
-    doc.text(hospitalName, centerX, 10, { align: 'center' });
-    doc.text(department, centerX, 16, { align: 'center' });
-    doc.text(`${activeTab.toUpperCase()} OPERATION LIST`, centerX, 22, { align: 'center' });
-    
-    // Sub-header row — single line matching exact Excel format
-    doc.setFontSize(10);
-    const dateStr = selectedDate.split('-').reverse().join('/');
-    const subHeaderY = 30;
-    doc.text(
-      `DATE:${dateStr}    SURGEON : ${surgeon}    UNIT :${surgeonUnit}               TIME:${otTime}`,
-      14, subHeaderY
-    );
-
-    // --- Table Data Construction ---
-    const tableRows: any[] = [];
-    let lastCategory = '';
-    let displaySequence = 1;
-
-    const sortedList = [...otList].filter(p => p.otType === activeTab).sort((a, b) => {
-        if (a.category === b.category) return a.sequence - b.sequence;
-        return (a.category || '').localeCompare(b.category || '');
-    });
-
-    const headers = ["SL NO", "IP NO", "UNIT", "NAME", "AGE", "WARD", "DIAGNOSIS", "OPERATION", "C ARM", "IMPLANTS"];
-
-    sortedList.forEach(patient => {
-        // If category changes, insert a header row
-        if (patient.category && patient.category !== lastCategory) {
-            tableRows.push([
-                { content: patient.category, styles: { fontStyle: 'bold', halign: 'center', valign: 'middle' } },
-                ...headers.map(h => ({ content: h, styles: { fontStyle: 'bold', halign: 'center', valign: 'middle' } }))
-            ]);
-            lastCategory = patient.category;
-            displaySequence = 1; // Reset sequence
-        }
-
-        // Clean ward number for export
-        const wardNum = patient.ward.replace(/Ward\s*/i, '').trim();
-
-        tableRows.push([
-            '', // Empty cell under Table Name
-            displaySequence++, // Use generated sequence
-            patient.ipNo,
-            patient.unit,
-            patient.name,
-            `${patient.age}/${patient.gender}`,
-            wardNum,
-            patient.diagnosis,
-            patient.procedure,
-            patient.cArm,
-            patient.implants
-        ]);
-    });
-
-    autoTable(doc, {
-      body: tableRows,
-      startY: 35,
-      theme: 'grid',
-      styles: { 
-          fontSize: 8, 
-          cellPadding: 1.5, 
-          lineColor: [0, 0, 0], 
-          lineWidth: 0.1,
-          font: 'helvetica',
-          fontStyle: 'bold', // Make all text bold
-          textColor: [0, 0, 0],
-          valign: 'middle',
-          overflow: 'linebreak',
-          halign: 'center' // Center align everything
-      },
-      didParseCell: (data) => {
-          // Apply styling to the header rows
-          const row = data.row;
-          if (row && Array.isArray(row.raw)) {
-             const cell2 = row.raw[1] as unknown;
-             const isHeader = typeof cell2 === 'object' && cell2 !== null &&
-               'content' in cell2 && (cell2 as { content: unknown }).content === 'SL NO';
-
-             if (isHeader) {
-                 data.cell.styles.fillColor = [255, 242, 204]; // Light Yellow 2
-             }
-          }
-      },
-      columnStyles: {
-          0: { cellWidth: 15 }, // Table Name
-          1: { cellWidth: 10 }, // SL NO
-          2: { cellWidth: 15 }, // IP NO
-          3: { cellWidth: 12 }, // UNIT
-          4: { cellWidth: 35 }, // NAME
-          5: { cellWidth: 15 }, // AGE
-          6: { cellWidth: 12 }, // WARD
-          7: { cellWidth: 45 }, // DIAGNOSIS
-          8: { cellWidth: 45 }, // OPERATION
-          9: { cellWidth: 15 }, // C ARM
-          10: { cellWidth: 'auto' } // IMPLANTS
-      },
-      margin: { top: 35, left: 10, right: 10 }
-    });
-
-    doc.save(`${activeTab}_OT_List_${selectedDate}.pdf`);
+    exportOTListToPDF(otList, activeTab, { hospitalName, department, selectedDate, surgeon, surgeonUnit, otTime });
   };
 
   const handleUpdateEntry = (id: string, field: keyof OTPatient, value: string) => {
@@ -639,6 +358,13 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         return prev.map(p => p.id === id ? { ...p, [field]: value } : p);
     });
   };
+
+  // The patient behind a pending-card drag, if that's what's currently
+  // active — same id-parsing lookup handleDragEnd uses — so the DragOverlay
+  // can show who is being dragged instead of a generic grip icon.
+  const activePendingPatient = activeId && activeId.startsWith(PENDING_ID_PREFIX)
+    ? patients.find(p => p.ipNo === activeId.slice(PENDING_ID_PREFIX.length))
+    : null;
 
   return (
     <div className="p-6 max-w-full mx-auto space-y-6">
@@ -727,14 +453,6 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       {/* Actions Toolbar */}
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => setIsImportModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <UserPlus className="w-4 h-4" />
-          Add from Pending
-        </button>
-
-        <button
           onClick={handleAddManualEntry}
           className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors border border-slate-300"
         >
@@ -769,186 +487,38 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         </div>
       </div>
 
-      {/* OT List Table with Drag and Drop */}
+      {/* OT List Table + Pending Panel with Drag and Drop */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
-                  <th className="p-4 w-12"></th>
-                  <th className="p-4 w-32">Table/Category</th>
-                  <th className="p-4 w-12">Seq</th>
-                  <th className="p-4 w-28">IP Number</th>
-                  <th className="p-4 w-20">Unit</th>
-                  <th className="p-4 w-40">Name</th>
-                  <th className="p-4 w-20">Age/Sex</th>
-                  <th className="p-4 w-20">Ward</th>
-                  <th className="p-4 w-48">Diagnosis</th>
-                  <th className="p-4 w-48">Operation</th>
-                  <th className="p-4 w-24">C-Arm</th>
-                  <th className="p-4 w-48">Implants</th>
-                  <th className="p-4 w-16"></th>
-                </tr>
-              </thead>
-              {getTableOptions().map(category => (
-                <SortableContext 
-                    key={category} 
-                    id={category} 
-                    items={groupedItems[category] || []}
-                    strategy={verticalListSortingStrategy}
-                >
-                    <tbody className="divide-y divide-slate-100 border-b-4 border-slate-100">
-                        {/* Category Header Row */}
-                        <tr className="bg-slate-100">
-                            <td colSpan={13} className="p-2 px-4 font-bold text-slate-700 text-sm">
-                                {category}
-                            </td>
-                        </tr>
-                        
-                        {groupedItems[category]?.length === 0 ? (
-                            <tr>
-                                <td colSpan={13} className="p-4 text-center text-slate-400 text-xs italic">
-                                    Drag items here
-                                </td>
-                            </tr>
-                        ) : (
-                            groupedItems[category].map((patient, index) => (
-                                <SortableRow key={patient.id} id={patient.id} className="hover:bg-slate-50 group bg-white">
-                                    <td className="p-4 cursor-grab touch-none" data-drag-handle>
-                                        <GripVertical className="w-4 h-4 text-slate-400" />
-                                    </td>
-                                    <td className="p-4">
-                                        <BottomSheetPicker
-                                            title="Category"
-                                            value={patient.category || ''}
-                                            options={getTableOptions().map(opt => ({ value: opt, label: opt }))}
-                                            onChange={val => handleUpdateEntry(patient.id, 'category', val)}
-                                            triggerClassName="w-full text-sm font-bold text-slate-700 flex items-center gap-1 cursor-pointer p-0"
-                                        />
-                                    </td>
-                                    <td className="p-4 text-slate-500 font-mono font-bold">
-                                        {/* Auto-calculated sequence based on index + 1 */}
-                                        {index + 1}
-                                    </td>
-                                    <td className="p-4">
-                                        <input 
-                                            type="text" 
-                                            value={patient.ipNo}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'ipNo', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 font-mono text-sm"
-                                            placeholder="IP No"
-                                        />
-                                    </td>
-                                    <td className="p-4">
-                                        <input 
-                                            type="text" 
-                                            value={patient.unit}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'unit', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm"
-                                            placeholder="Unit"
-                                        />
-                                    </td>
-                                    <td className="p-4 font-medium text-slate-900">
-                                        <input 
-                                            type="text" 
-                                            value={patient.name}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'name', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium"
-                                            placeholder="Name"
-                                        />
-                                    </td>
-                                    <td className="p-4 text-slate-600">
-                                        <div className="flex gap-1 items-center">
-                                            <input 
-                                            type="text" 
-                                            value={patient.age}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'age', e.target.value)}
-                                            className="w-8 bg-transparent border-b border-transparent focus:border-blue-500 focus:ring-0 p-0 text-center"
-                                            placeholder="Age"
-                                            />
-                                            <span className="text-slate-400">/</span>
-                                            <BottomSheetPicker
-                                                title="Gender"
-                                                value={patient.gender}
-                                                options={[{ value: 'M', label: 'M' }, { value: 'F', label: 'F' }]}
-                                                onChange={val => handleUpdateEntry(patient.id, 'gender', val)}
-                                                triggerClassName="w-12 text-sm font-medium text-slate-700 flex items-center gap-0.5 cursor-pointer p-0"
-                                            />
-                                        </div>
-                                    </td>
-                                    <td className="p-4">
-                                        <input 
-                                            type="text" 
-                                            value={patient.ward}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'ward', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm"
-                                            placeholder="Ward"
-                                        />
-                                    </td>
-                                    <td className="p-4">
-                                        <textarea 
-                                            value={patient.diagnosis}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'diagnosis', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none"
-                                            rows={2}
-                                            placeholder="Diagnosis"
-                                        />
-                                    </td>
-                                    <td className="p-4">
-                                        <textarea 
-                                            value={patient.procedure}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'procedure', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none"
-                                            rows={2}
-                                            placeholder="Operation"
-                                        />
-                                    </td>
-                                    <td className="p-4">
-                                        <BottomSheetPicker
-                                            title="C-Arm Required"
-                                            value={patient.cArm}
-                                            options={[{ value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }]}
-                                            onChange={val => handleUpdateEntry(patient.id, 'cArm', val)}
-                                            triggerClassName="w-full text-sm font-medium text-slate-700 flex items-center gap-1 cursor-pointer p-0"
-                                        />
-                                    </td>
-                                    <td className="p-4">
-                                        <textarea 
-                                            value={patient.implants}
-                                            onChange={(e) => handleUpdateEntry(patient.id, 'implants', e.target.value)}
-                                            className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none text-slate-500"
-                                            rows={2}
-                                            placeholder="Implants..."
-                                        />
-                                    </td>
-                                    <td className="p-4 text-right">
-                                        <button 
-                                            onClick={() => handleRemove(patient.id)}
-                                            className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </td>
-                                </SortableRow>
-                            ))
-                        )}
-                    </tbody>
-                </SortableContext>
-              ))}
-            </table>
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+          <div className="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <OTListTable
+              activeTab={activeTab}
+              groupedItems={groupedItems}
+              onUpdateEntry={handleUpdateEntry}
+              onRemove={handleRemove}
+              dragOverCategory={dragOverCategory}
+            />
+          </div>
+
+          {/* Tablet/desktop: persistent inline panel */}
+          <div className="hidden lg:block">
+            <PendingSurgeryPanel pendingPatients={pendingPatients} onAssign={handleAssignPatient} />
           </div>
         </div>
-        
-        {/* Drag Overlay for visual feedback */}
+
         <DragOverlay>
-            {activeId ? (
+            {activePendingPatient ? (
+                <div className="p-2 bg-white rounded shadow-lg border border-slate-200 cursor-grabbing max-w-[220px] truncate">
+                    <span className="font-medium text-slate-900 text-sm">{activePendingPatient.name}</span>
+                </div>
+            ) : activeId ? (
                 <div className="p-2 bg-white rounded shadow-lg border border-slate-200 cursor-grabbing">
                     <GripVertical className="w-4 h-4 text-slate-600" />
                 </div>
@@ -956,62 +526,41 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         </DragOverlay>
       </DndContext>
 
-      {/* Import Modal */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-900">Add from Pending List</h2>
-              <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+      {/* Phone: floating button + bottom drawer (dragging onto a hidden table
+          doesn't make sense once the drawer covers it, so this is a "+"-button-only
+          surface on phone — matches the drag cards' existing tap-to-add fallback).
+          bottom uses --fab-bottom (index.css) instead of a fixed Tailwind
+          offset so it clears App.tsx's fixed mobile bottom-nav bar, which
+          renders after this and would otherwise paint over most of it. */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed right-6 z-40 flex items-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-full shadow-lg"
+        style={{ bottom: 'var(--fab-bottom)' }}
+      >
+        <UserPlus className="w-5 h-5" />
+        Pending ({pendingPatients.length})
+      </button>
+
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/50 flex items-end"
+          onClick={() => setMobileOpen(false)}
+        >
+          <div
+            className="w-full bg-white rounded-t-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
+              <h2 className="font-bold text-slate-900">Pending Surgery</h2>
+              <button onClick={() => setMobileOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="p-4 border-b border-slate-100">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder="Search by Name or IP Number..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    />
-                </div>
-            </div>
-
-            <div className="p-6 overflow-y-auto">
-              {filteredPending.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  No matching pending patients found.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredPending.map(patient => (
-                    <div key={patient.ipNo} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                      <div>
-                        <div className="font-medium text-slate-900">{patient.name} <span className="text-slate-500 text-sm">({patient.ipNo})</span></div>
-                        <div className="text-sm text-slate-600">{patient.diagnosis}</div>
-                        <div className="text-xs text-slate-500 mt-1">Planned: {patient.procedure}</div>
-                      </div>
-                      <button 
-                        onClick={() => handleImportPatient(patient)}
-                        className="p-2 bg-blue-100 text-teal-600 rounded-lg hover:bg-blue-200"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="p-4 border-t border-slate-100 flex justify-end">
-                <button 
-                    onClick={() => setIsImportModalOpen(false)}
-                    className="px-6 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors"
-                >
-                    Done
-                </button>
+            <div className="p-3 overflow-y-auto">
+              <PendingSurgeryPanel
+                pendingPatients={pendingPatients}
+                onAssign={patient => { handleAssignPatient(patient); setMobileOpen(false); }}
+              />
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
-import { SortableRow } from '../../components/OTListManagement';
+import { SortableRow } from '../../components/otlist/OTListTable';
 
 // SortableRow needs a DndContext + SortableContext ancestor (useSortable reads them via context).
 function renderRow() {
