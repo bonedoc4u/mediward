@@ -7,8 +7,9 @@ import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefault
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { hasPendingSurgery } from '../utils/calculations';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
-import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical, ShieldAlert } from 'lucide-react';
+import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
 import OTListTable from './otlist/OTListTable';
+import PendingSurgeryPanel from './otlist/PendingSurgeryPanel';
 import {
   DndContext,
   closestCenter,
@@ -60,9 +61,8 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const selectedDate    = activeTab === 'Major' ? majorDate : activeTab === 'Minor' ? minorDate : eotDate;
   const setSelectedDate = activeTab === 'Major' ? setMajorDate : activeTab === 'Minor' ? setMinorDate : setEotDate;
   const [otList, setOtList] = useState<OTPatient[]>([]);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [surgeonUnit, setSurgeonUnit] = useState(effectiveUnit);
   const [surgeon, setSurgeon] = useState('');
   const [otTime, setOtTime] = useState('8.00AM');
@@ -141,12 +141,6 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     !otList.some(ot => ot.ipNo === p.ipNo && ot.otType === activeTab)
   );
 
-  const filteredPending = pendingPatients.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.ipNo.includes(searchTerm)
-  );
-
-
   // Group items by category for the active tab only
   const groupedItems = useMemo(() => {
     const opts = getTableOptionsForType(activeTab);
@@ -200,11 +194,34 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    if (!over) return;
 
-    if (active.id !== over?.id) {
+    const activeIdStr = active.id as string;
+
+    // A drag that started on a pending-panel card is an *assign*, not a
+    // reorder — build a new entry in whichever category it was dropped on.
+    if (activeIdStr.startsWith('pending-')) {
+      const ipNo = activeIdStr.slice('pending-'.length);
+      const patient = patients.find(p => p.ipNo === ipNo);
+      if (!patient) return;
+
+      const overId = over.id as string;
+      const overItem = otList.find(i => i.id === overId);
+      const targetCategory = overItem
+        ? overItem.category
+        : (getTableOptionsForType(activeTab).includes(overId) ? overId : null);
+      if (!targetCategory) return;
+
+      const existingInCategory = otList.filter(i => i.otType === activeTab && i.category === targetCategory);
+      const newEntry = buildOTPatientEntry(patient, activeTab, targetCategory, existingInCategory);
+      setOtList(prev => [...prev, newEntry]);
+      return;
+    }
+
+    if (active.id !== over.id) {
       setOtList((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over?.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
         const newItems = arrayMove(items, oldIndex, newIndex);
 
         const opts = getTableOptionsForType(activeTab);
@@ -370,14 +387,6 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       {/* Actions Toolbar */}
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => setIsImportModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          <UserPlus className="w-4 h-4" />
-          Add from Pending
-        </button>
-
-        <button
           onClick={handleAddManualEntry}
           className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors border border-slate-300"
         >
@@ -412,7 +421,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         </div>
       </div>
 
-      {/* OT List Table with Drag and Drop */}
+      {/* OT List Table + Pending Panel with Drag and Drop */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -420,14 +429,22 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <OTListTable
-          activeTab={activeTab}
-          groupedItems={groupedItems}
-          onUpdateEntry={handleUpdateEntry}
-          onRemove={handleRemove}
-        />
+        <div className="flex flex-col lg:flex-row gap-4 items-start">
+          <div className="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <OTListTable
+              activeTab={activeTab}
+              groupedItems={groupedItems}
+              onUpdateEntry={handleUpdateEntry}
+              onRemove={handleRemove}
+            />
+          </div>
 
-        {/* Drag Overlay for visual feedback */}
+          {/* Tablet/desktop: persistent inline panel */}
+          <div className="hidden lg:block">
+            <PendingSurgeryPanel pendingPatients={pendingPatients} onAssign={handleAssignPatient} />
+          </div>
+        </div>
+
         <DragOverlay>
             {activeId ? (
                 <div className="p-2 bg-white rounded shadow-lg border border-slate-200 cursor-grabbing">
@@ -437,62 +454,37 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         </DragOverlay>
       </DndContext>
 
-      {/* Import Modal */}
-      {isImportModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-900">Add from Pending List</h2>
-              <button onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+      {/* Phone: floating button + bottom drawer (dragging onto a hidden table
+          doesn't make sense once the drawer covers it, so this is a "+"-button-only
+          surface on phone — matches the drag cards' existing tap-to-add fallback) */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="lg:hidden fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-full shadow-lg"
+      >
+        <UserPlus className="w-5 h-5" />
+        Pending ({pendingPatients.length})
+      </button>
+
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/50 flex items-end"
+          onClick={() => setMobileOpen(false)}
+        >
+          <div
+            className="w-full bg-white rounded-t-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
+              <h2 className="font-bold text-slate-900">Pending Surgery</h2>
+              <button onClick={() => setMobileOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="p-4 border-b border-slate-100">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder="Search by Name or IP Number..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    />
-                </div>
-            </div>
-
-            <div className="p-6 overflow-y-auto">
-              {filteredPending.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  No matching pending patients found.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredPending.map(patient => (
-                    <div key={patient.ipNo} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                      <div>
-                        <div className="font-medium text-slate-900">{patient.name} <span className="text-slate-500 text-sm">({patient.ipNo})</span></div>
-                        <div className="text-sm text-slate-600">{patient.diagnosis}</div>
-                        <div className="text-xs text-slate-500 mt-1">Planned: {patient.procedure}</div>
-                      </div>
-                      <button
-                        onClick={() => handleAssignPatient(patient)}
-                        className="p-2 bg-blue-100 text-teal-600 rounded-lg hover:bg-blue-200"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="p-4 border-t border-slate-100 flex justify-end">
-                <button 
-                    onClick={() => setIsImportModalOpen(false)}
-                    className="px-6 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors"
-                >
-                    Done
-                </button>
+            <div className="p-3 overflow-y-auto">
+              <PendingSurgeryPanel
+                pendingPatients={pendingPatients}
+                onAssign={patient => { handleAssignPatient(patient); setMobileOpen(false); }}
+              />
             </div>
           </div>
         </div>
