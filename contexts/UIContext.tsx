@@ -83,8 +83,12 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     window.location.hash = params?.id ? `#/${view}/${params.id}` : `#/${view}`;
     setCurrentView(view);
 
-    // Lazy-load all patients when entering views that need the full list
-    if (view === 'master' || view === 'discharge') {
+    // Lazy-load all patients when entering views that need the full list.
+    // Admission List is a historical record (must show everyone admitted
+    // that day, including patients since discharged), not a current-state
+    // view like the dashboard — so it needs the same full-list load as
+    // Master/Discharge, or old dates silently drop discharged patients.
+    if (view === 'master' || view === 'discharge' || view === 'admissions') {
       loadAllPatients().catch(err => console.error('[UI] Failed to load all patients:', err));
     }
 
