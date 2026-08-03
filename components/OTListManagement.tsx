@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { UNIT_SCHEDULE, getOTCycleDates } from '../utils/otSchedule';
+import { getOTCycleDates } from '../utils/otSchedule';
+import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType } from '../utils/otListTypes';
 import { hasPendingSurgery } from '../utils/calculations';
 import * as XLSX from 'xlsx-js-style';
 import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical, ShieldAlert } from 'lucide-react';
@@ -34,38 +35,6 @@ import { CSS } from '@dnd-kit/utilities';
 interface OTListManagementProps {
   patients: Patient[];
   onUpdatePatient: (patient: Patient) => void;
-}
-
-interface OTPatient {
-  id: string;
-  sequence: number;
-  ipNo: string;
-  name: string;
-  age: string;
-  gender: 'M' | 'F' | string;
-  ward: string;
-  unit: string;
-  diagnosis: string;
-  procedure: string;
-  side: string;
-  anesthesia: string;
-  cArm: 'Yes' | 'No' | string;
-  implants: string;
-  remarks: string;
-  category?: string; // e.g., "Spinal Table", "Local Table"
-  otType: OTType;    // which OT list this entry belongs to
-}
-
-type OTType = 'Major' | 'Minor' | 'EOT';
-
-function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
-  const s = UNIT_SCHEDULE[unit?.toUpperCase()];
-  if (!s) return null;
-  const dow = new Date(dateStr + 'T00:00:00').getDay();
-  if (dow === s.majorDay)     return 'Major';
-  if (dow === s.minorDay)     return 'Minor';
-  if (dow === s.admissionDay) return 'EOT';
-  return null;
 }
 
 // Sortable Row Component
@@ -176,7 +145,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           if (existing.has(p.ipNo) || toAdd.some(x => x.ipNo === p.ipNo)) return;
           const unit     = (p.unit ?? '').toUpperCase();
           const otType   = getOTTypeForDate(unit, date) ?? fallbackType;
-          const category = getDefaultCategory(otType);
+          const category = getDefaultCategoryForType(otType);
           const seqBase  = prev.filter(x => x.otType === otType).length + toAdd.filter(x => x.otType === otType).length;
           toAdd.push({
             id: crypto.randomUUID(),
@@ -230,17 +199,10 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     p.ipNo.includes(searchTerm)
   );
 
-  const getTableOptions = (tab = activeTab) => {
-    if (tab === 'Major') return ['TABLE 1', 'TABLE 2'];
-    if (tab === 'Minor') return ['SPINAL TABLE', 'LOCAL TABLE'];
-    return ['SPINAL TABLE']; // EOT — single table
-  };
-
-  const getDefaultCategory = (tab = activeTab) => getTableOptions(tab)[0];
 
   // Group items by category for the active tab only
   const groupedItems = useMemo(() => {
-    const opts = getTableOptions();
+    const opts = getTableOptionsForType(activeTab);
     const groups: Record<string, OTPatient[]> = {};
     opts.forEach(opt => { groups[opt] = []; });
 
@@ -273,7 +235,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
     // If over a container (category header/empty space) or an item in a different category
     const activeCategory = activeItem.category;
-    const overCategory = overItem ? overItem.category : (getTableOptions().includes(overId) ? overId : null);
+    const overCategory = overItem ? overItem.category : (getTableOptionsForType(activeTab).includes(overId) ? overId : null);
 
 
     if (activeCategory !== overCategory && overCategory) {
@@ -298,7 +260,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         const newIndex = items.findIndex((item) => item.id === over?.id);
         const newItems = arrayMove(items, oldIndex, newIndex);
 
-        const opts = getTableOptions();
+        const opts = getTableOptionsForType(activeTab);
         const groups: Record<string, OTPatient[]> = {};
         opts.forEach(opt => { groups[opt] = []; });
 
@@ -323,7 +285,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
   const handleImportPatient = (patient: Patient) => {
     const wardNumber      = patient.ward.replace(/Ward\s*/i, '').trim();
-    const defaultCategory = getDefaultCategory();
+    const defaultCategory = getDefaultCategoryForType(activeTab);
     const existingInTab   = otList.filter(p => p.otType === activeTab && p.category === defaultCategory);
     const maxSeq          = Math.max(0, ...existingInTab.map(p => p.sequence));
     const newEntry: OTPatient = {
@@ -356,7 +318,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   };
 
   const handleAddManualEntry = () => {
-    const defaultCategory = getDefaultCategory();
+    const defaultCategory = getDefaultCategoryForType(activeTab);
     const existingInTab   = otList.filter(p => p.otType === activeTab && p.category === defaultCategory);
     const maxSeq          = Math.max(0, ...existingInTab.map(p => p.sequence));
     const newEntry: OTPatient = {
@@ -797,9 +759,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
                   <th className="p-4 w-16"></th>
                 </tr>
               </thead>
-              {getTableOptions().map(category => (
-                <SortableContext 
-                    key={category} 
+              {getTableOptionsForType(activeTab).map(category => (
+                <SortableContext
+                    key={category}
                     id={category} 
                     items={groupedItems[category] || []}
                     strategy={verticalListSortingStrategy}
@@ -828,7 +790,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
                                         <BottomSheetPicker
                                             title="Category"
                                             value={patient.category || ''}
-                                            options={getTableOptions().map(opt => ({ value: opt, label: opt }))}
+                                            options={getTableOptionsForType(activeTab).map(opt => ({ value: opt, label: opt }))}
                                             onChange={val => handleUpdateEntry(patient.id, 'category', val)}
                                             triggerClassName="w-full text-sm font-bold text-slate-700 flex items-center gap-1 cursor-pointer p-0"
                                         />
