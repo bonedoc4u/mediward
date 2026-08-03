@@ -164,12 +164,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
   // closestCenter alone can resolve a drop to a category's <tbody> droppable
   // instead of the specific row under the pointer (see utils/otListCollision
-  // for the root cause). Preferring a row collision when one exists keeps
-  // reorders landing where the user aimed; falling back to the container is
-  // still correct for the empty-category case this mechanism exists for.
+  // for the root cause and why this must be category-aware, not just "any
+  // row anywhere" — the latter can silently assign a patient to the wrong
+  // OT table). Preferring a same-category row when one exists keeps
+  // reorders/assigns landing where the user aimed; falling back to the
+  // container is still correct for the empty-category case this mechanism
+  // exists for.
   const collisionDetection: CollisionDetection = (args) => {
     const collisions = closestCenter(args);
-    return preferRowCollision(collisions, otList.map(item => item.id));
+    return preferRowCollision(collisions, otList);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -245,17 +248,24 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     if (active.id !== over.id) {
       setOtList((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
-        // -1 here means `over` resolved to a category container (the
-        // tbody's own droppable id, e.g. an empty category) rather than a
-        // specific row — collisionDetection above already prefers a row
-        // collision when one exists, so this only happens for that
-        // empty-category case. arrayMove computes its insertion index from
-        // `items.length` *before* the source item is removed, so a negative
-        // newIndex here appends the dragged item to the end of `items`
-        // (and, after the resequencing below, to the end of its category) —
-        // that's the intended behaviour, not a bug.
         const newIndex = items.findIndex((item) => item.id === over.id);
-        const newItems = arrayMove(items, oldIndex, newIndex);
+
+        let newItems: OTPatient[];
+        if (newIndex === -1) {
+          // `over` resolved to a category container (the tbody's own
+          // droppable id, e.g. an empty category) rather than a specific
+          // row — collisionDetection above already prefers a same-category
+          // row when one exists, so this only happens for the true
+          // empty-category case. Explicitly append the dragged item to the
+          // end of `items` instead of relying on arrayMove's implicit
+          // "negative index counts back from the end" behaviour, so this
+          // branch is visible as intentional rather than an accident of
+          // how arrayMove handles -1.
+          const movedItem = items[oldIndex];
+          newItems = [...items.filter((_, i) => i !== oldIndex), movedItem];
+        } else {
+          newItems = arrayMove(items, oldIndex, newIndex);
+        }
 
         const opts = getTableOptionsForType(activeTab);
         const groups: Record<string, OTPatient[]> = {};
@@ -278,6 +288,16 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         return [...otherTabItems, ...resequenced];
       });
     }
+  };
+
+  // A cancelled drag (Escape key, or an interrupted touch gesture) fires
+  // neither onDragEnd's "drop" path nor its "!over" early return in every
+  // case — without this, activeId/dragOverCategory could be left set,
+  // leaving the DragOverlay or the category highlight stuck until the next
+  // drag starts.
+  const handleDragCancel = () => {
+    setActiveId(null);
+    setDragOverCategory(null);
   };
 
   const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
@@ -468,6 +488,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           <div className="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
