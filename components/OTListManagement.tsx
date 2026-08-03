@@ -249,6 +249,12 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       setOtList((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
         const newIndex = items.findIndex((item) => item.id === over.id);
+        // Defensive: active.id should always resolve to a row already in
+        // `items` on this branch (the pending-prefix case returns earlier
+        // above), but if it ever didn't, bail out rather than let the
+        // `items[oldIndex]` access below produce `undefined` and crash the
+        // resequence step further down.
+        if (oldIndex === -1) return items;
 
         let newItems: OTPatient[];
         if (newIndex === -1) {
