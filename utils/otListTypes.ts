@@ -1,5 +1,13 @@
 import { UNIT_SCHEDULE } from './otSchedule';
 
+/**
+ * Prefix used to build the drag id for a pending-surgery card (see
+ * PendingSurgeryPanel) and to recognise it in OTListManagement's
+ * handleDragEnd. Shared here so a rename can't silently desync the two
+ * call sites (there is no test that would catch that otherwise).
+ */
+export const PENDING_ID_PREFIX = 'pending-';
+
 export type OTType = 'Major' | 'Minor' | 'EOT';
 
 export interface OTPatient {

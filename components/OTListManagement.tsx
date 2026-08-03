@@ -3,7 +3,7 @@ import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getOTCycleDates } from '../utils/otSchedule';
-import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType } from '../utils/otListTypes';
+import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { preferRowCollision } from '../utils/otListCollision';
 import { hasPendingSurgery } from '../utils/calculations';
@@ -224,8 +224,8 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
     // A drag that started on a pending-panel card is an *assign*, not a
     // reorder — build a new entry in whichever category it was dropped on.
-    if (activeIdStr.startsWith('pending-')) {
-      const ipNo = activeIdStr.slice('pending-'.length);
+    if (activeIdStr.startsWith(PENDING_ID_PREFIX)) {
+      const ipNo = activeIdStr.slice(PENDING_ID_PREFIX.length);
       const patient = patients.find(p => p.ipNo === ipNo);
       if (!patient) return;
 
@@ -332,6 +332,13 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         return prev.map(p => p.id === id ? { ...p, [field]: value } : p);
     });
   };
+
+  // The patient behind a pending-card drag, if that's what's currently
+  // active — same id-parsing lookup handleDragEnd uses — so the DragOverlay
+  // can show who is being dragged instead of a generic grip icon.
+  const activePendingPatient = activeId && activeId.startsWith(PENDING_ID_PREFIX)
+    ? patients.find(p => p.ipNo === activeId.slice(PENDING_ID_PREFIX.length))
+    : null;
 
   return (
     <div className="p-6 max-w-full mx-auto space-y-6">
@@ -480,7 +487,11 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         </div>
 
         <DragOverlay>
-            {activeId ? (
+            {activePendingPatient ? (
+                <div className="p-2 bg-white rounded shadow-lg border border-slate-200 cursor-grabbing max-w-[220px] truncate">
+                    <span className="font-medium text-slate-900 text-sm">{activePendingPatient.name}</span>
+                </div>
+            ) : activeId ? (
                 <div className="p-2 bg-white rounded shadow-lg border border-slate-200 cursor-grabbing">
                     <GripVertical className="w-4 h-4 text-slate-600" />
                 </div>

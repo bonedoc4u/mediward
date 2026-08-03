@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType } from '../utils/otListTypes';
+import { getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
+
+describe('PENDING_ID_PREFIX', () => {
+  it('is the shared prefix pending-card drag ids are built from and parsed with', () => {
+    // PendingSurgeryPanel builds `${PENDING_ID_PREFIX}${ipNo}`; OTListManagement's
+    // handleDragEnd/DragOverlay parse it back the same way. Pinning the value
+    // here means a future rename of the constant's contents shows up as a
+    // failing test instead of silently breaking assign-by-drag.
+    expect(PENDING_ID_PREFIX).toBe('pending-');
+  });
+});
 
 describe('getOTTypeForDate', () => {
   it('returns Major on the unit\'s major OT day', () => {

@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import { Search, GripVertical, Plus } from 'lucide-react';
 import { Patient } from '../../types';
+import { PENDING_ID_PREFIX } from '../../utils/otListTypes';
 
 function daysPending(doa: string): number {
   const admitted = new Date(doa + 'T00:00:00');
@@ -18,11 +18,15 @@ interface PendingCardProps {
 }
 
 function PendingCard({ patient, onAssign }: PendingCardProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `pending-${patient.ipNo}`,
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `${PENDING_ID_PREFIX}${patient.ipNo}`,
   });
+  // No `transform` here: plain useDraggable (unlike useSortable) has no
+  // built-in "hide the source, only show the overlay" behaviour, so
+  // translating this card would make both it and the DragOverlay track the
+  // pointer at once. The card stays put while dragging; DragOverlay (in
+  // OTListManagement) shows the moving preview instead.
   const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 1000 : 'auto',
     opacity: isDragging ? 0.5 : 1,
   };
