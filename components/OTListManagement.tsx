@@ -4,6 +4,7 @@ import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getOTCycleDates } from '../utils/otSchedule';
 import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType } from '../utils/otListTypes';
+import { buildOTPatientEntry } from '../utils/otListAssign';
 import { hasPendingSurgery } from '../utils/calculations';
 import * as XLSX from 'xlsx-js-style';
 import { Plus, Trash2, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, Search, GripVertical, ShieldAlert } from 'lucide-react';
@@ -283,27 +284,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     }
   };
 
-  const handleImportPatient = (patient: Patient) => {
-    const wardNumber      = patient.ward.replace(/Ward\s*/i, '').trim();
-    const defaultCategory = getDefaultCategoryForType(activeTab);
-    const existingInTab   = otList.filter(p => p.otType === activeTab && p.category === defaultCategory);
-    const maxSeq          = Math.max(0, ...existingInTab.map(p => p.sequence));
-    const newEntry: OTPatient = {
-      id: crypto.randomUUID(),
-      sequence: maxSeq + 1,
-      ipNo: patient.ipNo,
-      name: patient.name,
-      age: patient.age.toString(),
-      gender: patient.gender === 'Male' ? 'M' : patient.gender === 'Female' ? 'F' : '',
-      ward: wardNumber,
-      unit: patient.unit ?? 'OR1',
-      diagnosis: patient.diagnosis,
-      procedure: patient.procedure ?? '',
-      side: '', anesthesia: '', cArm: 'No', implants: '',
-      remarks: patient.comorbidities.join(', '),
-      category: defaultCategory,
-      otType: activeTab,
-    };
+  const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
+    const existingInCategory = otList.filter(p => p.otType === activeTab && p.category === category);
+    const newEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
     setOtList(prev => [...prev, newEntry]);
   };
 
@@ -956,8 +939,8 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
                         <div className="text-sm text-slate-600">{patient.diagnosis}</div>
                         <div className="text-xs text-slate-500 mt-1">Planned: {patient.procedure}</div>
                       </div>
-                      <button 
-                        onClick={() => handleImportPatient(patient)}
+                      <button
+                        onClick={() => handleAssignPatient(patient)}
                         className="p-2 bg-blue-100 text-teal-600 rounded-lg hover:bg-blue-200"
                       >
                         <Plus className="w-4 h-4" />
