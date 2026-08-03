@@ -48,14 +48,21 @@ export const SortableRow = ({ id, children, className }: { id: string, children:
 
 /** Makes an entire category's <tbody> a real drop target (id = category
  * name), so dropping onto an empty category — or a pending patient being
- * assigned there — always registers, not just drops onto an existing row. */
-function CategoryDropZone({ category, isEmpty, children }: { category: string; isEmpty: boolean; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: category });
+ * assigned there — always registers, not just drops onto an existing row.
+ *
+ * `isHighlighted` (not this droppable's own `isOver`) drives the highlight
+ * styling: with per-row `useSortable` droppables also inside this tbody,
+ * `isOver` loses the collision to a row most of the time in a populated
+ * category and flickers. The parent orchestrator already resolves "which
+ * category is the current drag target" for its own reorder logic in
+ * handleDragOver, so that resolved value is passed down here instead. */
+function CategoryDropZone({ category, isEmpty, isHighlighted, children }: { category: string; isEmpty: boolean; isHighlighted: boolean; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: category });
   return (
     <tbody
       ref={setNodeRef}
       className={`divide-y divide-slate-100 border-b-4 border-slate-100 transition-colors ${
-        isOver ? 'bg-teal-50 ring-2 ring-inset ring-teal-300' : ''
+        isHighlighted ? 'bg-teal-50 ring-2 ring-inset ring-teal-300' : ''
       }`}
     >
       <tr className="bg-slate-100">
@@ -79,9 +86,10 @@ interface OTListTableProps {
   groupedItems: Record<string, OTPatient[]>;
   onUpdateEntry: (id: string, field: keyof OTPatient, value: string) => void;
   onRemove: (id: string) => void;
+  dragOverCategory: string | null;
 }
 
-const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUpdateEntry, onRemove }) => {
+const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUpdateEntry, onRemove, dragOverCategory }) => {
   const options = getTableOptionsForType(activeTab);
 
   return (
@@ -111,7 +119,7 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
               items={groupedItems[category] || []}
               strategy={verticalListSortingStrategy}
           >
-              <CategoryDropZone category={category} isEmpty={(groupedItems[category]?.length ?? 0) === 0}>
+              <CategoryDropZone category={category} isEmpty={(groupedItems[category]?.length ?? 0) === 0} isHighlighted={category === dragOverCategory}>
                   {groupedItems[category]?.map((patient, index) => (
                       <SortableRow key={patient.id} id={patient.id} className="hover:bg-slate-50 group bg-white">
                           <td className="p-4 cursor-grab touch-none" data-drag-handle>

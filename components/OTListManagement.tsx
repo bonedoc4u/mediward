@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getOTCycleDates } from '../utils/otSchedule';
 import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
+import { preferRowCollision } from '../utils/otListCollision';
 import { hasPendingSurgery } from '../utils/calculations';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
 import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
@@ -22,6 +23,7 @@ import {
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
+  CollisionDetection,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -62,6 +64,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const setSelectedDate = activeTab === 'Major' ? setMajorDate : activeTab === 'Minor' ? setMinorDate : setEotDate;
   const [otList, setOtList] = useState<OTPatient[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Which category is the current resolved drag target (for the
+  // CategoryDropZone highlight — see handleDragOver for how it's resolved).
+  const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [surgeonUnit, setSurgeonUnit] = useState(effectiveUnit);
   const [surgeon, setSurgeon] = useState('');
@@ -157,13 +162,26 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     return groups;
   }, [otList, activeTab]);
 
+  // closestCenter alone can resolve a drop to a category's <tbody> droppable
+  // instead of the specific row under the pointer (see utils/otListCollision
+  // for the root cause). Preferring a row collision when one exists keeps
+  // reorders landing where the user aimed; falling back to the container is
+  // still correct for the empty-category case this mechanism exists for.
+  const collisionDetection: CollisionDetection = (args) => {
+    const collisions = closestCenter(args);
+    return preferRowCollision(collisions, otList.map(item => item.id));
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over) {
+      setDragOverCategory(null);
+      return;
+    }
 
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -171,13 +189,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     // Find the containers (categories)
     const activeItem = otList.find(i => i.id === activeId);
     const overItem = otList.find(i => i.id === overId);
-    
+
+    // Resolved drop-target category — drives the CategoryDropZone highlight
+    // for both an existing row being reordered and a pending card being
+    // assigned (neither of which is in `otList` as `activeItem` for the
+    // latter, so this is computed independently of activeItem).
+    const overCategory = overItem ? overItem.category : (getTableOptionsForType(activeTab).includes(overId) ? overId : null);
+    setDragOverCategory(overCategory ?? null);
+
     if (!activeItem) return;
 
     // If over a container (category header/empty space) or an item in a different category
     const activeCategory = activeItem.category;
-    const overCategory = overItem ? overItem.category : (getTableOptionsForType(activeTab).includes(overId) ? overId : null);
-
 
     if (activeCategory !== overCategory && overCategory) {
         setOtList((items) => {
@@ -194,6 +217,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setDragOverCategory(null);
     if (!over) return;
 
     const activeIdStr = active.id as string;
@@ -221,6 +245,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     if (active.id !== over.id) {
       setOtList((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id);
+        // -1 here means `over` resolved to a category container (the
+        // tbody's own droppable id, e.g. an empty category) rather than a
+        // specific row — collisionDetection above already prefers a row
+        // collision when one exists, so this only happens for that
+        // empty-category case. arrayMove computes its insertion index from
+        // `items.length` *before* the source item is removed, so a negative
+        // newIndex here appends the dragged item to the end of `items`
+        // (and, after the resequencing below, to the end of its category) —
+        // that's the intended behaviour, not a bug.
         const newIndex = items.findIndex((item) => item.id === over.id);
         const newItems = arrayMove(items, oldIndex, newIndex);
 
@@ -424,7 +457,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       {/* OT List Table + Pending Panel with Drag and Drop */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -436,6 +469,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
               groupedItems={groupedItems}
               onUpdateEntry={handleUpdateEntry}
               onRemove={handleRemove}
+              dragOverCategory={dragOverCategory}
             />
           </div>
 
