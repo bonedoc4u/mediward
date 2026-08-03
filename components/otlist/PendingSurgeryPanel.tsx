@@ -37,7 +37,7 @@ function PendingCard({ patient, onAssign }: PendingCardProps) {
         {...attributes}
         {...listeners}
         type="button"
-        className="cursor-grab touch-none text-slate-400 mt-0.5 shrink-0"
+        className="cursor-grab touch-none text-slate-400 shrink-0 min-w-11 min-h-11 flex items-center justify-center"
         aria-label={`Drag ${patient.name}`}
       >
         <GripVertical className="w-4 h-4" />
@@ -52,7 +52,7 @@ function PendingCard({ patient, onAssign }: PendingCardProps) {
       <button
         type="button"
         onClick={() => onAssign(patient)}
-        className="p-1.5 bg-teal-100 text-teal-700 rounded-md hover:bg-teal-200 shrink-0"
+        className="bg-teal-100 text-teal-700 rounded-md hover:bg-teal-200 shrink-0 min-w-11 min-h-11 flex items-center justify-center"
         aria-label={`Add ${patient.name} to current list`}
       >
         <Plus className="w-4 h-4" />
@@ -75,7 +75,7 @@ const PendingSurgeryPanel: React.FC<PendingSurgeryPanelProps> = ({ pendingPatien
   );
 
   const filtered = sorted.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.ipNo.includes(searchTerm),
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.ipNo.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (

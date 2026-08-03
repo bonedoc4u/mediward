@@ -50,6 +50,16 @@ describe('PendingSurgeryPanel', () => {
     expect(screen.getByText('Sarada Nair', { exact: false })).toBeInTheDocument();
   });
 
+  it('filters by IP number case-insensitively', () => {
+    renderPanel([
+      makePatient({ ipNo: 'IP001', name: 'Ravi Kumar' }),
+      makePatient({ ipNo: 'IP002', name: 'Sarada Nair' }),
+    ]);
+    fireEvent.change(screen.getByPlaceholderText(/Search/i), { target: { value: 'ip002' } });
+    expect(screen.queryByText('Ravi Kumar', { exact: false })).not.toBeInTheDocument();
+    expect(screen.getByText('Sarada Nair', { exact: false })).toBeInTheDocument();
+  });
+
   it('calls onAssign when the "+" button is pressed', () => {
     const { onAssign } = renderPanel([makePatient()]);
     fireEvent.click(screen.getByLabelText(/Add Ravi Kumar/i));
