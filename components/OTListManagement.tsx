@@ -3,10 +3,9 @@ import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getOTCycleDates } from '../utils/otSchedule';
-import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
+import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, isEligibleForOTList, PENDING_ID_PREFIX } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { preferRowCollision } from '../utils/otListCollision';
-import { hasPendingSurgery } from '../utils/calculations';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
 import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
 import OTListTable from './otlist/OTListTable';
@@ -92,7 +91,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       const existing = new Set(prev.map(p => p.ipNo));
       const toAdd: OTPatient[] = [];
       for (const { date, fallbackType } of tabDates) {
-        const dated = patients.filter(p => p.plannedDos === date && hasPendingSurgery(p));
+        const dated = patients.filter(p => p.plannedDos === date && isEligibleForOTList(p));
         dated.forEach(p => {
           if (existing.has(p.ipNo) || toAdd.some(x => x.ipNo === p.ipNo)) return;
           const unit     = (p.unit ?? '').toUpperCase();
@@ -142,7 +141,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
   // Filter pending patients for import (not yet in the current tab's list)
   const pendingPatients = patients.filter(p =>
-    hasPendingSurgery(p) &&
+    isEligibleForOTList(p) &&
     !otList.some(ot => ot.ipNo === p.ipNo && ot.otType === activeTab)
   );
 
