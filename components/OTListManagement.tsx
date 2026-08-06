@@ -141,8 +141,16 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       { type: 'Minor', date: minorDate },
       { type: 'EOT', date: eotDate },
     ];
+    // Weekend EOT dates (when this unit is on weekend duty this cycle) are
+    // a second date under the EOT type that the canonical fetch above
+    // doesn't cover. Still need to be LOADED here (so existingIpNos in the
+    // auto-populate effect below correctly reflects who's already
+    // persisted there and doesn't re-insert them) even though they're
+    // deliberately never cached in otListMetaByType (see that effect's own
+    // comment on why).
+    const weekendTabs: Array<{ type: OTType; date: string }> = cycle.eotWeekendDates.map(date => ({ type: 'EOT' as OTType, date }));
 
-    Promise.all(tabs.map(t => fetchOTList(user.hospitalId!, effectiveUnit, t.type, t.date)))
+    Promise.all([...tabs, ...weekendTabs].map(t => fetchOTList(user.hospitalId!, effectiveUnit, t.type, t.date)))
       .then(results => {
         if (cancelled) return;
         setOtList(results.flatMap(r => r.entries));
@@ -161,7 +169,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       });
 
     return () => { cancelled = true; };
-  }, [user?.hospitalId, effectiveUnit, majorDate, minorDate, eotDate]);
+  }, [user?.hospitalId, effectiveUnit, majorDate, minorDate, eotDate, cycle]);
 
   // Re-point surgeon/unit/time at whichever tab's own saved values exist,
   // whenever the active tab changes or that tab's data just finished loading
@@ -216,7 +224,11 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       Object.entries(pendingEntryChangesRef.current).forEach(([id, changes]) => {
         const current = otListRef.current.find(p => p.id === id);
         if (current && current.version != null && changes) {
-          void updateOTListEntry(id, current.version, changes);
+          // Swallow failures: unmount is navigation, which is exactly when
+          // an in-flight request is likeliest to be torn down, and there's
+          // no user left on this screen to show an error to. Without a
+          // handler this would surface as an unhandled rejection.
+          void updateOTListEntry(id, current.version, changes).catch(() => {});
         }
       });
     };
