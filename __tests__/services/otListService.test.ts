@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // table rather than one result for every call.
 const mockState = vi.hoisted(() => ({
   results: {} as Record<string, { data: any; error: any }>,
+  builders: {} as Record<string, Record<string, any>>,
 }));
 
 vi.mock('../../lib/supabase', () => {
@@ -18,6 +19,7 @@ vi.mock('../../lib/supabase', () => {
     for (const m of ['select', 'eq', 'order', 'upsert', 'insert', 'update', 'delete', 'maybeSingle', 'single']) {
       b[m] = vi.fn().mockReturnValue(b);
     }
+    mockState.builders[table] = b;
     return b;
   };
   return {
@@ -34,6 +36,7 @@ import {
 
 beforeEach(() => {
   mockState.results = {};
+  mockState.builders = {};
 });
 
 describe('fetchOTList', () => {
@@ -62,6 +65,8 @@ describe('fetchOTList', () => {
     expect(result.list).toEqual({ id: 'list-1', surgeon: 'Dr. Rao', surgeonUnit: 'OR1', otTime: '8.00AM', version: 2 });
     expect(result.entries).toHaveLength(1);
     expect(result.entries[0]).toMatchObject({ id: 'entry-1', otListId: 'list-1', version: 1, ipNo: 'IP001', cArm: 'No' });
+    expect(mockState.builders['ot_lists'].eq).toHaveBeenCalledWith('hospital_id', 'hosp-1');
+    expect(mockState.builders['ot_list_entries'].eq).toHaveBeenCalledWith('ot_list_id', 'list-1');
   });
 
   it('throws with a descriptive message when the list query errors', async () => {
@@ -78,6 +83,10 @@ describe('upsertOTListMeta', () => {
     };
     const result = await upsertOTListMeta('hosp-1', 'OR1', 'Major', '2026-08-06', { surgeon: 'Dr. Rao', surgeonUnit: 'OR1', otTime: '8.00AM' });
     expect(result).toEqual({ id: 'list-1', surgeon: 'Dr. Rao', surgeonUnit: 'OR1', otTime: '8.00AM', version: 1 });
+    expect(mockState.builders['ot_lists'].upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ hospital_id: 'hosp-1' }),
+      expect.anything(),
+    );
   });
 });
 
@@ -101,6 +110,9 @@ describe('insertOTListEntry', () => {
     expect(result.id).toBe('entry-1');
     expect(result.otListId).toBe('list-1');
     expect(result.version).toBe(1);
+    expect(mockState.builders['ot_list_entries'].insert).toHaveBeenCalledWith(
+      expect.objectContaining({ hospital_id: 'hosp-1' }),
+    );
   });
 });
 
@@ -118,6 +130,8 @@ describe('updateOTListEntry', () => {
     const result = await updateOTListEntry('entry-1', 1, { anesthesia: 'GA' });
     expect(result.anesthesia).toBe('GA');
     expect(result.version).toBe(2);
+    expect(mockState.builders['ot_list_entries'].eq).toHaveBeenCalledWith('id', 'entry-1');
+    expect(mockState.builders['ot_list_entries'].eq).toHaveBeenCalledWith('version', 1);
   });
 
   it('throws a CONCURRENT_EDIT error when the version check matches zero rows', async () => {
@@ -138,6 +152,7 @@ describe('reorderOTListEntries', () => {
   it('resolves when all updates succeed', async () => {
     mockState.results['ot_list_entries'] = { data: null, error: null };
     await expect(reorderOTListEntries([{ id: 'entry-1', sequence: 1, category: 'TABLE 1' }])).resolves.toBeUndefined();
+    expect(mockState.builders['ot_list_entries'].eq).not.toHaveBeenCalledWith('version', expect.anything());
   });
 
   it('throws if any update fails', async () => {
