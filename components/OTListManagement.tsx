@@ -3,9 +3,10 @@ import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getOTCycleDates } from '../utils/otSchedule';
-import { OTPatient, OTType, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
+import { OTPatient, OTType, OTListMeta, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { preferRowCollision } from '../utils/otListCollision';
+import { fetchOTList, upsertOTListMeta } from '../services/otListService';
 import { hasPendingSurgery } from '../utils/calculations';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
 import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
@@ -71,13 +72,69 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const [surgeonUnit, setSurgeonUnit] = useState(effectiveUnit);
   const [surgeon, setSurgeon] = useState('');
   const [otTime, setOtTime] = useState('8.00AM');
+  const [otListMetaByType, setOtListMetaByType] = useState<Record<OTType, OTListMeta | null>>({ Major: null, Minor: null, EOT: null });
+  const [isLoadingOTList, setIsLoadingOTList] = useState(false);
+  const [otListError, setOtListError] = useState<string | null>(null);
 
-  // Auto-fill surgeon from unit chiefs whenever the unit or chiefs config changes
+  // Auto-fill surgeon from unit chiefs whenever the unit or chiefs config
+  // changes — but only when there's no persisted list yet for this tab; a
+  // saved list's own surgeon override always wins over the chief default.
   useEffect(() => {
+    if (otListMetaByType[activeTab]) return;
     const key = surgeonUnit.replace(/\s+/g, '').toUpperCase();
     const chief = unitChiefs[key];
     if (chief) setSurgeon(chief);
-  }, [surgeonUnit, unitChiefs]);
+  }, [surgeonUnit, unitChiefs, activeTab, otListMetaByType]);
+
+  // Load all three tabs' persisted lists whenever the unit or any of their
+  // dates changes (not just the active tab — the auto-populate effect below
+  // scans all three tabs' dates at once, so loading only the active tab
+  // would risk it not knowing an entry already exists in a not-yet-loaded
+  // tab and inserting a duplicate).
+  useEffect(() => {
+    if (!user?.hospitalId) return;
+    let cancelled = false;
+    setIsLoadingOTList(true);
+    setOtListError(null);
+
+    const tabs: Array<{ type: OTType; date: string }> = [
+      { type: 'Major', date: majorDate },
+      { type: 'Minor', date: minorDate },
+      { type: 'EOT', date: eotDate },
+    ];
+
+    Promise.all(tabs.map(t => fetchOTList(user.hospitalId!, effectiveUnit, t.type, t.date)))
+      .then(results => {
+        if (cancelled) return;
+        setOtList(results.flatMap(r => r.entries));
+        setOtListMetaByType({
+          Major: results[0].list,
+          Minor: results[1].list,
+          EOT: results[2].list,
+        });
+      })
+      .catch(err => {
+        if (!cancelled) setOtListError(err instanceof Error ? err.message : 'Failed to load OT list');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingOTList(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [user?.hospitalId, effectiveUnit, majorDate, minorDate, eotDate]);
+
+  // Re-point surgeon/unit/time at whichever tab's own saved values exist,
+  // whenever the active tab changes or that tab's data just finished loading
+  // (the effect above already fetched it — this doesn't re-fetch, just
+  // re-syncs the editable fields to match).
+  useEffect(() => {
+    const meta = otListMetaByType[activeTab];
+    if (meta) {
+      setSurgeon(meta.surgeon);
+      setSurgeonUnit(meta.surgeonUnit);
+      setOtTime(meta.otTime);
+    }
+  }, [activeTab, otListMetaByType]);
 
   // Auto-populate patients whose plannedDos matches any of the three tab dates
   useEffect(() => {
@@ -306,6 +363,16 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     setDragOverCategory(null);
   };
 
+  const saveOTListMeta = async (next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
+    if (!user?.hospitalId) return;
+    try {
+      const meta = await upsertOTListMeta(user.hospitalId, effectiveUnit, activeTab, selectedDate, next);
+      setOtListMetaByType(prev => ({ ...prev, [activeTab]: meta }));
+    } catch (err) {
+      setOtListError(err instanceof Error ? err.message : 'Failed to save');
+    }
+  };
+
   const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
     const existingInCategory = otList.filter(p => p.otType === activeTab && p.category === category);
     const newEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
@@ -385,6 +452,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         </div>
       </div>
 
+      {otListError && (
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {otListError}
+        </div>
+      )}
+      {isLoadingOTList && (
+        <div className="text-sm text-slate-500">Loading OT list…</div>
+      )}
+
       {/* Weekend EOT duty hint — shown on the EOT tab when this unit is on weekend duty this cycle */}
       {activeTab === 'EOT' && cycle.eotWeekendDates.length > 0 && (
         <div className="flex items-center gap-2 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
@@ -404,7 +480,10 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           <input
             type="text"
             value={surgeon}
-            onChange={e => setSurgeon(e.target.value)}
+            onChange={e => {
+              setSurgeon(e.target.value);
+              void saveOTListMeta({ surgeon: e.target.value, surgeonUnit, otTime });
+            }}
             placeholder="Surgeon name…"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
           />
@@ -414,7 +493,10 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           <input
             type="text"
             value={surgeonUnit}
-            onChange={e => setSurgeonUnit(e.target.value)}
+            onChange={e => {
+              setSurgeonUnit(e.target.value);
+              void saveOTListMeta({ surgeon, surgeonUnit: e.target.value, otTime });
+            }}
             placeholder="e.g. OR 1"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
           />
@@ -424,7 +506,10 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           <input
             type="text"
             value={otTime}
-            onChange={e => setOtTime(e.target.value)}
+            onChange={e => {
+              setOtTime(e.target.value);
+              void saveOTListMeta({ surgeon, surgeonUnit, otTime: e.target.value });
+            }}
             placeholder="e.g. 8.00AM"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
           />
