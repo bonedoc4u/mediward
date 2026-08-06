@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -75,6 +75,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const [otListMetaByType, setOtListMetaByType] = useState<Record<OTType, OTListMeta | null>>({ Major: null, Minor: null, EOT: null });
   const [isLoadingOTList, setIsLoadingOTList] = useState(false);
   const [otListError, setOtListError] = useState<string | null>(null);
+  const saveMetaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-fill surgeon from unit chiefs whenever the unit or chiefs config
   // changes — but only when there's no persisted list yet for this tab; a
@@ -133,8 +134,20 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       setSurgeon(meta.surgeon);
       setSurgeonUnit(meta.surgeonUnit);
       setOtTime(meta.otTime);
+    } else {
+      setSurgeon('');
+      setSurgeonUnit(effectiveUnit);
+      setOtTime('8.00AM');
     }
-  }, [activeTab, otListMetaByType]);
+  }, [activeTab, otListMetaByType, effectiveUnit]);
+
+  // Clear any pending debounced metadata save on unmount so it can't fire
+  // (and write stale field values) after the component is gone.
+  useEffect(() => {
+    return () => {
+      if (saveMetaTimerRef.current) clearTimeout(saveMetaTimerRef.current);
+    };
+  }, []);
 
   // Auto-populate patients whose plannedDos matches any of the three tab dates
   useEffect(() => {
@@ -373,6 +386,19 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     }
   };
 
+  // Debounced wrapper around saveOTListMeta — only actual keystrokes (via the
+  // three onChange handlers below) should schedule a save. Programmatic
+  // field changes (e.g. the re-sync effect firing on tab switch) call
+  // setSurgeon/setSurgeonUnit/setOtTime directly and never go through this,
+  // so they can't trigger a spurious write. A ref (not state) holds the
+  // timer so rescheduling doesn't itself cause a re-render.
+  const saveOTListMetaDebounced = (next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
+    if (saveMetaTimerRef.current) clearTimeout(saveMetaTimerRef.current);
+    saveMetaTimerRef.current = setTimeout(() => {
+      void saveOTListMeta(next);
+    }, 500);
+  };
+
   const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
     const existingInCategory = otList.filter(p => p.otType === activeTab && p.category === category);
     const newEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
@@ -482,7 +508,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={surgeon}
             onChange={e => {
               setSurgeon(e.target.value);
-              void saveOTListMeta({ surgeon: e.target.value, surgeonUnit, otTime });
+              saveOTListMetaDebounced({ surgeon: e.target.value, surgeonUnit, otTime });
             }}
             placeholder="Surgeon name…"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
@@ -495,7 +521,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={surgeonUnit}
             onChange={e => {
               setSurgeonUnit(e.target.value);
-              void saveOTListMeta({ surgeon, surgeonUnit: e.target.value, otTime });
+              saveOTListMetaDebounced({ surgeon, surgeonUnit: e.target.value, otTime });
             }}
             placeholder="e.g. OR 1"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
@@ -508,7 +534,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={otTime}
             onChange={e => {
               setOtTime(e.target.value);
-              void saveOTListMeta({ surgeon, surgeonUnit, otTime: e.target.value });
+              saveOTListMetaDebounced({ surgeon, surgeonUnit, otTime: e.target.value });
             }}
             placeholder="e.g. 8.00AM"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
