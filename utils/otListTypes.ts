@@ -12,6 +12,8 @@ export type OTType = 'Major' | 'Minor' | 'EOT';
 
 export interface OTPatient {
   id: string;
+  otListId?: string; // set once persisted (see services/otListService.ts) — absent for an entry still mid-save
+  version?: number;  // optimistic-lock counter — absent for an entry still mid-save
   sequence: number;
   ipNo: string;
   name: string;
@@ -28,6 +30,14 @@ export interface OTPatient {
   remarks: string;
   category?: string; // e.g., "Spinal Table", "Local Table"
   otType: OTType;    // which OT list this entry belongs to
+}
+
+export interface OTListMeta {
+  id: string;
+  surgeon: string;
+  surgeonUnit: string;
+  otTime: string;
+  version: number;
 }
 
 export function getOTTypeForDate(unit: string, dateStr: string): OTType | null {
