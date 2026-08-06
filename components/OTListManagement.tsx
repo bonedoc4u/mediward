@@ -102,6 +102,13 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // cancelling the first field's still-pending one.
   const pendingEntryChangesRef = useRef<Record<string, Partial<Omit<OTPatient, 'id' | 'otListId' | 'version' | 'otType'>>>>({});
   const saveEntryTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // ipNos the user has explicitly removed this session — the auto-populate
+  // effect below must not re-insert them even after they're no longer in
+  // `otList`, otherwise a deliberate removal gets silently undone the next
+  // time `patients` changes (e.g. a realtime sync tick). Session-scoped by
+  // design: resets on remount, which is an accepted limitation, not a gap
+  // to close here.
+  const dismissedIpNosRef = useRef<Set<string>>(new Set());
 
   // Auto-fill surgeon from unit chiefs whenever the unit or chiefs config
   // changes — but only when there's no persisted list yet for this tab; a
@@ -211,7 +218,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       // Weekend EOT days when this unit is on weekend duty this cycle.
       ...cycle.eotWeekendDates.map(date => ({ date, fallbackType: 'EOT' as OTType })),
     ];
-    const existingIpNos = new Set(otList.map(p => p.ipNo));
+    const existingIpNos = new Set([...otList.map(p => p.ipNo), ...dismissedIpNosRef.current]);
     const newlyPlanned = findNewlyPlannedOTAssignments(patients, existingIpNos, tabDates);
 
     newlyPlanned.forEach(({ patient: p, otType, date }) => {
@@ -469,16 +476,17 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     }, 500);
   };
 
-  // Shared by the "+" button and drag-to-assign so persistence logic exists
-  // in exactly one place (both used to build the entry inline separately).
-  // Optimistically appends to local state, then persists — rolling the
-  // optimistic entry back out on failure.
-  const assignPatientToCategory = async (patient: Patient, category: string) => {
+  // Shared by "+" button assign, drag-to-assign, and "Add Row" — optimistic
+  // add to local state, then persist to the active tab's OT list (creating
+  // the list-level ot_lists row first if this is the first entry for it),
+  // rolling the optimistic entry back out on failure. The auto-populate
+  // effect above intentionally does NOT use this — it may be assigning
+  // into a tab other than the currently active one, which this helper
+  // doesn't handle (see that effect's own comment for why it stays
+  // separate; this was a plan-level decision, not an oversight).
+  const persistNewEntry = async (optimisticEntry: OTPatient) => {
     if (!user?.hospitalId) return;
-    const existingInCategory = otList.filter(p => p.otType === activeTab && p.category === category);
-    const optimisticEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
     setOtList(prev => [...prev, optimisticEntry]);
-
     try {
       let listMeta = otListMetaByType[activeTab];
       if (!listMeta) {
@@ -489,8 +497,17 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       setOtList(prev => prev.map(p => (p.id === optimisticEntry.id ? saved : p)));
     } catch (err) {
       setOtList(prev => prev.filter(p => p.id !== optimisticEntry.id));
-      setOtListError(err instanceof Error ? err.message : 'Failed to save assignment');
+      setOtListError(err instanceof Error ? err.message : 'Failed to save entry');
     }
+  };
+
+  // Kept as a thin wrapper (rather than inlined at both call sites) so
+  // handleDragEnd's pending-prefix branch and handleAssignPatient share one
+  // place that builds the entry from a Patient + category.
+  const assignPatientToCategory = async (patient: Patient, category: string) => {
+    const existingInCategory = otList.filter(p => p.otType === activeTab && p.category === category);
+    const optimisticEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
+    await persistNewEntry(optimisticEntry);
   };
 
   const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
@@ -499,18 +516,29 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
   const handleRemove = (id: string) => {
     const removed = otList.find(p => p.id === id);
+    if (removed) dismissedIpNosRef.current.add(removed.ipNo);
     setOtList(prev => prev.filter(p => p.id !== id));
     if (!removed?.version) return; // never persisted yet — nothing to delete server-side
     deleteOTListEntry(id).catch(err => {
       setOtList(prev => [...prev, removed]);
+      dismissedIpNosRef.current.delete(removed.ipNo);
       setOtListError(err instanceof Error ? err.message : 'Failed to delete');
     });
   };
 
   const handleClearList = () => {
-      if (window.confirm('Are you sure you want to clear the entire list?')) {
-          setOtList([]);
-      }
+      if (!window.confirm('Are you sure you want to clear the entire list?')) return;
+      // Clears all three tabs, not just the active one — pre-existing scope,
+      // unchanged here. No rollback on failure (matching reorder's existing
+      // precedent): this is a bulk operation behind an explicit confirm
+      // dialog, so a partial failure means some rows may still exist and
+      // reappear on next load — recoverable and surfaced via the error
+      // message, not silent data loss.
+      const toDelete = otList.filter(p => p.version != null);
+      setOtList([]);
+      Promise.all(toDelete.map(p => deleteOTListEntry(p.id))).catch(err => {
+        setOtListError(err instanceof Error ? err.message : 'Some entries may not have been fully cleared — please refresh to check.');
+      });
   };
 
   const handleAddManualEntry = () => {
@@ -527,7 +555,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       category: defaultCategory,
       otType: activeTab,
     };
-    setOtList(prev => [...prev, newEntry]);
+    void persistNewEntry(newEntry);
   };
 
   const handleExportExcel = () => {
