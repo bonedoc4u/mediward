@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX, OTPatient } from '../utils/otListTypes';
+import { getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, isEligibleForOTList, PENDING_ID_PREFIX, OTPatient } from '../utils/otListTypes';
+import { Patient, Gender, PacStatus, PatientStatus } from '../types';
+
+const makePatient = (overrides: Partial<Patient> = {}): Patient => ({
+  ipNo: 'IP001',
+  name: 'Ravi Kumar',
+  mobile: '9876543210',
+  age: 52,
+  gender: Gender.Male,
+  ward: 'Ward 22',
+  bed: '5',
+  diagnosis: 'Intertrochanteric fracture femur',
+  comorbidities: [],
+  doa: '2026-07-26',
+  pacStatus: PacStatus.Fit,
+  patientStatus: PatientStatus.Fit,
+  dailyRounds: [],
+  investigations: [],
+  labResults: [],
+  todos: [],
+  ...overrides,
+});
 
 describe('PENDING_ID_PREFIX', () => {
   it('is the shared prefix pending-card drag ids are built from and parsed with', () => {
@@ -74,5 +95,43 @@ describe('OTPatient optional persistence fields', () => {
     };
     expect(entry.otListId).toBe('list-uuid-1');
     expect(entry.version).toBe(1);
+  });
+});
+
+describe('isEligibleForOTList', () => {
+  it('includes a current inpatient who has never had surgery', () => {
+    expect(isEligibleForOTList(makePatient({ dos: undefined, plannedDos: undefined }))).toBe(true);
+  });
+
+  it('includes a current inpatient with a second surgery planned', () => {
+    expect(isEligibleForOTList(makePatient({ dos: '2026-07-28', plannedDos: '2026-08-10' }))).toBe(true);
+  });
+
+  it('excludes a current inpatient with no pending surgery at all', () => {
+    expect(isEligibleForOTList(makePatient({ dos: '2026-07-28', plannedDos: undefined }))).toBe(false);
+  });
+
+  it('excludes a Discharged patient even if they would otherwise be pending', () => {
+    expect(isEligibleForOTList(makePatient({
+      patientStatus: PatientStatus.Discharged, dos: undefined, plannedDos: undefined,
+    }))).toBe(false);
+  });
+
+  it('excludes a Discharged patient even with a planned second surgery', () => {
+    expect(isEligibleForOTList(makePatient({
+      patientStatus: PatientStatus.Discharged, dos: '2026-07-28', plannedDos: '2026-08-10',
+    }))).toBe(false);
+  });
+
+  it('excludes a Went Home patient with no second surgery planned', () => {
+    expect(isEligibleForOTList(makePatient({
+      patientStatus: PatientStatus.WentHome, dos: '2026-07-28', plannedDos: undefined,
+    }))).toBe(false);
+  });
+
+  it('includes a Went Home patient who has a second surgery planned', () => {
+    expect(isEligibleForOTList(makePatient({
+      patientStatus: PatientStatus.WentHome, dos: '2026-07-28', plannedDos: '2026-08-10',
+    }))).toBe(true);
   });
 });

@@ -3,12 +3,11 @@ import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getOTCycleDates } from '../utils/otSchedule';
-import { OTPatient, OTType, OTListMeta, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
+import { OTPatient, OTType, OTListMeta, getTableOptionsForType, getDefaultCategoryForType, isEligibleForOTList, PENDING_ID_PREFIX } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { preferRowCollision } from '../utils/otListCollision';
 import { findNewlyPlannedOTAssignments } from '../utils/otListAutoPopulate';
 import { fetchOTList, upsertOTListMeta, insertOTListEntry, updateOTListEntry, deleteOTListEntry, reorderOTListEntries } from '../services/otListService';
-import { hasPendingSurgery } from '../utils/calculations';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
 import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
 import OTListTable from './otlist/OTListTable';
@@ -353,7 +352,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
   // Filter pending patients for import (not yet in the current tab's list)
   const pendingPatients = patients.filter(p =>
-    hasPendingSurgery(p) &&
+    isEligibleForOTList(p) &&
     !otList.some(ot => ot.ipNo === p.ipNo && ot.otType === activeTab)
   );
 

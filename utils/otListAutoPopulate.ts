@@ -1,6 +1,5 @@
 import { Patient } from '../types';
-import { hasPendingSurgery } from './calculations';
-import { OTType, getOTTypeForDate } from './otListTypes';
+import { OTType, getOTTypeForDate, isEligibleForOTList } from './otListTypes';
 
 export interface PlannedOTAssignment {
   patient: Patient;
@@ -25,7 +24,7 @@ export function findNewlyPlannedOTAssignments(
   const seen = new Set(existingIpNos);
   const result: PlannedOTAssignment[] = [];
   for (const { date, fallbackType } of tabDates) {
-    const dated = patients.filter(p => p.plannedDos === date && hasPendingSurgery(p));
+    const dated = patients.filter(p => p.plannedDos === date && isEligibleForOTList(p));
     dated.forEach(p => {
       if (seen.has(p.ipNo)) return;
       seen.add(p.ipNo);

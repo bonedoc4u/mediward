@@ -1,4 +1,6 @@
 import { UNIT_SCHEDULE } from './otSchedule';
+import { Patient, PatientStatus } from '../types';
+import { hasPendingSurgery } from './calculations';
 
 /**
  * Prefix used to build the drag id for a pending-surgery card (see
@@ -58,4 +60,17 @@ export function getTableOptionsForType(otType: OTType): string[] {
 
 export function getDefaultCategoryForType(otType: OTType): string {
   return getTableOptionsForType(otType)[0];
+}
+
+/** Same pending-surgery rule as hasPendingSurgery, plus the status
+ *  exclusions an OT list specifically needs: a Discharged patient is never
+ *  relevant to any future OT list, but a patient who Went Home is still
+ *  relevant if they have a genuinely scheduled second surgery (plannedDos) —
+ *  unlike the Ward Dashboard's "Pending" tab, which excludes Went Home
+ *  unconditionally since that view tracks who's still physically pre-op in
+ *  the ward. */
+export function isEligibleForOTList(p: Patient): boolean {
+  if (p.patientStatus === PatientStatus.Discharged) return false;
+  if (p.patientStatus === PatientStatus.WentHome && !p.plannedDos) return false;
+  return hasPendingSurgery(p);
 }
