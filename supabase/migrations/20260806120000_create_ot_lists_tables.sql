@@ -51,7 +51,10 @@ alter table ot_lists enable row level security;
 alter table ot_list_entries enable row level security;
 
 create policy ot_lists_select on ot_lists
-  for select using (hospital_id = get_my_hospital_id());
+  for select using (
+    hospital_id = get_my_hospital_id()
+    or exists (select 1 from app_users where app_users.id = auth.uid() and app_users.role = 'superadmin')
+  );
 create policy ot_lists_insert on ot_lists
   for insert with check (
     hospital_id = get_my_hospital_id()
@@ -69,7 +72,10 @@ create policy ot_lists_delete on ot_lists
   );
 
 create policy ot_list_entries_select on ot_list_entries
-  for select using (hospital_id = get_my_hospital_id());
+  for select using (
+    hospital_id = get_my_hospital_id()
+    or exists (select 1 from app_users where app_users.id = auth.uid() and app_users.role = 'superadmin')
+  );
 create policy ot_list_entries_insert on ot_list_entries
   for insert with check (
     hospital_id = get_my_hospital_id()
@@ -87,7 +93,9 @@ create policy ot_list_entries_delete on ot_list_entries
   );
 
 create or replace function bump_ot_list_version() returns trigger
-language plpgsql as $$
+language plpgsql
+set search_path = public
+as $$
 begin
   new.version = coalesce(old.version, 0) + 1;
   return new;
@@ -97,6 +105,7 @@ $$;
 drop trigger if exists ot_lists_version_bump on ot_lists;
 create trigger ot_lists_version_bump before update on ot_lists
   for each row execute function bump_ot_list_version();
+revoke execute on function bump_ot_list_version() from public, anon, authenticated;
 
 drop trigger if exists ot_list_entries_version_bump on ot_list_entries;
 create trigger ot_list_entries_version_bump before update on ot_list_entries
