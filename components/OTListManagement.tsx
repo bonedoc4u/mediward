@@ -3,10 +3,11 @@ import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getOTCycleDates } from '../utils/otSchedule';
-import { OTPatient, OTType, OTListMeta, getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
+import { OTPatient, OTType, OTListMeta, getTableOptionsForType, getDefaultCategoryForType, PENDING_ID_PREFIX } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { preferRowCollision } from '../utils/otListCollision';
-import { fetchOTList, upsertOTListMeta } from '../services/otListService';
+import { findNewlyPlannedOTAssignments } from '../utils/otListAutoPopulate';
+import { fetchOTList, upsertOTListMeta, insertOTListEntry, updateOTListEntry, deleteOTListEntry, reorderOTListEntries } from '../services/otListService';
 import { hasPendingSurgery } from '../utils/calculations';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
 import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
@@ -153,8 +154,20 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     };
   }, []);
 
-  // Auto-populate patients whose plannedDos matches any of the three tab dates
+  // Auto-populate patients whose plannedDos matches any of the three tab
+  // dates. Runs after the load effect (Task 4) has populated otList from the
+  // database, so the "already present" set findNewlyPlannedOTAssignments
+  // checks against correctly reflects everyone already persisted across all
+  // three tabs, not just the currently-active one — avoiding a duplicate
+  // insert for a patient already assigned in a tab the user hasn't switched
+  // to yet this session. Gated on isLoadingOTList so it never runs against a
+  // still-loading (or not-yet-loaded) otList: firing mid-load would see an
+  // incomplete "already present" set and could insert a duplicate for a
+  // patient the load is about to bring in, plus a load completing afterward
+  // replaces otList wholesale and would transiently drop any entry this
+  // effect had just optimistically added but not yet persisted.
   useEffect(() => {
+    if (!user?.hospitalId || isLoadingOTList) return;
     const tabDates: Array<{ date: string; fallbackType: OTType }> = [
       { date: majorDate, fallbackType: 'Major' },
       { date: minorDate, fallbackType: 'Minor' },
@@ -162,39 +175,31 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       // Weekend EOT days when this unit is on weekend duty this cycle.
       ...cycle.eotWeekendDates.map(date => ({ date, fallbackType: 'EOT' as OTType })),
     ];
-    setOtList(prev => {
-      const existing = new Set(prev.map(p => p.ipNo));
-      const toAdd: OTPatient[] = [];
-      for (const { date, fallbackType } of tabDates) {
-        const dated = patients.filter(p => p.plannedDos === date && hasPendingSurgery(p));
-        dated.forEach(p => {
-          if (existing.has(p.ipNo) || toAdd.some(x => x.ipNo === p.ipNo)) return;
-          const unit     = (p.unit ?? '').toUpperCase();
-          const otType   = getOTTypeForDate(unit, date) ?? fallbackType;
-          const category = getDefaultCategoryForType(otType);
-          const seqBase  = prev.filter(x => x.otType === otType).length + toAdd.filter(x => x.otType === otType).length;
-          toAdd.push({
-            id: crypto.randomUUID(),
-            sequence: seqBase + 1,
-            ipNo: p.ipNo,
-            name: p.name,
-            age: p.age.toString(),
-            gender: p.gender === 'Male' ? 'M' : p.gender === 'Female' ? 'F' : '',
-            ward: p.ward.replace(/Ward\s*/i, '').trim(),
-            unit: p.unit ?? '',
-            diagnosis: p.diagnosis,
-            procedure: p.procedure ?? '',
-            side: '', anesthesia: '', cArm: 'No', implants: '',
-            remarks: p.comorbidities.join(', '),
-            category,
-            otType,
-          });
-        });
-      }
-      return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+    const existingIpNos = new Set(otList.map(p => p.ipNo));
+    const newlyPlanned = findNewlyPlannedOTAssignments(patients, existingIpNos, tabDates);
+
+    newlyPlanned.forEach(({ patient: p, otType, date }) => {
+      const category = getDefaultCategoryForType(otType);
+      const existingInCategory = otList.filter(x => x.otType === otType && x.category === category);
+      const optimisticEntry = buildOTPatientEntry(p, otType, category, existingInCategory);
+      setOtList(prev => [...prev, optimisticEntry]);
+
+      (async () => {
+        try {
+          let listMeta = otListMetaByType[otType];
+          if (!listMeta) {
+            listMeta = await upsertOTListMeta(user.hospitalId!, effectiveUnit, otType, date, { surgeon, surgeonUnit, otTime });
+            setOtListMetaByType(prev => ({ ...prev, [otType]: listMeta }));
+          }
+          const saved = await insertOTListEntry(listMeta.id, user.hospitalId!, optimisticEntry);
+          setOtList(prev => prev.map(x => (x.id === optimisticEntry.id ? saved : x)));
+        } catch (err) {
+          setOtList(prev => prev.filter(x => x.id !== optimisticEntry.id));
+          setOtListError(err instanceof Error ? err.message : 'Failed to auto-save a planned patient');
+        }
+      })();
     });
-   
-  }, [majorDate, minorDate, eotDate, patients, cycle]);
+  }, [majorDate, minorDate, eotDate, patients, cycle, isLoadingOTList]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -313,23 +318,20 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         : (getTableOptionsForType(activeTab).includes(overId) ? overId : null);
       if (!targetCategory) return;
 
-      const existingInCategory = otList.filter(i => i.otType === activeTab && i.category === targetCategory);
-      const newEntry = buildOTPatientEntry(patient, activeTab, targetCategory, existingInCategory);
-      setOtList(prev => [...prev, newEntry]);
+      void assignPatientToCategory(patient, targetCategory);
       return;
     }
 
     if (active.id !== over.id) {
-      setOtList((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        // Defensive: active.id should always resolve to a row already in
-        // `items` on this branch (the pending-prefix case returns earlier
-        // above), but if it ever didn't, bail out rather than let the
-        // `items[oldIndex]` access below produce `undefined` and crash the
-        // resequence step further down.
-        if (oldIndex === -1) return items;
+      const oldIndex = otList.findIndex((item) => item.id === active.id);
+      const newIndex = otList.findIndex((item) => item.id === over.id);
 
+      // Defensive: active.id should always resolve to a row already in
+      // `otList` on this branch (the pending-prefix case returns earlier
+      // above), but if it ever didn't, skip rather than let the
+      // `otList[oldIndex]` access below produce `undefined` and crash the
+      // resequence step further down.
+      if (oldIndex !== -1) {
         let newItems: OTPatient[];
         if (newIndex === -1) {
           // `over` resolved to a category container (the tbody's own
@@ -337,14 +339,14 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           // row — collisionDetection above already prefers a same-category
           // row when one exists, so this only happens for the true
           // empty-category case. Explicitly append the dragged item to the
-          // end of `items` instead of relying on arrayMove's implicit
+          // end of `otList` instead of relying on arrayMove's implicit
           // "negative index counts back from the end" behaviour, so this
           // branch is visible as intentional rather than an accident of
           // how arrayMove handles -1.
-          const movedItem = items[oldIndex];
-          newItems = [...items.filter((_, i) => i !== oldIndex), movedItem];
+          const movedItem = otList[oldIndex];
+          newItems = [...otList.filter((_, i) => i !== oldIndex), movedItem];
         } else {
-          newItems = arrayMove(items, oldIndex, newIndex);
+          newItems = arrayMove(otList, oldIndex, newIndex);
         }
 
         const opts = getTableOptionsForType(activeTab);
@@ -363,10 +365,24 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           });
         });
 
-        // Merge back with items from other tabs unchanged
+        // Merge back with items from other tabs unchanged, then persist.
         const otherTabItems = newItems.filter(i => i.otType !== activeTab);
-        return [...otherTabItems, ...resequenced];
-      });
+        setOtList([...otherTabItems, ...resequenced]);
+
+        // Reordering doesn't roll back on failure — a stale/failed reorder
+        // only risks a temporarily-odd order, never lost data, so a
+        // rollback here would add complexity for a low-stakes failure mode.
+        // An error still shows. Entries that haven't round-tripped through
+        // insertOTListEntry yet (no version) have nothing to persist to.
+        const persistable = resequenced
+          .filter(item => item.version != null)
+          .map(item => ({ id: item.id, sequence: item.sequence, category: item.category ?? '' }));
+        if (persistable.length > 0) {
+          reorderOTListEntries(persistable).catch(err => {
+            setOtListError(err instanceof Error ? err.message : 'Failed to save new order');
+          });
+        }
+      }
     }
   };
 
@@ -408,14 +424,42 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     }, 500);
   };
 
-  const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
+  // Shared by the "+" button and drag-to-assign so persistence logic exists
+  // in exactly one place (both used to build the entry inline separately).
+  // Optimistically appends to local state, then persists — rolling the
+  // optimistic entry back out on failure.
+  const assignPatientToCategory = async (patient: Patient, category: string) => {
+    if (!user?.hospitalId) return;
     const existingInCategory = otList.filter(p => p.otType === activeTab && p.category === category);
-    const newEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
-    setOtList(prev => [...prev, newEntry]);
+    const optimisticEntry = buildOTPatientEntry(patient, activeTab, category, existingInCategory);
+    setOtList(prev => [...prev, optimisticEntry]);
+
+    try {
+      let listMeta = otListMetaByType[activeTab];
+      if (!listMeta) {
+        listMeta = await upsertOTListMeta(user.hospitalId, effectiveUnit, activeTab, selectedDate, { surgeon, surgeonUnit, otTime });
+        setOtListMetaByType(prev => ({ ...prev, [activeTab]: listMeta }));
+      }
+      const saved = await insertOTListEntry(listMeta.id, user.hospitalId, optimisticEntry);
+      setOtList(prev => prev.map(p => (p.id === optimisticEntry.id ? saved : p)));
+    } catch (err) {
+      setOtList(prev => prev.filter(p => p.id !== optimisticEntry.id));
+      setOtListError(err instanceof Error ? err.message : 'Failed to save assignment');
+    }
+  };
+
+  const handleAssignPatient = (patient: Patient, category: string = getDefaultCategoryForType(activeTab)) => {
+    void assignPatientToCategory(patient, category);
   };
 
   const handleRemove = (id: string) => {
+    const removed = otList.find(p => p.id === id);
     setOtList(prev => prev.filter(p => p.id !== id));
+    if (!removed?.version) return; // never persisted yet — nothing to delete server-side
+    deleteOTListEntry(id).catch(err => {
+      setOtList(prev => [...prev, removed]);
+      setOtListError(err instanceof Error ? err.message : 'Failed to delete');
+    });
   };
 
   const handleClearList = () => {
@@ -450,15 +494,53 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   };
 
   const handleUpdateEntry = (id: string, field: keyof OTPatient, value: string) => {
+    const target = otList.find(p => p.id === id);
+    if (!target) return;
+
+    // Computed from the current `otList` closure value directly, not from
+    // a `prev` read inside the setOtList updater below — a value assigned
+    // inside a functional updater is only reliably visible to code that
+    // runs after this call if you depend on React's internal "eager state"
+    // bailout optimization, which isn't a documented guarantee. Computing
+    // it up front here avoids the dependency entirely.
+    const newSequence = field === 'category'
+      ? Math.max(0, ...otList.filter(p => p.category === value && p.id !== id).map(p => p.sequence)) + 1
+      : undefined;
+
     setOtList(prev => {
-        // If category changes, we need to update the sequence for this item in the new category
         if (field === 'category') {
-             const existingInNewCat = prev.filter(p => p.category === value && p.id !== id);
-             const maxSeq = Math.max(0, ...existingInNewCat.map(p => p.sequence));
-             return prev.map(p => p.id === id ? { ...p, [field]: value, sequence: maxSeq + 1 } : p);
+             return prev.map(p => p.id === id ? { ...p, [field]: value, sequence: newSequence! } : p);
         }
         return prev.map(p => p.id === id ? { ...p, [field]: value } : p);
     });
+
+    // An entry that hasn't round-tripped through insertOTListEntry yet
+    // (e.g. edited in the same instant it was added, before the insert
+    // response returned) has no version to check against — skip persisting
+    // this specific edit rather than guess at one. The field is already
+    // reflected locally; a known, narrow gap rather than queuing edits to
+    // retry (see the design spec's Non-goals on offline queueing).
+    if (target.version == null || !target.otListId) return;
+
+    type EditableOTPatientFields = Partial<Omit<OTPatient, 'id' | 'otListId' | 'version' | 'otType'>>;
+    const changes: EditableOTPatientFields = field === 'category'
+      ? { category: value, sequence: newSequence! } as EditableOTPatientFields
+      : { [field]: value } as EditableOTPatientFields;
+
+    updateOTListEntry(id, target.version, changes)
+      .then(saved => setOtList(prev => prev.map(p => (p.id === id ? { ...saved, otType: target.otType } : p))))
+      .catch(err => {
+        if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT')) {
+          setOtListError('That entry was just updated by someone else — refreshing.');
+          if (user?.hospitalId) {
+            fetchOTList(user.hospitalId, effectiveUnit, activeTab, selectedDate).then(({ entries }) => {
+              setOtList(prev => [...prev.filter(p => p.otType !== activeTab), ...entries]);
+            });
+          }
+        } else {
+          setOtListError(err instanceof Error ? err.message : 'Failed to save change');
+        }
+      });
   };
 
   // The patient behind a pending-card drag, if that's what's currently
