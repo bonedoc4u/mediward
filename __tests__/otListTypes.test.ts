@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, isEligibleForOTList, PENDING_ID_PREFIX } from '../utils/otListTypes';
+import { getOTTypeForDate, getTableOptionsForType, getDefaultCategoryForType, isEligibleForOTList, PENDING_ID_PREFIX, OTPatient } from '../utils/otListTypes';
 import { Patient, Gender, PacStatus, PatientStatus } from '../types';
 
 const makePatient = (overrides: Partial<Patient> = {}): Patient => ({
@@ -70,6 +70,31 @@ describe('getDefaultCategoryForType', () => {
     expect(getDefaultCategoryForType('Major')).toBe('TABLE 1');
     expect(getDefaultCategoryForType('Minor')).toBe('SPINAL TABLE');
     expect(getDefaultCategoryForType('EOT')).toBe('SPINAL TABLE');
+  });
+});
+
+describe('OTPatient optional persistence fields', () => {
+  it('allows constructing an OTPatient without otListId/version (not-yet-persisted case)', () => {
+    const entry: OTPatient = {
+      id: 'temp-1', sequence: 1, ipNo: 'IP001', name: 'Ravi Kumar', age: '52',
+      gender: 'M', ward: '22', unit: 'OR1', diagnosis: 'Fracture femur',
+      procedure: '', side: '', anesthesia: '', cArm: 'No', implants: '',
+      remarks: '', category: 'TABLE 1', otType: 'Major',
+    };
+    expect(entry.otListId).toBeUndefined();
+    expect(entry.version).toBeUndefined();
+  });
+
+  it('allows constructing an OTPatient with otListId/version set (persisted case)', () => {
+    const entry: OTPatient = {
+      id: 'real-uuid-1', otListId: 'list-uuid-1', version: 1,
+      sequence: 1, ipNo: 'IP001', name: 'Ravi Kumar', age: '52',
+      gender: 'M', ward: '22', unit: 'OR1', diagnosis: 'Fracture femur',
+      procedure: '', side: '', anesthesia: '', cArm: 'No', implants: '',
+      remarks: '', category: 'TABLE 1', otType: 'Major',
+    };
+    expect(entry.otListId).toBe('list-uuid-1');
+    expect(entry.version).toBe(1);
   });
 });
 
