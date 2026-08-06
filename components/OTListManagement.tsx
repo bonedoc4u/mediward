@@ -535,6 +535,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       // reappear on next load — recoverable and surfaced via the error
       // message, not silent data loss.
       const toDelete = otList.filter(p => p.version != null);
+      // Same mechanism as single-remove (Fix 5): without this, the
+      // auto-populate effect (which only checks otList for "already
+      // present") sees an empty otList the next time `patients` changes
+      // (e.g. a realtime sync tick) and silently re-inserts every
+      // plannedDos-matching patient across all three tabs — undoing this
+      // confirm-dialog-gated destructive action. Dismissed unconditionally,
+      // not rolled back on a failed delete, matching this function's
+      // existing no-rollback-on-failure stance for the deletes themselves.
+      otList.forEach(p => dismissedIpNosRef.current.add(p.ipNo));
       setOtList([]);
       Promise.all(toDelete.map(p => deleteOTListEntry(p.id))).catch(err => {
         setOtListError(err instanceof Error ? err.message : 'Some entries may not have been fully cleared — please refresh to check.');
@@ -581,14 +590,14 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         return prev.map(p => p.id === id ? { ...p, [field]: value } : p);
     });
 
-    // An entry that hasn't round-tripped through insertOTListEntry yet
-    // (e.g. edited in the same instant it was added, before the insert
-    // response returned) has no version to check against — skip persisting
-    // this specific edit rather than guess at one. The field is already
-    // reflected locally; a known, narrow gap rather than queuing edits to
-    // retry (see the design spec's Non-goals on offline queueing).
-    if (target.version == null || !target.otListId) return;
-
+    // Whether this entry already has a version is deliberately NOT checked
+    // here at schedule time. persistEntry below re-checks otListRef fresh
+    // at actual fire time (500ms later for non-category fields), by which
+    // point a just-added entry (e.g. via "Add Row") will typically have
+    // round-tripped through insertOTListEntry and gained one. Guarding here
+    // instead would silently drop the very keystrokes typed right after
+    // adding a row, before the insert response returns — the row would
+    // persist blank with no error shown.
     type EditableOTPatientFields = Partial<Omit<OTPatient, 'id' | 'otListId' | 'version' | 'otType'>>;
     const changes: EditableOTPatientFields = field === 'category'
       ? { category: value, sequence: newSequence! } as EditableOTPatientFields
