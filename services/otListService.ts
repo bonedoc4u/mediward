@@ -208,12 +208,21 @@ export async function deleteOTListEntry(entryId: string): Promise<void> {
 
 export async function reorderOTListEntries(
   updates: Array<{ id: string; sequence: number; category: string }>,
-): Promise<void> {
+): Promise<Array<{ id: string; version: number }>> {
+  // Returns the post-update id/version pairs — a reorder still bumps each
+  // row's optimistic-lock version (the DB trigger does this on every
+  // update), so callers need these back to keep their local copy in sync;
+  // otherwise the very next edit to a just-reordered row would carry a
+  // stale version and be rejected as a false conflict.
   const results = await Promise.all(
     updates.map(u =>
-      supabase.from('ot_list_entries').update({ sequence: u.sequence, category: u.category }).eq('id', u.id)
+      supabase.from('ot_list_entries')
+        .update({ sequence: u.sequence, category: u.category })
+        .eq('id', u.id)
+        .select('id, version')
     ),
   );
   const failed = results.find(r => r.error);
   if (failed?.error) throw new Error(`reorderOTListEntries: ${failed.error.message}`);
+  return results.flatMap(r => (r.data ?? []) as Array<{ id: string; version: number }>);
 }

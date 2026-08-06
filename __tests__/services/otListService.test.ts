@@ -149,9 +149,10 @@ describe('deleteOTListEntry', () => {
 });
 
 describe('reorderOTListEntries', () => {
-  it('resolves when all updates succeed', async () => {
-    mockState.results['ot_list_entries'] = { data: null, error: null };
-    await expect(reorderOTListEntries([{ id: 'entry-1', sequence: 1, category: 'TABLE 1' }])).resolves.toBeUndefined();
+  it('resolves with the updated id/version pairs when all updates succeed', async () => {
+    mockState.results['ot_list_entries'] = { data: [{ id: 'entry-1', version: 3 }], error: null };
+    const result = await reorderOTListEntries([{ id: 'entry-1', sequence: 1, category: 'TABLE 1' }]);
+    expect(result).toEqual([{ id: 'entry-1', version: 3 }]);
     expect(mockState.builders['ot_list_entries'].eq).not.toHaveBeenCalledWith('version', expect.anything());
   });
 

@@ -75,8 +75,33 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const [otTime, setOtTime] = useState('8.00AM');
   const [otListMetaByType, setOtListMetaByType] = useState<Record<OTType, OTListMeta | null>>({ Major: null, Minor: null, EOT: null });
   const [isLoadingOTList, setIsLoadingOTList] = useState(false);
+  // "Have I actually finished loading THIS exact unit/dates combination" —
+  // deliberately not just a boolean. isLoadingOTList flips true/false around
+  // the fetch, but that's a state update that only takes effect on the next
+  // render; the auto-populate effect below runs in the same initial commit
+  // and would otherwise see the stale `false` and fire against an empty
+  // otList (see that effect's comment for the consequences). Comparing
+  // against a key that's only set inside the load effect's own successful
+  // `.then` closes that gap, and also covers the case where a date changes
+  // mid-flight: the key won't match the new combination until a fresh load
+  // for it actually completes.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [otListError, setOtListError] = useState<string | null>(null);
   const saveMetaTimerRef = useRef<Partial<Record<OTType, ReturnType<typeof setTimeout>>>>({});
+  // Mirrors otList for handleUpdateEntry's debounced save below, which needs
+  // the CURRENT version at fire time (not whatever was captured when the
+  // keystroke scheduled the save) — a reorder or another field's save
+  // completing in between would otherwise be missed, causing a spurious
+  // version-conflict error.
+  const otListRef = useRef(otList);
+  useEffect(() => { otListRef.current = otList; }, [otList]);
+  // Per-entry accumulated field changes awaiting their debounced save, and
+  // that entry's pending save timer. Keyed by entry id (not by field) so
+  // editing two different fields on the same row within the debounce
+  // window merges into one save instead of the second field's keystroke
+  // cancelling the first field's still-pending one.
+  const pendingEntryChangesRef = useRef<Record<string, Partial<Omit<OTPatient, 'id' | 'otListId' | 'version' | 'otType'>>>>({});
+  const saveEntryTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Auto-fill surgeon from unit chiefs whenever the unit or chiefs config
   // changes — but only when there's no persisted list yet for this tab; a
@@ -96,6 +121,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   useEffect(() => {
     if (!user?.hospitalId) return;
     let cancelled = false;
+    const key = `${effectiveUnit}|${majorDate}|${minorDate}|${eotDate}`;
     setIsLoadingOTList(true);
     setOtListError(null);
 
@@ -114,6 +140,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           Minor: results[1].list,
           EOT: results[2].list,
         });
+        setLoadedKey(key);
       })
       .catch(err => {
         if (!cancelled) setOtListError(err instanceof Error ? err.message : 'Failed to load OT list');
@@ -151,6 +178,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       Object.values(saveMetaTimerRef.current).forEach(timer => {
         if (timer) clearTimeout(timer);
       });
+      Object.values(saveEntryTimerRef.current).forEach(timer => clearTimeout(timer));
     };
   }, []);
 
@@ -160,14 +188,22 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // checks against correctly reflects everyone already persisted across all
   // three tabs, not just the currently-active one — avoiding a duplicate
   // insert for a patient already assigned in a tab the user hasn't switched
-  // to yet this session. Gated on isLoadingOTList so it never runs against a
-  // still-loading (or not-yet-loaded) otList: firing mid-load would see an
-  // incomplete "already present" set and could insert a duplicate for a
-  // patient the load is about to bring in, plus a load completing afterward
-  // replaces otList wholesale and would transiently drop any entry this
-  // effect had just optimistically added but not yet persisted.
+  // to yet this session.
+  //
+  // Gated on loadedKey matching the current unit/dates combination — NOT on
+  // isLoadingOTList being false. isLoadingOTList is set true via
+  // setIsLoadingOTList, a state update that only takes effect on the next
+  // render; this effect runs in the SAME initial commit as the load effect
+  // and would read the old (false) value, firing against an empty otList
+  // and inserting duplicates for everyone already persisted. Comparing a
+  // key that's only stamped inside the load effect's own successful
+  // `.then` closes that gap and also covers a date change landing between
+  // the two effects: the key won't match until a fresh load for the new
+  // combination actually completes, so this can't write into the wrong
+  // date's list using a stale otListMetaByType entry.
   useEffect(() => {
-    if (!user?.hospitalId || isLoadingOTList) return;
+    const currentKey = `${effectiveUnit}|${majorDate}|${minorDate}|${eotDate}`;
+    if (!user?.hospitalId || loadedKey !== currentKey) return;
     const tabDates: Array<{ date: string; fallbackType: OTType }> = [
       { date: majorDate, fallbackType: 'Major' },
       { date: minorDate, fallbackType: 'Minor' },
@@ -199,7 +235,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         }
       })();
     });
-  }, [majorDate, minorDate, eotDate, patients, cycle, isLoadingOTList]);
+  }, [majorDate, minorDate, eotDate, effectiveUnit, patients, cycle, loadedKey]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -378,9 +414,18 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           .filter(item => item.version != null)
           .map(item => ({ id: item.id, sequence: item.sequence, category: item.category ?? '' }));
         if (persistable.length > 0) {
-          reorderOTListEntries(persistable).catch(err => {
-            setOtListError(err instanceof Error ? err.message : 'Failed to save new order');
-          });
+          // A reorder bumps each row's version server-side (the optimistic-
+          // lock trigger fires on every update) — merge the returned
+          // versions back in, or the next field edit to any of these rows
+          // would carry a stale version and be rejected as a false conflict.
+          reorderOTListEntries(persistable)
+            .then(updated => {
+              const versionById = new Map(updated.map(u => [u.id, u.version]));
+              setOtList(prev => prev.map(p => (versionById.has(p.id) ? { ...p, version: versionById.get(p.id)! } : p)));
+            })
+            .catch(err => {
+              setOtListError(err instanceof Error ? err.message : 'Failed to save new order');
+            });
         }
       }
     }
@@ -497,12 +542,6 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     const target = otList.find(p => p.id === id);
     if (!target) return;
 
-    // Computed from the current `otList` closure value directly, not from
-    // a `prev` read inside the setOtList updater below — a value assigned
-    // inside a functional updater is only reliably visible to code that
-    // runs after this call if you depend on React's internal "eager state"
-    // bailout optimization, which isn't a documented guarantee. Computing
-    // it up front here avoids the dependency entirely.
     const newSequence = field === 'category'
       ? Math.max(0, ...otList.filter(p => p.category === value && p.id !== id).map(p => p.sequence)) + 1
       : undefined;
@@ -527,20 +566,58 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       ? { category: value, sequence: newSequence! } as EditableOTPatientFields
       : { [field]: value } as EditableOTPatientFields;
 
-    updateOTListEntry(id, target.version, changes)
-      .then(saved => setOtList(prev => prev.map(p => (p.id === id ? { ...saved, otType: target.otType } : p))))
-      .catch(err => {
-        if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT')) {
-          setOtListError('That entry was just updated by someone else — refreshing.');
-          if (user?.hospitalId) {
-            fetchOTList(user.hospitalId, effectiveUnit, activeTab, selectedDate).then(({ entries }) => {
-              setOtList(prev => [...prev.filter(p => p.otType !== activeTab), ...entries]);
-            });
+    const persistEntry = (entryId: string, entryChanges: EditableOTPatientFields) => {
+      const current = otListRef.current.find(p => p.id === entryId);
+      if (!current || current.version == null) return;
+      updateOTListEntry(entryId, current.version, entryChanges)
+        .then(saved => {
+          setOtListError(null);
+          setOtList(prev => prev.map(p => (p.id === entryId ? { ...p, version: saved.version, otListId: saved.otListId } : p)));
+        })
+        .catch(err => {
+          if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT')) {
+            setOtListError('That entry was just updated by someone else — refreshing.');
+            if (user?.hospitalId) {
+              fetchOTList(user.hospitalId, effectiveUnit, activeTab, selectedDate)
+                .then(({ entries }) => {
+                  setOtList(prev => [...prev.filter(p => p.otType !== activeTab), ...entries]);
+                  setOtListError(null);
+                })
+                .catch(() => { /* refetch failed; the conflict notice stays visible so the user knows to reload */ });
+            }
+          } else {
+            setOtListError(err instanceof Error ? err.message : 'Failed to save change');
           }
-        } else {
-          setOtListError(err instanceof Error ? err.message : 'Failed to save change');
-        }
-      });
+        });
+    };
+
+    if (field === 'category') {
+      persistEntry(id, changes);
+      return;
+    }
+
+    // Debounced and accumulated per entry (not per field): text fields
+    // (anesthesia, implants, remarks, etc.) previously persisted on every
+    // keystroke, sending a new versioned write per character — at any real
+    // typing speed the version captured at keystroke N was already stale by
+    // the time it reached the server, throwing a false "someone else
+    // updated this" conflict and reverting whatever was typed since.
+    // Accumulating into one pending-changes bucket per entry (rather than a
+    // separate timer per field) also stops a second field's keystroke from
+    // cancelling a first field's still-pending save on the same row.
+    // Reading the version fresh from otListRef at fire time (not the value
+    // captured when the timer was scheduled) means a reorder, or another
+    // field's own debounced save completing in the meantime, is picked up
+    // correctly instead of causing a spurious conflict.
+    pendingEntryChangesRef.current[id] = { ...pendingEntryChangesRef.current[id], ...changes };
+    const existingTimer = saveEntryTimerRef.current[id];
+    if (existingTimer) clearTimeout(existingTimer);
+    saveEntryTimerRef.current[id] = setTimeout(() => {
+      const accumulated = pendingEntryChangesRef.current[id];
+      delete pendingEntryChangesRef.current[id];
+      delete saveEntryTimerRef.current[id];
+      if (accumulated) persistEntry(id, accumulated);
+    }, 500);
   };
 
   // The patient behind a pending-card drag, if that's what's currently
