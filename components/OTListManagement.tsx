@@ -39,7 +39,7 @@ interface OTListManagementProps {
 
 const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const { unitChiefs, hospitalName, department, weekendDuty } = useConfig();
-  const { user, selectedUnit } = useAuth();
+  const { user, selectedUnit, viewingHospitalId } = useAuth();
   const [activeTab, setActiveTab] = useState<OTType>('Major');
 
   // Resolve the effective unit: admin's picker selection takes priority over profile unit
@@ -48,6 +48,14 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       ? selectedUnit
       : user?.unit ?? 'OR1'
   ).toUpperCase();
+
+  // Superadmin viewing another hospital's workspace uses that hospital, not
+  // their own — matches contexts/PatientContext.tsx's effectiveHospitalId,
+  // which is what actually scopes the `patients` prop this component
+  // receives. Every otListService call below must use this, never
+  // user.hospitalId directly, or a superadmin's OT list writes would target
+  // their own hospital while reading another hospital's patient data.
+  const effectiveHospitalId = viewingHospitalId ?? user?.hospitalId;
 
   // OT cycle = the 7 days after this unit's admission day (see getOTCycleDates).
   // Each tab defaults to that cycle's Major / Minor / EOT date.
@@ -130,7 +138,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // would risk it not knowing an entry already exists in a not-yet-loaded
   // tab and inserting a duplicate).
   useEffect(() => {
-    if (!user?.hospitalId) return;
+    if (!effectiveHospitalId) return;
     let cancelled = false;
     const key = `${effectiveUnit}|${majorDate}|${minorDate}|${eotDate}`;
     setIsLoadingOTList(true);
@@ -150,7 +158,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     // comment on why).
     const weekendTabs: Array<{ type: OTType; date: string }> = cycle.eotWeekendDates.map(date => ({ type: 'EOT' as OTType, date }));
 
-    Promise.all([...tabs, ...weekendTabs].map(t => fetchOTList(user.hospitalId!, effectiveUnit, t.type, t.date)))
+    Promise.all([...tabs, ...weekendTabs].map(t => fetchOTList(effectiveHospitalId!, effectiveUnit, t.type, t.date)))
       .then(results => {
         if (cancelled) return;
         setOtList(results.flatMap(r => r.entries));
@@ -169,7 +177,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       });
 
     return () => { cancelled = true; };
-  }, [user?.hospitalId, effectiveUnit, majorDate, minorDate, eotDate, cycle]);
+  }, [effectiveHospitalId, effectiveUnit, majorDate, minorDate, eotDate, cycle]);
 
   // Re-point surgeon/unit/time at whichever tab's own saved values exist,
   // whenever the active tab changes or that tab's data just finished loading
@@ -268,14 +276,17 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // date's list using a stale otListMetaByType entry.
   useEffect(() => {
     const currentKey = `${effectiveUnit}|${majorDate}|${minorDate}|${eotDate}`;
-    if (!user?.hospitalId || loadedKey !== currentKey) return;
-    // An admin viewing "all units" has no single resolved unit to attribute
-    // auto-populated patients to — effectiveUnit silently falls back to a
-    // hardcoded default in that case (see its own definition above), which
-    // would write every unit's planned surgeries into that one default
-    // unit's OT list. Skip the automatic path entirely until a specific
-    // unit is selected; manual add/assign is unaffected.
+    if (!user || !effectiveHospitalId || loadedKey !== currentKey) return;
+    // Neither an admin viewing "all units" nor a superadmin (who has no
+    // unit of their own, regardless of which hospital's workspace they're
+    // viewing via effectiveHospitalId) has a single resolved unit to
+    // attribute auto-populated patients to — effectiveUnit silently falls
+    // back to a hardcoded default in that case (see its own definition
+    // above), which would write every unit's planned surgeries into that
+    // one default unit's OT list. Skip the automatic path entirely in both
+    // cases; manual add/assign is unaffected.
     if (user.role === 'admin' && (!selectedUnit || selectedUnit === 'all')) return;
+    if (user.role === 'superadmin') return;
     const tabDates: Array<{ date: string; fallbackType: OTType }> = [
       { date: majorDate, fallbackType: 'Major' },
       { date: minorDate, fallbackType: 'Minor' },
@@ -309,10 +320,10 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           if (isCanonicalDate && otListMetaByType[otType]) {
             listMeta = otListMetaByType[otType]!;
           } else {
-            listMeta = await upsertOTListMeta(user.hospitalId!, effectiveUnit, otType, date, defaultMetaFor(otType));
+            listMeta = await upsertOTListMeta(effectiveHospitalId!, effectiveUnit, otType, date, defaultMetaFor(otType));
             if (isCanonicalDate) setOtListMetaByType(prev => ({ ...prev, [otType]: listMeta }));
           }
-          const saved = await insertOTListEntry(listMeta.id, user.hospitalId!, optimisticEntry);
+          const saved = await insertOTListEntry(listMeta.id, effectiveHospitalId!, optimisticEntry);
           setOtList(prev => prev.map(x => (x.id === optimisticEntry.id ? saved : x)));
         } catch (err) {
           setOtList(prev => prev.filter(x => x.id !== optimisticEntry.id));
@@ -320,7 +331,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         }
       })();
     });
-  }, [majorDate, minorDate, eotDate, effectiveUnit, patients, cycle, loadedKey, selectedUnit]);
+  }, [majorDate, minorDate, eotDate, effectiveUnit, effectiveHospitalId, patients, cycle, loadedKey, selectedUnit]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -533,9 +544,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // resolve activeTab to the NEW tab, writing the old tab's typed surgeon
   // name into the new tab's ot_lists row.
   const saveOTListMeta = async (otType: OTType, date: string, next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
-    if (!user?.hospitalId) return;
+    if (!effectiveHospitalId) return;
     try {
-      const meta = await upsertOTListMeta(user.hospitalId, effectiveUnit, otType, date, next);
+      const meta = await upsertOTListMeta(effectiveHospitalId, effectiveUnit, otType, date, next);
       setOtListMetaByType(prev => ({ ...prev, [otType]: meta }));
     } catch (err) {
       setOtListError(err instanceof Error ? err.message : 'Failed to save');
@@ -572,15 +583,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // doesn't handle (see that effect's own comment for why it stays
   // separate; this was a plan-level decision, not an oversight).
   const persistNewEntry = async (optimisticEntry: OTPatient) => {
-    if (!user?.hospitalId) return;
+    if (!effectiveHospitalId) return;
     setOtList(prev => [...prev, optimisticEntry]);
     try {
       let listMeta = otListMetaByType[activeTab];
       if (!listMeta) {
-        listMeta = await upsertOTListMeta(user.hospitalId, effectiveUnit, activeTab, selectedDate, { surgeon, surgeonUnit, otTime });
+        listMeta = await upsertOTListMeta(effectiveHospitalId, effectiveUnit, activeTab, selectedDate, { surgeon, surgeonUnit, otTime });
         setOtListMetaByType(prev => ({ ...prev, [activeTab]: listMeta }));
       }
-      const saved = await insertOTListEntry(listMeta.id, user.hospitalId, optimisticEntry);
+      const saved = await insertOTListEntry(listMeta.id, effectiveHospitalId, optimisticEntry);
       setOtList(prev => prev.map(p => (p.id === optimisticEntry.id ? saved : p)));
     } catch (err) {
       setOtList(prev => prev.filter(p => p.id !== optimisticEntry.id));
@@ -701,8 +712,8 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         .catch(err => {
           if (err instanceof Error && err.message.startsWith('CONCURRENT_EDIT')) {
             setOtListError('That entry was just updated by someone else — refreshing.');
-            if (user?.hospitalId) {
-              fetchOTList(user.hospitalId, effectiveUnit, activeTab, selectedDate)
+            if (effectiveHospitalId) {
+              fetchOTList(effectiveHospitalId, effectiveUnit, activeTab, selectedDate)
                 .then(({ entries }) => {
                   setOtList(prev => [...prev.filter(p => p.otType !== activeTab), ...entries]);
                 })
