@@ -73,7 +73,10 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
                   key={`${f.name}-${i}`}
                   className="relative shrink-0 w-20 h-20 bg-slate-900 rounded-lg overflow-hidden"
                   onClick={canCrop ? () => onEditFile(i) : undefined}
-                  onKeyDown={canCrop ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEditFile(i); } } : undefined}
+                  onKeyDown={canCrop ? (e) => {
+                    if (e.target !== e.currentTarget) return;   // let the nested ✕ button handle its own keys
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEditFile(i); }
+                  } : undefined}
                   tabIndex={canCrop ? 0 : undefined}
                   role={canCrop ? 'button' : undefined}
                   aria-label={canCrop ? `Crop ${f.name}` : undefined}

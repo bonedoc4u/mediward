@@ -291,11 +291,18 @@ const RadiologyComparator: React.FC<Props> = ({
     if (initialPatientId) setSelectedPatientId(initialPatientId);
   }, [initialPatientId]);
 
-  useEffect(() => {
-    return () => {
-      previewUrls.forEach(url => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
-    };
-  }, [previewUrls]);
+  // Revoke on unmount only, not on every previewUrls change — every place that
+  // drops or replaces an individual URL (handleRemoveFile, handleCancelUpload,
+  // the partial-failure branch in handleSave, and the crop editor's onApply)
+  // already revokes exactly the URL it's dropping. A [previewUrls]-keyed
+  // cleanup would ALSO revoke URLs carried forward unchanged into the new
+  // array, killing previews that are still in use (this is what made cropping
+  // a second image in a batch open a blank editor).
+  const previewUrlsRef = useRef<string[]>(previewUrls);
+  useEffect(() => { previewUrlsRef.current = previewUrls; }, [previewUrls]);
+  useEffect(() => () => {
+    previewUrlsRef.current.forEach(url => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
+  }, []);
 
   const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
   const investigations  = selectedPatient?.investigations ?? [];
@@ -382,6 +389,7 @@ const RadiologyComparator: React.FC<Props> = ({
       if (prev[index]?.startsWith('blob:')) URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
+    setEditingIndex(null);
   };
 
   const handleSave = async () => {
@@ -630,12 +638,12 @@ const RadiologyComparator: React.FC<Props> = ({
           src={previewUrls[editingIndex]}
           onClose={() => setEditingIndex(null)}
           onApply={(edited) => {
-            setSelectedFiles(prev => prev.map((f, i) => (i === editingIndex ? edited : f)));
-            setPreviewUrls(prev => {
-              const oldUrl = prev[editingIndex!];
-              if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-              return prev.map((u, i) => (i === editingIndex ? URL.createObjectURL(edited) : u));
-            });
+            const idx = editingIndex;
+            const oldUrl = previewUrls[idx];
+            if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+            const nextUrl = URL.createObjectURL(edited);
+            setSelectedFiles(prev => prev.map((f, i) => (i === idx ? edited : f)));
+            setPreviewUrls(prev => prev.map((u, i) => (i === idx ? nextUrl : u)));
             setEditingIndex(null);
           }}
         />
