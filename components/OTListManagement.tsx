@@ -88,6 +88,10 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [otListError, setOtListError] = useState<string | null>(null);
   const saveMetaTimerRef = useRef<Partial<Record<OTType, ReturnType<typeof setTimeout>>>>({});
+  // The payload each pending metadata timer would have written, kept
+  // alongside the timer itself so the unmount cleanup below can FLUSH the
+  // save rather than merely cancel it (see that effect's comment).
+  const pendingMetaRef = useRef<Partial<Record<OTType, { date: string; next: { surgeon: string; surgeonUnit: string; otTime: string } }>>>({});
   // Mirrors otList for handleUpdateEntry's debounced save below, which needs
   // the CURRENT version at fire time (not whatever was captured when the
   // keystroke scheduled the save) — a reorder or another field's save
@@ -163,6 +167,16 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // whenever the active tab changes or that tab's data just finished loading
   // (the effect above already fetched it — this doesn't re-fetch, just
   // re-syncs the editable fields to match).
+  //
+  // Depends on loadedKey (changes once per genuine load) and activeTab (a
+  // tab switch), deliberately NOT on otListMetaByType itself — that object
+  // also changes on every individual metadata/entry save (yours or
+  // auto-populate's), and re-syncing on those would echo the server's
+  // response back into whatever you're still typing, reverting it. The
+  // body below still reads the CURRENT otListMetaByType[activeTab] value
+  // when it does run, so a freshly-loaded or newly-created list's saved
+  // values still display correctly on the triggers that actually warrant a
+  // re-sync.
   useEffect(() => {
     const meta = otListMetaByType[activeTab];
     if (meta) {
@@ -174,20 +188,52 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       setSurgeonUnit(effectiveUnit);
       setOtTime('8.00AM');
     }
-  }, [activeTab, otListMetaByType, effectiveUnit]);
+  }, [activeTab, loadedKey, effectiveUnit]);
 
-  // Clear any pending debounced metadata saves on unmount so they can't fire
-  // (and write stale field values) after the component is gone. Iterates
-  // every tab's timer, not just one — see saveMetaTimerRef's per-tab keying
-  // below.
+  // Stop any pending debounced timers on unmount, then flush what they were
+  // going to write. Iterates every tab's timer, not just one — see
+  // saveMetaTimerRef's per-tab keying below.
   useEffect(() => {
     return () => {
-      Object.values(saveMetaTimerRef.current).forEach(timer => {
+      Object.entries(saveMetaTimerRef.current).forEach(([, timer]) => {
         if (timer) clearTimeout(timer);
       });
-      Object.values(saveEntryTimerRef.current).forEach(timer => clearTimeout(timer));
+      Object.entries(saveEntryTimerRef.current).forEach(([, timer]) => {
+        clearTimeout(timer);
+      });
+      // Flush, don't just cancel: a pending debounced save represents real
+      // typed clinical text (or a surgeon/time edit) that hasn't reached
+      // the server yet, and this component fully unmounts on every
+      // navigation — cancelling here would silently lose exactly the class
+      // of edit this whole feature exists to stop losing. Reading from
+      // otListRef (not otList) for the entry flush because this cleanup
+      // only runs once (empty dependency array) and otListRef is kept
+      // fresh every render regardless; a `.then` landing after unmount is
+      // a harmless no-op React state update.
+      Object.entries(pendingMetaRef.current).forEach(([otType, pending]) => {
+        if (pending) void saveOTListMeta(otType as OTType, pending.date, pending.next);
+      });
+      Object.entries(pendingEntryChangesRef.current).forEach(([id, changes]) => {
+        const current = otListRef.current.find(p => p.id === id);
+        if (current && current.version != null && changes) {
+          void updateOTListEntry(id, current.version, changes);
+        }
+      });
     };
   }, []);
+
+  // Resolves the surgeon/unit/time to seed a brand-new ot_lists row with,
+  // when auto-populate is the one creating it. Only uses the live,
+  // currently-displayed field values when otType really is the active tab
+  // (those values genuinely belong to it); a list being created for a
+  // *different* tab must not inherit whatever happens to be showing on
+  // screen right now — it gets the same unit_chiefs default a manually
+  // created list would.
+  const defaultMetaFor = (otType: OTType): { surgeon: string; surgeonUnit: string; otTime: string } => {
+    if (otType === activeTab) return { surgeon, surgeonUnit, otTime };
+    const key = effectiveUnit.replace(/\s+/g, '').toUpperCase();
+    return { surgeon: unitChiefs[key] ?? '', surgeonUnit: effectiveUnit, otTime: '8.00AM' };
+  };
 
   // Auto-populate patients whose plannedDos matches any of the three tab
   // dates. Runs after the load effect (Task 4) has populated otList from the
@@ -211,6 +257,13 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   useEffect(() => {
     const currentKey = `${effectiveUnit}|${majorDate}|${minorDate}|${eotDate}`;
     if (!user?.hospitalId || loadedKey !== currentKey) return;
+    // An admin viewing "all units" has no single resolved unit to attribute
+    // auto-populated patients to — effectiveUnit silently falls back to a
+    // hardcoded default in that case (see its own definition above), which
+    // would write every unit's planned surgeries into that one default
+    // unit's OT list. Skip the automatic path entirely until a specific
+    // unit is selected; manual add/assign is unaffected.
+    if (user.role === 'admin' && (!selectedUnit || selectedUnit === 'all')) return;
     const tabDates: Array<{ date: string; fallbackType: OTType }> = [
       { date: majorDate, fallbackType: 'Major' },
       { date: minorDate, fallbackType: 'Minor' },
@@ -227,12 +280,25 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       const optimisticEntry = buildOTPatientEntry(p, otType, category, existingInCategory);
       setOtList(prev => [...prev, optimisticEntry]);
 
+      // otListMetaByType is keyed by otType alone, which only safely
+      // identifies a list when there's exactly one persisted date per
+      // otType — true for majorDate/minorDate/eotDate, false for a weekend
+      // EOT date (a second date under the same 'EOT' key). Only the
+      // canonical-date case is allowed to read or write that cache; a
+      // weekend date always upserts fresh instead (never cached at the
+      // component level — the date picker already fetches it correctly on
+      // demand via the load effect, so no cache is needed here).
+      const canonicalDate = otType === 'Major' ? majorDate : otType === 'Minor' ? minorDate : eotDate;
+      const isCanonicalDate = date === canonicalDate;
+
       (async () => {
         try {
-          let listMeta = otListMetaByType[otType];
-          if (!listMeta) {
-            listMeta = await upsertOTListMeta(user.hospitalId!, effectiveUnit, otType, date, { surgeon, surgeonUnit, otTime });
-            setOtListMetaByType(prev => ({ ...prev, [otType]: listMeta }));
+          let listMeta: OTListMeta;
+          if (isCanonicalDate && otListMetaByType[otType]) {
+            listMeta = otListMetaByType[otType]!;
+          } else {
+            listMeta = await upsertOTListMeta(user.hospitalId!, effectiveUnit, otType, date, defaultMetaFor(otType));
+            if (isCanonicalDate) setOtListMetaByType(prev => ({ ...prev, [otType]: listMeta }));
           }
           const saved = await insertOTListEntry(listMeta.id, user.hospitalId!, optimisticEntry);
           setOtList(prev => prev.map(x => (x.id === optimisticEntry.id ? saved : x)));
@@ -242,7 +308,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         }
       })();
     });
-  }, [majorDate, minorDate, eotDate, effectiveUnit, patients, cycle, loadedKey]);
+  }, [majorDate, minorDate, eotDate, effectiveUnit, patients, cycle, loadedKey, selectedUnit]);
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -448,11 +514,17 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     setDragOverCategory(null);
   };
 
-  const saveOTListMeta = async (next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
+  // otType/date are explicit parameters, deliberately NOT read from the
+  // ambient activeTab/selectedDate closure: a debounced save fires up to
+  // 500ms after the keystroke that scheduled it, by which point the user
+  // may have switched tabs — and the closure this runs in would then
+  // resolve activeTab to the NEW tab, writing the old tab's typed surgeon
+  // name into the new tab's ot_lists row.
+  const saveOTListMeta = async (otType: OTType, date: string, next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
     if (!user?.hospitalId) return;
     try {
-      const meta = await upsertOTListMeta(user.hospitalId, effectiveUnit, activeTab, selectedDate, next);
-      setOtListMetaByType(prev => ({ ...prev, [activeTab]: meta }));
+      const meta = await upsertOTListMeta(user.hospitalId, effectiveUnit, otType, date, next);
+      setOtListMetaByType(prev => ({ ...prev, [otType]: meta }));
     } catch (err) {
       setOtListError(err instanceof Error ? err.message : 'Failed to save');
     }
@@ -468,11 +540,14 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // typing in Major then switching to Minor and typing there would let
   // Minor's keystroke clearTimeout Major's still-pending save, silently
   // dropping Major's edit with no error shown.
-  const saveOTListMetaDebounced = (otType: OTType, next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
+  const saveOTListMetaDebounced = (otType: OTType, date: string, next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
+    pendingMetaRef.current[otType] = { date, next };
     const existing = saveMetaTimerRef.current[otType];
     if (existing) clearTimeout(existing);
     saveMetaTimerRef.current[otType] = setTimeout(() => {
-      void saveOTListMeta(next);
+      delete pendingMetaRef.current[otType];
+      delete saveMetaTimerRef.current[otType];
+      void saveOTListMeta(otType, date, next);
     }, 500);
   };
 
@@ -618,7 +693,6 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
               fetchOTList(user.hospitalId, effectiveUnit, activeTab, selectedDate)
                 .then(({ entries }) => {
                   setOtList(prev => [...prev.filter(p => p.otType !== activeTab), ...entries]);
-                  setOtListError(null);
                 })
                 .catch(() => { /* refetch failed; the conflict notice stays visible so the user knows to reload */ });
             }
@@ -713,7 +787,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={surgeon}
             onChange={e => {
               setSurgeon(e.target.value);
-              saveOTListMetaDebounced(activeTab, { surgeon: e.target.value, surgeonUnit, otTime });
+              saveOTListMetaDebounced(activeTab, selectedDate, { surgeon: e.target.value, surgeonUnit, otTime });
             }}
             placeholder="Surgeon name…"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
@@ -726,7 +800,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={surgeonUnit}
             onChange={e => {
               setSurgeonUnit(e.target.value);
-              saveOTListMetaDebounced(activeTab, { surgeon, surgeonUnit: e.target.value, otTime });
+              saveOTListMetaDebounced(activeTab, selectedDate, { surgeon, surgeonUnit: e.target.value, otTime });
             }}
             placeholder="e.g. OR 1"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
@@ -739,7 +813,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={otTime}
             onChange={e => {
               setOtTime(e.target.value);
-              saveOTListMetaDebounced(activeTab, { surgeon, surgeonUnit, otTime: e.target.value });
+              saveOTListMetaDebounced(activeTab, selectedDate, { surgeon, surgeonUnit, otTime: e.target.value });
             }}
             placeholder="e.g. 8.00AM"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
