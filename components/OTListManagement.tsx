@@ -75,7 +75,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const [otListMetaByType, setOtListMetaByType] = useState<Record<OTType, OTListMeta | null>>({ Major: null, Minor: null, EOT: null });
   const [isLoadingOTList, setIsLoadingOTList] = useState(false);
   const [otListError, setOtListError] = useState<string | null>(null);
-  const saveMetaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveMetaTimerRef = useRef<Partial<Record<OTType, ReturnType<typeof setTimeout>>>>({});
 
   // Auto-fill surgeon from unit chiefs whenever the unit or chiefs config
   // changes — but only when there's no persisted list yet for this tab; a
@@ -141,11 +141,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     }
   }, [activeTab, otListMetaByType, effectiveUnit]);
 
-  // Clear any pending debounced metadata save on unmount so it can't fire
-  // (and write stale field values) after the component is gone.
+  // Clear any pending debounced metadata saves on unmount so they can't fire
+  // (and write stale field values) after the component is gone. Iterates
+  // every tab's timer, not just one — see saveMetaTimerRef's per-tab keying
+  // below.
   useEffect(() => {
     return () => {
-      if (saveMetaTimerRef.current) clearTimeout(saveMetaTimerRef.current);
+      Object.values(saveMetaTimerRef.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
     };
   }, []);
 
@@ -392,9 +396,14 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   // setSurgeon/setSurgeonUnit/setOtTime directly and never go through this,
   // so they can't trigger a spurious write. A ref (not state) holds the
   // timer so rescheduling doesn't itself cause a re-render.
-  const saveOTListMetaDebounced = (next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
-    if (saveMetaTimerRef.current) clearTimeout(saveMetaTimerRef.current);
-    saveMetaTimerRef.current = setTimeout(() => {
+  // Keyed per-tab (otType) rather than a single shared timer: without this,
+  // typing in Major then switching to Minor and typing there would let
+  // Minor's keystroke clearTimeout Major's still-pending save, silently
+  // dropping Major's edit with no error shown.
+  const saveOTListMetaDebounced = (otType: OTType, next: { surgeon: string; surgeonUnit: string; otTime: string }) => {
+    const existing = saveMetaTimerRef.current[otType];
+    if (existing) clearTimeout(existing);
+    saveMetaTimerRef.current[otType] = setTimeout(() => {
       void saveOTListMeta(next);
     }, 500);
   };
@@ -508,7 +517,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={surgeon}
             onChange={e => {
               setSurgeon(e.target.value);
-              saveOTListMetaDebounced({ surgeon: e.target.value, surgeonUnit, otTime });
+              saveOTListMetaDebounced(activeTab, { surgeon: e.target.value, surgeonUnit, otTime });
             }}
             placeholder="Surgeon name…"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
@@ -521,7 +530,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={surgeonUnit}
             onChange={e => {
               setSurgeonUnit(e.target.value);
-              saveOTListMetaDebounced({ surgeon, surgeonUnit: e.target.value, otTime });
+              saveOTListMetaDebounced(activeTab, { surgeon, surgeonUnit: e.target.value, otTime });
             }}
             placeholder="e.g. OR 1"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
@@ -534,7 +543,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             value={otTime}
             onChange={e => {
               setOtTime(e.target.value);
-              saveOTListMetaDebounced({ surgeon, surgeonUnit, otTime: e.target.value });
+              saveOTListMetaDebounced(activeTab, { surgeon, surgeonUnit, otTime: e.target.value });
             }}
             placeholder="e.g. 8.00AM"
             className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
