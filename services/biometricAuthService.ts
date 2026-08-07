@@ -14,6 +14,12 @@ import { saveToStorage, loadFromStorage, removeFromStorage } from './persistence
 export interface BiometricCredential {
   refreshToken: string;
   expiresAt: number;
+  /** The Supabase user id that enrolled this credential — the TOKEN_REFRESHED
+   *  rotation handler in AuthContext.tsx only updates the stored token when
+   *  this matches the currently-refreshing session, so a credential can
+   *  never silently get re-pointed at a different account on a shared
+   *  device. */
+  userId: string;
 }
 
 const STORAGE_KEY = 'biometric_credential';
@@ -56,8 +62,8 @@ export async function promptBiometric(reason: string): Promise<boolean> {
   }
 }
 
-export async function storeBiometricCredential(refreshToken: string, expiresAt: number): Promise<void> {
-  saveToStorage<BiometricCredential>(STORAGE_KEY, { refreshToken, expiresAt });
+export async function storeBiometricCredential(refreshToken: string, expiresAt: number, userId: string): Promise<void> {
+  saveToStorage<BiometricCredential>(STORAGE_KEY, { refreshToken, expiresAt, userId });
 }
 
 export async function loadBiometricCredential(): Promise<BiometricCredential | null> {

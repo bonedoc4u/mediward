@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // the moment login() succeeds and the moment the user responds to the
   // "enable fingerprint?" prompt (enrollBiometric() consumes this). Not
   // React state — nothing needs to re-render when this changes.
-  const pendingBiometricEnrollmentRef = React.useRef<{ refreshToken: string; expiresAt: number } | null>(null);
+  const pendingBiometricEnrollmentRef = React.useRef<{ refreshToken: string; expiresAt: number; userId: string } | null>(null);
 
   // Workspace selection: persisted across page reloads but cleared on logout.
   const [selectedDepartment, setSelectedDepartmentState] = useState<string | null>(
@@ -357,7 +357,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const enrollBiometric = useCallback(async () => {
     const pending = pendingBiometricEnrollmentRef.current;
     if (pending) {
-      await storeBiometricCredential(pending.refreshToken, pending.expiresAt);
+      await storeBiometricCredential(pending.refreshToken, pending.expiresAt, pending.userId);
       pendingBiometricEnrollmentRef.current = null;
     }
     setOfferBiometricEnrollment(false);
@@ -414,11 +414,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // rotates so a later biometric login always presents a live one.
         // expiresAt is deliberately left untouched — the safety-critical
         // session-boundary anchor must never move, only the token value.
+        //
+        // Gated on the refreshing session belonging to the SAME user who
+        // enrolled — without this, a credential left behind by a user
+        // whose session was externally signed out (not via this app's own
+        // logout, e.g. an admin force-logout) could silently get re-pointed
+        // at whichever different account logs in next on the same device.
         loadBiometricCredential().then(existing => {
-          if (existing) {
-            storeBiometricCredential(session.refresh_token, existing.expiresAt).catch(() => {});
+          if (existing && session.user.id === existing.userId) {
+            storeBiometricCredential(session.refresh_token, existing.expiresAt, existing.userId).catch(() => {});
           }
-        });
+        }).catch(() => {});
       } else if (event === 'SIGNED_OUT') {
         setIsRecoveryMode(false);
         // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
@@ -477,6 +483,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           pendingBiometricEnrollmentRef.current = {
             refreshToken: authData.session.refresh_token,
             expiresAt: session.sessionExpiry,
+            userId: authData.user.id,
           };
           setOfferBiometricEnrollment(true);
         }
