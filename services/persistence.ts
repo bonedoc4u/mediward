@@ -13,7 +13,7 @@ const STORAGE_PREFIX = 'mediward_';
 const SCHEMA_VERSION = 1;
 
 // Keys that must survive iOS memory pressure — written to Capacitor Preferences too
-const DURABLE_KEYS = new Set(['session', 'patients_cache']);
+const DURABLE_KEYS = new Set(['session', 'patients_cache', 'biometric_credential']);
 
 interface StorageEnvelope<T> {
   version: number;
