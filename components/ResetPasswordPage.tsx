@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { validatePassword } from '../utils/passwordPolicy';
+import { clearBiometricCredential } from '../services/biometricAuthService';
 import { Lock, Eye, EyeOff, CheckCircle, Loader2, Stethoscope } from 'lucide-react';
 
 interface Props {
@@ -38,6 +39,11 @@ const ResetPasswordPage: React.FC<Props> = ({ onDone }) => {
       setError(updateError.message);
       return;
     }
+
+    // A password reset means whatever was stored for fast fingerprint
+    // re-login on this device belonged to the old credentials — clear it
+    // so a future biometric login can't work off a stale enrollment.
+    clearBiometricCredential().catch(() => {});
 
     // Clear the recovery token from the URL so a hard-refresh doesn't re-show
     // this form after the password has already been updated
