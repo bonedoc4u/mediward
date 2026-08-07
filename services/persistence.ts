@@ -35,7 +35,7 @@ function unwrapEnvelope<T>(raw: string, key: string): T | null {
     if (envelope.version !== SCHEMA_VERSION) {
       console.warn(`[Persistence] Schema version mismatch for "${key}". Expected ${SCHEMA_VERSION}, got ${envelope.version}`);
     }
-    return envelope.data;
+    return envelope.data ?? null;
   } catch {
     return null;
   }

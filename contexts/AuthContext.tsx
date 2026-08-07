@@ -138,8 +138,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // itself alive past this app's own 8-hour cutoff. Fire-and-forget,
       // matching every other teardown path in this file (the timer-based
       // expiry, inactivity logout, and explicit logout all do the same).
-      supabase.auth.signOut().catch(() => {});
-      clearBiometricCredential().catch(() => {});
+      //
+      // Skipped specifically when the boot URL is a password-recovery
+      // link: Supabase's client saves the recovery session before firing
+      // PASSWORD_RECOVERY, and signOut() here would run after that save,
+      // revoking the just-established recovery session and breaking the
+      // reset flow for exactly the "had a stale expired session sitting
+      // around" case this cleanup targets. isRecoveryMode is computed
+      // synchronously above (its own useState initializer runs first),
+      // so it's safe to read directly here.
+      if (!isRecoveryMode) {
+        supabase.auth.signOut().catch(() => {});
+        clearBiometricCredential().catch(() => {});
+      }
     }
     removeFromStorage('session');
     return null;
@@ -204,9 +215,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (msUntilExpiry <= 0) {
       // Same narrow race the initializer above now also covers (session
       // was valid at initializer-time by a few ms, expired by the time
-      // this effect actually runs) — same fix, for the same reason.
-      supabase.auth.signOut().catch(() => {});
-      clearBiometricCredential().catch(() => {});
+      // this effect actually runs) — same fix, for the same reason,
+      // including the isRecoveryMode guard (see the initializer's comment).
+      if (!isRecoveryMode) {
+        supabase.auth.signOut().catch(() => {});
+        clearBiometricCredential().catch(() => {});
+      }
       setUser(null);
       removeFromStorage('session');
       return;
