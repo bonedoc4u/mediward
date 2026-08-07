@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, renderHook, act, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
-import { findUserByEmail } from '../../services/userService';
 
 const mockSignOut = vi.hoisted(() => vi.fn().mockResolvedValue({ error: null }));
 const mockRefreshSession = vi.hoisted(() => vi.fn());
+// A real vi.fn() (not an inline anonymous one) so tests can reach into
+// .mock.calls to grab the callback AuthContext.tsx registers with it, and
+// invoke that callback directly to simulate a Supabase-emitted auth event
+// (e.g. TOKEN_REFRESHED) without needing a real Supabase client.
+const mockOnAuthStateChange = vi.hoisted(() =>
+  vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+);
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     auth: {
       signOut: mockSignOut,
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
-      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+      onAuthStateChange: mockOnAuthStateChange,
       signInWithPassword: vi.fn(),
       refreshSession: mockRefreshSession,
     },
@@ -51,10 +57,11 @@ vi.mock('../../services/biometricAuthService', async () => {
   };
 });
 
-// Must resolve (not a bare vi.fn(), which returns undefined) — the
-// profile-refresh effect calls .then() on this unconditionally whenever
-// `user` is non-null, i.e. in the "still valid" case below.
-vi.mock('../../services/userService', () => ({ findUserByEmail: vi.fn().mockResolvedValue(null) }));
+// Hoisted (not an inline factory value) so beforeEach can reset it —
+// otherwise a resolved value set by one test (e.g. the loginWithBiometric
+// test below) would leak into whichever test runs next.
+const mockFindUserByEmail = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+vi.mock('../../services/userService', () => ({ findUserByEmail: mockFindUserByEmail }));
 vi.mock('../../services/auditLog', () => ({ logAuditEvent: vi.fn() }));
 vi.mock('../../services/patientCache', () => ({ clearPatientCache: vi.fn() }));
 vi.mock('../../components/ClinicalDisclaimer', () => ({ clearDisclaimerAccepted: vi.fn() }));
@@ -72,6 +79,11 @@ beforeEach(() => {
   mockStoreBiometricCredential.mockReset().mockResolvedValue(undefined);
   mockIsBiometricAvailable.mockReset().mockResolvedValue(false);
   mockPromptBiometric.mockReset().mockResolvedValue(false);
+  // Must resolve (not a bare vi.fn(), which returns undefined) — the
+  // profile-refresh effect calls .then() on this unconditionally whenever
+  // `user` is non-null, i.e. in the "still valid" case below.
+  mockFindUserByEmail.mockReset().mockResolvedValue(null);
+  mockOnAuthStateChange.mockReset().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } });
   localStorage.clear();
 });
 
@@ -159,14 +171,14 @@ describe('loginWithBiometric session boundary', () => {
     // this ever regressed to computing a fresh expiry instead of reusing
     // the stored credential's original one.
     const originalExpiresAt = Date.now() + 60_000;
-    mockLoadBiometricCredential.mockResolvedValue({ refreshToken: 'stored-refresh-token', expiresAt: originalExpiresAt });
+    mockLoadBiometricCredential.mockResolvedValue({ refreshToken: 'stored-refresh-token', expiresAt: originalExpiresAt, userId: 'u1' });
     mockIsBiometricAvailable.mockResolvedValue(true);
     mockPromptBiometric.mockResolvedValue(true);
     mockRefreshSession.mockResolvedValue({
       data: { session: { user: { id: 'u1', email: 'doc@hospital.com' } } },
       error: null,
     });
-    vi.mocked(findUserByEmail).mockResolvedValue({
+    mockFindUserByEmail.mockResolvedValue({
       id: 'u1', email: 'doc@hospital.com', name: 'Dr. Test', role: 'resident', hospitalId: 'h1',
     });
 
@@ -181,5 +193,57 @@ describe('loginWithBiometric session boundary', () => {
 
     expect(loginResult?.success).toBe(true);
     expect(result.current.user?.sessionExpiry).toBe(originalExpiresAt);
+  });
+});
+
+describe('TOKEN_REFRESHED biometric credential rotation (Fix A regression coverage)', () => {
+  // Grabs the callback AuthContext.tsx's onAuthStateChange effect registered
+  // for the most recently rendered provider, so the test can simulate
+  // Supabase emitting a TOKEN_REFRESHED event without a real client.
+  function latestAuthStateChangeHandler(): (event: string, session: unknown) => void {
+    const calls = mockOnAuthStateChange.mock.calls;
+    return calls[calls.length - 1][0];
+  }
+
+  it('updates the stored token but leaves expiresAt untouched when the refresh belongs to the SAME user who enrolled', async () => {
+    const originalExpiresAt = Date.now() + 60_000;
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'old-token', expiresAt: originalExpiresAt, userId: 'user-1',
+    });
+
+    renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    const handler = latestAuthStateChangeHandler();
+
+    await act(async () => {
+      handler('TOKEN_REFRESHED', { refresh_token: 'rotated-token', user: { id: 'user-1' } });
+      // Flush the loadBiometricCredential().then() microtask chain.
+      await new Promise(r => setTimeout(r, 0));
+    });
+
+    expect(mockStoreBiometricCredential).toHaveBeenCalledWith('rotated-token', originalExpiresAt, 'user-1');
+  });
+
+  it('leaves the stored credential untouched when the refresh belongs to a DIFFERENT user (mismatched userId)', async () => {
+    const originalExpiresAt = Date.now() + 60_000;
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'old-token', expiresAt: originalExpiresAt, userId: 'user-1',
+    });
+
+    renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    const handler = latestAuthStateChangeHandler();
+
+    await act(async () => {
+      // A different user's session started refreshing on this device —
+      // e.g. user-1 was externally signed out without their credential
+      // being cleared, and user-2 subsequently logged in.
+      handler('TOKEN_REFRESHED', { refresh_token: 'someone-elses-token', user: { id: 'user-2' } });
+      await new Promise(r => setTimeout(r, 0));
+    });
+
+    expect(mockStoreBiometricCredential).not.toHaveBeenCalled();
   });
 });

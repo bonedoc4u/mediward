@@ -38,17 +38,17 @@ beforeEach(() => {
 
 describe('isBiometricCredentialValid', () => {
   it('is true for a credential that has not expired yet', () => {
-    const cred: BiometricCredential = { refreshToken: 'tok', expiresAt: 2000 };
+    const cred: BiometricCredential = { refreshToken: 'tok', expiresAt: 2000, userId: 'user-1' };
     expect(isBiometricCredentialValid(cred, 1000)).toBe(true);
   });
 
   it('is false for a credential exactly at its expiry instant', () => {
-    const cred: BiometricCredential = { refreshToken: 'tok', expiresAt: 1000 };
+    const cred: BiometricCredential = { refreshToken: 'tok', expiresAt: 1000, userId: 'user-1' };
     expect(isBiometricCredentialValid(cred, 1000)).toBe(false);
   });
 
   it('is false for an expired credential', () => {
-    const cred: BiometricCredential = { refreshToken: 'tok', expiresAt: 1000 };
+    const cred: BiometricCredential = { refreshToken: 'tok', expiresAt: 1000, userId: 'user-1' };
     expect(isBiometricCredentialValid(cred, 2000)).toBe(false);
   });
 
@@ -58,18 +58,18 @@ describe('isBiometricCredentialValid', () => {
 });
 
 describe('storeBiometricCredential', () => {
-  it('saves under the biometric_credential key with the given refreshToken/expiresAt', async () => {
-    await storeBiometricCredential('my-refresh-token', 5000);
-    expect(mockSave).toHaveBeenCalledWith('biometric_credential', { refreshToken: 'my-refresh-token', expiresAt: 5000 });
+  it('saves under the biometric_credential key with the given refreshToken/expiresAt/userId', async () => {
+    await storeBiometricCredential('my-refresh-token', 5000, 'user-1');
+    expect(mockSave).toHaveBeenCalledWith('biometric_credential', { refreshToken: 'my-refresh-token', expiresAt: 5000, userId: 'user-1' });
   });
 });
 
 describe('loadBiometricCredential', () => {
   it('returns the stored credential when present', async () => {
-    mockLoad.mockReturnValue({ refreshToken: 'tok', expiresAt: 5000 });
+    mockLoad.mockReturnValue({ refreshToken: 'tok', expiresAt: 5000, userId: 'user-1' });
     const result = await loadBiometricCredential();
     expect(mockLoad).toHaveBeenCalledWith('biometric_credential');
-    expect(result).toEqual({ refreshToken: 'tok', expiresAt: 5000 });
+    expect(result).toEqual({ refreshToken: 'tok', expiresAt: 5000, userId: 'user-1' });
   });
 
   it('returns null when nothing is stored', async () => {
