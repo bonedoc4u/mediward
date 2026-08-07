@@ -261,6 +261,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     timers.push(setTimeout(() => {
       toast.warning('Session expired. Please log in again.');
       supabase.auth.signOut().catch(() => {});
+      clearBiometricCredential().catch(() => {});
+      pendingBiometricEnrollmentRef.current = null;
+      setOfferBiometricEnrollment(false);
       setUser(null);
       removeFromStorage('session');
       window.location.hash = '#/dashboard';
@@ -289,6 +292,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logoutTimer = setTimeout(() => {
         toast.warning(`Logged out after ${limitMinutes} minutes of inactivity.`);
         supabase.auth.signOut().catch(() => {});
+        clearBiometricCredential().catch(() => {});
+        pendingBiometricEnrollmentRef.current = null;
+        setOfferBiometricEnrollment(false);
         setUser(null);
         removeFromStorage('session');
         clearDisclaimerAccepted();
@@ -394,11 +400,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ─── Supabase auth state listener (catches server-side token expiry / revocation) ───
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         // User clicked the password reset link in their email.
         // Surface the reset form instead of the login page.
         setIsRecoveryMode(true);
+      } else if (event === 'TOKEN_REFRESHED' && session?.refresh_token) {
+        // Supabase rotates the refresh token on every use, including its
+        // own background autoRefreshToken cycle (roughly hourly, since the
+        // JWT itself only lives 1h) — the token captured at enrollment time
+        // goes stale long before the stored credential's expiresAt (which
+        // can be up to 8h out). Keep the STORED token current as it
+        // rotates so a later biometric login always presents a live one.
+        // expiresAt is deliberately left untouched — the safety-critical
+        // session-boundary anchor must never move, only the token value.
+        loadBiometricCredential().then(existing => {
+          if (existing) {
+            storeBiometricCredential(session.refresh_token, existing.expiresAt).catch(() => {});
+          }
+        });
       } else if (event === 'SIGNED_OUT') {
         setIsRecoveryMode(false);
         // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
@@ -452,8 +472,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // derived value, so the stored credential's window can never drift
       // from the real session's window.
       if (authData.session?.refresh_token) {
-        const alreadyEnrolled = await loadBiometricCredential();
-        if (!alreadyEnrolled && await isBiometricAvailable()) {
+        const existingCredential = await loadBiometricCredential();
+        if (!isBiometricCredentialValid(existingCredential, Date.now()) && await isBiometricAvailable()) {
           pendingBiometricEnrollmentRef.current = {
             refreshToken: authData.session.refresh_token,
             expiresAt: session.sessionExpiry,
@@ -487,44 +507,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const ok = await promptBiometric('Sign in to MediWard');
     if (!ok) return { success: false, error: 'cancelled' };
 
-    // credential is narrowed to non-null here — isBiometricCredentialValid
-    // is a type predicate (see services/biometricAuthService.ts), so no `!`
-    // assertion is needed.
-    const { data, error } = await supabase.auth.refreshSession({ refresh_token: credential.refreshToken });
-    if (error || !data.session) {
-      if (!isAuthRetryableFetchError(error)) {
-        // A real rejection (revoked, or genuinely past Supabase's own
-        // refresh-token lifetime), not a connectivity blip — this
-        // credential is dead, clear it so the fingerprint button stops
-        // being offered.
-        await clearBiometricCredential();
+    try {
+      // credential is narrowed to non-null here — isBiometricCredentialValid
+      // is a type predicate (see services/biometricAuthService.ts), so no `!`
+      // assertion is needed.
+      const { data, error } = await supabase.auth.refreshSession({ refresh_token: credential.refreshToken });
+      if (error || !data.session) {
+        const isNetworkBlip = isAuthRetryableFetchError(error);
+        if (!isNetworkBlip) {
+          // A real rejection (revoked, or genuinely past Supabase's own
+          // refresh-token lifetime), not a connectivity blip — this
+          // credential is dead, clear it so the fingerprint button stops
+          // being offered.
+          await clearBiometricCredential();
+        }
+        return { success: false, error: isNetworkBlip ? 'network' : 'Please log in again.' };
       }
-      return { success: false, error: !isAuthRetryableFetchError(error) ? 'Please log in again.' : 'network' };
+
+      const email = data.session.user.email;
+      if (!email) {
+        await clearBiometricCredential();
+        return { success: false, error: 'Please log in again.' };
+      }
+
+      const found = await findUserByEmail(email);
+      if (!found) return { success: false, error: 'User role not configured. Contact admin.' };
+
+      const session: AuthUser = {
+        id:            data.session.user.id,
+        email:         found.email,
+        name:          found.name,
+        role:          found.role,
+        ward:          found.ward,
+        unit:          found.unit,
+        hospitalId:    found.hospitalId,
+        sessionExpiry: credential.expiresAt, // anchored to the ORIGINAL login, never extended
+      };
+      setUser(session);
+      saveToStorage('session', session);
+      logAuditEvent(session.id, session.name, 'LOGIN', 'session', session.id, `Fingerprint login: ${email}`);
+      return { success: true };
+    } catch (err) {
+      // supabase.auth.refreshSession can reject (not just resolve with an
+      // error) on unexpected failures — turn that into a normal failure
+      // result instead of an unhandled promise rejection so the UI (Task 4)
+      // always gets a { success: false } it can render, never a crash.
+      return { success: false, error: err instanceof Error ? err.message : 'Please log in again.' };
     }
-
-    const email = data.session.user.email;
-    if (!email) {
-      await clearBiometricCredential();
-      return { success: false, error: 'Please log in again.' };
-    }
-
-    const found = await findUserByEmail(email);
-    if (!found) return { success: false, error: 'User role not configured. Contact admin.' };
-
-    const session: AuthUser = {
-      id:            data.session.user.id,
-      email:         found.email,
-      name:          found.name,
-      role:          found.role,
-      ward:          found.ward,
-      unit:          found.unit,
-      hospitalId:    found.hospitalId,
-      sessionExpiry: credential.expiresAt, // anchored to the ORIGINAL login, never extended
-    };
-    setUser(session);
-    saveToStorage('session', session);
-    logAuditEvent(session.id, session.name, 'LOGIN', 'session', session.id, `Fingerprint login: ${email}`);
-    return { success: true };
   }, []);
 
   // ─── Verify password without extending session (lock screen re-auth) ───
@@ -547,6 +576,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     supabase.auth.signOut().catch(() => {});
     clearBiometricCredential().catch(() => {});
+    pendingBiometricEnrollmentRef.current = null;
+    setOfferBiometricEnrollment(false);
     setUser(null);
     setIsLocked(false);
     removeFromStorage('session');
