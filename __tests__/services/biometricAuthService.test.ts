@@ -9,8 +9,19 @@ vi.mock('../../services/persistence', () => ({
   removeFromStorage: mockRemove,
 }));
 
+const mockCheckBiometry = vi.hoisted(() => vi.fn());
+const mockAuthenticate  = vi.hoisted(() => vi.fn());
+vi.mock('@aparajita/capacitor-biometric-auth', () => ({
+  BiometricAuth: {
+    checkBiometry: mockCheckBiometry,
+    authenticate: mockAuthenticate,
+  },
+}));
+
 import {
   isBiometricCredentialValid,
+  isBiometricAvailable,
+  promptBiometric,
   storeBiometricCredential,
   loadBiometricCredential,
   clearBiometricCredential,
@@ -21,6 +32,8 @@ beforeEach(() => {
   mockSave.mockReset();
   mockLoad.mockReset();
   mockRemove.mockReset();
+  mockCheckBiometry.mockReset();
+  mockAuthenticate.mockReset();
 });
 
 describe('isBiometricCredentialValid', () => {
@@ -70,5 +83,34 @@ describe('clearBiometricCredential', () => {
   it('removes the biometric_credential key', async () => {
     await clearBiometricCredential();
     expect(mockRemove).toHaveBeenCalledWith('biometric_credential');
+  });
+});
+
+describe('isBiometricAvailable', () => {
+  it('returns true when the platform reports biometrics available', async () => {
+    mockCheckBiometry.mockResolvedValue({ isAvailable: true });
+    expect(await isBiometricAvailable()).toBe(true);
+  });
+
+  it('returns false when the platform reports biometrics unavailable', async () => {
+    mockCheckBiometry.mockResolvedValue({ isAvailable: false });
+    expect(await isBiometricAvailable()).toBe(false);
+  });
+
+  it('returns false (never throws) if checkBiometry itself throws', async () => {
+    mockCheckBiometry.mockRejectedValue(new Error('platform error'));
+    await expect(isBiometricAvailable()).resolves.toBe(false);
+  });
+});
+
+describe('promptBiometric', () => {
+  it('returns true when authenticate resolves (successful scan)', async () => {
+    mockAuthenticate.mockResolvedValue(undefined);
+    expect(await promptBiometric('test reason')).toBe(true);
+  });
+
+  it('returns false (never throws) when authenticate rejects — covers both a real failure and a user cancel', async () => {
+    mockAuthenticate.mockRejectedValue(new Error('user cancelled'));
+    await expect(promptBiometric('test reason')).resolves.toBe(false);
   });
 });
