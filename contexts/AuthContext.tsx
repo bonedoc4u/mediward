@@ -14,6 +14,8 @@ import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
 import { clearDisclaimerAccepted } from '../components/ClinicalDisclaimer';
 import { clearPatientCache } from '../services/patientCache';
+import { isSessionValid } from '../utils/sessionValidity';
+import { clearBiometricCredential } from '../services/biometricAuthService';
 
 const SESSION_DURATION   = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
 const WARN_BEFORE_EXPIRY = 5 * 60 * 1000;        // warn 5 min before absolute expiry
@@ -127,7 +129,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [user, setUser] = useState<AuthUser | null>(() => {
     const saved = loadFromStorage<AuthUser>('session');
-    if (saved && saved.sessionExpiry > Date.now()) return saved;
+    if (isSessionValid(saved, Date.now())) return saved;
+    if (saved) {
+      // A session was found but had already expired by the time the app
+      // reopened — clean up fully, not just the local copy, so a
+      // lingering Supabase session (persistSession/autoRefreshToken are
+      // both on by default, see lib/supabase.ts) can't silently keep
+      // itself alive past this app's own 8-hour cutoff. Fire-and-forget,
+      // matching every other teardown path in this file (the timer-based
+      // expiry, inactivity logout, and explicit logout all do the same).
+      supabase.auth.signOut().catch(() => {});
+      clearBiometricCredential().catch(() => {});
+    }
     removeFromStorage('session');
     return null;
   });
@@ -189,6 +202,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const msUntilExpiry = user.sessionExpiry - Date.now();
     if (msUntilExpiry <= 0) {
+      // Same narrow race the initializer above now also covers (session
+      // was valid at initializer-time by a few ms, expired by the time
+      // this effect actually runs) — same fix, for the same reason.
+      supabase.auth.signOut().catch(() => {});
+      clearBiometricCredential().catch(() => {});
       setUser(null);
       removeFromStorage('session');
       return;
