@@ -28,13 +28,32 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
     setError('');
     const result = await loginWithBiometric();
     setBiometricLoading(false);
-    if (!result.success) {
-      // A stored credential that's now invalid/expired means the button
-      // shouldn't be offered again this visit — silently fall through to
-      // the always-present email/password form below, no error message
-      // (this is the expected "fast-login window ran out" case, not a
-      // failure the user needs to see).
-      setShowBiometricButton(false);
+    if (result.success) return;
+
+    switch (result.error) {
+      case 'expired':
+      case 'Please log in again.':
+        // The credential is gone (loginWithBiometric already cleared it) —
+        // the expected "fast-login window ran out" case. Fall through
+        // silently to the password form below, no error message.
+        setShowBiometricButton(false);
+        break;
+      case 'cancelled':
+      case 'unavailable':
+        // Credential is still valid; nothing actionable to tell the user —
+        // they can retry the fingerprint button or just use the password
+        // form below.
+        break;
+      case 'network':
+        // Credential was deliberately preserved specifically so this is
+        // retryable — tell the user why it didn't work.
+        setError("Couldn't reach the server — check your connection and try again.");
+        break;
+      default:
+        // 'User role not configured. Contact admin.' and any other real
+        // rejection — surface it verbatim, same as the password path
+        // already does for the same underlying error.
+        setError(result.error || 'Fingerprint sign-in failed.');
     }
   };
 
