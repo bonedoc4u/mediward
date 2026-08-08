@@ -228,8 +228,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (credential) armOrphanedCredentialDeadline(credential.expiresAt);
     }).catch(() => {});
     // Mount-only — specifically the "app just (re)opened with no local
-    // session" check. The cleanup also clears any deadline armed later by
-    // the inactivity path, so a timer can't outlive the provider.
+    // session" check. If a real session already exists at boot (the common
+    // case), the early return above means this effect registers no cleanup
+    // at all for this instance — fine, since nothing gets armed on that
+    // path either. The cleanup below only runs if AuthProvider itself
+    // unmounts (a full page reload/close) after this effect did arm
+    // something; the browser destroys all JS timers at that point anyway,
+    // so this is a defensive no-op, not something load-bearing.
     return disarmOrphanedCredentialDeadline;
 
   }, []);

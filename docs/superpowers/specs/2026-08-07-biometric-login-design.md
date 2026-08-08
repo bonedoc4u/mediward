@@ -250,7 +250,11 @@ isolation:
     the soft-logout window: with no local session but a stored credential,
     it re-arms the same deadline (reopened before it) or sweeps at once
     (reopened after it). Skipped in `isRecoveryMode`, for the same reason
-    the boot-time `signOut()` is.
+    the boot-time `signOut()` is — accepted trade-off: a recovery boot with
+    an already-past-deadline credential *defers* the sweep rather than
+    performing it, so that refresh token stays live (but unusable, since
+    `isBiometricCredentialValid` still gates every path that would act on
+    it) until the next non-recovery boot re-triggers this check.
   - `disarmOrphanedCredentialDeadline()` is called by `login()` and
     `loginWithBiometric()` when a real session is re-established (the
     `[user]`-keyed timers take over from there), and by `logout()` and the

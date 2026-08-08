@@ -166,6 +166,27 @@ describe('AuthProvider boot with an expired stored session', () => {
       expect(mockSignOut).not.toHaveBeenCalled();
       expect(mockClearBiometric).not.toHaveBeenCalled();
     });
+
+    it('does NOT sweep an already-expired orphaned biometric credential either', async () => {
+      // Exercises the OTHER isRecoveryMode guard added alongside the
+      // orphaned-credential deadline mechanism (the boot-time sweep effect
+      // in AuthContext.tsx), separate from the pre-existing boot-time
+      // session-expiry guard covered by the test above. Without this guard,
+      // an already-past-deadline stored credential would trigger an
+      // immediate sweep and revoke the just-established recovery session.
+      window.location.hash = '#access_token=xxx&type=recovery';
+      mockLoadBiometricCredential.mockResolvedValue({
+        refreshToken: 'stored-refresh-token',
+        expiresAt: Date.now() - 1000, // already past its deadline
+        userId: 'u1',
+      });
+
+      render(<AuthProvider><Probe /></AuthProvider>);
+
+      await new Promise(r => setTimeout(r, 10));
+      expect(mockSignOut).not.toHaveBeenCalled();
+      expect(mockClearBiometric).not.toHaveBeenCalled();
+    });
   });
 });
 
