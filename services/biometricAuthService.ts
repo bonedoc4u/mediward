@@ -8,7 +8,7 @@
  * copied from the ORIGINAL password login's sessionExpiry, never a fresh
  * window computed at biometric-check time.
  */
-import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
+import { AndroidBiometryStrength, BiometricAuth } from '@aparajita/capacitor-biometric-auth';
 import { saveToStorage, loadFromStorage, removeFromStorage } from './persistence';
 
 export interface BiometricCredential {
@@ -44,7 +44,12 @@ export function isBiometricCredentialValid(
 export async function isBiometricAvailable(): Promise<boolean> {
   try {
     const result = await BiometricAuth.checkBiometry();
-    return result.isAvailable;
+    // Require STRONG biometry (Class 3 on Android) — this gates access to
+    // patient data, and Android's weak tier can include camera-based face
+    // unlock that isn't suitable for that. iOS is unaffected: iOS only has
+    // strong biometry, so isAvailable and strongBiometryIsAvailable are
+    // always identical there.
+    return result.strongBiometryIsAvailable;
   } catch {
     return false;
   }
@@ -52,7 +57,7 @@ export async function isBiometricAvailable(): Promise<boolean> {
 
 export async function promptBiometric(reason: string): Promise<boolean> {
   try {
-    await BiometricAuth.authenticate({ reason });
+    await BiometricAuth.authenticate({ reason, androidBiometryStrength: AndroidBiometryStrength.strong });
     return true;
   } catch {
     // Covers both a genuine failure and a user cancel — both fall back to

@@ -16,6 +16,9 @@ vi.mock('@aparajita/capacitor-biometric-auth', () => ({
     checkBiometry: mockCheckBiometry,
     authenticate: mockAuthenticate,
   },
+  // Real runtime enum in the plugin (dist/esm/definitions.js) — mirrored here
+  // because the service imports the value, not just the type.
+  AndroidBiometryStrength: { weak: 0, strong: 1 },
 }));
 
 import {
@@ -87,13 +90,21 @@ describe('clearBiometricCredential', () => {
 });
 
 describe('isBiometricAvailable', () => {
-  it('returns true when the platform reports biometrics available', async () => {
-    mockCheckBiometry.mockResolvedValue({ isAvailable: true });
+  it('returns true when the platform reports STRONG biometrics available', async () => {
+    mockCheckBiometry.mockResolvedValue({ isAvailable: true, strongBiometryIsAvailable: true });
     expect(await isBiometricAvailable()).toBe(true);
   });
 
   it('returns false when the platform reports biometrics unavailable', async () => {
-    mockCheckBiometry.mockResolvedValue({ isAvailable: false });
+    mockCheckBiometry.mockResolvedValue({ isAvailable: false, strongBiometryIsAvailable: false });
+    expect(await isBiometricAvailable()).toBe(false);
+  });
+
+  it('returns false when only WEAK biometry is available (Android Class 2 — not enough to gate PHI)', async () => {
+    // isAvailable reflects weak-or-better; strongBiometryIsAvailable is the
+    // strong-only signal. A device with just camera-based face unlock lands
+    // here, and must NOT be offered biometric access to patient data.
+    mockCheckBiometry.mockResolvedValue({ isAvailable: true, strongBiometryIsAvailable: false });
     expect(await isBiometricAvailable()).toBe(false);
   });
 
@@ -107,6 +118,15 @@ describe('promptBiometric', () => {
   it('returns true when authenticate resolves (successful scan)', async () => {
     mockAuthenticate.mockResolvedValue(undefined);
     expect(await promptBiometric('test reason')).toBe(true);
+  });
+
+  it('requests STRONG android biometry explicitly (the plugin otherwise defaults to weak)', async () => {
+    mockAuthenticate.mockResolvedValue(undefined);
+    await promptBiometric('test reason');
+    expect(mockAuthenticate).toHaveBeenCalledWith({
+      reason: 'test reason',
+      androidBiometryStrength: 1, // AndroidBiometryStrength.strong
+    });
   });
 
   it('returns false (never throws) when authenticate rejects — covers both a real failure and a user cancel', async () => {
