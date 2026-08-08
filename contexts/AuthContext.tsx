@@ -291,8 +291,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }, warn);
       logoutTimer = setTimeout(() => {
         toast.warning(`Logged out after ${limitMinutes} minutes of inactivity.`);
-        supabase.auth.signOut().catch(() => {});
-        clearBiometricCredential().catch(() => {});
+        // Deliberately NOT calling supabase.auth.signOut() here, unlike
+        // every other teardown path in this file — ANY scope of signOut()
+        // destroys the current session's refresh token server-side
+        // (verified against Supabase's own docs: `local` only limits which
+        // OTHER sessions are affected, not whether THIS session's own
+        // token survives — there is no scope that preserves it). This is
+        // the one deliberately "soft" logout: it clears this app's own
+        // session state so no protected UI renders and no app-level data
+        // fetching happens, but leaves Supabase's client session alive so
+        // a stored biometric credential's refresh token keeps working
+        // within the ORIGINAL 8h window (see loginWithBiometric's
+        // sessionExpiry anchoring, which is what actually bounds how long
+        // that token can be used for). The 8h absolute timer in the
+        // "Session Expiry Timers" effect just above this one still does a
+        // real, full signOut() when it fires — that
+        // boundary is untouched and is what ultimately closes this
+        // exposure if the user never comes back.
         pendingBiometricEnrollmentRef.current = null;
         setOfferBiometricEnrollment(false);
         setUser(null);
@@ -427,6 +442,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }).catch(() => {});
       } else if (event === 'SIGNED_OUT') {
         setIsRecoveryMode(false);
+        // Reset any unanswered enrollment offer and clear the stored
+        // credential — safe unconditionally here because, after the
+        // inactivity-timeout fix above, this event now only fires when the
+        // refresh token has genuinely already been destroyed (this file's
+        // own global signOut() calls at boot/8h-expiry/explicit logout, or
+        // a real external revocation). Closes a gap where an externally
+        // triggered SIGNED_OUT (e.g. an admin force-logout, which doesn't
+        // go through any of this file's own call sites) left a dangling
+        // enrollment offer for a subsequently-logged-in different user.
+        pendingBiometricEnrollmentRef.current = null;
+        setOfferBiometricEnrollment(false);
+        clearBiometricCredential().catch(() => {});
         // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
         // clear our local session too so the user is redirected to login.
         setUser(prev => {
@@ -532,7 +559,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const email = data.session.user.email;
-      if (!email) {
+      // Defence in depth alongside the TOKEN_REFRESHED identity gate: the
+      // refreshed session must belong to the same user that enrolled this
+      // credential, never a different account on the same device.
+      if (!email || data.session.user.id !== credential.userId) {
         await clearBiometricCredential();
         return { success: false, error: 'Please log in again.' };
       }

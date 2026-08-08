@@ -30,6 +30,9 @@ vi.mock('../../lib/supabase', () => ({
 // isBiometricCredentialValid) doesn't try to touch actual native code.
 vi.mock('@aparajita/capacitor-biometric-auth', () => ({
   BiometricAuth: { checkBiometry: vi.fn(), authenticate: vi.fn() },
+  // Real runtime enum in the plugin — biometricAuthService.ts imports the
+  // value (not just the type), so vi.importActual() below needs it present.
+  AndroidBiometryStrength: { weak: 0, strong: 1 },
 }));
 
 const mockClearBiometric           = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -164,6 +167,84 @@ describe('AuthProvider boot with an expired stored session', () => {
   });
 });
 
+describe('inactivity auto-logout is a deliberately SOFT logout', () => {
+  // The whole cold-start half of biometric login depends on this: any scope
+  // of supabase.auth.signOut() destroys the CURRENT session's refresh token
+  // server-side, and the stored biometric credential's expiresAt is copied
+  // from the same session's sessionExpiry — so signing out here would kill
+  // the credential and the token behind it together, in exactly the case
+  // the feature exists for. This path must therefore clear ONLY this app's
+  // own local session state.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('clears the local session but does NOT call signOut() or clearBiometricCredential()', async () => {
+    vi.useFakeTimers();
+
+    const valid = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        id: 'u1', email: 'doc@hospital.com', name: 'Dr. Test',
+        role: 'resident', hospitalId: 'h1',
+        // 8 h out, so the ABSOLUTE-expiry timer (which legitimately does a
+        // full signOut) cannot be what fires during this test.
+        sessionExpiry: Date.now() + 8 * 60 * 60 * 1000,
+      },
+    };
+    localStorage.setItem('mediward_session', JSON.stringify(valid));
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    expect(result.current.user).not.toBeNull();
+
+    // 'resident' gets a 4-hour inactivity limit (getInactivityLimits).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000 + 1_000);
+    });
+
+    // Local session state IS torn down...
+    expect(result.current.user).toBeNull();
+    expect(result.current.isAuthenticated).toBe(false);
+    expect(localStorage.getItem('mediward_session')).toBeNull();
+
+    // ...but the Supabase session and the stored credential are left alive.
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(mockClearBiometric).not.toHaveBeenCalled();
+  });
+
+  it('still does a full signOut() + credential clear when the 8h ABSOLUTE limit fires', async () => {
+    vi.useFakeTimers();
+
+    const valid = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      data: {
+        id: 'u1', email: 'doc@hospital.com', name: 'Dr. Test',
+        // 'admin' gets the 1-hour inactivity window, but we set the absolute
+        // expiry shorter still so the absolute timer is unambiguously the
+        // one that fires — that boundary is untouched by the soft-logout fix.
+        role: 'admin', hospitalId: 'h1',
+        sessionExpiry: Date.now() + 30 * 60 * 1000,
+      },
+    };
+    localStorage.setItem('mediward_session', JSON.stringify(valid));
+
+    renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1_000);
+    });
+
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockClearBiometric).toHaveBeenCalled();
+  });
+});
+
 describe('loginWithBiometric session boundary', () => {
   it('anchors sessionExpiry to the stored credential, never a fresh session window', async () => {
     // Deliberately NOT close to Date.now() + 8h, so this test would fail
@@ -196,15 +277,15 @@ describe('loginWithBiometric session boundary', () => {
   });
 });
 
-describe('TOKEN_REFRESHED biometric credential rotation (Fix A regression coverage)', () => {
-  // Grabs the callback AuthContext.tsx's onAuthStateChange effect registered
-  // for the most recently rendered provider, so the test can simulate
-  // Supabase emitting a TOKEN_REFRESHED event without a real client.
-  function latestAuthStateChangeHandler(): (event: string, session: unknown) => void {
-    const calls = mockOnAuthStateChange.mock.calls;
-    return calls[calls.length - 1][0];
-  }
+// Grabs the callback AuthContext.tsx's onAuthStateChange effect registered
+// for the most recently rendered provider, so tests can simulate Supabase
+// emitting an auth event without a real client.
+function latestAuthStateChangeHandler(): (event: string, session: unknown) => void {
+  const calls = mockOnAuthStateChange.mock.calls;
+  return calls[calls.length - 1][0];
+}
 
+describe('TOKEN_REFRESHED biometric credential rotation (Fix A regression coverage)', () => {
   it('updates the stored token but leaves expiresAt untouched when the refresh belongs to the SAME user who enrolled', async () => {
     const originalExpiresAt = Date.now() + 60_000;
     mockLoadBiometricCredential.mockResolvedValue({
@@ -245,5 +326,56 @@ describe('TOKEN_REFRESHED biometric credential rotation (Fix A regression covera
     });
 
     expect(mockStoreBiometricCredential).not.toHaveBeenCalled();
+  });
+});
+
+describe('SIGNED_OUT teardown', () => {
+  it('clears the stored credential and any unanswered enrollment offer', async () => {
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    const handler = latestAuthStateChangeHandler();
+
+    await act(async () => {
+      // e.g. an admin force-logout — an external revocation that doesn't go
+      // through any of AuthContext.tsx's own signOut() call sites. By the
+      // time this fires the refresh token is already destroyed, so keeping
+      // the credential would only leave a dead one (and a dangling offer)
+      // behind for whoever logs in next on this device.
+      handler('SIGNED_OUT', null);
+      await new Promise(r => setTimeout(r, 0));
+    });
+
+    expect(mockClearBiometric).toHaveBeenCalled();
+    expect(result.current.offerBiometricEnrollment).toBe(false);
+  });
+});
+
+describe('loginWithBiometric identity re-check', () => {
+  it('refuses (and clears the credential) when the refreshed session belongs to a different user', async () => {
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'stored-refresh-token', expiresAt: Date.now() + 60_000, userId: 'user-1',
+    });
+    mockIsBiometricAvailable.mockResolvedValue(true);
+    mockPromptBiometric.mockResolvedValue(true);
+    mockRefreshSession.mockResolvedValue({
+      // Same device, but the refresh resolved to a DIFFERENT Supabase user
+      // than the one that enrolled this credential.
+      data: { session: { user: { id: 'user-2', email: 'other@hospital.com' } } },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    let loginResult: { success: boolean; error?: string } | undefined;
+    await act(async () => {
+      loginResult = await result.current.loginWithBiometric();
+    });
+
+    expect(loginResult).toEqual({ success: false, error: 'Please log in again.' });
+    expect(mockClearBiometric).toHaveBeenCalled();
+    expect(result.current.user).toBeNull();
   });
 });
