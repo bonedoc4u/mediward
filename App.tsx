@@ -22,7 +22,7 @@ import ToastContainer from './components/ToastContainer';
 import {
   LayoutDashboard, FileImage, Menu, X, Home, ClipboardList, Database,
   Activity, Users, HeartPulse, LogOut, Stethoscope, ListChecks, Syringe,
-  Loader2, Shield, Settings, BookOpen,
+  Loader2, Shield, Settings, BookOpen, Fingerprint,
 } from 'lucide-react';
 
 // Lazy load heavy components
@@ -60,10 +60,21 @@ const LockScreen: React.FC<{
   userName: string;
   onUnlock: (password: string) => Promise<{ success: boolean; error?: string }>;
   onLogout: () => void;
-}> = ({ userName, onUnlock, onLogout }) => {
+  onAutoBiometric: () => Promise<boolean>;
+}> = ({ userName, onUnlock, onLogout, onAutoBiometric }) => {
   const [password, setPassword] = React.useState('');
   const [error, setError]       = React.useState('');
   const [loading, setLoading]   = React.useState(false);
+
+  // Auto-prompt biometric the moment the lock screen appears — the
+  // password field below stays visible and usable the whole time as the
+  // fallback, not gated behind waiting for this to resolve.
+  React.useEffect(() => {
+    onAutoBiometric();
+    // Intentionally run only once per mount (a fresh lock screen instance),
+    // not on every re-render. (react-hooks/exhaustive-deps is off project-wide
+    // — see eslint.config.js — so no disable directive is needed here.)
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +130,47 @@ const LockScreen: React.FC<{
   );
 };
 
+// ─── Biometric Enrollment Offer ─────────────────────────────────────────────
+// Shown once, immediately after a successful password login, on a device
+// that supports biometrics and has nothing enrolled yet (see login() in
+// AuthContext.tsx). offerBiometricEnrollment flips true a couple of `await`s
+// after login() calls setUser() — by which point isAuthenticated is already
+// true and LoginPage has already unmounted (state updates don't stay batched
+// across an await boundary), so this can't live inside LoginPage.tsx. It
+// reads its own auth fields via useAuth() and is rendered as a top-level
+// overlay from every post-login branch below (disclaimer, department/unit
+// picker, dashboard, lock screen) so it's visible wherever the user actually
+// lands right after login, not just one specific screen.
+const BiometricEnrollmentOffer: React.FC = () => {
+  const { offerBiometricEnrollment, enrollBiometric, dismissBiometricOffer } = useAuth();
+  if (!offerBiometricEnrollment) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000] px-4">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 space-y-4 text-center">
+        <Fingerprint className="w-10 h-10 text-teal-600 mx-auto" />
+        <h3 className="text-lg font-bold text-slate-800">Enable Fingerprint Sign-In?</h3>
+        <p className="text-sm text-slate-500">
+          Skip typing your password next time you open MediWard on this device.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={dismissBiometricOffer}
+            className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Not now
+          </button>
+          <button
+            onClick={enrollBiometric}
+            className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl"
+          >
+            Enable
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Navigation Config ───
 interface NavItem {
   id: ViewMode;
@@ -160,7 +212,7 @@ const ViewLoader = () => (
 // ─── Main App ───
 const App: React.FC = () => {
   const {
-    isAuthenticated, isRecoveryMode, isLocked, unlock, user, verifyPassword, logout,
+    isAuthenticated, isRecoveryMode, isLocked, unlock, unlockWithBiometric, user, verifyPassword, logout,
     viewingHospitalId, viewingHospitalName, setViewingHospital,
     selectedDepartment, selectedUnit, setSelectedDepartment, setSelectedUnit, clearWorkspaceSelection,
   } = useAuth();
@@ -436,15 +488,19 @@ const App: React.FC = () => {
   // Lock screen — shown when the device was idle/hidden for >60 s on a shared tablet
   if (isAuthenticated && isLocked) {
     return (
-      <LockScreen
-        userName={user?.name ?? ''}
-        onUnlock={async (password) => {
-          const result = await verifyPassword(password);
-          if (result.success) unlock();
-          return result;
-        }}
-        onLogout={logout}
-      />
+      <>
+        <LockScreen
+          userName={user?.name ?? ''}
+          onUnlock={async (password) => {
+            const result = await verifyPassword(password);
+            if (result.success) unlock();
+            return result;
+          }}
+          onLogout={logout}
+          onAutoBiometric={unlockWithBiometric}
+        />
+        <BiometricEnrollmentOffer />
+      </>
     );
   }
 
@@ -474,15 +530,21 @@ const App: React.FC = () => {
     if (disclaimerOk === null) {
       // Still checking whether this user has already accepted — avoid a flash.
       return (
-        <div className="min-h-[100dvh] flex items-center justify-center bg-slate-50">
-          <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
-        </div>
+        <>
+          <div className="min-h-[100dvh] flex items-center justify-center bg-slate-50">
+            <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
+          </div>
+          <BiometricEnrollmentOffer />
+        </>
       );
     }
     return (
-      <ClinicalDisclaimer
-        onAccept={() => { checkedDisclaimerFor.current = user?.id ?? null; setDisclaimerOk(true); }}
-      />
+      <>
+        <ClinicalDisclaimer
+          onAccept={() => { checkedDisclaimerFor.current = user?.id ?? null; setDisclaimerOk(true); }}
+        />
+        <BiometricEnrollmentOffer />
+      </>
     );
   }
 
@@ -496,6 +558,7 @@ const App: React.FC = () => {
           onSelect={(dept) => setSelectedDepartment(dept)}
         />
         <ToastContainer />
+        <BiometricEnrollmentOffer />
       </>
     );
   }
@@ -507,10 +570,13 @@ const App: React.FC = () => {
     // "Unit 1" would filter every patient out.
     if (isLoadingConfig) {
       return (
-        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-3 text-slate-300">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
-          <p className="text-sm">Loading your department…</p>
-        </div>
+        <>
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-3 text-slate-300">
+            <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
+            <p className="text-sm">Loading your department…</p>
+          </div>
+          <BiometricEnrollmentOffer />
+        </>
       );
     }
     const deptLabel = department || 'Dept. of Orthopaedics';
@@ -525,6 +591,7 @@ const App: React.FC = () => {
           onSelect={(unit) => setSelectedUnit(unit)}
         />
         <ToastContainer />
+        <BiometricEnrollmentOffer />
       </>
     );
   }
@@ -532,10 +599,13 @@ const App: React.FC = () => {
   // ─── Super Admin ───
   if (user?.role === 'superadmin' && superAdminMode) {
     return (
-      <SuperAdminPanel
-        onSwitchToApp={() => setSuperAdminMode(false)}
-        onViewWorkspace={(id, name) => { setViewingHospital(id, name); setSuperAdminMode(false); }}
-      />
+      <>
+        <SuperAdminPanel
+          onSwitchToApp={() => setSuperAdminMode(false)}
+          onViewWorkspace={(id, name) => { setViewingHospital(id, name); setSuperAdminMode(false); }}
+        />
+        <BiometricEnrollmentOffer />
+      </>
     );
   }
 
@@ -956,6 +1026,9 @@ const App: React.FC = () => {
 
       {/* ─── Toast Notifications ─── */}
       <ToastContainer />
+
+      {/* ─── Biometric Enrollment Offer (post-login, one-time) ─── */}
+      <BiometricEnrollmentOffer />
     </div>
   );
 };

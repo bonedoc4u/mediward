@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AppContext';
-import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Fingerprint } from 'lucide-react';
+import { isBiometricAvailable, loadBiometricCredential, isBiometricCredentialValid } from '../services/biometricAuthService';
 
 const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({ onPrivacy, onTerms }) => {
-  const { login } = useAuth();
+  const { login, loginWithBiometric } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -12,6 +13,30 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
   // Client-side rate limiting: exponential backoff after failed attempts
   const [failCount, setFailCount] = useState(0);
   const [lockUntil, setLockUntil] = useState(0);
+  const [showBiometricButton, setShowBiometricButton] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const [available, credential] = await Promise.all([isBiometricAvailable(), loadBiometricCredential()]);
+      setShowBiometricButton(available && isBiometricCredentialValid(credential, Date.now()));
+    })();
+  }, []);
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    setError('');
+    const result = await loginWithBiometric();
+    setBiometricLoading(false);
+    if (!result.success) {
+      // A stored credential that's now invalid/expired means the button
+      // shouldn't be offered again this visit — silently fall through to
+      // the always-present email/password form below, no error message
+      // (this is the expected "fast-login window ran out" case, not a
+      // failure the user needs to see).
+      setShowBiometricButton(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +126,18 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             <h3 className="text-2xl font-bold text-slate-800">Welcome Back</h3>
             <p className="text-slate-500 text-sm mt-1">Enter your credentials to access the dashboard.</p>
           </div>
+
+          {showBiometricButton && (
+            <button
+              type="button"
+              onClick={handleBiometricLogin}
+              disabled={biometricLoading}
+              className="w-full mb-4 flex items-center justify-center gap-2 py-3 border-2 border-teal-600 text-teal-700 font-bold rounded-lg hover:bg-teal-50 disabled:opacity-60 transition-colors"
+            >
+              <Fingerprint className="w-5 h-5" />
+              {biometricLoading ? 'Verifying…' : 'Sign in with Fingerprint'}
+            </button>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
