@@ -13,7 +13,7 @@ const STORAGE_PREFIX = 'mediward_';
 const SCHEMA_VERSION = 1;
 
 // Keys that must survive iOS memory pressure — written to Capacitor Preferences too
-const DURABLE_KEYS = new Set(['session', 'patients_cache']);
+const DURABLE_KEYS = new Set(['session', 'patients_cache', 'biometric_credential']);
 
 interface StorageEnvelope<T> {
   version: number;
@@ -35,7 +35,7 @@ function unwrapEnvelope<T>(raw: string, key: string): T | null {
     if (envelope.version !== SCHEMA_VERSION) {
       console.warn(`[Persistence] Schema version mismatch for "${key}". Expected ${SCHEMA_VERSION}, got ${envelope.version}`);
     }
-    return envelope.data;
+    return envelope.data ?? null;
   } catch {
     return null;
   }

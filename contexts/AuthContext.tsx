@@ -11,9 +11,19 @@ import { loadFromStorage, saveToStorage, removeFromStorage } from '../services/p
 import { logAuditEvent } from '../services/auditLog';
 import { findUserByEmail } from '../services/userService';
 import { supabase } from '../lib/supabase';
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { toast } from '../utils/toast';
 import { clearDisclaimerAccepted } from '../components/ClinicalDisclaimer';
 import { clearPatientCache } from '../services/patientCache';
+import { isSessionValid } from '../utils/sessionValidity';
+import {
+  clearBiometricCredential,
+  isBiometricAvailable,
+  promptBiometric,
+  storeBiometricCredential,
+  loadBiometricCredential,
+  isBiometricCredentialValid,
+} from '../services/biometricAuthService';
 
 const SESSION_DURATION   = 8 * 60 * 60 * 1000;  // 8 hours absolute limit
 const WARN_BEFORE_EXPIRY = 5 * 60 * 1000;        // warn 5 min before absolute expiry
@@ -52,6 +62,16 @@ interface AuthContextType {
   isLocked: boolean;
   /** Dismiss the lock screen (called after successful re-auth). */
   unlock: () => void;
+  /** Fingerprint unlock for an already-valid, backgrounded session — no server call. Returns whether it succeeded. */
+  unlockWithBiometric: () => Promise<boolean>;
+  /** Fingerprint sign-in after a real logout/expiry, using a stored, boundary-limited credential. */
+  loginWithBiometric: () => Promise<{ success: boolean; error?: string }>;
+  /** True right after a successful password login on a device that supports biometrics and has none enrolled yet. */
+  offerBiometricEnrollment: boolean;
+  /** Store the pending login's credential for future fingerprint sign-in. */
+  enrollBiometric: () => Promise<void>;
+  /** Decline the one-time enrollment offer without storing anything. */
+  dismissBiometricOffer: () => void;
   /** Superadmin: ID of the hospital workspace currently being viewed (null = own hospital). */
   viewingHospitalId: string | null;
   /** Superadmin: display name of the hospital being viewed. */
@@ -82,6 +102,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [viewingHospitalName, setViewingHospitalName] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const hiddenAtRef = React.useRef<number | null>(null);
+
+  const [offerBiometricEnrollment, setOfferBiometricEnrollment] = useState(false);
+  // Holds the just-issued refresh token + this login's sessionExpiry between
+  // the moment login() succeeds and the moment the user responds to the
+  // "enable fingerprint?" prompt (enrollBiometric() consumes this). Not
+  // React state — nothing needs to re-render when this changes.
+  const pendingBiometricEnrollmentRef = React.useRef<{ refreshToken: string; expiresAt: number; userId: string } | null>(null);
 
   // Workspace selection: persisted across page reloads but cleared on logout.
   const [selectedDepartment, setSelectedDepartmentState] = useState<string | null>(
@@ -127,10 +154,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [user, setUser] = useState<AuthUser | null>(() => {
     const saved = loadFromStorage<AuthUser>('session');
-    if (saved && saved.sessionExpiry > Date.now()) return saved;
+    if (isSessionValid(saved, Date.now())) return saved;
+    if (saved) {
+      // A session was found but had already expired by the time the app
+      // reopened — clean up fully, not just the local copy, so a
+      // lingering Supabase session (persistSession/autoRefreshToken are
+      // both on by default, see lib/supabase.ts) can't silently keep
+      // itself alive past this app's own 8-hour cutoff. Fire-and-forget,
+      // matching every other teardown path in this file (the timer-based
+      // expiry, inactivity logout, and explicit logout all do the same).
+      //
+      // Skipped specifically when the boot URL is a password-recovery
+      // link: Supabase's client saves the recovery session before firing
+      // PASSWORD_RECOVERY, and signOut() here would run after that save,
+      // revoking the just-established recovery session and breaking the
+      // reset flow for exactly the "had a stale expired session sitting
+      // around" case this cleanup targets. isRecoveryMode is computed
+      // synchronously above (its own useState initializer runs first),
+      // so it's safe to read directly here.
+      if (!isRecoveryMode) {
+        supabase.auth.signOut().catch(() => {});
+        clearBiometricCredential().catch(() => {});
+      }
+    }
     removeFromStorage('session');
     return null;
   });
+
+  // ─── Orphaned-credential deadline enforcement ────────────────────────────
+  // When the Inactivity Timeout effect below preserves a stored biometric
+  // credential instead of calling signOut(), the underlying Supabase session
+  // keeps running after `user` becomes null — and the "Session Expiry Timers"
+  // effect is keyed on [user], so it tears its own timers down the instant
+  // `user` is cleared and can never fire the real signOut() that soft logout
+  // was supposed to be bounded by. This ref-held timer is the actual bound:
+  // it schedules a full teardown for no later than the preserved credential's
+  // own expiresAt (== the original session's absolute deadline), independent
+  // of whatever `user` does in the meantime.
+  const orphanedCredentialTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const armOrphanedCredentialDeadline = useCallback((expiresAt: number) => {
+    if (orphanedCredentialTimerRef.current) clearTimeout(orphanedCredentialTimerRef.current);
+    const msRemaining = expiresAt - Date.now();
+    const sweep = () => {
+      supabase.auth.signOut().catch(() => {});
+      clearBiometricCredential().catch(() => {});
+      orphanedCredentialTimerRef.current = null;
+    };
+    if (msRemaining <= 0) {
+      sweep();
+    } else {
+      orphanedCredentialTimerRef.current = setTimeout(sweep, msRemaining);
+    }
+  }, []);
+
+  const disarmOrphanedCredentialDeadline = useCallback(() => {
+    if (orphanedCredentialTimerRef.current) {
+      clearTimeout(orphanedCredentialTimerRef.current);
+      orphanedCredentialTimerRef.current = null;
+    }
+  }, []);
+
+  // Boot-time sweep: covers the case where the app was closed during the
+  // "soft logged out, credential preserved" window and reopened either
+  // before the deadline (re-arms the same timer so the bound survives the
+  // reload) or after it (sweeps immediately). Skipped during a
+  // password-recovery flow for the same reason the boot-time signOut above
+  // is — sweeping would revoke the just-established recovery session.
+  useEffect(() => {
+    if (user) return;        // a live local session means this doesn't apply
+    if (isRecoveryMode) return;
+    loadBiometricCredential().then(credential => {
+      if (credential) armOrphanedCredentialDeadline(credential.expiresAt);
+    }).catch(() => {});
+    // Mount-only — specifically the "app just (re)opened with no local
+    // session" check. If a real session already exists at boot (the common
+    // case), the early return above means this effect registers no cleanup
+    // at all for this instance — fine, since nothing gets armed on that
+    // path either. The cleanup below only runs if AuthProvider itself
+    // unmounts (a full page reload/close) after this effect did arm
+    // something; the browser destroys all JS timers at that point anyway,
+    // so this is a defensive no-op, not something load-bearing.
+    return disarmOrphanedCredentialDeadline;
+
+  }, []);
 
   // ─── Profile refresh on every app open ───────────────────────────────────
   // localStorage session can be stale: unit/role/name may have changed while
@@ -189,6 +296,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const msUntilExpiry = user.sessionExpiry - Date.now();
     if (msUntilExpiry <= 0) {
+      // Same narrow race the initializer above now also covers (session
+      // was valid at initializer-time by a few ms, expired by the time
+      // this effect actually runs) — same fix, for the same reason,
+      // including the isRecoveryMode guard (see the initializer's comment).
+      if (!isRecoveryMode) {
+        supabase.auth.signOut().catch(() => {});
+        clearBiometricCredential().catch(() => {});
+      }
       setUser(null);
       removeFromStorage('session');
       return;
@@ -203,7 +318,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     timers.push(setTimeout(() => {
       toast.warning('Session expired. Please log in again.');
+      // This IS the absolute deadline, and it does the full teardown itself
+      // — no orphan sweep needs to remain armed behind it.
+      disarmOrphanedCredentialDeadline();
       supabase.auth.signOut().catch(() => {});
+      clearBiometricCredential().catch(() => {});
+      pendingBiometricEnrollmentRef.current = null;
+      setOfferBiometricEnrollment(false);
       setUser(null);
       removeFromStorage('session');
       window.location.hash = '#/dashboard';
@@ -231,11 +352,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }, warn);
       logoutTimer = setTimeout(() => {
         toast.warning(`Logged out after ${limitMinutes} minutes of inactivity.`);
-        supabase.auth.signOut().catch(() => {});
+        // Local teardown happens unconditionally: no protected UI renders
+        // and no app-level data fetching happens once `user` is null.
+        pendingBiometricEnrollmentRef.current = null;
+        setOfferBiometricEnrollment(false);
         setUser(null);
         removeFromStorage('session');
         clearDisclaimerAccepted();
         window.location.hash = '#/dashboard';
+
+        // Whether we ALSO sign out of Supabase depends on there being a
+        // stored biometric credential worth preserving.
+        //
+        // ANY scope of signOut() — including { scope: 'local' } — destroys
+        // the current session's refresh token server-side (`local` only
+        // limits which OTHER sessions are affected; no scope preserves this
+        // one). A credential's expiresAt is copied from this same session's
+        // sessionExpiry, so signing out here would kill the credential and
+        // the token behind it together — in exactly the case cold-start
+        // fingerprint re-login exists for. So when a credential exists this
+        // is a deliberately SOFT logout, and the deadline armed below is
+        // what bounds it: a real, full teardown fires no later than that
+        // credential's own expiresAt. (It has to be armed here rather than
+        // relying on the "Session Expiry Timers" effect, which is keyed on
+        // [user] and therefore cancels itself the moment setUser(null) above
+        // takes effect.)
+        //
+        // With no credential stored there is nothing to preserve and no
+        // future benefit, so this does the same full teardown every other
+        // path in this file does. Same on a storage read failure — fail safe.
+        loadBiometricCredential().then(credential => {
+          if (credential) {
+            armOrphanedCredentialDeadline(credential.expiresAt);
+          } else {
+            supabase.auth.signOut().catch(() => {});
+            clearBiometricCredential().catch(() => {});
+          }
+        }).catch(() => {
+          supabase.auth.signOut().catch(() => {});
+          clearBiometricCredential().catch(() => {});
+        });
       }, limit);
     };
 
@@ -280,6 +436,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const unlock = useCallback(() => setIsLocked(false), []);
 
+  // Lock-screen unlock via fingerprint — the session is already valid while
+  // locked, so unlike loginWithBiometric this never touches Supabase at
+  // all, exactly mirroring how the existing password-based verifyPassword
+  // path is really just a local "prove you're still you" gate.
+  const unlockWithBiometric = useCallback(async (): Promise<boolean> => {
+    if (!(await isBiometricAvailable())) return false;
+    const ok = await promptBiometric('Unlock MediWard');
+    if (ok) unlock();
+    return ok;
+  }, [unlock]);
+
+  const enrollBiometric = useCallback(async () => {
+    const pending = pendingBiometricEnrollmentRef.current;
+    if (pending) {
+      await storeBiometricCredential(pending.refreshToken, pending.expiresAt, pending.userId);
+      pendingBiometricEnrollmentRef.current = null;
+    }
+    setOfferBiometricEnrollment(false);
+  }, []);
+
+  const dismissBiometricOffer = useCallback(() => {
+    pendingBiometricEnrollmentRef.current = null;
+    setOfferBiometricEnrollment(false);
+  }, []);
+
   // ─── Live session sync — watch the logged-in user's app_users row ───
   // When an admin changes unit/role in TeamManagement, Supabase fires a realtime
   // UPDATE on app_users. We pick it up here and update the session immediately
@@ -312,13 +493,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ─── Supabase auth state listener (catches server-side token expiry / revocation) ───
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         // User clicked the password reset link in their email.
         // Surface the reset form instead of the login page.
         setIsRecoveryMode(true);
+      } else if (event === 'TOKEN_REFRESHED' && session?.refresh_token) {
+        // Supabase rotates the refresh token on every use, including its
+        // own background autoRefreshToken cycle (roughly hourly, since the
+        // JWT itself only lives 1h) — the token captured at enrollment time
+        // goes stale long before the stored credential's expiresAt (which
+        // can be up to 8h out). Keep the STORED token current as it
+        // rotates so a later biometric login always presents a live one.
+        // expiresAt is deliberately left untouched — the safety-critical
+        // session-boundary anchor must never move, only the token value.
+        //
+        // Gated on the refreshing session belonging to the SAME user who
+        // enrolled — without this, a credential left behind by a user
+        // whose session was externally signed out (not via this app's own
+        // logout, e.g. an admin force-logout) could silently get re-pointed
+        // at whichever different account logs in next on the same device.
+        loadBiometricCredential().then(existing => {
+          if (existing && session.user.id === existing.userId) {
+            storeBiometricCredential(session.refresh_token, existing.expiresAt, existing.userId).catch(() => {});
+          }
+        }).catch(() => {});
       } else if (event === 'SIGNED_OUT') {
         setIsRecoveryMode(false);
+        // Reset any unanswered enrollment offer and clear the stored
+        // credential — safe unconditionally here because, after the
+        // inactivity-timeout fix above, this event now only fires when the
+        // refresh token has genuinely already been destroyed (this file's
+        // own global signOut() calls at boot/8h-expiry/explicit logout, or
+        // a real external revocation). Closes a gap where an externally
+        // triggered SIGNED_OUT (e.g. an admin force-logout, which doesn't
+        // go through any of this file's own call sites) left a dangling
+        // enrollment offer for a subsequently-logged-in different user.
+        pendingBiometricEnrollmentRef.current = null;
+        setOfferBiometricEnrollment(false);
+        clearBiometricCredential().catch(() => {});
         // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
         // clear our local session too so the user is redirected to login.
         setUser(prev => {
@@ -358,14 +571,112 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hospitalId:    found.hospitalId,
         sessionExpiry: Date.now() + SESSION_DURATION,
       };
+      // A real session exists again, so the [user]-keyed timers take over —
+      // drop any orphaned-credential deadline left armed by a previous soft
+      // logout, or it could later sign out this fresh session.
+      disarmOrphanedCredentialDeadline();
       setUser(session);
       saveToStorage('session', session);
       logAuditEvent(session.id, session.name, 'LOGIN', 'session', session.id, `Login: ${email}`);
+
+      // Offer fingerprint sign-in once per fresh password login, if this
+      // device supports it and nothing is enrolled for it yet. The refresh
+      // token comes straight from this same signInWithPassword response —
+      // no extra Supabase call needed. expiresAt is deliberately the exact
+      // same session.sessionExpiry just computed above, not a separately
+      // derived value, so the stored credential's window can never drift
+      // from the real session's window.
+      if (authData.session?.refresh_token) {
+        const existingCredential = await loadBiometricCredential();
+        if (!isBiometricCredentialValid(existingCredential, Date.now()) && await isBiometricAvailable()) {
+          pendingBiometricEnrollmentRef.current = {
+            refreshToken: authData.session.refresh_token,
+            expiresAt: session.sessionExpiry,
+            userId: authData.user.id,
+          };
+          setOfferBiometricEnrollment(true);
+        }
+      }
+
       return { success: true };
     }
 
     // Supabase Auth failed — no legacy fallback.
     return { success: false, error: authError?.message ?? 'Invalid email or password.' };
+  }, []);
+
+  // Cold-start sign-in via fingerprint — no session currently exists (a
+  // real logout/expiry already happened). Gated by a stored refresh token
+  // whose expiresAt was captured from a real password login's own
+  // sessionExpiry (see login()'s enrollment step above) and is NEVER
+  // extended here — a successful fingerprint check re-establishes a
+  // Supabase session but the resulting AuthUser keeps the credential's
+  // original expiresAt, not Date.now() + SESSION_DURATION.
+  const loginWithBiometric = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    const credential = await loadBiometricCredential();
+    if (!isBiometricCredentialValid(credential, Date.now())) {
+      await clearBiometricCredential();
+      return { success: false, error: 'expired' };
+    }
+
+    if (!(await isBiometricAvailable())) return { success: false, error: 'unavailable' };
+    const ok = await promptBiometric('Sign in to MediWard');
+    if (!ok) return { success: false, error: 'cancelled' };
+
+    try {
+      // credential is narrowed to non-null here — isBiometricCredentialValid
+      // is a type predicate (see services/biometricAuthService.ts), so no `!`
+      // assertion is needed.
+      const { data, error } = await supabase.auth.refreshSession({ refresh_token: credential.refreshToken });
+      if (error || !data.session) {
+        const isNetworkBlip = isAuthRetryableFetchError(error);
+        if (!isNetworkBlip) {
+          // A real rejection (revoked, or genuinely past Supabase's own
+          // refresh-token lifetime), not a connectivity blip — this
+          // credential is dead, clear it so the fingerprint button stops
+          // being offered.
+          await clearBiometricCredential();
+        }
+        return { success: false, error: isNetworkBlip ? 'network' : 'Please log in again.' };
+      }
+
+      const email = data.session.user.email;
+      // Defence in depth alongside the TOKEN_REFRESHED identity gate: the
+      // refreshed session must belong to the same user that enrolled this
+      // credential, never a different account on the same device.
+      if (!email || data.session.user.id !== credential.userId) {
+        await clearBiometricCredential();
+        return { success: false, error: 'Please log in again.' };
+      }
+
+      const found = await findUserByEmail(email);
+      if (!found) return { success: false, error: 'User role not configured. Contact admin.' };
+
+      const session: AuthUser = {
+        id:            data.session.user.id,
+        email:         found.email,
+        name:          found.name,
+        role:          found.role,
+        ward:          found.ward,
+        unit:          found.unit,
+        hospitalId:    found.hospitalId,
+        sessionExpiry: credential.expiresAt, // anchored to the ORIGINAL login, never extended
+      };
+      // Same reasoning as login(): the [user]-keyed timers take over from
+      // here, so any armed orphan deadline must not survive to fire against
+      // this now-legitimate session.
+      disarmOrphanedCredentialDeadline();
+      setUser(session);
+      saveToStorage('session', session);
+      logAuditEvent(session.id, session.name, 'LOGIN', 'session', session.id, `Fingerprint login: ${email}`);
+      return { success: true };
+    } catch (err) {
+      // supabase.auth.refreshSession can reject (not just resolve with an
+      // error) on unexpected failures — turn that into a normal failure
+      // result instead of an unhandled promise rejection so the UI (Task 4)
+      // always gets a { success: false } it can render, never a crash.
+      return { success: false, error: err instanceof Error ? err.message : 'Please log in again.' };
+    }
   }, []);
 
   // ─── Verify password without extending session (lock screen re-auth) ───
@@ -386,7 +697,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logAuditEvent(user.id, user.name, 'LOGOUT', 'session', user.id, 'User logged out');
       clearPatientCache(user.hospitalId); // clear hospital-scoped cache so next user can't read it
     }
+    disarmOrphanedCredentialDeadline(); // this path signs out for real itself
     supabase.auth.signOut().catch(() => {});
+    clearBiometricCredential().catch(() => {});
+    pendingBiometricEnrollmentRef.current = null;
+    setOfferBiometricEnrollment(false);
     setUser(null);
     setIsLocked(false);
     removeFromStorage('session');
@@ -412,6 +727,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isRecoveryMode,
       isLocked,
       unlock,
+      unlockWithBiometric,
+      loginWithBiometric,
+      offerBiometricEnrollment,
+      enrollBiometric,
+      dismissBiometricOffer,
       viewingHospitalId,
       viewingHospitalName,
       setViewingHospital,

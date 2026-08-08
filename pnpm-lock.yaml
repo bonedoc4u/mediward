@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@aparajita/capacitor-biometric-auth':
+        specifier: ^9.0.0
+        version: 9.1.2
       '@capacitor/android':
         specifier: ^7.5.0
         version: 7.6.7(@capacitor/core@7.6.7)
@@ -200,6 +203,10 @@ packages:
 
   '@adobe/css-tools@4.5.0':
     resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
+
+  '@aparajita/capacitor-biometric-auth@9.1.2':
+    resolution: {integrity: sha512-cDcTFOQW4iI1+/AwkA0hRfiP53BuCSWvoxxkyp2NC7Hf0tNSg5fZ4zmXI/PcpLKUR7cd91TxnAxWYAAGJKOBig==}
+    engines: {node: '>=20.0.0'}
 
   '@apideck/better-ajv-errors@0.3.7':
     resolution: {integrity: sha512-TajUJwGWbDwkCx/CZi7tRE8PVB7simCvKJfHUsSdvps+aTM/PDPP4gkLmKnc+x3CE//y9i/nj74GqdL/hwk7Iw==}
@@ -4115,6 +4122,13 @@ snapshots:
   '@acemir/cssom@0.9.31': {}
 
   '@adobe/css-tools@4.5.0': {}
+
+  '@aparajita/capacitor-biometric-auth@9.1.2':
+    dependencies:
+      '@capacitor/android': 7.6.7(@capacitor/core@7.6.7)
+      '@capacitor/app': 7.1.2(@capacitor/core@7.6.7)
+      '@capacitor/core': 7.6.7
+      '@capacitor/ios': 7.6.7(@capacitor/core@7.6.7)
 
   '@apideck/better-ajv-errors@0.3.7(ajv@8.20.0)':
     dependencies:
