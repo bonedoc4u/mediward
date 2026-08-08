@@ -50,17 +50,22 @@
    `isRecoveryMode`.** Supabase saves the recovery session before firing
    `PASSWORD_RECOVERY`; an unguarded `signOut()` there would revoke it and
    break the password-reset flow.
-4. **Inactivity auto-logout does NOT call `supabase.auth.signOut()` —
-   the one deliberate exception among this file's teardown paths.** ANY
-   scope of `signOut()` (including `{ scope: 'local' }`) destroys the
-   current session's refresh token server-side, which would kill the stored
-   biometric credential in exactly the case cold-start re-login exists for.
-   This path clears only the app's own local session state. The 8 h
-   absolute timer still does a full real `signOut()` +
-   `clearBiometricCredential()`; that boundary is unchanged. See the spec's
-   Architecture section for the accepted trade-off, and
-   `__tests__/contexts/AuthContext.test.tsx` ("inactivity auto-logout is a
-   deliberately SOFT logout") for the regression test that pins it.
+4. **Inactivity auto-logout does NOT call `supabase.auth.signOut()` when a
+   biometric credential is stored — the one deliberate exception among this
+   file's teardown paths.** ANY scope of `signOut()` (including
+   `{ scope: 'local' }`) destroys the current session's refresh token
+   server-side, which would kill the stored credential in exactly the case
+   cold-start re-login exists for. With no credential stored the path does
+   the full teardown as before. See the spec's Architecture section for the
+   accepted trade-off.
+4b. **An orphaned-credential deadline (`orphanedCredentialTimerRef`) is what
+   bounds that soft logout — NOT the 8 h "Session Expiry Timers" effect.**
+   That effect is keyed on `[user]`, so `setUser(null)` cancels its own
+   timer; relying on it left the Supabase session live indefinitely. A
+   ref-held timer independent of `user` schedules the real teardown for the
+   credential's `expiresAt`, a mount-only boot check re-arms or sweeps after
+   a close/reopen, and `login()`/`loginWithBiometric()`/`logout()`/the
+   absolute-expiry timer disarm it. Five tests pin this.
 5. **The `SIGNED_OUT` handler clears the credential and resets the pending
    enrollment offer.** Safe unconditionally given (4), since the event now
    only fires when the refresh token is already destroyed.

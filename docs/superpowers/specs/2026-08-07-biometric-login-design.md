@@ -218,17 +218,50 @@ isolation:
   (`setUser(null)`, `removeFromStorage('session')`, disclaimer, pending
   enrollment offer) but leaves Supabase's client session and the stored
   credential alone.
+  **Gated on a credential actually existing.** The skip only applies when
+  `loadBiometricCredential()` returns something. A user who never enrolled
+  has nothing to preserve and gains nothing, so for them this path does the
+  same full `signOut()` + `clearBiometricCredential()` teardown as every
+  other path. A storage read failure fails safe the same way.
   **Accepted trade-off, explicitly approved:** the underlying
   Supabase-authenticated session stays genuinely live during the interval
   the app displays as "logged out, please sign in again". This is bounded
   because (a) all protected UI and data fetching is gated on the
   `user`/`isAuthenticated` React state, so nothing renders or queries
-  while `user` is null, and (b) the 8 h absolute timer — unchanged, and
-  still doing a full real `signOut()` + `clearBiometricCredential()` —
-  ultimately closes it, as does any explicit next login or logout.
-  A regression test (`__tests__/contexts/AuthContext.test.tsx`,
-  "inactivity auto-logout is a deliberately SOFT logout") pins this
-  behaviour in both directions.
+  while `user` is null, and (b) the orphaned-credential deadline described
+  next guarantees a real teardown by the original session's absolute
+  expiry — as does any explicit next login or logout before then.
+- **Orphaned-credential deadline enforcement (`orphanedCredentialTimerRef`)
+  — this is what actually bounds the soft logout.** The obvious assumption
+  is that the existing "Session Expiry Timers" effect provides that bound,
+  but it does not: it is `useEffect(..., [user])` with `if (!user) return`,
+  so the moment the soft logout calls `setUser(null)` its cleanup runs and
+  cancels the very 8 h timer that was supposed to force the eventual real
+  `signOut()`. Without a separate mechanism the Supabase session would stay
+  live indefinitely, and a reload would not recover it either — the
+  boot-time sweep keys off a stored `session`, which the inactivity path has
+  already removed. So the bound is a ref-held timer, independent of `user`:
+  - `armOrphanedCredentialDeadline(expiresAt)` schedules a full
+    `signOut()` + `clearBiometricCredential()` for the credential's own
+    `expiresAt` (== the original session's absolute deadline), or performs
+    it immediately if that instant has already passed. The inactivity path
+    calls it instead of signing out.
+  - A mount-only boot check covers the app being closed and reopened during
+    the soft-logout window: with no local session but a stored credential,
+    it re-arms the same deadline (reopened before it) or sweeps at once
+    (reopened after it). Skipped in `isRecoveryMode`, for the same reason
+    the boot-time `signOut()` is.
+  - `disarmOrphanedCredentialDeadline()` is called by `login()` and
+    `loginWithBiometric()` when a real session is re-established (the
+    `[user]`-keyed timers take over from there), and by `logout()` and the
+    absolute-expiry timer, which do their own full teardown. Without this,
+    a stale armed timer could later sign out a legitimately fresh session.
+
+  Five regression tests in `__tests__/contexts/AuthContext.test.tsx`
+  ("inactivity auto-logout is a deliberately SOFT logout" and
+  "orphaned-credential deadline survives the app being closed") pin all of
+  this: soft-at-first, torn-down-at-the-deadline, the no-credential gate,
+  boot-time re-arm vs immediate sweep, and the disarm-on-re-auth race.
 - **`SIGNED_OUT` handler**: because the inactivity path no longer emits it,
   `SIGNED_OUT` now only ever fires when the refresh token has genuinely
   already been destroyed (this file's own global `signOut()` calls at

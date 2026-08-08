@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 
 const mockSignOut = vi.hoisted(() => vi.fn().mockResolvedValue({ error: null }));
 const mockRefreshSession = vi.hoisted(() => vi.fn());
+const mockSignInWithPassword = vi.hoisted(() => vi.fn());
 // A real vi.fn() (not an inline anonymous one) so tests can reach into
 // .mock.calls to grab the callback AuthContext.tsx registers with it, and
 // invoke that callback directly to simulate a Supabase-emitted auth event
@@ -17,7 +18,7 @@ vi.mock('../../lib/supabase', () => ({
       signOut: mockSignOut,
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
       onAuthStateChange: mockOnAuthStateChange,
-      signInWithPassword: vi.fn(),
+      signInWithPassword: mockSignInWithPassword,
       refreshSession: mockRefreshSession,
     },
     channel: vi.fn().mockReturnValue({ on: vi.fn().mockReturnThis(), subscribe: vi.fn() }),
@@ -78,6 +79,7 @@ beforeEach(() => {
   mockSignOut.mockClear();
   mockClearBiometric.mockClear();
   mockRefreshSession.mockReset();
+  mockSignInWithPassword.mockReset();
   mockLoadBiometricCredential.mockReset().mockResolvedValue(null);
   mockStoreBiometricCredential.mockReset().mockResolvedValue(undefined);
   mockIsBiometricAvailable.mockReset().mockResolvedValue(false);
@@ -179,28 +181,36 @@ describe('inactivity auto-logout is a deliberately SOFT logout', () => {
     vi.useRealTimers();
   });
 
-  it('clears the local session but does NOT call signOut() or clearBiometricCredential()', async () => {
-    vi.useFakeTimers();
-
-    const valid = {
+  // Boots a valid 'resident' session (4 h inactivity limit) whose absolute
+  // expiry is 8 h out, so the ABSOLUTE-expiry timer cannot be what fires
+  // during the inactivity window.
+  function bootValidResidentSession(absoluteExpiry: number) {
+    localStorage.setItem('mediward_session', JSON.stringify({
       version: 1,
       timestamp: new Date().toISOString(),
       data: {
         id: 'u1', email: 'doc@hospital.com', name: 'Dr. Test',
         role: 'resident', hospitalId: 'h1',
-        // 8 h out, so the ABSOLUTE-expiry timer (which legitimately does a
-        // full signOut) cannot be what fires during this test.
-        sessionExpiry: Date.now() + 8 * 60 * 60 * 1000,
+        sessionExpiry: absoluteExpiry,
       },
-    };
-    localStorage.setItem('mediward_session', JSON.stringify(valid));
-
-    const { result } = renderHook(() => useAuth(), {
+    }));
+    return renderHook(() => useAuth(), {
       wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
     });
+  }
+
+  it('with a credential stored: clears the local session but does NOT call signOut() or clearBiometricCredential()', async () => {
+    vi.useFakeTimers();
+    const absoluteExpiry = Date.now() + 8 * 60 * 60 * 1000;
+    // A credential's expiresAt is always copied from the same session's
+    // sessionExpiry — that invariant is what makes signOut() here fatal.
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'tok', expiresAt: absoluteExpiry, userId: 'u1',
+    });
+
+    const { result } = bootValidResidentSession(absoluteExpiry);
     expect(result.current.user).not.toBeNull();
 
-    // 'resident' gets a 4-hour inactivity limit (getInactivityLimits).
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000 + 1_000);
     });
@@ -213,6 +223,52 @@ describe('inactivity auto-logout is a deliberately SOFT logout', () => {
     // ...but the Supabase session and the stored credential are left alive.
     expect(mockSignOut).not.toHaveBeenCalled();
     expect(mockClearBiometric).not.toHaveBeenCalled();
+  });
+
+  it('with a credential stored: the preserved session is still torn down for real at the credential\'s expiresAt', async () => {
+    // The bound the soft logout depends on. The "Session Expiry Timers"
+    // effect is keyed on [user], so it cancels itself the instant the soft
+    // logout nulls `user` — an independent, ref-held deadline has to carry
+    // the absolute boundary from there. Without it the Supabase session
+    // would stay live indefinitely.
+    vi.useFakeTimers();
+    const absoluteExpiry = Date.now() + 8 * 60 * 60 * 1000;
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'tok', expiresAt: absoluteExpiry, userId: 'u1',
+    });
+
+    const { result } = bootValidResidentSession(absoluteExpiry);
+
+    // 4 h: inactivity soft logout fires, `user` becomes null, nothing signed out.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000 + 1_000);
+    });
+    expect(result.current.user).toBeNull();
+    expect(mockSignOut).not.toHaveBeenCalled();
+
+    // Another 4 h, i.e. past the ORIGINAL 8 h absolute deadline, with `user`
+    // null the whole way. The real teardown must still happen.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000);
+    });
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockClearBiometric).toHaveBeenCalled();
+  });
+
+  it('with NO credential stored: does the full signOut() teardown like every other path', async () => {
+    // Nothing to preserve and no future benefit — skipping signOut() for a
+    // user who never enrolled would just orphan a live session for nothing.
+    vi.useFakeTimers();
+    mockLoadBiometricCredential.mockResolvedValue(null);
+
+    const { result } = bootValidResidentSession(Date.now() + 8 * 60 * 60 * 1000);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000 + 1_000);
+    });
+
+    expect(result.current.user).toBeNull();
+    expect(mockSignOut).toHaveBeenCalled();
   });
 
   it('still does a full signOut() + credential clear when the 8h ABSOLUTE limit fires', async () => {
@@ -242,6 +298,87 @@ describe('inactivity auto-logout is a deliberately SOFT logout', () => {
 
     expect(mockSignOut).toHaveBeenCalled();
     expect(mockClearBiometric).toHaveBeenCalled();
+  });
+});
+
+describe('orphaned-credential deadline survives the app being closed', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('sweeps immediately on boot when no local session exists and the credential is already past its deadline', async () => {
+    // The app was closed during the "soft logged out, credential preserved"
+    // window and reopened after the original absolute deadline. Nothing is
+    // left to re-arm a timer from — the boot check has to do the teardown.
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'tok', expiresAt: Date.now() - 1_000, userId: 'u1',
+    });
+    // No 'mediward_session' in localStorage: the inactivity path removed it,
+    // so the existing boot-time expired-session sweep can't cover this.
+    expect(localStorage.getItem('mediward_session')).toBeNull();
+
+    renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    // Only a microtask flush — the sweep must be immediate, not scheduled.
+    await act(async () => {});
+
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockClearBiometric).toHaveBeenCalled();
+  });
+
+  it('re-arms (does not sweep) when reopened BEFORE the deadline, then sweeps when it arrives', async () => {
+    vi.useFakeTimers();
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'tok', expiresAt: Date.now() + 60_000, userId: 'u1',
+    });
+
+    renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(59_000); });
+    expect(mockSignOut).not.toHaveBeenCalled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(mockClearBiometric).toHaveBeenCalled();
+  });
+
+  it('is disarmed by a fresh password login, so a stale timer cannot sign out the new session', async () => {
+    // The race this guards: an armed deadline from a previous soft logout
+    // firing against a legitimate, newly-authenticated session. A password
+    // login mints a fresh 8h window, well past the old 60s deadline, so the
+    // two are cleanly distinguishable here.
+    vi.useFakeTimers();
+    mockLoadBiometricCredential.mockResolvedValue({
+      refreshToken: 'tok', expiresAt: Date.now() + 60_000, userId: 'u1',
+    });
+
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    await act(async () => {}); // let the boot check arm the deadline
+
+    mockSignInWithPassword.mockResolvedValue({
+      data: { user: { id: 'u1' }, session: { refresh_token: 'fresh-token' } },
+      error: null,
+    });
+    mockFindUserByEmail.mockResolvedValue({
+      id: 'u1', email: 'doc@hospital.com', name: 'Dr. Test', role: 'resident', hospitalId: 'h1',
+    });
+
+    await act(async () => {
+      await result.current.login('doc@hospital.com', 'correct-horse');
+    });
+    expect(result.current.user).not.toBeNull();
+
+    // Past the OLD deadline, nowhere near the new session's 8h window.
+    await act(async () => { await vi.advanceTimersByTimeAsync(90_000); });
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(result.current.user).not.toBeNull();
   });
 });
 
