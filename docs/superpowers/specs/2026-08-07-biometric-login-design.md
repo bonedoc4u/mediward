@@ -112,18 +112,29 @@ biometric-specific logic, kept separate from `AuthContext.tsx` specifically
 so the boundary-anchoring math and storage round-trip are unit-testable in
 isolation:
 - `isBiometricAvailable(): Promise<boolean>` — wraps the plugin's
-  availability check.
+  availability check. **As shipped, this requires STRONG biometry**
+  (`checkBiometry().strongBiometryIsAvailable`, i.e. Android Class 3), not
+  the plugin's weaker `isAvailable` field, which is true for weak-or-better.
+  Android's weak tier can include camera-based face unlock that isn't
+  suitable for gating PHI. iOS only has strong biometry, so the two fields
+  are always identical there and this is Android-only in effect.
 - `promptBiometric(reason: string): Promise<boolean>` — wraps the actual
   native prompt, resolves `true`/`false` (never throws for a normal
   cancel/fail — only for a genuine plugin/platform error, which callers
-  treat the same as `false`).
-- `storeBiometricCredential(refreshToken: string, expiresAt: number): Promise<void>`
-  and `loadBiometricCredential(): Promise<{ refreshToken: string; expiresAt: number } | null>`
+  treat the same as `false`). Passes
+  `androidBiometryStrength: AndroidBiometryStrength.strong` explicitly, for
+  the same reason — the plugin's own default is `weak`.
+- `storeBiometricCredential(refreshToken: string, expiresAt: number, userId: string): Promise<void>`
+  and `loadBiometricCredential(): Promise<{ refreshToken: string; expiresAt: number; userId: string } | null>`
   and `clearBiometricCredential(): Promise<void>` — read/write/clear a
-  small object (`{ refreshToken, expiresAt }`) via `@capacitor/preferences`
-  under its own key (`mediward_biometric_credential`), following the exact
-  persistence pattern `services/persistence.ts` already uses for
-  `mediward_session`.
+  small object (`{ refreshToken, expiresAt, userId }`) via
+  `@capacitor/preferences` under its own key
+  (`mediward_biometric_credential`), following the exact persistence pattern
+  `services/persistence.ts` already uses for `mediward_session`. `userId` is
+  the Supabase user id that enrolled the credential; it exists so the
+  credential can never silently get re-pointed at, or used to sign in as, a
+  different account on the same device (see the `TOKEN_REFRESHED` handler
+  and `loginWithBiometric`'s identity re-check below).
 - `isBiometricCredentialValid(credential: { expiresAt: number } | null, now: number): boolean`
   — the pure boundary check: `credential !== null && credential.expiresAt > now`.
   This is the one piece of logic that MUST be correct (it's what prevents
@@ -154,7 +165,11 @@ isolation:
   runs (`findUserByEmail` using `session.user.email` from the refreshed
   session, build the `AuthUser` object with `sessionExpiry` still anchored
   to the ORIGINAL stored `expiresAt` — not a fresh 8-hour window from now
-  — `setUser`, `saveToStorage`, audit log). On a Supabase-side failure
+  — `setUser`, `saveToStorage`, audit log). Before building that
+  `AuthUser`, the refreshed session's `user.id` is re-checked against the
+  credential's own `userId`; a mismatch clears the credential and fails
+  with `'Please log in again.'` (defence in depth alongside the
+  `TOKEN_REFRESHED` gate below). On a Supabase-side failure
   (refresh token revoked/invalid), clears the stored credential and falls
   back to `{ success: false, error: 'Please log in again.' }`. On a network
   failure specifically (distinguishable from an auth rejection), returns
@@ -167,14 +182,62 @@ isolation:
   directly (no Supabase call needed at all, matching how `verifyPassword`'s
   password check today is really just a local "prove you're still you"
   gate, not a session-refresh).
+- **Refresh-token rotation (`TOKEN_REFRESHED`)**: Supabase rotates the
+  refresh token on every use, including its own background
+  `autoRefreshToken` cycle (roughly hourly, since the JWT itself only lives
+  1 h). The token captured at enrollment therefore goes stale long before
+  the stored credential's `expiresAt`, which can be up to 8 h out — without
+  this handler the whole cold-start flow would break within about an hour.
+  `onAuthStateChange`'s `TOKEN_REFRESHED` branch re-stores the credential
+  with the NEW token, keeping `expiresAt` byte-for-byte identical (the
+  safety-critical boundary anchor must never move, only the token value),
+  and only when `session.user.id` matches the credential's `userId`.
 - **Boot-time gap fix**: the `useState` initializer (lines 128-133) and its
   effect mirror (lines 187-195) both currently discard an expired local
   session without calling `supabase.auth.signOut()`. Both now also call
   `supabase.auth.signOut().catch(() => {})`, matching the pattern the
-  timer-based expiry, inactivity logout, and explicit logout paths already
-  use. `clearBiometricCredential()` is also called here — a session that's
+  timer-based expiry and explicit logout paths already use.
+  `clearBiometricCredential()` is also called here — a session that's
   aged out at boot means any stored biometric credential for it is stale
   too (its `expiresAt` was anchored to that same lapsed session).
+  **Both are guarded by `isRecoveryMode`**: Supabase's client saves the
+  recovery session before firing `PASSWORD_RECOVERY`, so an unguarded
+  `signOut()` here would revoke the just-established recovery session and
+  break password reset for exactly the "stale expired session sitting
+  around" case this cleanup targets.
+- **Inactivity auto-logout is the one deliberate exception — it does NOT
+  call `supabase.auth.signOut()`.** ANY scope of `signOut()`, including
+  `{ scope: 'local' }`, destroys the CURRENT session's refresh token
+  server-side (`local` only limits which OTHER sessions are affected;
+  there is no scope that preserves this one). Since a stored credential's
+  `expiresAt` is always copied from the same session's `sessionExpiry`, a
+  `signOut()` here would kill the credential and the token behind it
+  together — in precisely the case cold-start biometric re-login exists
+  for (an inactivity logout partway through the 8 h window). So this path
+  is a deliberately SOFT logout: it clears this app's own session state
+  (`setUser(null)`, `removeFromStorage('session')`, disclaimer, pending
+  enrollment offer) but leaves Supabase's client session and the stored
+  credential alone.
+  **Accepted trade-off, explicitly approved:** the underlying
+  Supabase-authenticated session stays genuinely live during the interval
+  the app displays as "logged out, please sign in again". This is bounded
+  because (a) all protected UI and data fetching is gated on the
+  `user`/`isAuthenticated` React state, so nothing renders or queries
+  while `user` is null, and (b) the 8 h absolute timer — unchanged, and
+  still doing a full real `signOut()` + `clearBiometricCredential()` —
+  ultimately closes it, as does any explicit next login or logout.
+  A regression test (`__tests__/contexts/AuthContext.test.tsx`,
+  "inactivity auto-logout is a deliberately SOFT logout") pins this
+  behaviour in both directions.
+- **`SIGNED_OUT` handler**: because the inactivity path no longer emits it,
+  `SIGNED_OUT` now only ever fires when the refresh token has genuinely
+  already been destroyed (this file's own global `signOut()` calls at
+  boot / 8 h expiry / explicit logout, or a real external revocation such
+  as an admin force-logout). It therefore unconditionally resets the
+  pending enrollment offer and clears the stored credential, in addition to
+  clearing the local session — closing a gap where an externally triggered
+  sign-out left a dangling "Enable Fingerprint Sign-In?" offer for a
+  subsequently-logged-in different user.
 - `logout()` (lines 384-403): add `clearBiometricCredential()` alongside
   its existing cleanup — logging out always removes the device's stored
   credential, regardless of whether its own `expiresAt` has technically
@@ -249,10 +312,18 @@ isolation:
   sees the normal password/email form with no special messaging — this is
   the expected "your fast-login window ran out, log in properly" case.
 - Network failure specifically during `refreshSession()`: distinguished
-  from an auth rejection (Supabase's client surfaces network errors
-  differently from 4xx auth errors) — credential is NOT cleared, user sees
-  a plain "Couldn't reach the server — check your connection" message and
-  can retry the fingerprint button or fall back to password immediately.
+  from an auth rejection (via `isAuthRetryableFetchError` from
+  `@supabase/supabase-js`) — credential is NOT cleared, user sees a plain
+  "Couldn't reach the server — check your connection and try again."
+  message and can retry the fingerprint button or fall back to password
+  immediately.
+- Any other real rejection (notably `'User role not configured. Contact
+  admin.'`, which the password path already surfaces for the same
+  underlying condition): shown verbatim, credential left untouched.
+  `LoginPage.handleBiometricLogin` switches on `loginWithBiometric`'s
+  error string rather than collapsing every failure into "hide the button",
+  so the credential-cleared cases (`'expired'`, `'Please log in again.'`)
+  hide the fingerprint button while the retryable ones do not.
 
 ## Testing
 

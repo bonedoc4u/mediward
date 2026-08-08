@@ -57,6 +57,10 @@ import LegalPage from './components/LegalPage';
 // ─── Lock Screen ─────────────────────────────────────────────────────────────
 // Shown when the tab/device is hidden for >60 s. Requires password re-entry
 // so the next person who picks up a shared tablet cannot see PHI.
+// The fingerprint auto-prompt below fires unconditionally, personal phone or
+// shared device: it's purely local (no server call, no session extension) and
+// always falls back to the password field, so it doesn't weaken the
+// shared-device protection this comment describes.
 const LockScreen: React.FC<{
   userName: string;
   onUnlock: (password: string) => Promise<{ success: boolean; error?: string }>;

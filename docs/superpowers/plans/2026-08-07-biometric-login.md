@@ -22,6 +22,71 @@
 
 ---
 
+## As-shipped deviations from this plan
+
+> Added after the final whole-branch review. The task bodies below are the
+> plan as written; these are the places where the implementation, review
+> rounds, and the final fix round deliberately went further or differently.
+> Where the two disagree, this section is what actually shipped. The full
+> design rationale lives in
+> `docs/superpowers/specs/2026-08-07-biometric-login-design.md`.
+
+1. **`BiometricCredential` gained a `userId` field.** The shape is
+   `{ refreshToken: string; expiresAt: number; userId: string }`, and
+   `storeBiometricCredential(refreshToken, expiresAt, userId)` takes the
+   third argument. It's the Supabase user id that enrolled the credential,
+   so it can never be re-pointed at — or used to sign in as — a different
+   account on the same device.
+2. **A `TOKEN_REFRESHED` rotation handler was added** to
+   `onAuthStateChange` in `AuthContext.tsx` (not in this plan at all).
+   Supabase rotates the refresh token on every use, including its own
+   ~hourly background `autoRefreshToken` cycle, so the token captured at
+   enrollment goes stale long before the credential's `expiresAt` — without
+   this, cold-start biometric login would break within about an hour. The
+   handler re-stores the credential with the new token, keeps `expiresAt`
+   unchanged, and only fires when `session.user.id` matches the
+   credential's `userId`.
+3. **Both boot-time `signOut()` calls (Task 2) are guarded by
+   `isRecoveryMode`.** Supabase saves the recovery session before firing
+   `PASSWORD_RECOVERY`; an unguarded `signOut()` there would revoke it and
+   break the password-reset flow.
+4. **Inactivity auto-logout does NOT call `supabase.auth.signOut()` —
+   the one deliberate exception among this file's teardown paths.** ANY
+   scope of `signOut()` (including `{ scope: 'local' }`) destroys the
+   current session's refresh token server-side, which would kill the stored
+   biometric credential in exactly the case cold-start re-login exists for.
+   This path clears only the app's own local session state. The 8 h
+   absolute timer still does a full real `signOut()` +
+   `clearBiometricCredential()`; that boundary is unchanged. See the spec's
+   Architecture section for the accepted trade-off, and
+   `__tests__/contexts/AuthContext.test.tsx` ("inactivity auto-logout is a
+   deliberately SOFT logout") for the regression test that pins it.
+5. **The `SIGNED_OUT` handler clears the credential and resets the pending
+   enrollment offer.** Safe unconditionally given (4), since the event now
+   only fires when the refresh token is already destroyed.
+6. **`loginWithBiometric` re-checks identity after `refreshSession`** —
+   `data.session.user.id !== credential.userId` clears the credential and
+   fails with `'Please log in again.'`. It also wraps `refreshSession` in
+   `try/catch` (it can reject, not just resolve with an `error`).
+7. **`isBiometricAvailable()` requires STRONG biometry**
+   (`checkBiometry().strongBiometryIsAvailable`, Android Class 3), and
+   `promptBiometric()` passes
+   `androidBiometryStrength: AndroidBiometryStrength.strong` — the plugin
+   defaults to `weak`, which on Android can mean camera-based face unlock.
+   No effect on iOS, which only has strong biometry.
+8. **`LoginPage.handleBiometricLogin` switches on the error string** rather
+   than collapsing every failure into `setShowBiometricButton(false)`, so
+   retryable failures (`'network'`, `'cancelled'`, `'unavailable'`) keep the
+   button and surface a message where one is actionable.
+9. **The enrollment prompt lives in its own component file**
+   (`components/BiometricEnrollmentOffer.tsx`), rendered from `App.tsx`, not
+   inline in `LoginPage.tsx` — Task 4 Step 5's open question, resolved that
+   way because `LoginPage` unmounts the moment login succeeds.
+10. **Manual on-device verification (Task 4 Step 7) has still not been
+    performed** — it requires real biometric hardware.
+
+---
+
 ### Task 1: `services/biometricAuthService.ts` — plugin wrapper + credential storage
 
 **Files:**
