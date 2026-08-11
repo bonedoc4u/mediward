@@ -214,7 +214,7 @@ const RoundMode: React.FC = () => {
   // ─── Add new todo ───
   const handleAddTodo = useCallback(() => {
     if (!patient || !newTodoText.trim()) return;
-    const newTodo: ToDoItem = { id: generateId(), task: newTodoText.trim(), isDone: false };
+    const newTodo: ToDoItem = { id: generateId(), task: newTodoText.trim(), isDone: false, addedDate: todayYmd() };
     const updatedPatient: Patient = { ...patient, todos: [...patient.todos, newTodo] };
     updatePatient(updatedPatient);
     setNewTodoText('');
@@ -225,7 +225,7 @@ const RoundMode: React.FC = () => {
   const handleQuickAdd = useCallback((task: string) => {
     if (!patient) return;
     if (patient.todos.some(t => t.task === task)) return; // already exists
-    const newTodo: ToDoItem = { id: generateId(), task, isDone: false };
+    const newTodo: ToDoItem = { id: generateId(), task, isDone: false, addedDate: todayYmd() };
     updatePatient({ ...patient, todos: [...patient.todos, newTodo] });
   }, [patient, updatePatient]);
 

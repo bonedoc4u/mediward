@@ -206,9 +206,10 @@ function rowToPatient(row: PatientRow): Patient {
     todos: Array.isArray(row.todos)
       ? (row.todos as unknown as Record<string, unknown>[])
           .map(t => ({
-            id:     String(t.id     ?? ''),
-            task:   String(t.task   ?? t.text ?? ''),
-            isDone: Boolean(t.isDone ?? false),
+            id:        String(t.id     ?? ''),
+            task:      String(t.task   ?? t.text ?? ''),
+            isDone:    Boolean(t.isDone ?? false),
+            addedDate: typeof t.addedDate === 'string' ? t.addedDate : undefined,
           }))
           .filter(t => t.task.trim() !== '')
       : [],
