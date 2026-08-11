@@ -5,13 +5,11 @@ import { getStatusColor, sortByBed, groupByWard } from '../utils/calculations';
 
 /** Show only the bed suffix, e.g. "24-01" → "01", "1A" → "1A" */
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
-
-/** "2026-08-04" → "04-08" — pure string slicing, no Date parsing (see utils/dates.ts). */
-const shortDate = (ymd: string) => ymd.slice(5).split('-').reverse().join('-');
 import { generateId } from '../utils/sanitize';
 import { CheckSquare, Plus, Trash2, Calendar, Share2, FileDown, ChevronLeft, ChevronRight, Lock, Layout, HeartPulse } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { localYmd, todayYmd } from '../utils/dates';
+import { carryOverLabel } from '../utils/todoCarryOver';
 
 interface Props {
   patients: Patient[];
@@ -158,11 +156,9 @@ const PatientRoundCard = memo(({
                   <span className={`text-sm ${todo.isDone ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
                     {todo.task}
                   </span>
-                  {/* Carried-over marker — never hides the item, just flags it's not
-                      freshly ordered on the day being viewed (see types.ts ToDoItem.addedDate). */}
-                  {todo.addedDate && todo.addedDate !== selectedDate && !todo.isDone && (
+                  {carryOverLabel(todo, selectedDate) && (
                     <span className="text-[10px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded font-medium shrink-0">
-                      since {shortDate(todo.addedDate)}
+                      {carryOverLabel(todo, selectedDate)}
                     </span>
                   )}
                 </div>
