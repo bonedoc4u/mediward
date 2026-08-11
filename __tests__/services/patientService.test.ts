@@ -252,6 +252,26 @@ describe('fractures mapping', () => {
   });
 });
 
+describe('todos mapping', () => {
+  it('preserves addedDate on read, so carried-over items stay flagged after a reload', async () => {
+    // Regression: rowToPatient's todos mapping used to allowlist only
+    // id/task/isDone, silently stripping any other field on every fetch —
+    // addedDate (used to badge stale todos in DailyRounds/RoundMode) would
+    // vanish the instant the app reloaded from Supabase.
+    const todos = [{ id: 't1', task: 'C & D', isDone: false, addedDate: '2026-08-04' }];
+    mockState.result = { data: [makeRow({ todos })], error: null };
+    const patients = await fetchActivePatients();
+    expect(patients[0].todos[0].addedDate).toBe('2026-08-04');
+  });
+
+  it('leaves addedDate undefined for legacy todos that never had it', async () => {
+    const todos = [{ id: 't1', task: 'Old task', isDone: false }];
+    mockState.result = { data: [makeRow({ todos })], error: null };
+    const patients = await fetchActivePatients();
+    expect(patients[0].todos[0].addedDate).toBeUndefined();
+  });
+});
+
 // ─── fetchAllPatients ─────────────────────────────────────────────────────────
 
 describe('fetchAllPatients', () => {

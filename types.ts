@@ -392,6 +392,11 @@ export interface ToDoItem {
   id: string;
   task: string;
   isDone: boolean;
+  /** YYYY-MM-DD the item was first added. Optional — legacy items predate this
+   *  field and have no recoverable creation date. Used to badge carried-over
+   *  items in the daily rounds view (never to hide them — an open order must
+   *  stay visible until it's actually done). */
+  addedDate?: string;
 }
 
 export interface PacChecklistItem {
