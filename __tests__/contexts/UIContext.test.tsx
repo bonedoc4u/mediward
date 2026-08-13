@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIProvider, useUI } from '../../contexts/UIContext';
 import { ViewMode } from '../../types';
 
@@ -25,37 +25,103 @@ function NavProbe({ view }: { view: ViewMode }) {
   return <button onClick={() => navigateTo(view)}>go</button>;
 }
 
-function renderNav(view: ViewMode) {
-  render(
-    <UIProvider>
-      <NavProbe view={view} />
-    </UIProvider>,
-  );
-  fireEvent.click(screen.getByText('go'));
-}
+const originalHash = window.location.hash;
 
-describe('UIContext navigateTo — full patient list loading', () => {
+describe('UIContext — full patient list loading', () => {
   beforeEach(() => {
     loadAllPatients.mockClear();
   });
 
-  it('loads all patients (including discharged) when entering Admission List', () => {
-    renderNav('admissions');
-    expect(loadAllPatients).toHaveBeenCalled();
+  afterEach(() => {
+    // currentView's initializer reads window.location.hash directly, so a
+    // hash left over from one test would leak into the next test's mount.
+    window.location.hash = originalHash;
   });
 
-  it('loads all patients when entering Master List', () => {
-    renderNav('master');
-    expect(loadAllPatients).toHaveBeenCalled();
+  describe('on direct landing (mount, no navigation)', () => {
+    // currentView's useState initializer reads window.location.hash before
+    // navigateTo is ever called — the common case of opening the app
+    // straight to a view, or reloading while already on it. Setting the
+    // hash before render simulates landing directly on that view.
+    function renderLanding(view: ViewMode) {
+      window.location.hash = `#/${view}`;
+      render(<UIProvider><div /></UIProvider>);
+    }
+
+    it('loads all patients when landing directly on the dashboard', () => {
+      renderLanding('dashboard');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when landing directly on Pending List', () => {
+      renderLanding('pending');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when landing directly on Went Home', () => {
+      renderLanding('wenthome');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('does NOT load all patients when landing on a non-list view', () => {
+      renderLanding('rounds');
+      expect(loadAllPatients).not.toHaveBeenCalled();
+    });
   });
 
-  it('loads all patients when entering Discharge', () => {
-    renderNav('discharge');
-    expect(loadAllPatients).toHaveBeenCalled();
-  });
+  describe('via navigateTo', () => {
+    // Start from a view outside needsFullPatientList so the mount-time
+    // effect above doesn't also fire and confound the navigateTo-specific
+    // assertion below.
+    function renderNav(view: ViewMode) {
+      window.location.hash = '#/rounds';
+      render(
+        <UIProvider>
+          <NavProbe view={view} />
+        </UIProvider>,
+      );
+      loadAllPatients.mockClear(); // discard any mount-time call before the click under test
+      fireEvent.click(screen.getByText('go'));
+    }
 
-  it('does not load all patients when entering the dashboard', () => {
-    renderNav('dashboard');
-    expect(loadAllPatients).not.toHaveBeenCalled();
+    it('loads all patients (including discharged) when entering Admission List', () => {
+      renderNav('admissions');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when entering Master List', () => {
+      renderNav('master');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when entering Discharge', () => {
+      renderNav('discharge');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when navigating to the dashboard', () => {
+      // Regression: a paginated first page silently hid active patients from
+      // their own ward's tab once a hospital passed the page size — a fully
+      // active inpatient (not discharged, not gone home) could sit just past
+      // the "50 most recently created" cutoff and vanish from the dashboard
+      // while still showing correctly in Master List.
+      renderNav('dashboard');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when navigating to Pending List', () => {
+      renderNav('pending');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when navigating to Went Home', () => {
+      renderNav('wenthome');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('does NOT load all patients when navigating to a non-list view', () => {
+      renderNav('labs');
+      expect(loadAllPatients).not.toHaveBeenCalled();
+    });
   });
 });
