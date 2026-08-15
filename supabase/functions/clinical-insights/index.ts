@@ -180,8 +180,24 @@ async function checkRateLimit(userId: string): Promise<{ allowed: boolean; remai
   }
 }
 
-/** Write AI usage to audit_log table for compliance. */
-async function logAiAudit(userId: string, hospitalId: string | null, patientCount: number, alertCount: number): Promise<void> {
+/**
+ * Write AI usage to audit_log table for compliance.
+ *
+ * audit_log has no dedicated AI action type — chk_audit_action only allows
+ * CREATE/UPDATE/DELETE/LOGIN/LOGOUT/VIEW/EXPORT, and this project's
+ * convention (see rename_patient_ip_no's own audit fix) is to remap onto an
+ * existing action rather than grow the CHECK constraint per feature. 'VIEW'
+ * is the closest fit — the AI reads/processes patient data to generate
+ * insights, it doesn't create/change/export anything. The distinction from a
+ * human chart view is preserved in `details`, not the action column.
+ *
+ * Previously this insert used entity_type (the table's column is `entity`)
+ * and action 'AI_CLINICAL_INSIGHTS' (not in chk_audit_action) — both
+ * constraint/schema mismatches, silently swallowed by the caller's
+ * try/catch, so AI usage was never actually logged despite this function's
+ * own doc comment saying it would be.
+ */
+async function logAiAudit(userId: string, userName: string, hospitalId: string | null, patientCount: number, alertCount: number): Promise<void> {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -190,11 +206,12 @@ async function logAiAudit(userId: string, hospitalId: string | null, patientCoun
     const sb = createClient(supabaseUrl, serviceKey);
     await sb.from('audit_log').insert({
       user_id:     userId,
+      user_name:   userName,
       hospital_id: hospitalId,
-      action:      'AI_CLINICAL_INSIGHTS',
-      entity_type: 'ai_request',
+      action:      'VIEW',
+      entity:      'ai_clinical_insights',
       entity_id:   userId,
-      details:     `Analysed ${patientCount} patients, generated ${alertCount} alerts`,
+      details:     `AI Clinical Insights: analysed ${patientCount} patients, generated ${alertCount} alerts`,
     });
   } catch {
     // Non-blocking — audit failure must not break the clinical response
@@ -217,6 +234,7 @@ serve(async (req: Request) => {
   try {
     // ─── Extract user from JWT for rate limiting and audit ───
     let userId = 'anonymous';
+    let userName = 'anonymous';
     let hospitalId: string | null = null;
     const authHeader = req.headers.get('authorization') ?? '';
 
@@ -243,10 +261,11 @@ serve(async (req: Request) => {
         userId = user.id;
         const { data: appUser } = await sb
           .from('app_users')
-          .select('hospital_id')
+          .select('hospital_id, name')
           .eq('id', user.id)
           .maybeSingle();
         hospitalId = appUser?.hospital_id ?? null;
+        userName = appUser?.name ?? 'unknown';
       }
     } catch {
       return new Response(JSON.stringify({ error: 'Authentication failed' }), {
@@ -334,7 +353,7 @@ serve(async (req: Request) => {
     }
 
     // ─── Audit log (non-blocking) ───
-    logAiAudit(userId, hospitalId, body.patients.length, alerts.length);
+    logAiAudit(userId, userName, hospitalId, body.patients.length, alerts.length);
 
     return new Response(JSON.stringify({ alerts }), {
       status: 200,
