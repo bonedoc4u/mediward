@@ -22,6 +22,7 @@ import StickyPatientHeader from './patient/StickyPatientHeader';
 import MoveBedSheet from './patient/MoveBedSheet';
 import ReferralLetter from './ReferralLetter';
 import { todayYmd } from '../utils/dates';
+import { logAuditEvent } from '../services/auditLog';
 const MedicationChart  = lazy(() => import('./MedicationChart'));
 const NursingNotes     = lazy(() => import('./NursingNotes'));
 const IntakeOutput     = lazy(() => import('./IntakeOutput'));
@@ -110,6 +111,17 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       setEditProcedure(patient.procedure ?? '');
     }
   }, [patient?.ipNo]);
+
+  // Audit log: opening a patient's full record is a read of PHI and should
+  // leave a trail, same as every create/update/delete already does. Keyed on
+  // patient?.ipNo (not the patient object itself) so this fires once per
+  // patient actually opened, not on every background data refresh of the
+  // same patient while the record stays open.
+  useEffect(() => {
+    if (patient && user) {
+      logAuditEvent(user.id, user.name, 'VIEW', 'patient', patient.ipNo, `Viewed: ${patient.name}`);
+    }
+  }, [patient?.ipNo, user?.id]);
 
   if (!patient) {
     return (
