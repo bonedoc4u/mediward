@@ -93,6 +93,13 @@ interface PatientContextType {
   addInvestigation: (patientId: string, inv: Investigation) => void;
   deleteInvestigation: (patientId: string, invId: string) => void;
   getPatient: (ipNo: string) => Patient | undefined;
+  /** Emergency (break-glass) lookup of a patient outside the caller's normal
+   *  unit scope — hospital-scoped only (never crosses hospital_id, the real
+   *  tenant boundary), logs a distinct justified audit entry, and does NOT
+   *  merge the result into `patients` state so it never leaks into ward
+   *  views/counts. Returns null if no patient with that IP number exists in
+   *  this hospital. */
+  fetchEmergencyPatient: (ipNo: string, reason: string) => Promise<Patient | null>;
   /** Persist a daily round note to the normalized rounds table + update local state. */
   saveRound: (patientIpNo: string, round: DailyRound) => void;
   /** Insert a new vitals observation to the normalized table + update local state. */
@@ -1034,6 +1041,18 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     patients.find(p => p.ipNo === ipNo),
   [patients]);
 
+  // Emergency (break-glass) lookup — see PatientContextType's doc comment.
+  const fetchEmergencyPatient = useCallback(async (ipNo: string, reason: string): Promise<Patient | null> => {
+    const found = await fetchPatientById(ipNo, user?.hospitalId);
+    if (found && user) {
+      logAuditEvent(
+        user.id, user.name, 'VIEW', 'patient', found.ipNo,
+        `EMERGENCY ACCESS (reason: ${reason}): viewed ${found.name}, outside home unit "${user.unit ?? 'none'}" (patient unit: "${found.unit ?? 'none'}")`,
+      );
+    }
+    return found;
+  }, [user]);
+
   const resolveConcurrentEdit = useCallback((choice: 'local' | 'remote') => {
     if (!concurrentEditConflict) return;
     const { localPatient, remotePatient } = concurrentEditConflict;
@@ -1102,6 +1121,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addInvestigation,
     deleteInvestigation,
     getPatient,
+    fetchEmergencyPatient,
     saveRound,
     addVitalSign,
     concurrentEditConflict,
@@ -1114,7 +1134,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     hasMore, isLoadingMore, loadMorePatients,
     hasLoadedAll, loadAllPatients, updatePatient, addSurgery, addPatient, deletePatient,
     renamePatientIpNo, addLabResult, addInvestigation, deleteInvestigation, getPatient,
-    saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
+    fetchEmergencyPatient, saveRound, addVitalSign, concurrentEditConflict, resolveConcurrentEdit,
     realtimeStatus, forceReconnect, sessionExpired,
   ]);
 

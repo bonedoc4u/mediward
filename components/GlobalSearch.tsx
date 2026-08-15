@@ -1,12 +1,54 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
-import { Search, X } from 'lucide-react';
+import { Search, X, AlertTriangle } from 'lucide-react';
+import { Patient } from '../types';
+import EmergencyPatientView from './EmergencyPatientView';
+import { toast } from '../utils/toast';
 
 const GlobalSearch: React.FC = () => {
-  const { patients, navigateTo } = useApp();
+  const { patients, navigateTo, user, fetchEmergencyPatient } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Emergency (break-glass) access ───
+  // Only relevant for unit-scoped users — admin/ICU (no unit) already see
+  // every patient in the normal search above. Offered as a fallback once
+  // normal search comes up empty, not as a general-purpose second search
+  // bar: this is for a specific known IP number, not fishing.
+  const [showEmergencyForm, setShowEmergencyForm] = useState(false);
+  const [emergencyIpNo, setEmergencyIpNo] = useState('');
+  const [emergencyReason, setEmergencyReason] = useState('');
+  const [emergencyLoading, setEmergencyLoading] = useState(false);
+  const [emergencyPatient, setEmergencyPatient] = useState<Patient | null>(null);
+  const [emergencyPatientReason, setEmergencyPatientReason] = useState('');
+
+  const resetEmergencyForm = () => {
+    setShowEmergencyForm(false);
+    setEmergencyIpNo('');
+    setEmergencyReason('');
+  };
+
+  const handleEmergencyLookup = async () => {
+    if (!emergencyIpNo.trim() || !emergencyReason.trim()) return;
+    setEmergencyLoading(true);
+    try {
+      const found = await fetchEmergencyPatient(emergencyIpNo.trim(), emergencyReason.trim());
+      if (!found) {
+        toast.error(`No patient found with IP number "${emergencyIpNo.trim()}" in this hospital.`);
+        return;
+      }
+      setEmergencyPatientReason(emergencyReason.trim());
+      setEmergencyPatient(found);
+      setIsOpen(false);
+      setQuery('');
+      resetEmergencyForm();
+    } catch {
+      toast.error('Emergency lookup failed. Please try again.');
+    } finally {
+      setEmergencyLoading(false);
+    }
+  };
 
   // Keyboard shortcut: Cmd/Ctrl + K
   useEffect(() => {
@@ -18,6 +60,7 @@ const GlobalSearch: React.FC = () => {
       if (e.key === 'Escape') {
         setIsOpen(false);
         setQuery('');
+        resetEmergencyForm();
       }
     };
     window.addEventListener('keydown', handler);
@@ -65,7 +108,7 @@ const GlobalSearch: React.FC = () => {
 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setIsOpen(false); setQuery(''); }} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setIsOpen(false); setQuery(''); resetEmergencyForm(); }} />
 
           <div className="relative w-full max-w-lg mx-4 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
             {/* Search Input */}
@@ -89,9 +132,60 @@ const GlobalSearch: React.FC = () => {
 
             {/* Results */}
             <div className="max-h-80 overflow-y-auto">
-              {query.length >= 2 && results.length === 0 && (
-                <div className="p-8 text-center text-slate-400 text-sm">
-                  No patients match "{query}"
+              {query.length >= 2 && results.length === 0 && !showEmergencyForm && (
+                <div className="p-6 text-center text-slate-400 text-sm space-y-3">
+                  <p>No patients match "{query}" in your unit.</p>
+                  {/* Break-glass fallback — only relevant for unit-scoped users;
+                      admin/ICU (no unit) already see everyone in the search above. */}
+                  {user?.unit && (
+                    <button
+                      onClick={() => { setShowEmergencyForm(true); setEmergencyIpNo(query); }}
+                      className="flex items-center gap-2 mx-auto text-xs font-semibold text-amber-700 hover:text-amber-800 border border-amber-300 bg-amber-50 hover:bg-amber-100 rounded-lg px-3 py-2 transition-colors"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Not finding them? Emergency access — search all patients in this hospital
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {showEmergencyForm && (
+                <div className="p-4 space-y-3 bg-amber-50 border-y border-amber-200">
+                  <p className="text-xs font-bold text-amber-800 uppercase tracking-wide flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Emergency Access
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    This looks up a patient outside your unit, read-only, and is logged with the reason you give below.
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Patient IP number"
+                    className="w-full text-sm p-2.5 border border-amber-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                    value={emergencyIpNo}
+                    onChange={(e) => setEmergencyIpNo(e.target.value)}
+                  />
+                  <textarea
+                    placeholder="Reason for access (required)"
+                    rows={2}
+                    className="w-full text-sm p-2.5 border border-amber-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-400 bg-white resize-none"
+                    value={emergencyReason}
+                    onChange={(e) => setEmergencyReason(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={resetEmergencyForm}
+                      className="flex-1 py-2 text-xs font-semibold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleEmergencyLookup}
+                      disabled={!emergencyIpNo.trim() || !emergencyReason.trim() || emergencyLoading}
+                      className="flex-1 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
+                    >
+                      {emergencyLoading ? 'Looking up…' : 'Access record'}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -125,6 +219,14 @@ const GlobalSearch: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {emergencyPatient && (
+        <EmergencyPatientView
+          patient={emergencyPatient}
+          reason={emergencyPatientReason}
+          onClose={() => setEmergencyPatient(null)}
+        />
       )}
     </>
   );
