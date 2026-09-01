@@ -454,10 +454,19 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const remaining = getQueue().length;
       if (remaining === 0) {
         toast.success('All offline changes synced');
-        // Read from ref to avoid stale closure capturing pre-login user
-        const currentUser = userRef.current;
-        fetchActivePatients(currentUser?.unit, hospitalIdRef.current)
+        // effectiveUnitRef, not userRef.current?.unit: for an admin, user.unit
+        // is always undefined ("sees all" is only the default) — that field
+        // ignores whatever unit the admin has picked via UnitPicker, the
+        // exact bug already fixed in loadAllPatients (see effectiveUnit's
+        // definition above). This effect has [] deps, so it needs the ref
+        // (kept fresh by its own effect), not the plain variable.
+        const generation = ++patientsFetchGenerationRef.current;
+        fetchActivePatients(effectiveUnitRef.current, hospitalIdRef.current)
           .then(data => {
+            // A newer fetch (paginated, loadAllPatients, or another sync/
+            // cross-tab refresh) has started since — applying this response
+            // now would overwrite it with a stale scope.
+            if (generation !== patientsFetchGenerationRef.current) return;
             const enriched = enrichPatientData(data);
             setPatients(enriched);
             saveActiveCache(data, hospitalIdRef.current ?? '');
@@ -512,10 +521,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         e.data?.type === 'SYNC_COMPLETE' &&
         e.data?.hospitalId === (hospitalIdRef.current ?? effectiveHospitalId)
       ) {
-        // Another tab synced — quietly refresh this tab's patient list
-        const currentUser = userRef.current;
-        fetchActivePatients(currentUser?.unit, hospitalIdRef.current)
+        // Another tab synced — quietly refresh this tab's patient list.
+        // effectiveUnitRef, not userRef.current?.unit — same reasoning as the
+        // handleOnline sync-drain refetch above.
+        const generation = ++patientsFetchGenerationRef.current;
+        fetchActivePatients(effectiveUnitRef.current, hospitalIdRef.current)
           .then(data => {
+            if (generation !== patientsFetchGenerationRef.current) return; // superseded
             const enriched = enrichPatientData(data);
             setPatients(enriched);
             saveActiveCache(data, hospitalIdRef.current ?? '');
