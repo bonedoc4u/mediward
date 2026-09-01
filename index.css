@@ -70,23 +70,23 @@
  * pale red-50-style tint that reads on white does not read on a dark surface. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-vital-critical:         #f87171; /* red-400, graphic ~3.4:1 on dark surface */
-    --color-vital-critical-fg:      #fca5a5; /* red-300, text ~6.1:1 on dark surface */
+    --color-vital-critical:         #f87171; /* red-400, graphic ~6.65:1 on surface */
+    --color-vital-critical-fg:      #fca5a5; /* red-300, text ~9.69:1 on surface */
     --color-vital-critical-surface: rgb(248 113 113 / 0.12);
     --color-vital-critical-border:  rgb(248 113 113 / 0.35);
 
-    --color-vital-warning:          #fbbf24; /* amber-400 */
-    --color-vital-warning-fg:       #fcd34d; /* amber-300 */
+    --color-vital-warning:          #fbbf24; /* amber-400, graphic ~11.02:1 on surface */
+    --color-vital-warning-fg:       #fcd34d; /* amber-300, text ~12.76:1 on surface */
     --color-vital-warning-surface:  rgb(251 191 36 / 0.12);
     --color-vital-warning-border:   rgb(251 191 36 / 0.35);
 
-    --color-vital-normal:           #4ade80; /* green-400 */
-    --color-vital-normal-fg:        #86efac; /* green-300 */
+    --color-vital-normal:           #4ade80; /* green-400, graphic ~10.56:1 on surface */
+    --color-vital-normal-fg:        #86efac; /* green-300, text ~13.10:1 on surface */
     --color-vital-normal-surface:   rgb(74 222 128 / 0.12);
     --color-vital-normal-border:    rgb(74 222 128 / 0.35);
 
-    --color-vital-low:              #60a5fa; /* blue-400 */
-    --color-vital-low-fg:           #93c5fd; /* blue-300 */
+    --color-vital-low:              #60a5fa; /* blue-400, graphic ~7.23:1 on surface */
+    --color-vital-low-fg:           #93c5fd; /* blue-300, text ~10.20:1 on surface */
     --color-vital-low-surface:      rgb(96 165 250 / 0.12);
     --color-vital-low-border:       rgb(96 165 250 / 0.35);
 
@@ -99,11 +99,11 @@
     --color-surface:         #101517; /* app background */
     --color-surface-card:    #1b2226; /* cards, sheets, modals — lighter than surface (elevated) */
     --color-surface-sunken:  #0a0d0f; /* chips, wells, skeletons — darker than surface (recessed) */
-    --color-ink:             #e7edee; /* primary text ~14:1 on surface */
-    --color-ink-muted:       #9aa8ab; /* secondary text ~7:1 */
-    --color-ink-faint:       #62717d; /* disabled/placeholder ONLY */
-    --color-accent:          #4ba39e; /* scrub teal, brightened for dark bg, ~3.2:1 */
-    --color-accent-fg:       #6cc0ba; /* teal as text ~5.1:1 on surface */
+    --color-ink:             #e7edee; /* primary text ~15.54:1 on surface */
+    --color-ink-muted:       #9aa8ab; /* secondary text ~7.50:1 on surface */
+    --color-ink-faint:       #62717d; /* disabled/placeholder ONLY, ~3.66:1 on surface */
+    --color-accent:          #4ba39e; /* scrub teal, graphic ~6.16:1 on surface */
+    --color-accent-fg:       #6cc0ba; /* teal as text ~8.66:1 on surface */
     --color-accent-soft:     rgb(75 163 158 / 0.16); /* selection/hover tint */
     --color-accent-pressed:  #3f8f89; /* pressed/active state */
     --color-line:            #2a3336; /* borders and dividers */
@@ -112,43 +112,43 @@
 
 /* ── Dark mode — explicit user choice, wins regardless of system preference ── */
 :root[data-theme="dark"] {
-  --color-vital-critical:         #f87171;
-  --color-vital-critical-fg:      #fca5a5;
+  --color-vital-critical:         #f87171; /* red-400, graphic ~6.65:1 on surface */
+  --color-vital-critical-fg:      #fca5a5; /* red-300, text ~9.69:1 on surface */
   --color-vital-critical-surface: rgb(248 113 113 / 0.12);
   --color-vital-critical-border:  rgb(248 113 113 / 0.35);
 
-  --color-vital-warning:          #fbbf24;
-  --color-vital-warning-fg:       #fcd34d;
+  --color-vital-warning:          #fbbf24; /* amber-400, graphic ~11.02:1 on surface */
+  --color-vital-warning-fg:       #fcd34d; /* amber-300, text ~12.76:1 on surface */
   --color-vital-warning-surface:  rgb(251 191 36 / 0.12);
   --color-vital-warning-border:   rgb(251 191 36 / 0.35);
 
-  --color-vital-normal:           #4ade80;
-  --color-vital-normal-fg:        #86efac;
+  --color-vital-normal:           #4ade80; /* green-400, graphic ~10.56:1 on surface */
+  --color-vital-normal-fg:        #86efac; /* green-300, text ~13.10:1 on surface */
   --color-vital-normal-surface:   rgb(74 222 128 / 0.12);
   --color-vital-normal-border:    rgb(74 222 128 / 0.35);
 
-  --color-vital-low:              #60a5fa;
-  --color-vital-low-fg:           #93c5fd;
+  --color-vital-low:              #60a5fa; /* blue-400, graphic ~7.23:1 on surface */
+  --color-vital-low-fg:           #93c5fd; /* blue-300, text ~10.20:1 on surface */
   --color-vital-low-surface:      rgb(96 165 250 / 0.12);
   --color-vital-low-border:       rgb(96 165 250 / 0.35);
 
-  --color-chart-bp-sys: #818cf8;
-  --color-chart-bp-dia: #a5b4fc;
-  --color-chart-hr:     #f472b6;
-  --color-chart-spo2:   #22d3ee;
-  --color-chart-temp:   #a78bfa;
+  --color-chart-bp-sys: #818cf8; /* indigo-400 */
+  --color-chart-bp-dia: #a5b4fc; /* indigo-300 */
+  --color-chart-hr:     #f472b6; /* pink-400 */
+  --color-chart-spo2:   #22d3ee; /* cyan-400 */
+  --color-chart-temp:   #a78bfa; /* violet-400 */
 
-  --color-surface:         #101517;
-  --color-surface-card:    #1b2226;
-  --color-surface-sunken:  #0a0d0f;
-  --color-ink:             #e7edee;
-  --color-ink-muted:       #9aa8ab;
-  --color-ink-faint:       #62717d;
-  --color-accent:          #4ba39e;
-  --color-accent-fg:       #6cc0ba;
-  --color-accent-soft:     rgb(75 163 158 / 0.16);
-  --color-accent-pressed:  #3f8f89;
-  --color-line:            #2a3336;
+  --color-surface:         #101517; /* app background */
+  --color-surface-card:    #1b2226; /* cards, sheets, modals — lighter than surface (elevated) */
+  --color-surface-sunken:  #0a0d0f; /* chips, wells, skeletons — darker than surface (recessed) */
+  --color-ink:             #e7edee; /* primary text ~15.54:1 on surface */
+  --color-ink-muted:       #9aa8ab; /* secondary text ~7.50:1 on surface */
+  --color-ink-faint:       #62717d; /* disabled/placeholder ONLY, ~3.66:1 on surface */
+  --color-accent:          #4ba39e; /* scrub teal, graphic ~6.16:1 on surface */
+  --color-accent-fg:       #6cc0ba; /* teal as text ~8.66:1 on surface */
+  --color-accent-soft:     rgb(75 163 158 / 0.16); /* selection/hover tint */
+  --color-accent-pressed:  #3f8f89; /* pressed/active state */
+  --color-line:            #2a3336; /* borders and dividers */
 }
 
 /* ── Global CSS custom properties ─────────────────────────────── */
