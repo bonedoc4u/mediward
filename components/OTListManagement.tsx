@@ -7,6 +7,7 @@ import { OTPatient, OTType, OTListMeta, getTableOptionsForType, getDefaultCatego
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { preferRowCollision } from '../utils/otListCollision';
 import { findNewlyPlannedOTAssignments } from '../utils/otListAutoPopulate';
+import { resolveEffectiveUnit } from '../utils/effectiveUnit';
 import { fetchOTList, upsertOTListMeta, insertOTListEntry, updateOTListEntry, deleteOTListEntry, reorderOTListEntries } from '../services/otListService';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
 import { Plus, Calendar, Download, UserPlus, X, RefreshCw, FileSpreadsheet, GripVertical, ShieldAlert } from 'lucide-react';
@@ -41,12 +42,12 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const { user, selectedUnit, viewingHospitalId } = useAuth();
   const [activeTab, setActiveTab] = useState<OTType>('Major');
 
-  // Resolve the effective unit: admin's picker selection takes priority over profile unit
-  const effectiveUnit = (
-    user?.role === 'admin' && selectedUnit && selectedUnit !== 'all'
-      ? selectedUnit
-      : user?.unit ?? 'OR1'
-  ).toUpperCase();
+  // Resolve the effective unit: admin's picker selection takes priority over
+  // profile unit. 'OR1' fallback preserved for OT lists specifically — unlike
+  // the ward dashboard, there's no "all units" OT list view, so this always
+  // needs a concrete unit even when resolveEffectiveUnit itself would be
+  // undefined (e.g. an admin who hasn't picked one yet).
+  const effectiveUnit = (resolveEffectiveUnit(user?.role, selectedUnit, user?.unit) ?? 'OR1').toUpperCase();
 
   // Superadmin viewing another hospital's workspace uses that hospital, not
   // their own — matches contexts/PatientContext.tsx's effectiveHospitalId,
