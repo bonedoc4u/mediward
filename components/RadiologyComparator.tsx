@@ -4,9 +4,9 @@ import { useAuth } from '../contexts/AppContext';
 import {
   ImageIcon, Camera, X,
   CloudUpload, FileDown, Loader2, Search, ChevronDown, ChevronRight, Leaf,
-  Crop as CropIcon,
 } from 'lucide-react';
 import ImageEditor from './radiology/ImageEditor';
+import UploadSheet from './radiology/UploadSheet';
 import { uploadInvestigationImage, deleteInvestigationImage, validateImageFile, isPdfPath } from '../services/storageService';
 import { useSignedUrl } from '../hooks/useSignedUrl';
 import { getModality } from './radiology/modality';
@@ -16,7 +16,6 @@ import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { exportRadiologyPDF } from '../utils/exportRadiologyPDF';
 import { compressImage } from '../utils/imageUtils';
-import BottomSheetPicker from './ui/BottomSheetPicker';
 import { todayYmd } from '../utils/dates';
 import { getAdmissionDayCohort } from '../utils/calculations';
 
@@ -259,174 +258,6 @@ const PatientPicker: React.FC<{
   );
 };
 
-// ─── Upload Bottom Sheet ──────────────────────────────────────────────────────
-const UploadSheet: React.FC<{
-  isOpen: boolean;
-  files: File[];
-  previewUrls: string[];
-  patient: Patient;
-  isUploading: boolean;
-  uploadError: string | null;
-  onPhaseChange: (p: RadPhase) => void;
-  onTypeChange: (t: string) => void;
-  phase: RadPhase;
-  invType: string;
-  allowPostOp: boolean;
-  onSave: () => void;
-  onCancel: () => void;
-  onRemoveFile: (index: number) => void;
-  /** Opens the crop/rotate editor — only offered for a single image, not PDFs or batches. */
-  onEdit?: () => void;
-}> = ({ isOpen, files, previewUrls, patient, isUploading, uploadError,
-        onPhaseChange, onTypeChange, phase, invType, allowPostOp, onSave, onCancel, onRemoveFile, onEdit }) => {
-  if (!isOpen) return null;
-  const isSingleImage = files.length === 1 && files[0].type.startsWith('image/');
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl
-                      animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-center pt-3 pb-1 sm:hidden">
-          <div className="w-10 h-1 bg-slate-200 rounded-full" />
-        </div>
-
-        {/* Preview — single image gets a large preview; a batch gets a thumbnail strip
-            so each file can be reviewed/removed before the shared modality+phase is saved. */}
-        {isSingleImage ? (
-          <div className="relative bg-black h-48 mx-4 rounded-xl overflow-hidden mb-4">
-            <img src={previewUrls[0]} alt="Preview" className="w-full h-full object-contain" />
-            {!isUploading && (
-              <button
-                onClick={onCancel}
-                aria-label="Discard image"
-                className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-            {!isUploading && onEdit && (
-              <button
-                onClick={onEdit}
-                className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/60 hover:bg-black/80 text-white text-xs font-semibold px-3 py-2 rounded-full"
-              >
-                <CropIcon className="w-3.5 h-3.5" /> Crop / Rotate
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex gap-2 overflow-x-auto px-4 mb-4 pb-1">
-            {files.map((f, i) => (
-              <div key={`${f.name}-${i}`} className="relative shrink-0 w-20 h-20 bg-slate-900 rounded-lg overflow-hidden">
-                {f.type.startsWith('image/')
-                  ? <img src={previewUrls[i]} alt={f.name} className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center text-slate-400 text-[9px] font-semibold px-1 text-center break-all">{f.name}</div>}
-                {!isUploading && (
-                  <button
-                    onClick={() => onRemoveFile(i)}
-                    aria-label={`Remove ${f.name}`}
-                    className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="px-5 pb-8 space-y-4">
-          <h3 className="text-base font-semibold text-slate-900">
-            Upload {files.length > 1 ? `${files.length} investigations` : 'investigation'}
-          </h3>
-          <p className="text-xs text-slate-400">{patient.name} · Bed {patient.bed}</p>
-
-          {/* Phase toggle — hidden for conservative patients (post-op not applicable) */}
-          {allowPostOp && (
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
-                Investigation type
-              </label>
-              <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
-                <button
-                  onClick={() => onPhaseChange('preop')}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    phase === 'preop'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Pre-Op
-                </button>
-                <button
-                  onClick={() => onPhaseChange('postop')}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    phase === 'postop'
-                      ? 'bg-teal-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Post-Op
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Modality */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
-              Modality
-            </label>
-            <BottomSheetPicker
-              title="Modality"
-              value={invType}
-              options={[
-                { value: 'X-Ray',          label: 'X-Ray' },
-                { value: 'CT',             label: 'CT Scan' },
-                { value: 'MRI',            label: 'MRI' },
-                { value: 'USG',            label: 'Ultrasound (USG)' },
-                { value: 'Culture Report', label: 'Culture Report' },
-                { value: 'Report',         label: 'Report / Document' },
-              ]}
-              onChange={onTypeChange}
-              disabled={isUploading}
-            />
-          </div>
-
-          {uploadError && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
-              {uploadError}
-            </p>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              onClick={onCancel}
-              disabled={isUploading}
-              className="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-semibold
-                         text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onSave}
-              disabled={isUploading || files.length === 0}
-              className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-60
-                         text-white font-semibold rounded-xl transition-colors
-                         flex items-center justify-center gap-2"
-            >
-              {isUploading
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
-                : files.length > 1 ? `Save ${files.length}` : 'Save'
-              }
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const RadiologyComparator: React.FC<Props> = ({
   patients, onAddInvestigation, onDeleteInvestigation, initialPatientId,
@@ -448,7 +279,10 @@ const RadiologyComparator: React.FC<Props> = ({
   // post-op) the clicked thumbnail belongs to, not the patient's full list —
   // matches the visual grouping the user clicked from.
   const [lightboxSource, setLightboxSource] = useState<{ scans: Investigation[]; index: number } | null>(null);
-  const [showEditor, setShowEditor]       = useState(false);
+  // Index into selectedFiles/previewUrls currently open in the crop editor;
+  // null means the editor is closed. Works for both the single-image case
+  // (always index 0) and any image in a multi-select batch.
+  const [editingIndex, setEditingIndex]   = useState<number | null>(null);
 
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const isNativePlatform = Capacitor.isNativePlatform();
@@ -457,11 +291,18 @@ const RadiologyComparator: React.FC<Props> = ({
     if (initialPatientId) setSelectedPatientId(initialPatientId);
   }, [initialPatientId]);
 
-  useEffect(() => {
-    return () => {
-      previewUrls.forEach(url => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
-    };
-  }, [previewUrls]);
+  // Revoke on unmount only, not on every previewUrls change — every place that
+  // drops or replaces an individual URL (handleRemoveFile, handleCancelUpload,
+  // the partial-failure branch in handleSave, and the crop editor's onApply)
+  // already revokes exactly the URL it's dropping. A [previewUrls]-keyed
+  // cleanup would ALSO revoke URLs carried forward unchanged into the new
+  // array, killing previews that are still in use (this is what made cropping
+  // a second image in a batch open a blank editor).
+  const previewUrlsRef = useRef<string[]>(previewUrls);
+  useEffect(() => { previewUrlsRef.current = previewUrls; }, [previewUrls]);
+  useEffect(() => () => {
+    previewUrlsRef.current.forEach(url => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
+  }, []);
 
   const selectedPatient = patients.find(p => p.ipNo === selectedPatientId);
   const investigations  = selectedPatient?.investigations ?? [];
@@ -548,6 +389,7 @@ const RadiologyComparator: React.FC<Props> = ({
       if (prev[index]?.startsWith('blob:')) URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
+    setEditingIndex(null);
   };
 
   const handleSave = async () => {
@@ -603,7 +445,7 @@ const RadiologyComparator: React.FC<Props> = ({
     setSelectedFiles([]);
     setPreviewUrls([]);
     setShowUploadForm(false);
-    setShowEditor(false);
+    setEditingIndex(null);
     setUploadError(null);
     if (fileInputRef.current)  fileInputRef.current.value  = '';
   };
@@ -786,20 +628,23 @@ const RadiologyComparator: React.FC<Props> = ({
         onSave={handleSave}
         onCancel={handleCancelUpload}
         onRemoveFile={handleRemoveFile}
-        // Crop/rotate only makes sense for a single image at a time
-        onEdit={selectedFiles.length === 1 && selectedFiles[0].type.startsWith('image/') ? () => setShowEditor(true) : undefined}
+        onEditFile={(index) => setEditingIndex(index)}
       />
 
-      {/* Crop / rotate / straighten editor — only reachable when exactly one file is queued */}
-      {showEditor && previewUrls[0] && (
+      {/* Crop / rotate / straighten editor — reachable for any image file,
+          single or in a batch; editingIndex says which one. */}
+      {editingIndex !== null && previewUrls[editingIndex] && (
         <ImageEditor
-          src={previewUrls[0]}
-          onClose={() => setShowEditor(false)}
+          src={previewUrls[editingIndex]}
+          onClose={() => setEditingIndex(null)}
           onApply={(edited) => {
-            if (previewUrls[0]?.startsWith('blob:')) URL.revokeObjectURL(previewUrls[0]);
-            setSelectedFiles([edited]);
-            setPreviewUrls([URL.createObjectURL(edited)]);
-            setShowEditor(false);
+            const idx = editingIndex;
+            const oldUrl = previewUrls[idx];
+            if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+            const nextUrl = URL.createObjectURL(edited);
+            setSelectedFiles(prev => prev.map((f, i) => (i === idx ? edited : f)));
+            setPreviewUrls(prev => prev.map((u, i) => (i === idx ? nextUrl : u)));
+            setEditingIndex(null);
           }}
         />
       )}
