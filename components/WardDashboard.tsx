@@ -11,6 +11,7 @@ import BottomSheetPicker from './ui/BottomSheetPicker';
 import { calcPod } from './HandoverSummary';
 import TodaySchedule from './TodaySchedule';
 import OTDatePicker from './OTDatePicker';
+import { resolveEffectiveUnit } from '../utils/effectiveUnit';
 
 /** Strip ward-number prefix from bed for display: "10-05" → "05", "1A" → "1A" */
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
@@ -79,10 +80,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   // - Admin who picked 'all': show all wards
   const activeConfigWards = useMemo(() => {
     const all = configWards.filter(w => w.active).sort((a, b) => a.sortOrder - b.sortOrder);
-    const effectiveUnit = user?.unit ?? (selectedUnit && selectedUnit !== 'all' ? selectedUnit : null);
+    const effectiveUnit = resolveEffectiveUnit(user?.role, selectedUnit, user?.unit);
     if (!effectiveUnit) return all;
     return all.filter(w => !w.unit?.length || w.unit.includes(effectiveUnit) || w.isIcu);
-  }, [configWards, user?.unit, selectedUnit]);
+  }, [configWards, user?.role, user?.unit, selectedUnit]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPending, setFilterPending] = useState(false);
