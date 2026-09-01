@@ -972,7 +972,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             <div className="p-3 overflow-y-auto">
               <PendingSurgeryPanel
                 pendingPatients={pendingPatients}
-                onAssign={patient => { handleAssignPatient(patient); setMobileOpen(false); }}
+                onAssign={handleAssignPatient}
               />
             </div>
           </div>
