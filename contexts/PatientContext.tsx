@@ -27,6 +27,7 @@ function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number)
 }
 import { Patient, LabResult, Investigation, DailyRound, VitalSigns } from '../types';
 import { enrichPatientData, buildSurgeryUpdate } from '../utils/calculations';
+import { resolveEffectiveUnit } from '../utils/effectiveUnit';
 import { sanitizeInput } from '../utils/sanitize';
 import { logAuditEvent } from '../services/auditLog';
 import {
@@ -197,10 +198,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // For admins, the unit picker result overrides user.unit (which is null for admin = all units).
   // 'all' → no filter; a specific unit string → filter to that unit.
-  const effectiveUnit: string | undefined =
-    user?.role === 'admin' && selectedUnit && selectedUnit !== 'all'
-      ? selectedUnit
-      : user?.unit ?? undefined;
+  const effectiveUnit = resolveEffectiveUnit(user?.role, selectedUnit, user?.unit);
 
   // Debounced cache write — reduced to 300ms so a backgrounded/killed app loses
   // at most 300ms of realtime events rather than 2000ms.
@@ -237,6 +235,19 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const effectiveUnitRef = useRef<string | undefined>(effectiveUnit);
   useEffect(() => { effectiveUnitRef.current = effectiveUnit; }, [effectiveUnit]);
 
+  // Shared between the paginated background fetch and loadAllPatients:
+  // whichever fetch was issued MOST RECENTLY should win, regardless of which
+  // one finishes first. Without this, loadAllPatients()'s very first call
+  // (fired on mount, before an admin has chosen a unit in UnitPicker — see
+  // AuthContext's selectedUnit, null until then) can still be in flight when
+  // the admin picks a unit and the paginated effect below re-fetches for it;
+  // if the slow, unit-unfiltered load-all resolves after the fast, correctly
+  // scoped paginated fetch, it silently overwrites it — the admin would see
+  // every unit's patients instead of just the one they selected. Every fetch
+  // below increments this before issuing a request and checks it hasn't
+  // changed before applying the result.
+  const patientsFetchGenerationRef = useRef(0);
+
   // ─── Background Fetch — paginated (cache-first then network) ───
   // user.unit filters patients to only this unit; admins (no unit) see all.
   // user?.id is intentionally in the dep array so the fetch re-runs after login
@@ -256,8 +267,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsLoadingPatients(true);
     }
 
+    const generation = ++patientsFetchGenerationRef.current;
+
     fetchActivePatientsPage(effectiveUnit, 0, PATIENT_PAGE_SIZE, viewingHospitalId ?? undefined)
       .then(({ patients: data, hasMore: more }) => {
+        // A newer fetch (paginated or loadAllPatients) has started since —
+        // applying this response now would overwrite it with a stale scope.
+        if (generation !== patientsFetchGenerationRef.current) return;
         const enriched = enrichPatientData(data);
         setPatients(enriched);
         setHasMore(more);
@@ -687,8 +703,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [hasMore, isLoadingMore, currentPage, effectiveUnit, viewingHospitalId]);
 
   // ─── Load All Patients (lazy — Master/Discharge views) ───
+  // Tracks which unit scope the last successful full load covered, so a
+  // later change of effectiveUnit (admin picks a different unit) correctly
+  // triggers a fresh, re-scoped fetch instead of the hasLoadedAll guard
+  // silently freezing the list at whatever was loaded first.
+  const loadedAllUnitRef = useRef<string | undefined>(undefined);
   const loadAllPatients = useCallback(async () => {
-    if (hasLoadedAll) return;
+    if (hasLoadedAll && loadedAllUnitRef.current === effectiveUnit) return;
+    const generation = ++patientsFetchGenerationRef.current;
 
     // Serve all-patients cache immediately if available
     const cached = loadAllCache(effectiveHospitalId);
@@ -699,18 +721,27 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     try {
-      const data = await fetchAllPatients(user?.unit);
+      // effectiveUnit, not user?.unit: for an admin, user.unit is always
+      // undefined ("sees all patients" is only the *default*) — using it
+      // here ignored the admin's UnitPicker selection entirely, so Master
+      // List (and, since dashboard/pending/wenthome also call this, the
+      // regular dashboard too) always showed every unit's patients no
+      // matter which unit was selected.
+      const data = await fetchAllPatients(effectiveUnit);
+      if (generation !== patientsFetchGenerationRef.current) return; // superseded
       const enriched = enrichPatientData(data);
       setPatients(enriched);
       saveAllCache(data, effectiveHospitalId);
       setIsStale(false);
       setCacheTimestamp(null);
       setHasLoadedAll(true);
+      loadedAllUnitRef.current = effectiveUnit;
     } catch (err) {
+      if (generation !== patientsFetchGenerationRef.current) return; // superseded
       console.error('[Patients] Failed to load all — serving cache:', err);
       if (!cached) throw err; // no fallback — propagate so caller can handle
     }
-  }, [hasLoadedAll, user?.unit]);
+  }, [hasLoadedAll, effectiveUnit, effectiveHospitalId]);
 
   // ─── Patient CRUD ───
 
