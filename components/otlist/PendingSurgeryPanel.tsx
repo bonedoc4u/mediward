@@ -35,28 +35,30 @@ function PendingCard({ patient, onAssign }: PendingCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-start gap-2 p-3 bg-white rounded-lg border border-slate-200 hover:border-teal-300 transition-colors"
+      className="flex items-start gap-2 p-3 bg-surface-card rounded-lg border border-line hover:border-accent transition-colors"
     >
       <button
         {...attributes}
         {...listeners}
         type="button"
-        className="cursor-grab touch-none text-slate-400 shrink-0 min-w-11 min-h-11 flex items-center justify-center"
+        className="cursor-grab touch-none text-ink-muted shrink-0 min-w-11 min-h-11 flex items-center justify-center"
         aria-label={`Drag ${patient.name}`}
       >
         <GripVertical className="w-4 h-4" />
       </button>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-slate-900 text-sm truncate">
-          {patient.name} <span className="text-slate-500 font-normal">({patient.ipNo})</span>
+        <div className="font-medium text-ink text-sm truncate">
+          {patient.name} <span className="text-ink-muted font-normal">({patient.ipNo})</span>
         </div>
-        <div className="text-xs text-slate-600 truncate">{patient.diagnosis}</div>
-        <div className="text-xs text-slate-400 mt-0.5">Pending {daysPending(patient.doa)}d</div>
+        <div className="text-xs text-ink truncate">{patient.diagnosis}</div>
+        <div className="text-xs text-ink-muted mt-0.5">Pending {daysPending(patient.doa)}d</div>
       </div>
+      {/* bg-accent-soft/hover:bg-accent-soft (no visible hover shift) matches the verified
+          real precedent in WardDashboard.tsx (lines ~545, ~758) for this exact idiom. */}
       <button
         type="button"
         onClick={() => onAssign(patient)}
-        className="bg-teal-100 text-teal-700 rounded-md hover:bg-teal-200 shrink-0 min-w-11 min-h-11 flex items-center justify-center"
+        className="bg-accent-soft text-accent-fg rounded-md hover:bg-accent-soft shrink-0 min-w-11 min-h-11 flex items-center justify-center"
         aria-label={`Add ${patient.name} to current list`}
       >
         <Plus className="w-4 h-4" />
@@ -83,25 +85,25 @@ const PendingSurgeryPanel: React.FC<PendingSurgeryPanelProps> = ({ pendingPatien
   );
 
   return (
-    <div className="w-full lg:w-80 shrink-0 bg-slate-50 rounded-xl border border-slate-200 p-3 flex flex-col gap-3 max-h-[calc(100vh-200px)]">
+    <div className="w-full lg:w-80 shrink-0 bg-surface-sunken rounded-xl border border-line p-3 flex flex-col gap-3 max-h-[calc(100vh-200px)]">
       <div>
-        <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
+        <h2 className="text-sm font-bold text-ink uppercase tracking-wide">
           Pending Surgery ({pendingPatients.length})
         </h2>
         <div className="relative mt-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
           <input
             type="text"
             placeholder="Search name or IP..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-surface-card border border-line rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto space-y-2">
         {filtered.length === 0 ? (
-          <div className="text-center py-8 text-slate-400 text-sm">No patients pending surgery.</div>
+          <div className="text-center py-8 text-ink-muted text-sm">No patients pending surgery.</div>
         ) : (
           filtered.map(patient => (
             <PendingCard key={patient.ipNo} patient={patient} onAssign={onAssign} />
