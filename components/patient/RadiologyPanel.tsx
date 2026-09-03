@@ -75,6 +75,14 @@ const RadiologyPanel: React.FC<Props> = ({ patient, onOpenFull }) => {
           <span className="text-xs font-semibold">Add imaging or report</span>
         </button>
       ) : (
+        // JUDGMENT CALL: this strip (and each StudyCard's well inside it) stays
+        // hardcoded dark — it's the "negatoscope" viewing surface described in
+        // this file's header comment ("radiographs read best on dark"), the same
+        // always-dark-independent-of-theme reasoning as modality.ts and the
+        // Lightbox/ImageEditor decisions in this task (see task-6-report.md).
+        // All descendant text/icon colors inside this strip (bg-slate-800 wells,
+        // text-slate-300/500/600) are calibrated for this fixed-dark backdrop and
+        // stay hardcoded too, rather than switching to theme-reactive ink tokens.
         <div className="rounded-xl bg-slate-900 overflow-hidden">
           <div className="flex gap-3 overflow-x-auto snap-x px-3 py-3 scrollbar-hide">
             {studies.map((inv, i) => (

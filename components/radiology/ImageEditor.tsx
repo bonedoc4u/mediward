@@ -60,6 +60,15 @@ const ImageEditor: React.FC<Props> = ({ src, onApply, onClose }) => {
     }, 'image/jpeg', 0.92);
   };
 
+  // JUDGMENT CALL: this full-screen container's bg-slate-950 stays hardcoded,
+  // matching the Lightbox.tsx decision (see that file's top-level comment and
+  // task-6-report.md) — a crop/rotate tool needs a neutral dark canvas so the
+  // user can judge the image accurately (Cropper's own `background={false}`
+  // below relies on this), independent of the app's light/dark theme, same
+  // reasoning as modality.ts's always-dark viewer backgrounds. All of this
+  // dialog's own chrome (buttons, slider hint text) is calibrated for that
+  // fixed-dark backdrop and stays hardcoded too; the Apply button is a
+  // self-contained solid-fill button, so it converts normally to accent.
   return (
     <div role="dialog" aria-modal="true" aria-label="Edit image" className="fixed inset-0 z-[120] flex flex-col bg-slate-950">
       {/* Header */}
@@ -138,7 +147,7 @@ const ImageEditor: React.FC<Props> = ({ src, onApply, onClose }) => {
           type="button"
           onClick={apply}
           disabled={applying}
-          className="w-full py-3.5 bg-teal-500 hover:bg-teal-400 disabled:opacity-60 text-white text-sm font-bold rounded-2xl flex items-center justify-center gap-2"
+          className="w-full py-3.5 bg-accent hover:bg-accent-pressed disabled:opacity-60 text-white text-sm font-bold rounded-2xl flex items-center justify-center gap-2"
         >
           {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {applying ? 'Applying…' : 'Apply'}

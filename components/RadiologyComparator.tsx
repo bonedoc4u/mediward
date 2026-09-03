@@ -43,11 +43,16 @@ const ImageCard: React.FC<{
 
   return (
     <div
-      className="group rounded-xl border border-slate-200 overflow-hidden cursor-pointer
-                  hover:border-teal-300 hover:-translate-y-0.5 hover:shadow-sm
+      className="group rounded-xl border border-line overflow-hidden cursor-pointer
+                  hover:border-accent hover:-translate-y-0.5 hover:shadow-sm
                   transition-all active:scale-[0.98]"
       onClick={onClick}
     >
+      {/* cfg.bg is the modality viewer background from modality.ts — deliberately
+          always-dark regardless of app theme (see modality.ts header comment), so
+          the icon/loader colors overlaid on it (text-white/*) must also stay fixed
+          rather than switching to theme-reactive ink tokens, or they'd disappear
+          against the dark well in light mode. */}
       <div className={`h-[72px] flex items-center justify-center relative ${cfg.bg}`}>
         {inv.imageUrl
           ? (isPdfPath(inv.imageUrl)
@@ -60,7 +65,7 @@ const ImageCard: React.FC<{
         {onDelete && (
           <button
             onClick={e => { e.stopPropagation(); onDelete(); }}
-            className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white
+            className="absolute top-1 right-1 bg-vital-critical/80 hover:bg-vital-critical text-white
                        p-1 rounded-full opacity-0 group-hover:opacity-100
                        [@media(hover:none)]:opacity-100 transition-opacity"
           >
@@ -68,14 +73,14 @@ const ImageCard: React.FC<{
           </button>
         )}
       </div>
-      <div className="p-2 bg-white">
+      <div className="p-2 bg-surface-card">
         <span className={`text-[8px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${cfg.badge}`}>
           {inv.type}
         </span>
-        <p className="text-[11px] font-semibold text-slate-700 mt-1 leading-tight truncate">
+        <p className="text-[11px] font-semibold text-ink mt-1 leading-tight truncate">
           {inv.findings || inv.type}
         </p>
-        <p className="text-[10px] text-slate-400">{fmtDate}</p>
+        <p className="text-[10px] text-ink-muted">{fmtDate}</p>
       </div>
     </div>
   );
@@ -88,19 +93,26 @@ const UploadCard: React.FC<{
 }> = ({ phase, onClick }) => (
   <button
     onClick={onClick}
+    // JUDGMENT CALL: pre-op/post-op is a categorical (non-clinical) distinction that
+    // needs two visually distinct hues to stay tellable apart at a glance. Post-op's
+    // teal maps to the accent token below, but pre-op's blue is deliberately left
+    // hardcoded — mapping it to vital-low would misrepresent it as an "abnormal-low
+    // lab value" (blue is reserved for that per docs/UI-UX-CURRENT-STATE.md §2.1),
+    // and mapping it to accent would make it visually identical to post-op, erasing
+    // the distinction. No second categorical token exists yet; see task-6-report.md.
     className={`rounded-xl border-2 border-dashed min-h-[116px] w-full
                 flex flex-col items-center justify-center gap-1.5
                 cursor-pointer transition-all ${
       phase === 'preop'
         ? 'border-blue-200 bg-blue-50/30 hover:border-blue-400 hover:bg-blue-50'
-        : 'border-teal-200 bg-teal-50/30 hover:border-teal-400 hover:bg-teal-50'
+        : 'border-accent/30 bg-accent-soft/40 hover:border-accent hover:bg-accent-soft'
     }`}
   >
-    <CloudUpload className={`w-5 h-5 ${phase === 'preop' ? 'text-blue-400' : 'text-teal-400'}`} />
-    <span className="text-[10px] font-semibold text-slate-500">
+    <CloudUpload className={`w-5 h-5 ${phase === 'preop' ? 'text-blue-400' : 'text-accent'}`} />
+    <span className="text-[10px] font-semibold text-ink-muted">
       Add {phase === 'preop' ? 'pre-op' : 'post-op'}
     </span>
-    <span className="text-[9px] text-slate-400">JPEG · PNG · PDF</span>
+    <span className="text-[9px] text-ink-muted">JPEG · PNG · PDF</span>
   </button>
 );
 
@@ -149,15 +161,17 @@ const SectionHeader: React.FC<{
 
   return (
     <div className="flex items-center gap-2 mb-3">
+      {/* Same pre-op(blue)/post-op(teal) categorical judgment call as UploadCard
+          above — blue stays hardcoded, teal maps to the accent family. */}
       <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${
         isPreOp
           ? 'bg-blue-100 text-blue-700 border border-blue-200'
-          : 'bg-teal-100 text-teal-700 border border-teal-200'
+          : 'bg-accent-soft text-accent-fg border border-accent'
       }`}>
         {label}
       </span>
-      <span className="text-sm font-bold text-slate-700">Investigations</span>
-      <span className="text-xs text-slate-400">({count})</span>
+      <span className="text-sm font-bold text-ink">Investigations</span>
+      <span className="text-xs text-ink-muted">({count})</span>
       <div className="flex-1" />
       <button
         onClick={handleExport}
@@ -166,7 +180,7 @@ const SectionHeader: React.FC<{
                     border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
           isPreOp
             ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:border-blue-600'
-            : 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-600 hover:text-white hover:border-teal-600'
+            : 'bg-accent-soft text-accent-fg border-accent hover:bg-accent hover:text-white hover:border-accent'
         }`}
       >
         {progress !== null ? (
@@ -200,54 +214,54 @@ const PatientPicker: React.FC<{
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 bg-white border border-slate-200 rounded-xl
-                   px-4 py-3 text-left hover:border-teal-400 transition-colors"
+        className="w-full flex items-center gap-3 bg-surface-card border border-line rounded-xl
+                   px-4 py-3 text-left hover:border-accent transition-colors"
       >
         {selected ? (
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-900 truncate">{selected.name}</p>
-            <p className="text-[11px] text-slate-400">Bed {selected.bed} · IP: {selected.ipNo}</p>
+            <p className="text-sm font-semibold text-ink truncate">{selected.name}</p>
+            <p className="text-[11px] text-ink-muted">Bed {selected.bed} · IP: {selected.ipNo}</p>
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-1">
-            <Search className="w-4 h-4 text-slate-400" />
-            <span className="text-sm text-slate-400">Search patient…</span>
+            <Search className="w-4 h-4 text-ink-muted" />
+            <span className="text-sm text-ink-muted">Search patient…</span>
           </div>
         )}
-        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-ink-muted transition-transform shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-slate-200
+        <div className="absolute top-full mt-1 left-0 right-0 bg-surface-card border border-line
                         rounded-xl shadow-xl z-30 max-h-64 overflow-hidden flex flex-col">
-          <div className="p-2 border-b border-slate-100">
-            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
-              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <div className="p-2 border-b border-line">
+            <div className="flex items-center gap-2 bg-surface-sunken rounded-lg px-3 py-2">
+              <Search className="w-3.5 h-3.5 text-ink-muted shrink-0" />
               <input
                 autoFocus
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Name, bed or IP no."
-                className="flex-1 text-sm bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+                className="flex-1 text-sm bg-transparent outline-none text-ink placeholder:text-ink-faint"
               />
             </div>
           </div>
           <div className="overflow-y-auto flex-1">
             {filtered.length === 0 ? (
-              <p className="text-center text-xs text-slate-400 py-6">No patients found</p>
+              <p className="text-center text-xs text-ink-muted py-6">No patients found</p>
             ) : filtered.map(p => (
               <button
                 key={p.ipNo}
                 onClick={() => { onSelect(p.ipNo); setOpen(false); setSearch(''); }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left
-                            hover:bg-teal-50 transition-colors ${p.ipNo === selectedId ? 'bg-teal-50' : ''}`}
+                            hover:bg-accent-soft transition-colors ${p.ipNo === selectedId ? 'bg-accent-soft' : ''}`}
               >
-                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                  <span className="text-[10px] font-bold text-slate-500">{p.bed}</span>
+                <div className="w-8 h-8 rounded-lg bg-surface-sunken flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-bold text-ink-muted">{p.bed}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
-                  <p className="text-[10px] text-slate-400">IP: {p.ipNo} · {p.ward}</p>
+                  <p className="text-sm font-semibold text-ink truncate">{p.name}</p>
+                  <p className="text-[10px] text-ink-muted">IP: {p.ipNo} · {p.ward}</p>
                 </div>
               </button>
             ))}
@@ -474,8 +488,8 @@ const RadiologyComparator: React.FC<Props> = ({
       <input type="file" accept="image/*,.pdf" multiple className="hidden" ref={fileInputRef} onChange={handleFileChange} />
 
       {/* Patient picker */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+      <div className="bg-surface-card rounded-xl border border-line p-4 shadow-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-muted mb-2">
           Select Patient
         </p>
         <PatientPicker patients={sortedPatients} selectedId={selectedPatientId} onSelect={onPatientSelect} />
@@ -483,43 +497,59 @@ const RadiologyComparator: React.FC<Props> = ({
 
       {!selectedPatient ? (
         todaysAdmissions.length > 0 ? (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Today's Admissions</p>
+          <div className="bg-surface-card rounded-xl border border-line shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-line bg-surface-sunken">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-muted">Today's Admissions</p>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-line">
               {todaysAdmissions.map(p => (
                 <button
                   key={p.ipNo}
                   type="button"
                   onClick={() => onPatientSelect(p.ipNo)}
-                  className="w-full flex items-center gap-3 px-4 py-3 min-h-11 text-left hover:bg-slate-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 min-h-11 text-left hover:bg-surface-sunken transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-bold font-mono text-slate-500">{p.bed}</span>
+                  <div className="w-9 h-9 rounded-lg bg-surface-sunken flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold font-mono text-ink-muted">{p.bed}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-sm font-semibold text-ink truncate">{p.name}</p>
+                    <p className="text-[11px] text-ink-muted">
                       IP: {p.ipNo} · {p.investigations.length > 0 ? `${p.investigations.length} scan${p.investigations.length !== 1 ? 's' : ''}` : 'No scans yet'}
                     </p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-ink-faint shrink-0" />
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-slate-50
-                          rounded-xl border-2 border-dashed border-slate-200 p-16 text-center">
-            <ImageIcon className="w-10 h-10 text-slate-200 mb-3" />
-            <p className="text-sm font-semibold text-slate-500">Select a patient above</p>
-            <p className="text-xs text-slate-400 mt-1">X-Rays, CT, MRI and reports will appear here</p>
+          <div className="flex-1 flex flex-col items-center justify-center bg-surface-sunken
+                          rounded-xl border-2 border-dashed border-line p-16 text-center">
+            {/* text-slate-200/300 (very light, decorative-only) collapsed to
+                ink-faint here — lighter than the ink-muted used for body/caption
+                text elsewhere; not a literal mapping-table row, extrapolated for
+                consistency (see task-6-report.md). */}
+            <ImageIcon className="w-10 h-10 text-ink-faint mb-3" />
+            <p className="text-sm font-semibold text-ink-muted">Select a patient above</p>
+            <p className="text-xs text-ink-muted mt-1">X-Rays, CT, MRI and reports will appear here</p>
           </div>
         )
       ) : (
         <>
-          {/* Patient header */}
+          {/* Patient header — JUDGMENT CALL: bg-slate-900 here is a "dark stat card"
+              (mapping-table's judgment-call row for bg-slate-900/800/700 chrome
+              blocks), not an image viewer. Left hardcoded rather than converted to
+              bg-surface-card: this is a per-patient identity/emphasis bar, and
+              converting it would visibly change today's light-mode appearance
+              (white card losing its dark "pop") for a purely cosmetic dark-mode
+              gain — since bg-slate-900 already sits close to the app's own dark
+              --color-surface once dark mode exists, the "no silent breaking
+              changes" call is to leave it as-is. Descendant text (text-white,
+              text-slate-400/500, text-teal-400) stays hardcoded too, since it's
+              calibrated for this permanently-dark backdrop. The Camera button is
+              self-contained (own solid fill), so it converts normally below. See
+              task-6-report.md for the fuller writeup. */}
           <div className="bg-slate-900 rounded-xl p-4 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{selectedPatient.name}</p>
@@ -538,7 +568,7 @@ const RadiologyComparator: React.FC<Props> = ({
             {isNativePlatform && (
               <button
                 onClick={handleCameraClick}
-                className="shrink-0 flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700
+                className="shrink-0 flex items-center gap-1.5 bg-accent hover:bg-accent-pressed
                            text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
               >
                 <Camera className="w-3.5 h-3.5" /> Camera
@@ -546,8 +576,9 @@ const RadiologyComparator: React.FC<Props> = ({
             )}
           </div>
 
-          {/* ── PRE-OP ──────────────────────────────────────────────── */}
-          <div className="bg-white rounded-xl border border-blue-100 p-4">
+          {/* ── PRE-OP ──────────────────────────────────────────────── (border-blue-100:
+              same pre-op categorical judgment call as UploadCard — left hardcoded) */}
+          <div className="bg-surface-card rounded-xl border border-blue-100 p-4">
             <SectionHeader phase="preop" count={preOpScans.length} patient={selectedPatient} scans={preOpScans} />
             <div className="grid grid-cols-3 gap-2">
               {preOpScans.map((inv, i) => (
@@ -564,7 +595,7 @@ const RadiologyComparator: React.FC<Props> = ({
 
           {/* ── POST-OP ─────────────────────────────────────────────── */}
           {showPostOp ? (
-            <div className="bg-white rounded-xl border border-teal-100 p-4">
+            <div className="bg-surface-card rounded-xl border border-accent p-4">
               <SectionHeader phase="postop" count={postOpScans.length} patient={selectedPatient} scans={postOpScans} />
               <div className="grid grid-cols-3 gap-2">
                 {postOpScans.map((inv, i) => (
@@ -579,20 +610,28 @@ const RadiologyComparator: React.FC<Props> = ({
               </div>
             </div>
           ) : (
-            <div className="bg-emerald-50/40 rounded-xl border border-emerald-100 p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                <Leaf className="w-4 h-4 text-emerald-600" />
+            <div className="bg-vital-normal-surface/40 rounded-xl border border-vital-normal-border p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-vital-normal-surface flex items-center justify-center shrink-0">
+                <Leaf className="w-4 h-4 text-vital-normal" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-700">Post-op imaging not required</p>
-                <p className="text-xs text-slate-400">Planned conservative management — no post-operative X-ray expected.</p>
+                <p className="text-sm font-semibold text-ink">Post-op imaging not required</p>
+                <p className="text-xs text-ink-muted">Planned conservative management — no post-operative X-ray expected.</p>
               </div>
             </div>
           )}
 
-          {/* ── WhatsApp Share Bar ───────────────────────────────────── */}
+          {/* ── WhatsApp Share Bar ─────────────────────────────────────
+              JUDGMENT CALL: reuses the vital-normal ("success") family for this
+              green banner even though it isn't a clinical value — WhatsApp's own
+              brand green (#25D366, the inline-styled icon circle below) is left
+              untouched as a fixed third-party brand mark, but the surrounding
+              Tailwind bg-green-50/border-green-200/text-green-* classes were a
+              static light-green tint that would look wrong pinned onto a dark
+              page, so they take the "positive outcome" reading of vital-normal
+              rather than staying hardcoded. See task-6-report.md. */}
           {(preOpScans.length + postOpScans.length) > 0 && (
-            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl p-3">
+            <div className="flex items-center gap-3 bg-vital-normal-surface border border-vital-normal-border rounded-xl p-3">
               <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
                    style={{ backgroundColor: '#25D366' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
@@ -601,8 +640,8 @@ const RadiologyComparator: React.FC<Props> = ({
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-green-800">Share via WhatsApp</p>
-                <p className="text-[10px] text-green-600 truncate font-mono">
+                <p className="text-xs font-bold text-vital-normal-fg">Share via WhatsApp</p>
+                <p className="text-[10px] text-vital-normal-fg truncate font-mono">
                   {selectedPatient.name.replace(/\s+/g, '_')}_PreOp.pdf
                   {postOpScans.length > 0 && ` · ${selectedPatient.name.replace(/\s+/g, '_')}_PostOp.pdf`}
                 </p>
