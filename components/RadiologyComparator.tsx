@@ -166,7 +166,7 @@ const SectionHeader: React.FC<{
       <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${
         isPreOp
           ? 'bg-blue-100 text-blue-700 border border-blue-200'
-          : 'bg-accent-soft text-accent-fg border border-accent'
+          : 'bg-accent-soft text-accent-fg border border-accent/30'
       }`}>
         {label}
       </span>
@@ -537,19 +537,36 @@ const RadiologyComparator: React.FC<Props> = ({
         )
       ) : (
         <>
-          {/* Patient header — JUDGMENT CALL: bg-slate-900 here is a "dark stat card"
-              (mapping-table's judgment-call row for bg-slate-900/800/700 chrome
-              blocks), not an image viewer. Left hardcoded rather than converted to
-              bg-surface-card: this is a per-patient identity/emphasis bar, and
-              converting it would visibly change today's light-mode appearance
-              (white card losing its dark "pop") for a purely cosmetic dark-mode
-              gain — since bg-slate-900 already sits close to the app's own dark
-              --color-surface once dark mode exists, the "no silent breaking
-              changes" call is to leave it as-is. Descendant text (text-white,
-              text-slate-400/500, text-teal-400) stays hardcoded too, since it's
-              calibrated for this permanently-dark backdrop. The Camera button is
-              self-contained (own solid fill), so it converts normally below. See
-              task-6-report.md for the fuller writeup. */}
+          {/*
+            Patient header — JUDGMENT CALL, left hardcoded (bg-slate-900 + text-white,
+            and every light-on-dark color within it below — text-slate-400/500,
+            text-teal-400), not tokenized. Not a mechanical mapping-table lookup;
+            documented here + commit message + task-6-report.md.
+
+            Why: this bar is a deliberately-always-dark "hero" identity block for the
+            currently-selected patient (same role as an active-state pill elsewhere in
+            the app's nav), not a plain card section. Two token-only options were
+            considered and rejected:
+              1. bg-surface-card/bg-surface — in LIGHT mode surface-card is WHITE,
+                 which would erase the bold dark banner entirely (a real visual
+                 regression, not a mere color-space conversion).
+              2. bg-accent — recolors what the dark color communicates (identity/
+                 emphasis) into generic brand teal, which doesn't fit here either.
+            Instead this follows the verified precedent already accepted in this
+            app: RoundMode.tsx's own Patient Header (lines ~553-577, see
+            task-4-report.md) is structurally the same kind of element
+            (bg-slate-900/bg-red-900 + text-white + light-on-dark descendant text)
+            and was left hardcoded for this exact reasoning, itself following
+            App.tsx's mobile header/sidebar and LoginPage.tsx's left brand panel —
+            all permanently-dark blocks whose light-on-dark text stays hardcoded
+            because the ink/vital-* tokens are calibrated against light-mode card
+            backgrounds and lose meaning against a block that never lightens.
+            This is safe (not the illegibility bug this whole plan warns about):
+            text-white paired with a hardcoded raw dark color never flips, so it can
+            never become white-on-white the way bg-ink + text-white would.
+            The Camera button is self-contained (own solid fill), so it converts
+            normally below.
+          */}
           <div className="bg-slate-900 rounded-xl p-4 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">{selectedPatient.name}</p>
@@ -595,7 +612,7 @@ const RadiologyComparator: React.FC<Props> = ({
 
           {/* ── POST-OP ─────────────────────────────────────────────── */}
           {showPostOp ? (
-            <div className="bg-surface-card rounded-xl border border-accent p-4">
+            <div className="bg-surface-card rounded-xl border border-accent/30 p-4">
               <SectionHeader phase="postop" count={postOpScans.length} patient={selectedPatient} scans={postOpScans} />
               <div className="grid grid-cols-3 gap-2">
                 {postOpScans.map((inv, i) => (
