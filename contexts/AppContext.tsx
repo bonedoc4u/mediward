@@ -13,7 +13,6 @@
  */
 
 import React from 'react';
-import { ThemeProvider } from './ThemeContext';
 import { ConfigProvider } from './ConfigContext';
 import { AuthProvider, useAuth } from './AuthContext';
 import { PatientProvider, usePatients } from './PatientContext';
@@ -39,18 +38,16 @@ export function useApp() {
 
 /**
  * AppProvider — wraps the entire app.
- * Order: Theme (no deps) → Config (no deps) → Auth → Patient (needs auth) → UI (needs both).
+ * Order: Config (no deps) → Auth → Patient (needs auth) → UI (needs both).
  */
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ThemeProvider>
-    <AuthProvider>
-      <ConfigProvider>
-        <PatientProvider>
-          <UIProvider>
-            {children}
-          </UIProvider>
-        </PatientProvider>
-      </ConfigProvider>
-    </AuthProvider>
-  </ThemeProvider>
+  <AuthProvider>
+    <ConfigProvider>
+      <PatientProvider>
+        <UIProvider>
+          {children}
+        </UIProvider>
+      </PatientProvider>
+    </ConfigProvider>
+  </AuthProvider>
 );

@@ -18,7 +18,6 @@ import UnitPicker from './components/UnitPicker';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationCenter from './components/NotificationCenter';
 import GlobalSearch from './components/GlobalSearch';
-import { ThemeToggle } from './components/ui/ThemeToggle';
 import WardSkeleton from './components/WardSkeleton';
 import ToastContainer from './components/ToastContainer';
 import {
@@ -694,7 +693,6 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <ThemeToggle variant="dark" />
             <GlobalSearch />
             <NotificationCenter />
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}>
@@ -870,7 +868,6 @@ const App: React.FC = () => {
                 <p className="text-ink-muted text-sm">{meta.description}</p>
               </div>
               <div className="flex items-center gap-2">
-                <ThemeToggle variant="light" />
                 <GlobalSearch />
                 <NotificationCenter />
               </div>
