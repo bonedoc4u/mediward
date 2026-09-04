@@ -142,10 +142,10 @@ const Icd10Picker: React.FC<{
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder={placeholder ?? 'ICD-10 code or search…'}
-        className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-teal-400"
+        className="w-full text-xs px-2 py-1.5 border border-line rounded-lg bg-surface-sunken focus:outline-none focus:ring-1 focus:ring-teal-400"
       />
       {open && matches.length > 0 && (
-        <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <ul className="absolute z-30 left-0 right-0 mt-1 bg-surface-card border border-line rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {matches.map(item => (
             <li key={item.code}>
               <button
@@ -154,7 +154,7 @@ const Icd10Picker: React.FC<{
                 className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-baseline gap-2"
               >
                 <span className="font-mono font-bold text-blue-700 shrink-0">{item.code}</span>
-                <span className="text-slate-700">{item.desc}</span>
+                <span className="text-ink">{item.desc}</span>
               </button>
             </li>
           ))}
@@ -211,7 +211,7 @@ const MultiDiagnosisField: React.FC<{
 
   return (
     <div className="mb-5">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 border-b border-slate-200 pb-1 flex items-center justify-between">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-2 border-b border-line pb-1 flex items-center justify-between">
         <span>Final Diagnosis (at Discharge)</span>
         <button
           type="button"
@@ -226,7 +226,11 @@ const MultiDiagnosisField: React.FC<{
         {entries.map((entry, idx) => (
           <div key={idx} className="flex items-start gap-2 group">
             {/* Diagnosis number badge */}
-            <span className="shrink-0 w-5 h-5 mt-1.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center">
+            {/* bg-slate-200 as a background fill isn't a literal mapping-table row
+                (only 50/100 are tabled for surface-sunken); extrapolated to the same
+                chip/well family for consistency (same idiom as RadiologyComparator's
+                text-slate-200/300 -> ink-faint extrapolation, task-6-report.md). */}
+            <span className="shrink-0 w-5 h-5 mt-1.5 rounded-full bg-surface-sunken text-ink text-[10px] font-bold flex items-center justify-center">
               {idx + 1}
             </span>
 
@@ -237,7 +241,7 @@ const MultiDiagnosisField: React.FC<{
                 value={entry.text}
                 onChange={e => updateEntry(idx, { text: e.target.value })}
                 placeholder="Diagnosis description…"
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-line focus:border-teal-400 focus:outline-none bg-transparent py-1 text-ink"
               />
 
               {/* ICD-10 picker */}
@@ -266,16 +270,16 @@ const MultiDiagnosisField: React.FC<{
 
       {/* Secondary / comorbidity ICD-10 codes */}
       <div className="mt-4">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1 flex items-center justify-between">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-1 border-b border-line pb-1 flex items-center justify-between">
           <span>Secondary ICD-10 Codes (comorbidities)</span>
-          <span className="text-[9px] font-normal text-slate-400 normal-case">ICD-10 / ICD-11</span>
+          <span className="text-[9px] font-normal text-ink-muted normal-case">ICD-10 / ICD-11</span>
         </div>
         <input
           type="text"
           value={icd10Secondary}
           onChange={e => onChange({ finalDiagnosis, icd10Code, icd10Secondary: e.target.value })}
           placeholder="e.g. I10 — Hypertension, E11.9 — Type 2 DM"
-          className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+          className="w-full text-sm border-0 border-b border-dashed border-line focus:border-teal-400 focus:outline-none bg-transparent py-1 text-ink"
         />
       </div>
     </div>
@@ -300,11 +304,11 @@ const DocField = ({
 
   return (
     <div className="mb-5">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-1 border-b border-line pb-1">
         {label}
       </div>
       {readOnly ? (
-        <p className="text-sm text-slate-800 leading-relaxed min-h-[1.5rem] whitespace-pre-wrap break-words">{value || '—'}</p>
+        <p className="text-sm text-ink leading-relaxed min-h-[1.5rem] whitespace-pre-wrap break-words">{value || '—'}</p>
       ) : (
         <textarea
           ref={ref}
@@ -316,7 +320,7 @@ const DocField = ({
             e.target.style.height = e.target.scrollHeight + 'px';
             onChange?.(e.target.value);
           }}
-          className="w-full text-sm text-slate-800 leading-relaxed resize-none overflow-hidden border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 placeholder-slate-300"
+          className="w-full text-sm text-ink leading-relaxed resize-none overflow-hidden border-0 border-b border-dashed border-line focus:border-teal-400 focus:outline-none bg-transparent py-1 placeholder-ink-faint"
           placeholder={`Enter ${label.toLowerCase()}...`}
         />
       )}
@@ -391,7 +395,7 @@ const MedicationPicker: React.FC<{
 
   return (
     <div className="mb-5">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 border-b border-slate-200 pb-1 flex items-center gap-1.5">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-2 border-b border-line pb-1 flex items-center gap-1.5">
         <Pill className="w-3.5 h-3.5" />
         <span>Discharge Medications</span>
       </div>
@@ -403,10 +407,10 @@ const MedicationPicker: React.FC<{
             <div key={i} className="flex items-start gap-2 group bg-blue-50/60 border border-blue-100 rounded-lg px-3 py-2">
               <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-blue-200 text-blue-800 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800 leading-tight">{e.name}</p>
+                <p className="text-sm font-semibold text-ink leading-tight">{e.name}</p>
                 <div className="flex gap-2 mt-1 flex-wrap">
-                  {e.freq && <span className="text-[10px] font-medium bg-white border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded">{e.freq}</span>}
-                  {e.duration && <span className="text-[10px] font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{e.duration}</span>}
+                  {e.freq && <span className="text-[10px] font-medium bg-surface-card border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded">{e.freq}</span>}
+                  {e.duration && <span className="text-[10px] font-medium bg-surface-card border border-line text-ink px-1.5 py-0.5 rounded">{e.duration}</span>}
                 </div>
               </div>
               <button type="button" onClick={() => removeEntry(i)}
@@ -424,29 +428,29 @@ const MedicationPicker: React.FC<{
           <p className="text-xs font-semibold text-indigo-800">{addForm.name}</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Frequency</label>
+              <label className="text-[10px] font-bold uppercase text-ink-muted mb-0.5 block">Frequency</label>
               <BottomSheetPicker
                 title="Frequency"
                 value={addForm.freq}
                 options={FREQUENCIES.map(f => ({ value: f, label: f }))}
                 onChange={val => setAddForm(f => f && ({ ...f, freq: val }))}
-                triggerClassName="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none flex items-center justify-between gap-1"
+                triggerClassName="w-full text-xs border border-line rounded-lg px-2 py-1.5 bg-surface-card focus:outline-none flex items-center justify-between gap-1"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Duration</label>
+              <label className="text-[10px] font-bold uppercase text-ink-muted mb-0.5 block">Duration</label>
               <BottomSheetPicker
                 title="Duration"
                 value={addForm.duration}
                 options={DURATIONS.map(d => ({ value: d, label: d }))}
                 onChange={val => setAddForm(f => f && ({ ...f, duration: val }))}
-                triggerClassName="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none flex items-center justify-between gap-1"
+                triggerClassName="w-full text-xs border border-line rounded-lg px-2 py-1.5 bg-surface-card focus:outline-none flex items-center justify-between gap-1"
               />
             </div>
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setAddForm(null)}
-              className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+              className="text-xs px-3 py-1.5 border border-line rounded-lg hover:bg-surface-sunken">Cancel</button>
             <button type="button" onClick={confirmAdd}
               className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Add to list</button>
           </div>
@@ -455,8 +459,8 @@ const MedicationPicker: React.FC<{
 
       {/* Search box */}
       <div className="relative">
-        <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus-within:ring-1 focus-within:ring-teal-400 focus-within:border-blue-400">
-          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <div className="flex items-center gap-2 border border-line rounded-xl px-3 py-2 bg-surface-sunken focus-within:ring-1 focus-within:ring-teal-400 focus-within:border-blue-400">
+          <Search className="w-3.5 h-3.5 text-ink-muted shrink-0" />
           <input
             type="text"
             value={search}
@@ -464,7 +468,7 @@ const MedicationPicker: React.FC<{
             onFocus={() => setShowDrop(true)}
             onBlur={() => setTimeout(() => setShowDrop(false), 150)}
             placeholder={medications.length ? 'Search medication by name or brand…' : 'No medications loaded — seed list in Admin settings'}
-            className="flex-1 text-xs bg-transparent focus:outline-none text-slate-700 placeholder-slate-400"
+            className="flex-1 text-xs bg-transparent focus:outline-none text-ink placeholder-ink-faint"
           />
           <button type="button" onClick={() => { setShowDrop(false); setSearch(''); setAddForm({ name: search.trim(), dose: '', freq: 'OD', duration: '5 days' }); }}
             disabled={!search.trim()}
@@ -474,17 +478,17 @@ const MedicationPicker: React.FC<{
         </div>
 
         {showDrop && suggestions.length > 0 && (
-          <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+          <ul className="absolute z-30 left-0 right-0 mt-1 bg-surface-card border border-line rounded-xl shadow-lg max-h-56 overflow-y-auto">
             {suggestions.map(m => (
               <li key={m.id}>
                 <button type="button"
                   onMouseDown={() => selectMed(m.name, m.form, m.strength)}
                   className="w-full text-left px-3 py-2.5 hover:bg-blue-50 flex items-start gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-800">{m.name} {m.strength && <span className="font-normal text-slate-500">{m.strength}</span>}</p>
-                    {m.brand && <p className="text-[10px] text-slate-400">{m.brand}</p>}
+                    <p className="text-xs font-semibold text-ink">{m.name} {m.strength && <span className="font-normal text-ink-muted">{m.strength}</span>}</p>
+                    {m.brand && <p className="text-[10px] text-ink-muted">{m.brand}</p>}
                   </div>
-                  <span className="shrink-0 text-[9px] font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mt-0.5">{m.form}</span>
+                  <span className="shrink-0 text-[9px] font-medium bg-surface-sunken text-ink-muted px-1.5 py-0.5 rounded mt-0.5">{m.form}</span>
                   <span className="shrink-0 text-[9px] font-medium bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded mt-0.5">{m.category}</span>
                 </button>
               </li>
@@ -519,33 +523,33 @@ const DamaFormComponent: React.FC<{ patient: Patient; onUpdate: (p: Patient) => 
         <h2 className="font-bold text-amber-900 text-sm mb-1">Discharge Against Medical Advice (DAMA)</h2>
         <p className="text-xs text-amber-700">Document this DAMA carefully — patient/relative has refused continued in-patient care.</p>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+      <div className="bg-surface-card rounded-xl border border-line p-5 space-y-4">
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date & Time of DAMA</label>
-          <input type="datetime-local" value={form.dateTime} onChange={e => upd('dateTime', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Date & Time of DAMA</label>
+          <input type="datetime-local" value={form.dateTime} onChange={e => upd('dateTime', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
         </div>
         {([['clinicalCondition','Clinical Condition at Time of DAMA',3],['patientReason','Reason Given by Patient / Relative',2],['risksExplained','Risks Explained (document verbatim)',3],['witnessName','Witness Name',1]] as [keyof DamaSummary, string, number][]).map(([key, label, rows]) => (
           <div key={key}>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">{label}</label>
             {rows === 1
-              ? <input type="text" value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
-              : <textarea rows={rows} value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+              ? <input type="text" value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              : <textarea rows={rows} value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
             }
           </div>
         ))}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Attending Doctor</label>
-            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Attending Doctor</label>
+            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
           </div>
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Resident Doctor</label>
-            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Resident Doctor</label>
+            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
           </div>
         </div>
         <label className="flex items-center gap-3 cursor-pointer">
           <input type="checkbox" checked={form.signatureObtained} onChange={e => upd('signatureObtained', e.target.checked)} className="w-4 h-4 accent-amber-600" />
-          <span className="text-sm font-medium text-slate-700">Patient / Next-of-kin signature obtained on DAMA form</span>
+          <span className="text-sm font-medium text-ink">Patient / Next-of-kin signature obtained on DAMA form</span>
         </label>
         <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}>
           {saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
@@ -583,44 +587,44 @@ const DeathFormComponent: React.FC<{ patient: Patient; onUpdate: (p: Patient) =>
         <h2 className="font-bold text-white text-sm mb-1">Death Summary</h2>
         <p className="text-xs text-slate-300">Complete all fields. This document supports the medical death certificate.</p>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+      <div className="bg-surface-card rounded-xl border border-line p-5 space-y-4">
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date & Time of Death</label>
-          <input type="datetime-local" value={form.dateTimeOfDeath} onChange={e => upd('dateTimeOfDeath', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Date & Time of Death</label>
+          <input type="datetime-local" value={form.dateTimeOfDeath} onChange={e => upd('dateTimeOfDeath', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
         </div>
-        <div className="bg-slate-50 rounded-lg p-3 space-y-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Cause of Death (Certificate Format)</p>
+        <div className="bg-surface-sunken rounded-lg p-3 space-y-3">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Cause of Death (Certificate Format)</p>
           {([['immediateCause','Ia — Immediate cause','e.g. Septic shock'],['antecedentCause','Ib — Antecedent cause','e.g. Postoperative wound infection'],['underlyingCause','Ic — Underlying cause (underlying disease)','e.g. Carcinoma colon'],['otherConditions','II — Other significant conditions','e.g. Hypertension, DM']] as [keyof DeathSummary, string, string][]).map(([key, label, ph]) => (
             <div key={key}>
-              <label className="text-xs text-slate-500 mb-0.5 block">{label}</label>
-              <input type="text" placeholder={ph} value={form[key] as string} onChange={e => upd(key, e.target.value as DeathSummary[typeof key])} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+              <label className="text-xs text-ink-muted mb-0.5 block">{label}</label>
+              <input type="text" placeholder={ph} value={form[key] as string} onChange={e => upd(key, e.target.value as DeathSummary[typeof key])} className="w-full text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
             </div>
           ))}
         </div>
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Clinical Course Summary</label>
-          <textarea rows={4} value={form.clinicalCourse} onChange={e => upd('clinicalCourse', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Clinical Course Summary</label>
+          <textarea rows={4} value={form.clinicalCourse} onChange={e => upd('clinicalCourse', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none" />
         </div>
         <div className="space-y-2">
           {([['unnaturalDeath','Unnatural / Suspicious death'],['policeIntimated','Police / Medico-legal intimation given'],['postMortemDone','Post-mortem performed / requested']] as [keyof DeathSummary, string][]).map(([key, label]) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={form[key] as boolean} onChange={e => upd(key, e.target.checked as DeathSummary[typeof key])} className="w-4 h-4 accent-slate-700" />
-              <span className="text-sm text-slate-700">{label}</span>
+              <span className="text-sm text-ink">{label}</span>
             </label>
           ))}
         </div>
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Death Certificate No.</label>
-          <input type="text" value={form.certificateNo} onChange={e => upd('certificateNo', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Death Certificate No.</label>
+          <input type="text" value={form.certificateNo} onChange={e => upd('certificateNo', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Attending Doctor</label>
-            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Attending Doctor</label>
+            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
           </div>
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Resident Doctor</label>
-            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Resident Doctor</label>
+            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
           </div>
         </div>
         <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'}`}>
@@ -828,10 +832,10 @@ const DischargeForm: React.FC<{
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="no-print bg-white rounded-lg shadow-sm border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
+      <div className="no-print bg-surface-card rounded-lg shadow-sm border border-line p-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-teal-600 transition-colors"
+          className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-teal-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> All Discharged Patients
         </button>
@@ -849,7 +853,11 @@ const DischargeForm: React.FC<{
               </button>
               <button
                 onClick={() => setConfirmReadmit(false)}
-                className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded transition-colors"
+                // bg-slate-200/300 as background fills aren't literal table rows;
+                // extrapolated to the surface-sunken/surface pair (same idiom as
+                // WardDashboard.tsx's verified "border-line ... hover:bg-surface"
+                // secondary-button pattern, line ~800) rather than inventing a new token.
+                className="px-2.5 py-1 bg-surface-sunken hover:bg-surface text-ink text-xs font-bold rounded transition-colors"
               >
                 Cancel
               </button>
@@ -883,13 +891,13 @@ const DischargeForm: React.FC<{
       </div>
 
       {/* Document mode tabs */}
-      <div className="no-print flex gap-1 p-1 bg-slate-100 rounded-xl">
+      <div className="no-print flex gap-1 p-1 bg-surface-sunken rounded-xl">
         {([['discharge','Discharge Summary','bg-teal-600'],['dama','DAMA','bg-amber-500'],['death','Death Summary','bg-slate-700']] as [typeof docMode, string, string][]).map(([mode, label, activeColor]) => (
           <button
             key={mode}
             onClick={() => setDocMode(mode)}
             className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-              docMode === mode ? `${activeColor} text-white shadow-sm` : 'text-slate-500 hover:text-slate-700'
+              docMode === mode ? `${activeColor} text-white shadow-sm` : 'text-ink-muted hover:text-ink'
             }`}
           >
             {label}
@@ -915,7 +923,7 @@ const DischargeForm: React.FC<{
       {/* ── Document (discharge mode only) ── */}
       {docMode !== 'discharge' ? null : <>
       {/* (discharge document rendered below) */}
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 max-w-4xl mx-auto">
+      <div className="bg-surface-card rounded-xl shadow-md border border-line max-w-4xl mx-auto">
         {/* Document Header — overflow-hidden kept here so the dark bg clips to rounded-xl corners */}
         <div className="bg-slate-800 text-white text-center py-5 px-6 rounded-t-xl overflow-hidden">
           <p className="text-xs font-semibold tracking-widest uppercase text-slate-300 mb-0.5">
@@ -927,44 +935,44 @@ const DischargeForm: React.FC<{
 
         <div className="p-6 md:p-8">
           {/* Patient Info */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-6 pb-5 border-b border-slate-200 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-6 pb-5 border-b border-line text-sm">
             {[
               ['Name', patient.name],
               ['Age / Sex', `${patient.age}y / ${patient.gender}`],
               ['IP No', patient.ipNo],
               ['Ward / Bed', `${patient.ward} / Bed ${patient.bed}`],
               ['Date of Admission', patient.doa],
-              ['Date of Discharge', patient.dod || <span className="text-slate-400 italic">Not yet discharged</span>],
+              ['Date of Discharge', patient.dod || <span className="text-ink-muted italic">Not yet discharged</span>],
               ['Contact', patient.mobile],
               ['Comorbidities', patient.comorbidities.join(', ') || 'None'],
             ].map(([label, val]) => (
               <div key={String(label)}>
-                <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
-                <span className="text-slate-800 font-medium">{val}</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-ink-muted">{label}</span>
+                <span className="text-ink font-medium">{val}</span>
               </div>
             ))}
           </div>
 
           {/* Doctor fields — inline editable */}
-          <div className="grid grid-cols-2 gap-4 mb-6 pb-5 border-b border-slate-200">
+          <div className="grid grid-cols-2 gap-4 mb-6 pb-5 border-b border-line">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Consultant / Attending Doctor</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-ink-muted mb-1">Consultant / Attending Doctor</label>
               <input
                 type="text"
                 value={summary.attendingDoctor}
                 onChange={e => update('attendingDoctor', e.target.value)}
                 placeholder="Dr. ..."
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-line focus:border-teal-400 focus:outline-none bg-transparent py-1 text-ink"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Resident Doctor</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-ink-muted mb-1">Resident Doctor</label>
               <input
                 type="text"
                 value={summary.residentDoctor}
                 onChange={e => update('residentDoctor', e.target.value)}
                 placeholder="Dr. ..."
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-line focus:border-teal-400 focus:outline-none bg-transparent py-1 text-ink"
               />
             </div>
           </div>
@@ -1031,31 +1039,31 @@ const DischargeForm: React.FC<{
             rows={2}
           />
           <div className="mb-5">
-            <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1">
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-1 border-b border-line pb-1">
               Follow-Up Appointment Date
             </label>
             <input
               type="date"
               value={summary.followUpDate}
               onChange={e => update('followUpDate', e.target.value)}
-              className="text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+              className="text-sm border-0 border-b border-dashed border-line focus:border-teal-400 focus:outline-none bg-transparent py-1 text-ink"
             />
           </div>
 
           {/* Signature area */}
-          <div className="grid grid-cols-2 gap-8 mt-10 pt-5 border-t-2 border-slate-300">
+          <div className="grid grid-cols-2 gap-8 mt-10 pt-5 border-t-2 border-line">
             <div className="text-center">
               <div className="h-12 border-b-2 border-slate-400 mb-2" />
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Consultant Signature</p>
+              <p className="text-xs font-bold text-ink uppercase tracking-wide">Consultant Signature</p>
               {summary.attendingDoctor && (
-                <p className="text-xs text-slate-500 mt-0.5">{summary.attendingDoctor}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{summary.attendingDoctor}</p>
               )}
             </div>
             <div className="text-center">
               <div className="h-12 border-b-2 border-slate-400 mb-2" />
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Resident Signature</p>
+              <p className="text-xs font-bold text-ink uppercase tracking-wide">Resident Signature</p>
               {summary.residentDoctor && (
-                <p className="text-xs text-slate-500 mt-0.5">{summary.residentDoctor}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{summary.residentDoctor}</p>
               )}
             </div>
           </div>
@@ -1086,22 +1094,22 @@ const DischargedList: React.FC<{
   return (
     <div className="space-y-4">
       {/* Search */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+      <div className="bg-surface-card rounded-lg shadow-sm border border-line p-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" />
           <input
             type="text"
             placeholder="Search by name, IP No, diagnosis..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-line rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
           />
         </div>
       </div>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="p-12 flex flex-col items-center justify-center text-slate-400">
+        <div className="p-12 flex flex-col items-center justify-center text-ink-muted">
           <LogOut className="w-10 h-10 mb-3 opacity-30" />
           <p className="font-medium">{patients.length === 0 ? 'No discharged patients yet.' : 'No results found.'}</p>
         </div>
@@ -1115,12 +1123,12 @@ const DischargedList: React.FC<{
                 : null;
               const hasSummary = !!patient.dischargeSummary;
               return (
-                <div key={patient.ipNo} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+                <div key={patient.ipNo} className="bg-surface-card rounded-xl border border-line shadow-sm p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-900 truncate">{patient.name}</p>
-                      <p className="text-xs text-slate-500">{patient.age}y / {patient.gender} · IP: {patient.ipNo}</p>
-                      <p className="text-xs text-slate-400">{patient.ward} / Bed {patient.bed}</p>
+                      <p className="font-bold text-ink truncate">{patient.name}</p>
+                      <p className="text-xs text-ink-muted">{patient.age}y / {patient.gender} · IP: {patient.ipNo}</p>
+                      <p className="text-xs text-ink-muted">{patient.ward} / Bed {patient.bed}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       {stayDays !== null && (
@@ -1131,8 +1139,8 @@ const DischargedList: React.FC<{
                         : <span className="text-xs text-amber-500">Pending</span>}
                     </div>
                   </div>
-                  <p className="text-sm text-slate-700 line-clamp-2">{patient.diagnosis}</p>
-                  <div className="text-xs text-slate-400 flex gap-3">
+                  <p className="text-sm text-ink line-clamp-2">{patient.diagnosis}</p>
+                  <div className="text-xs text-ink-muted flex gap-3">
                     <span>Admitted: {patient.doa}</span>
                     <span>Discharged: {patient.dod || '—'}</span>
                   </div>
@@ -1156,10 +1164,10 @@ const DischargedList: React.FC<{
           </div>
 
           {/* Desktop table layout */}
-          <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="hidden sm:block bg-surface-card rounded-xl shadow-sm border border-line overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left min-w-[700px]">
-                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                <thead className="text-xs text-ink-muted uppercase bg-surface border-b border-line">
                   <tr>
                     <th className="px-5 py-3">Patient</th>
                     <th className="px-5 py-3">Diagnosis</th>
@@ -1177,18 +1185,18 @@ const DischargedList: React.FC<{
                       : null;
                     const hasSummary = !!patient.dischargeSummary;
                     return (
-                      <tr key={patient.ipNo} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
+                      <tr key={patient.ipNo} className="border-b last:border-0 hover:bg-surface transition-colors">
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-900">{patient.name}</div>
-                          <div className="text-xs text-slate-500">{patient.age}y / {patient.gender} • IP: {patient.ipNo}</div>
-                          <div className="text-xs text-slate-400">{patient.ward} / Bed {patient.bed}</div>
+                          <div className="font-semibold text-ink">{patient.name}</div>
+                          <div className="text-xs text-ink-muted">{patient.age}y / {patient.gender} • IP: {patient.ipNo}</div>
+                          <div className="text-xs text-ink-muted">{patient.ward} / Bed {patient.bed}</div>
                         </td>
                         <td className="px-5 py-4 max-w-xs">
-                          <p className="text-slate-700 truncate" title={patient.diagnosis}>{patient.diagnosis}</p>
-                          {patient.procedure && <p className="text-xs text-slate-400 truncate">{patient.procedure}</p>}
+                          <p className="text-ink truncate" title={patient.diagnosis}>{patient.diagnosis}</p>
+                          {patient.procedure && <p className="text-xs text-ink-muted truncate">{patient.procedure}</p>}
                         </td>
-                        <td className="px-5 py-4 text-slate-600 whitespace-nowrap">{patient.doa}</td>
-                        <td className="px-5 py-4 text-slate-600 whitespace-nowrap">{patient.dod || '—'}</td>
+                        <td className="px-5 py-4 text-ink whitespace-nowrap">{patient.doa}</td>
+                        <td className="px-5 py-4 text-ink whitespace-nowrap">{patient.dod || '—'}</td>
                         <td className="px-5 py-4">
                           {stayDays !== null ? (
                             <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded text-xs font-medium">{stayDays}d</span>
