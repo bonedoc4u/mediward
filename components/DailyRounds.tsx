@@ -150,7 +150,7 @@ const PatientRoundCard = memo(({
             </h4>
             <button
               onClick={onGeneratePdf}
-              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-accent-fg bg-accent-soft hover:bg-accent-soft rounded border border-accent transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-accent-fg bg-accent-soft hover:bg-accent-soft/70 rounded border border-accent transition-colors"
             >
               <Share2 className="w-3 h-3" /> Share
             </button>

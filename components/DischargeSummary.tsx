@@ -425,7 +425,7 @@ const MedicationPicker: React.FC<{
         <div className="mb-3 space-y-1.5">
           {entries.map((e, i) => (
             <div key={i} className="flex items-start gap-2 group bg-accent-soft border border-accent rounded-lg px-3 py-2">
-              <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-accent-soft text-accent-fg text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+              <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-surface-card text-accent-fg text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-ink leading-tight">{e.name}</p>
                 <div className="flex gap-2 mt-1 flex-wrap">

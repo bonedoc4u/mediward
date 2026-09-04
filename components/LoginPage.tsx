@@ -219,7 +219,7 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-accent hover:bg-accent-pressed text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
+              className="w-full bg-accent hover:bg-accent-pressed text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-accent/30 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
             >
               {isLoading ? (
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
