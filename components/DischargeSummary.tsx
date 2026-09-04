@@ -930,13 +930,15 @@ const DischargeForm: React.FC<{
             <div className="flex items-center gap-2 bg-vital-warning-surface border border-vital-warning-border rounded-lg px-3 py-1.5">
               <AlertTriangle className="w-4 h-4 text-vital-warning shrink-0" />
               <span className="text-xs font-medium text-vital-warning-fg">Readmit to ward?</span>
-              {/* Same solid-fill contrast fix as the DAMA/Death Save buttons: this
-                  destructive-ish confirm action uses the pale trio + hover:opacity-90
-                  instead of the original solid bg-amber-500 + text-white, matching
-                  OTListManagement.tsx's "Clear List" button (task-5-report.md). */}
+              {/* Button must have a distinct background from its own parent container
+                  (which is also bg-vital-warning-surface). Using bg-surface-card
+                  (neutral card surface) with text-vital-warning-fg + border-vital-warning-border
+                  keeps the warning semantic meaning and follows the same file's neighboring
+                  Cancel button's "distinct-from-parent" pattern (line ~949). This avoids
+                  re-triggering the earlier solid-fill-white-text WCAG failure (~1.67:1). */}
               <button
                 onClick={() => { setConfirmReadmit(false); onReadmit(patient); }}
-                className="px-2.5 py-1 bg-vital-warning-surface text-vital-warning-fg hover:opacity-90 text-xs font-bold rounded transition-colors"
+                className="px-2.5 py-1 bg-surface-card text-vital-warning-fg border border-vital-warning-border hover:bg-vital-warning-surface text-xs font-bold rounded transition-colors"
               >
                 Yes, readmit
               </button>
