@@ -72,6 +72,23 @@ const Lightbox: React.FC<Props> = ({ investigations, initialIndex, onClose }) =>
 
   if (!inv || !cfg) return null;
 
+  // JUDGMENT CALL (dark-mode Task 6): this viewer's own chrome — the bg-black
+  // full-screen container, the bg-black/70 top bar, the bg-black/50 nav-arrow
+  // buttons, and every text-white/* label — is left hardcoded rather than
+  // converted to bg-surface/text-ink. Reasoning: (1) it mirrors modality.ts's
+  // own explicitly-documented always-dark-independent-of-theme viewer
+  // background, whose getModality().badge this same component consumes a few
+  // lines above; (2) a full-screen photo/study viewer conventionally stays
+  // dark-chrome regardless of system theme (iOS Photos, Google Photos, WhatsApp
+  // media viewer all do this); (3) practically, X-ray/CT/MRI grayscale images
+  // read with the most fidelity against a neutral dark backdrop with no color
+  // cast — the same clinical reason modality.ts gives per-modality dark
+  // backgrounds, just applied full-screen instead of per-thumbnail. None of
+  // this file's classes were flagged by the grep sweep in the first place
+  // (it uses bg-black/text-white, not a slate-family class), but the decision
+  // is recorded here because ImageEditor.tsx's and RadiologyPanel.tsx's
+  // analogous always-dark surfaces cite this file as precedent — see
+  // task-6-report.md for the full writeup.
   return (
     <div className="fixed inset-0 z-[70] bg-black flex flex-col" onClick={onClose}>
       {/* Top bar */}

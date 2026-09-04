@@ -142,19 +142,24 @@ const Icd10Picker: React.FC<{
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder={placeholder ?? 'ICD-10 code or search…'}
-        className="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-teal-400"
+        className="w-full text-xs px-2 py-1.5 border border-line rounded-lg bg-surface-sunken focus:outline-none focus:ring-1 focus:ring-accent"
       />
       {open && matches.length > 0 && (
-        <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <ul className="absolute z-30 left-0 right-0 mt-1 bg-surface-card border border-line rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {matches.map(item => (
             <li key={item.code}>
               <button
                 type="button"
                 onMouseDown={() => { onChange(`${item.code} — ${item.desc}`); setQuery(''); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-baseline gap-2"
+                // blue reclassified to accent: purely decorative differentiation for a
+                // search-result row, not attached to any lab/clinical value (per the
+                // mapping table's own carve-out + the verified precedent in
+                // RoundMode.tsx of reclassifying non-lab blue instances to accent,
+                // task-4-report.md).
+                className="w-full text-left px-3 py-2 text-xs hover:bg-accent-soft flex items-baseline gap-2"
               >
-                <span className="font-mono font-bold text-blue-700 shrink-0">{item.code}</span>
-                <span className="text-slate-700">{item.desc}</span>
+                <span className="font-mono font-bold text-accent-fg shrink-0">{item.code}</span>
+                <span className="text-ink">{item.desc}</span>
               </button>
             </li>
           ))}
@@ -211,12 +216,17 @@ const MultiDiagnosisField: React.FC<{
 
   return (
     <div className="mb-5">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 border-b border-slate-200 pb-1 flex items-center justify-between">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-2 border-b border-line pb-1 flex items-center justify-between">
         <span>Final Diagnosis (at Discharge)</span>
         <button
           type="button"
           onClick={addEntry}
-          className="flex items-center gap-1 text-[10px] normal-case font-semibold text-teal-600 hover:text-blue-800 px-2 py-0.5 rounded-md hover:bg-blue-50 transition-colors"
+          // hover:text-blue-800/hover:bg-blue-50 were a stray mismatched color next to an
+          // otherwise-teal base (text-accent-fg) — the same "copy-paste artifact" pattern
+          // RoundMode.tsx found and folded into its sibling teal fill (task-4-report.md).
+          // Folded into the accent family here too, using accent-pressed for the hover-text
+          // darken step (mirrors how bg-accent-pressed serves as the pressed/hover shade).
+          className="flex items-center gap-1 text-[10px] normal-case font-semibold text-accent-fg hover:text-accent-pressed px-2 py-0.5 rounded-md hover:bg-accent-soft transition-colors"
         >
           <Plus className="w-3 h-3" /> Add Diagnosis
         </button>
@@ -226,7 +236,11 @@ const MultiDiagnosisField: React.FC<{
         {entries.map((entry, idx) => (
           <div key={idx} className="flex items-start gap-2 group">
             {/* Diagnosis number badge */}
-            <span className="shrink-0 w-5 h-5 mt-1.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center">
+            {/* bg-slate-200 as a background fill isn't a literal mapping-table row
+                (only 50/100 are tabled for surface-sunken); extrapolated to the same
+                chip/well family for consistency (same idiom as RadiologyComparator's
+                text-slate-200/300 -> ink-faint extrapolation, task-6-report.md). */}
+            <span className="shrink-0 w-5 h-5 mt-1.5 rounded-full bg-surface-sunken text-ink text-[10px] font-bold flex items-center justify-center">
               {idx + 1}
             </span>
 
@@ -237,7 +251,7 @@ const MultiDiagnosisField: React.FC<{
                 value={entry.text}
                 onChange={e => updateEntry(idx, { text: e.target.value })}
                 placeholder="Diagnosis description…"
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-line focus:border-accent focus:outline-none bg-transparent py-1 text-ink"
               />
 
               {/* ICD-10 picker */}
@@ -255,7 +269,7 @@ const MultiDiagnosisField: React.FC<{
               <button
                 type="button"
                 onClick={() => removeEntry(idx)}
-                className="shrink-0 mt-1.5 p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="shrink-0 mt-1.5 p-0.5 text-ink-muted hover:text-vital-critical opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <XIcon className="w-4 h-4" />
               </button>
@@ -266,16 +280,16 @@ const MultiDiagnosisField: React.FC<{
 
       {/* Secondary / comorbidity ICD-10 codes */}
       <div className="mt-4">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1 flex items-center justify-between">
+        <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-1 border-b border-line pb-1 flex items-center justify-between">
           <span>Secondary ICD-10 Codes (comorbidities)</span>
-          <span className="text-[9px] font-normal text-slate-400 normal-case">ICD-10 / ICD-11</span>
+          <span className="text-[9px] font-normal text-ink-muted normal-case">ICD-10 / ICD-11</span>
         </div>
         <input
           type="text"
           value={icd10Secondary}
           onChange={e => onChange({ finalDiagnosis, icd10Code, icd10Secondary: e.target.value })}
           placeholder="e.g. I10 — Hypertension, E11.9 — Type 2 DM"
-          className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+          className="w-full text-sm border-0 border-b border-dashed border-line focus:border-accent focus:outline-none bg-transparent py-1 text-ink"
         />
       </div>
     </div>
@@ -300,11 +314,11 @@ const DocField = ({
 
   return (
     <div className="mb-5">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-1 border-b border-line pb-1">
         {label}
       </div>
       {readOnly ? (
-        <p className="text-sm text-slate-800 leading-relaxed min-h-[1.5rem] whitespace-pre-wrap break-words">{value || '—'}</p>
+        <p className="text-sm text-ink leading-relaxed min-h-[1.5rem] whitespace-pre-wrap break-words">{value || '—'}</p>
       ) : (
         <textarea
           ref={ref}
@@ -316,7 +330,7 @@ const DocField = ({
             e.target.style.height = e.target.scrollHeight + 'px';
             onChange?.(e.target.value);
           }}
-          className="w-full text-sm text-slate-800 leading-relaxed resize-none overflow-hidden border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 placeholder-slate-300"
+          className="w-full text-sm text-ink leading-relaxed resize-none overflow-hidden border-0 border-b border-dashed border-line focus:border-accent focus:outline-none bg-transparent py-1 placeholder-ink-faint"
           placeholder={`Enter ${label.toLowerCase()}...`}
         />
       )}
@@ -391,26 +405,36 @@ const MedicationPicker: React.FC<{
 
   return (
     <div className="mb-5">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2 border-b border-slate-200 pb-1 flex items-center gap-1.5">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-2 border-b border-line pb-1 flex items-center gap-1.5">
         <Pill className="w-3.5 h-3.5" />
         <span>Discharge Medications</span>
       </div>
 
-      {/* Existing entries */}
+      {/* Existing entries.
+          JUDGMENT CALL: this whole row's blue (and the add-form panel's indigo, below)
+          are reclassified to accent, not vital-low or neutral-chip. Neither shade is
+          attached to a lab/clinical value in this file (this is a medication-list UI,
+          not a lab screen), so the mapping table's own carve-out applies ("if a blue
+          instance is really just a neutral info banner unrelated to any lab/clinical
+          value, prefer accent"). Unlike RoundMode.tsx's purely-informational purple
+          comorbidity tags (which went to a neutral chip, task-4-report.md), these rows
+          represent an actively-confirmed/selected state (the user searched for and
+          added this medication), which is the "selection tint" role bg-accent-soft is
+          explicitly defined for in the mapping table — so accent, not neutral, here. */}
       {entries.length > 0 && (
         <div className="mb-3 space-y-1.5">
           {entries.map((e, i) => (
-            <div key={i} className="flex items-start gap-2 group bg-blue-50/60 border border-blue-100 rounded-lg px-3 py-2">
-              <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-blue-200 text-blue-800 text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+            <div key={i} className="flex items-start gap-2 group bg-accent-soft border border-accent rounded-lg px-3 py-2">
+              <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-surface-card text-accent-fg text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800 leading-tight">{e.name}</p>
+                <p className="text-sm font-semibold text-ink leading-tight">{e.name}</p>
                 <div className="flex gap-2 mt-1 flex-wrap">
-                  {e.freq && <span className="text-[10px] font-medium bg-white border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded">{e.freq}</span>}
-                  {e.duration && <span className="text-[10px] font-medium bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{e.duration}</span>}
+                  {e.freq && <span className="text-[10px] font-medium bg-surface-card border border-accent text-accent-fg px-1.5 py-0.5 rounded">{e.freq}</span>}
+                  {e.duration && <span className="text-[10px] font-medium bg-surface-card border border-line text-ink px-1.5 py-0.5 rounded">{e.duration}</span>}
                 </div>
               </div>
               <button type="button" onClick={() => removeEntry(i)}
-                className="shrink-0 mt-0.5 p-0.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                className="shrink-0 mt-0.5 p-0.5 text-ink-muted hover:text-vital-critical opacity-0 group-hover:opacity-100 transition-opacity">
                 <XIcon className="w-4 h-4" />
               </button>
             </div>
@@ -418,45 +442,46 @@ const MedicationPicker: React.FC<{
         </div>
       )}
 
-      {/* Add form (shown after selecting a med) */}
+      {/* Add form (shown after selecting a med). Indigo -> accent, same reasoning as the
+          existing-entries row above: a pending/in-progress action, not a lab value. */}
       {addForm && (
-        <div className="mb-3 border border-indigo-200 bg-indigo-50/50 rounded-xl p-3 space-y-2">
-          <p className="text-xs font-semibold text-indigo-800">{addForm.name}</p>
+        <div className="mb-3 border border-accent bg-accent-soft rounded-xl p-3 space-y-2">
+          <p className="text-xs font-semibold text-accent-fg">{addForm.name}</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Frequency</label>
+              <label className="text-[10px] font-bold uppercase text-ink-muted mb-0.5 block">Frequency</label>
               <BottomSheetPicker
                 title="Frequency"
                 value={addForm.freq}
                 options={FREQUENCIES.map(f => ({ value: f, label: f }))}
                 onChange={val => setAddForm(f => f && ({ ...f, freq: val }))}
-                triggerClassName="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none flex items-center justify-between gap-1"
+                triggerClassName="w-full text-xs border border-line rounded-lg px-2 py-1.5 bg-surface-card focus:outline-none flex items-center justify-between gap-1"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase text-slate-400 mb-0.5 block">Duration</label>
+              <label className="text-[10px] font-bold uppercase text-ink-muted mb-0.5 block">Duration</label>
               <BottomSheetPicker
                 title="Duration"
                 value={addForm.duration}
                 options={DURATIONS.map(d => ({ value: d, label: d }))}
                 onChange={val => setAddForm(f => f && ({ ...f, duration: val }))}
-                triggerClassName="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none flex items-center justify-between gap-1"
+                triggerClassName="w-full text-xs border border-line rounded-lg px-2 py-1.5 bg-surface-card focus:outline-none flex items-center justify-between gap-1"
               />
             </div>
           </div>
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={() => setAddForm(null)}
-              className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+              className="text-xs px-3 py-1.5 border border-line rounded-lg hover:bg-surface-sunken">Cancel</button>
             <button type="button" onClick={confirmAdd}
-              className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Add to list</button>
+              className="text-xs px-3 py-1.5 bg-accent text-white rounded-lg hover:bg-accent-pressed">Add to list</button>
           </div>
         </div>
       )}
 
       {/* Search box */}
       <div className="relative">
-        <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus-within:ring-1 focus-within:ring-teal-400 focus-within:border-blue-400">
-          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <div className="flex items-center gap-2 border border-line rounded-xl px-3 py-2 bg-surface-sunken focus-within:ring-1 focus-within:ring-accent focus-within:border-accent">
+          <Search className="w-3.5 h-3.5 text-ink-muted shrink-0" />
           <input
             type="text"
             value={search}
@@ -464,28 +489,33 @@ const MedicationPicker: React.FC<{
             onFocus={() => setShowDrop(true)}
             onBlur={() => setTimeout(() => setShowDrop(false), 150)}
             placeholder={medications.length ? 'Search medication by name or brand…' : 'No medications loaded — seed list in Admin settings'}
-            className="flex-1 text-xs bg-transparent focus:outline-none text-slate-700 placeholder-slate-400"
+            className="flex-1 text-xs bg-transparent focus:outline-none text-ink placeholder-ink-faint"
           />
           <button type="button" onClick={() => { setShowDrop(false); setSearch(''); setAddForm({ name: search.trim(), dose: '', freq: 'OD', duration: '5 days' }); }}
             disabled={!search.trim()}
-            className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-teal-600 hover:text-blue-800 disabled:opacity-30">
+            className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-accent-fg hover:text-accent-pressed disabled:opacity-30">
             <Plus className="w-3 h-3" /> Custom
           </button>
         </div>
 
         {showDrop && suggestions.length > 0 && (
-          <ul className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+          <ul className="absolute z-30 left-0 right-0 mt-1 bg-surface-card border border-line rounded-xl shadow-lg max-h-56 overflow-y-auto">
             {suggestions.map(m => (
               <li key={m.id}>
                 <button type="button"
                   onMouseDown={() => selectMed(m.name, m.form, m.strength)}
-                  className="w-full text-left px-3 py-2.5 hover:bg-blue-50 flex items-start gap-3">
+                  className="w-full text-left px-3 py-2.5 hover:bg-accent-soft flex items-start gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-800">{m.name} {m.strength && <span className="font-normal text-slate-500">{m.strength}</span>}</p>
-                    {m.brand && <p className="text-[10px] text-slate-400">{m.brand}</p>}
+                    <p className="text-xs font-semibold text-ink">{m.name} {m.strength && <span className="font-normal text-ink-muted">{m.strength}</span>}</p>
+                    {m.brand && <p className="text-[10px] text-ink-muted">{m.brand}</p>}
                   </div>
-                  <span className="shrink-0 text-[9px] font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mt-0.5">{m.form}</span>
-                  <span className="shrink-0 text-[9px] font-medium bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded mt-0.5">{m.category}</span>
+                  <span className="shrink-0 text-[9px] font-medium bg-surface-sunken text-ink-muted px-1.5 py-0.5 rounded mt-0.5">{m.form}</span>
+                  {/* Category tag: unlike the row above, this is a plain reference label
+                      (like its sibling form-badge right next to it), not a selected/
+                      confirmed state -> neutral chip, not accent, matching RoundMode.tsx's
+                      purple-comorbidity-tag precedent (task-4-report.md) for the same
+                      "informational tag, not a primary action" reasoning. */}
+                  <span className="shrink-0 text-[9px] font-medium bg-surface-sunken text-ink-muted px-1.5 py-0.5 rounded mt-0.5">{m.category}</span>
                 </button>
               </li>
             ))}
@@ -515,39 +545,52 @@ const DamaFormComponent: React.FC<{ patient: Patient; onUpdate: (p: Patient) => 
   const handleSave = () => { onUpdate({ ...patient, damaSummary: form }); setSaved(true); };
   return (
     <div className="space-y-4">
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-        <h2 className="font-bold text-amber-900 text-sm mb-1">Discharge Against Medical Advice (DAMA)</h2>
-        <p className="text-xs text-amber-700">Document this DAMA carefully — patient/relative has refused continued in-patient care.</p>
+      {/* Confirmed by reading (not assumed): this is the DAMA warning banner the task
+          brief anticipated. Maps to the full vital-warning triplet. The original used
+          two amber text shades (900 for the bold title, 700 for the body) but only one
+          text-vital-warning-fg token exists -> both map to it (minor loss of the
+          title/body weight distinction, documented judgment call). */}
+      <div className="bg-vital-warning-surface border border-vital-warning-border rounded-xl p-4">
+        <h2 className="font-bold text-vital-warning-fg text-sm mb-1">Discharge Against Medical Advice (DAMA)</h2>
+        <p className="text-xs text-vital-warning-fg">Document this DAMA carefully — patient/relative has refused continued in-patient care.</p>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+      <div className="bg-surface-card rounded-xl border border-line p-5 space-y-4">
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date & Time of DAMA</label>
-          <input type="datetime-local" value={form.dateTime} onChange={e => upd('dateTime', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Date & Time of DAMA</label>
+          <input type="datetime-local" value={form.dateTime} onChange={e => upd('dateTime', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-vital-warning" />
         </div>
         {([['clinicalCondition','Clinical Condition at Time of DAMA',3],['patientReason','Reason Given by Patient / Relative',2],['risksExplained','Risks Explained (document verbatim)',3],['witnessName','Witness Name',1]] as [keyof DamaSummary, string, number][]).map(([key, label, rows]) => (
           <div key={key}>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</label>
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">{label}</label>
             {rows === 1
-              ? <input type="text" value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
-              : <textarea rows={rows} value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" />
+              ? <input type="text" value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-vital-warning" />
+              : <textarea rows={rows} value={form[key] as string} onChange={e => upd(key, e.target.value as DamaSummary[typeof key])} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-vital-warning resize-none" />
             }
           </div>
         ))}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Attending Doctor</label>
-            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Attending Doctor</label>
+            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-vital-warning" />
           </div>
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Resident Doctor</label>
-            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Resident Doctor</label>
+            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-vital-warning" />
           </div>
         </div>
         <label className="flex items-center gap-3 cursor-pointer">
-          <input type="checkbox" checked={form.signatureObtained} onChange={e => upd('signatureObtained', e.target.checked)} className="w-4 h-4 accent-amber-600" />
-          <span className="text-sm font-medium text-slate-700">Patient / Next-of-kin signature obtained on DAMA form</span>
+          <input type="checkbox" checked={form.signatureObtained} onChange={e => upd('signatureObtained', e.target.checked)} className="w-4 h-4 accent-vital-warning" />
+          <span className="text-sm font-medium text-ink">Patient / Next-of-kin signature obtained on DAMA form</span>
         </label>
-        <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}>
+        {/* JUDGMENT CALL: NOT solid bg-vital-normal/bg-vital-warning + text-white, despite
+            that being listed as an option in the mapping table for the green case. Same
+            contrast finding made twice already in this plan (Task 4's Conservative button;
+            OTListManagement's Export Excel button): dark-mode --color-vital-normal (#4ade80)
+            and --color-vital-warning (#fbbf24) are both light/bright colors, and white text
+            on either computes to poor contrast as a solid button fill. Uses the pale
+            surface/fg trio + hover:opacity-90 instead, same fix applied at both other
+            Save buttons in this file (Death form below, main toolbar). */}
+        <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-vital-normal-surface text-vital-normal-fg hover:opacity-90' : 'bg-vital-warning-surface text-vital-warning-fg hover:opacity-90'}`}>
           {saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
           {saved ? 'Saved!' : 'Save DAMA Record'}
         </button>
@@ -579,51 +622,97 @@ const DeathFormComponent: React.FC<{ patient: Patient; onUpdate: (p: Patient) =>
   const handleSave = () => { onUpdate({ ...patient, deathSummary: form, patientStatus: PatientStatus.Discharged, dod: form.dateTimeOfDeath.split('T')[0] }); setSaved(true); };
   return (
     <div className="space-y-4">
+      {/*
+        Death Summary banner — JUDGMENT CALL, left hardcoded (bg-slate-800 + text-white +
+        text-slate-300), not tokenized. Not a mechanical mapping-table lookup; documented
+        here + commit message + task-7-report.md.
+
+        Confirmed by reading (not assumed): unlike the DAMA banner above (which is a real
+        vital-warning case), this banner deliberately does NOT use red or amber. Death is a
+        completed, factual event to be documented, not a warning to act on or a danger to
+        flag — so it uses the same restrained "dark, solemn, non-clinical-color" treatment
+        the app already uses for identity/hero chrome elsewhere, per the mapping table's own
+        carve-out for bg-slate-700/800/900 as a deliberate dark block ("leave it hardcoded
+        and note why").
+
+        Two token-only options were considered and rejected, same reasoning as the verified
+        Patient Header precedent (RoundMode.tsx line ~553-577, RadiologyComparator.tsx line
+        ~540-568, both read and confirmed):
+          1. bg-surface-card — in LIGHT mode surface-card is WHITE, which would erase this
+             banner into the identical white of the card directly below it, losing the
+             visual separation that signals "this sub-form carries extra gravity" — a real
+             visual regression, not a mere color-space conversion.
+          2. bg-accent — would recolor a deliberately-neutral/solemn banner as the app's
+             upbeat brand teal, which is the wrong semantic (this isn't a primary action).
+        This is safe (not the illegibility bug this whole plan warns about): text-white/
+        text-slate-300 paired with a hardcoded raw dark color can never flip to
+        white-on-white the way bg-ink + text-white would.
+      */}
       <div className="bg-slate-800 rounded-xl p-4">
         <h2 className="font-bold text-white text-sm mb-1">Death Summary</h2>
         <p className="text-xs text-slate-300">Complete all fields. This document supports the medical death certificate.</p>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+      <div className="bg-surface-card rounded-xl border border-line p-5 space-y-4">
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Date & Time of Death</label>
-          <input type="datetime-local" value={form.dateTimeOfDeath} onChange={e => upd('dateTimeOfDeath', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Date & Time of Death</label>
+          {/* JUDGMENT CALL: focus:ring-slate-400 (here and every other field in this form)
+              -> ring-ink-muted, not ring-accent and not border-line. Not a literal
+              mapping-table row (rings aren't tabled). Reasoning: this form's fields
+              deliberately don't use the app's teal accent ring or the DAMA form's amber
+              ring — consistent with the Death banner's own deliberate avoidance of both
+              colors above. border-line was rejected as the "obvious" structural mapping
+              because its value (#dce4e4) is tuned for subtle dividers and would render a
+              barely-visible focus ring — a real accessibility regression for keyboard
+              navigation. ink-muted is a stronger neutral, visible in both themes, and
+              keeps the same "neutral, non-branded" distinction intentional here. */}
+          <input type="datetime-local" value={form.dateTimeOfDeath} onChange={e => upd('dateTimeOfDeath', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ink-muted" />
         </div>
-        <div className="bg-slate-50 rounded-lg p-3 space-y-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Cause of Death (Certificate Format)</p>
+        <div className="bg-surface-sunken rounded-lg p-3 space-y-3">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Cause of Death (Certificate Format)</p>
           {([['immediateCause','Ia — Immediate cause','e.g. Septic shock'],['antecedentCause','Ib — Antecedent cause','e.g. Postoperative wound infection'],['underlyingCause','Ic — Underlying cause (underlying disease)','e.g. Carcinoma colon'],['otherConditions','II — Other significant conditions','e.g. Hypertension, DM']] as [keyof DeathSummary, string, string][]).map(([key, label, ph]) => (
             <div key={key}>
-              <label className="text-xs text-slate-500 mb-0.5 block">{label}</label>
-              <input type="text" placeholder={ph} value={form[key] as string} onChange={e => upd(key, e.target.value as DeathSummary[typeof key])} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+              <label className="text-xs text-ink-muted mb-0.5 block">{label}</label>
+              <input type="text" placeholder={ph} value={form[key] as string} onChange={e => upd(key, e.target.value as DeathSummary[typeof key])} className="w-full text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ink-muted" />
             </div>
           ))}
         </div>
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Clinical Course Summary</label>
-          <textarea rows={4} value={form.clinicalCourse} onChange={e => upd('clinicalCourse', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400 resize-none" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Clinical Course Summary</label>
+          <textarea rows={4} value={form.clinicalCourse} onChange={e => upd('clinicalCourse', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ink-muted resize-none" />
         </div>
         <div className="space-y-2">
           {([['unnaturalDeath','Unnatural / Suspicious death'],['policeIntimated','Police / Medico-legal intimation given'],['postMortemDone','Post-mortem performed / requested']] as [keyof DeathSummary, string][]).map(([key, label]) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={form[key] as boolean} onChange={e => upd(key, e.target.checked as DeathSummary[typeof key])} className="w-4 h-4 accent-slate-700" />
-              <span className="text-sm text-slate-700">{label}</span>
+              {/* accent-slate-700 -> accent-ink-muted, same "deliberately neutral, not
+                  branded/clinical" reasoning as the ring-ink-muted judgment call above,
+                  applied to the native checkbox tint. */}
+              <input type="checkbox" checked={form[key] as boolean} onChange={e => upd(key, e.target.checked as DeathSummary[typeof key])} className="w-4 h-4 accent-ink-muted" />
+              <span className="text-sm text-ink">{label}</span>
             </label>
           ))}
         </div>
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Death Certificate No.</label>
-          <input type="text" value={form.certificateNo} onChange={e => upd('certificateNo', e.target.value)} className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+          <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Death Certificate No.</label>
+          <input type="text" value={form.certificateNo} onChange={e => upd('certificateNo', e.target.value)} className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ink-muted" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Attending Doctor</label>
-            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Attending Doctor</label>
+            <input type="text" value={form.attendingDoctor} onChange={e => upd('attendingDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ink-muted" />
           </div>
           <div>
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Resident Doctor</label>
-            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-400" />
+            <label className="text-[11px] font-bold uppercase tracking-widest text-ink-muted">Resident Doctor</label>
+            <input type="text" value={form.residentDoctor} onChange={e => upd('residentDoctor', e.target.value)} placeholder="Dr. ..." className="w-full mt-1 text-sm border border-line rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ink-muted" />
           </div>
         </div>
-        <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-white'}`}>
+        {/* Same solid-fill contrast fix as the DAMA Save button above for the "saved"
+            (green) state. The "unsaved" state here is plain bg-slate-800 (non-clinical,
+            the app's default dark CTA button, same as everywhere else in this file) ->
+            bg-accent/accent-pressed + text-white, the established safe pairing
+            (OTListManagement.tsx's Export PDF conversion, task-5-report.md: "bg-ink flips
+            to a near-white value in dark mode ... bg-accent/accent-pressed is guaranteed
+            dark in both themes and is the standard safe pairing with text-white"). */}
+        <button onClick={handleSave} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-colors ${saved ? 'bg-vital-normal-surface text-vital-normal-fg hover:opacity-90' : 'bg-accent hover:bg-accent-pressed text-white'}`}>
           {saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
           {saved ? 'Saved!' : 'Save Death Summary'}
         </button>
@@ -828,28 +917,38 @@ const DischargeForm: React.FC<{
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="no-print bg-white rounded-lg shadow-sm border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
+      <div className="no-print bg-surface-card rounded-lg shadow-sm border border-line p-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-10">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-teal-600 transition-colors"
+          className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-accent-fg transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> All Discharged Patients
         </button>
         <div className="flex items-center gap-2">
           {/* Readmit — inline confirm so it can't be triggered accidentally */}
           {confirmReadmit ? (
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
-              <span className="text-xs font-medium text-amber-800">Readmit to ward?</span>
+            <div className="flex items-center gap-2 bg-vital-warning-surface border border-vital-warning-border rounded-lg px-3 py-1.5">
+              <AlertTriangle className="w-4 h-4 text-vital-warning shrink-0" />
+              <span className="text-xs font-medium text-vital-warning-fg">Readmit to ward?</span>
+              {/* Button must have a distinct background from its own parent container
+                  (which is also bg-vital-warning-surface). Using bg-surface-card
+                  (neutral card surface) with text-vital-warning-fg + border-vital-warning-border
+                  keeps the warning semantic meaning and follows the same file's neighboring
+                  Cancel button's "distinct-from-parent" pattern (line ~949). This avoids
+                  re-triggering the earlier solid-fill-white-text WCAG failure (~1.67:1). */}
               <button
                 onClick={() => { setConfirmReadmit(false); onReadmit(patient); }}
-                className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded transition-colors"
+                className="px-2.5 py-1 bg-surface-card text-vital-warning-fg border border-vital-warning-border hover:bg-vital-warning-surface text-xs font-bold rounded transition-colors"
               >
                 Yes, readmit
               </button>
               <button
                 onClick={() => setConfirmReadmit(false)}
-                className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded transition-colors"
+                // bg-slate-200/300 as background fills aren't literal table rows;
+                // extrapolated to the surface-sunken/surface pair (same idiom as
+                // WardDashboard.tsx's verified "border-line ... hover:bg-surface"
+                // secondary-button pattern, line ~800) rather than inventing a new token.
+                className="px-2.5 py-1 bg-surface-sunken hover:bg-surface text-ink text-xs font-bold rounded transition-colors"
               >
                 Cancel
               </button>
@@ -857,17 +956,20 @@ const DischargeForm: React.FC<{
           ) : (
             <button
               onClick={() => setConfirmReadmit(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold border border-vital-warning-border text-vital-warning-fg hover:bg-vital-warning-surface rounded-lg transition-colors"
             >
               <RotateCcw className="w-4 h-4" /> Readmit to Ward
             </button>
           )}
+          {/* Same solid-fill contrast fix as the DAMA/Death Save buttons above (saved=
+              pale vital-normal trio, not solid+white); unsaved state is the same
+              non-clinical bg-accent/accent-pressed CTA pairing used throughout this file. */}
           <button
             onClick={handleSave}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
               saved
-                ? 'bg-green-600 text-white'
-                : 'bg-slate-800 hover:bg-slate-700 text-white'
+                ? 'bg-vital-normal-surface text-vital-normal-fg hover:opacity-90'
+                : 'bg-accent hover:bg-accent-pressed text-white'
             }`}
           >
             {saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
@@ -875,21 +977,36 @@ const DischargeForm: React.FC<{
           </button>
           <button
             onClick={handleExportPdf}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-pressed text-white rounded-lg transition-colors"
           >
             <FileDown className="w-4 h-4" /> Export PDF
           </button>
         </div>
       </div>
 
-      {/* Document mode tabs */}
-      <div className="no-print flex gap-1 p-1 bg-slate-100 rounded-xl">
-        {([['discharge','Discharge Summary','bg-teal-600'],['dama','DAMA','bg-amber-500'],['death','Death Summary','bg-slate-700']] as [typeof docMode, string, string][]).map(([mode, label, activeColor]) => (
+      {/* Document mode tabs.
+          JUDGMENT CALL: active-tab styling changed from a solid color fill +
+          text-white to bg-surface-card + a semantic text color, matching the
+          verified precedent in OTListManagement.tsx's own tab bar (line
+          ~862-866: `bg-surface-card text-vital-critical-fg shadow-sm` /
+          `bg-surface-card text-accent-fg shadow-sm`, read and confirmed).
+          Reason: a solid fill here would become dark-mode
+          --color-vital-warning (#fbbf24, a bright amber-400) with white text
+          on top for the DAMA tab, which computes to poor contrast — the same
+          "solid vital-* fill + white text fails WCAG AA in dark mode" finding
+          already made twice in this plan (Task 4's Conservative button,
+          task-4-report.md; OTListManagement's Export Excel button,
+          task-5-report.md). The Death tab has no vital-* meaning at all
+          (death isn't "critical" or "warning" — see the Death Summary banner
+          judgment call below), so it uses text-ink for neutral emphasis
+          instead of a clinical color. */}
+      <div className="no-print flex gap-1 p-1 bg-surface-sunken rounded-xl">
+        {([['discharge','Discharge Summary','text-accent-fg'],['dama','DAMA','text-vital-warning-fg'],['death','Death Summary','text-ink']] as [typeof docMode, string, string][]).map(([mode, label, activeColor]) => (
           <button
             key={mode}
             onClick={() => setDocMode(mode)}
             className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-              docMode === mode ? `${activeColor} text-white shadow-sm` : 'text-slate-500 hover:text-slate-700'
+              docMode === mode ? `bg-surface-card ${activeColor} shadow-sm` : 'text-ink-muted hover:text-ink'
             }`}
           >
             {label}
@@ -905,8 +1022,8 @@ const DischargeForm: React.FC<{
 
       {/* Discharged badge */}
       {docMode === 'discharge' && patient.patientStatus === PatientStatus.Discharged && patient.dod && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-teal-50 border border-teal-100 rounded-lg text-sm text-teal-700">
-          <CheckCircle className="w-4 h-4 text-teal-500" />
+        <div className="flex items-center gap-2 px-4 py-2 bg-accent-soft border border-accent rounded-lg text-sm text-accent-fg">
+          <CheckCircle className="w-4 h-4 text-accent" />
           Patient discharged on <span className="font-bold">{patient.dod}</span>
           &nbsp;• {Math.floor((Date.now() - new Date(patient.doa).getTime()) / (1000 * 60 * 60 * 24))} days admitted
         </div>
@@ -915,8 +1032,33 @@ const DischargeForm: React.FC<{
       {/* ── Document (discharge mode only) ── */}
       {docMode !== 'discharge' ? null : <>
       {/* (discharge document rendered below) */}
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 max-w-4xl mx-auto">
-        {/* Document Header — overflow-hidden kept here so the dark bg clips to rounded-xl corners */}
+      <div className="bg-surface-card rounded-xl shadow-md border border-line max-w-4xl mx-auto">
+        {/* Document Header — overflow-hidden kept here so the dark bg clips to rounded-xl corners.
+            JUDGMENT CALL, left hardcoded (bg-slate-800 + text-white/text-slate-300/
+            text-slate-200), not tokenized. Documented here + commit message +
+            task-7-report.md.
+
+            This is the on-screen letterhead for the discharge document (hospital name,
+            department, "DISCHARGE SUMMARY"), and it deliberately mirrors the exported
+            PDF's own letterhead a few hundred lines up in this same file
+            (`doc.setFillColor(30, 41, 59)` in handleExportPdf — 30,41,59 is exactly
+            slate-800's RGB value). That PDF header is generated by jsPDF as raw RGB
+            bytes, entirely outside the Tailwind/CSS token system, and can never respond
+            to the app's theme (a PDF page has no "dark mode"). Keeping this on-screen
+            preview visually matched to what actually gets exported/printed is the
+            deliberate reason for the hardcoding, not an oversight.
+            Two token-only options were considered and rejected, same core reasoning as
+            the Death Summary banner and the verified Patient Header precedent
+            (RoundMode.tsx ~553-577, RadiologyComparator.tsx ~540-568):
+              1. bg-surface-card — in LIGHT mode surface-card is WHITE, identical to the
+                 document card's own background directly below, which would erase the
+                 letterhead bar entirely — a real visual regression.
+              2. bg-accent — would recolor a formal hospital-document letterhead as the
+                 app's own brand teal, which doesn't represent what this bar is (an
+                 institutional letterhead, not an in-app action).
+            Safe for the same reason as the other hardcoded-dark blocks in this file:
+            hardcoded light text paired with a hardcoded dark bg can never flip to
+            white-on-white. */}
         <div className="bg-slate-800 text-white text-center py-5 px-6 rounded-t-xl overflow-hidden">
           <p className="text-xs font-semibold tracking-widest uppercase text-slate-300 mb-0.5">
             {hospitalName}
@@ -927,44 +1069,44 @@ const DischargeForm: React.FC<{
 
         <div className="p-6 md:p-8">
           {/* Patient Info */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-6 pb-5 border-b border-slate-200 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 mb-6 pb-5 border-b border-line text-sm">
             {[
               ['Name', patient.name],
               ['Age / Sex', `${patient.age}y / ${patient.gender}`],
               ['IP No', patient.ipNo],
               ['Ward / Bed', `${patient.ward} / Bed ${patient.bed}`],
               ['Date of Admission', patient.doa],
-              ['Date of Discharge', patient.dod || <span className="text-slate-400 italic">Not yet discharged</span>],
+              ['Date of Discharge', patient.dod || <span className="text-ink-muted italic">Not yet discharged</span>],
               ['Contact', patient.mobile],
               ['Comorbidities', patient.comorbidities.join(', ') || 'None'],
             ].map(([label, val]) => (
               <div key={String(label)}>
-                <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
-                <span className="text-slate-800 font-medium">{val}</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-ink-muted">{label}</span>
+                <span className="text-ink font-medium">{val}</span>
               </div>
             ))}
           </div>
 
           {/* Doctor fields — inline editable */}
-          <div className="grid grid-cols-2 gap-4 mb-6 pb-5 border-b border-slate-200">
+          <div className="grid grid-cols-2 gap-4 mb-6 pb-5 border-b border-line">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Consultant / Attending Doctor</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-ink-muted mb-1">Consultant / Attending Doctor</label>
               <input
                 type="text"
                 value={summary.attendingDoctor}
                 onChange={e => update('attendingDoctor', e.target.value)}
                 placeholder="Dr. ..."
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-line focus:border-accent focus:outline-none bg-transparent py-1 text-ink"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Resident Doctor</label>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-ink-muted mb-1">Resident Doctor</label>
               <input
                 type="text"
                 value={summary.residentDoctor}
                 onChange={e => update('residentDoctor', e.target.value)}
                 placeholder="Dr. ..."
-                className="w-full text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+                className="w-full text-sm border-0 border-b border-dashed border-line focus:border-accent focus:outline-none bg-transparent py-1 text-ink"
               />
             </div>
           </div>
@@ -1031,31 +1173,38 @@ const DischargeForm: React.FC<{
             rows={2}
           />
           <div className="mb-5">
-            <label className="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1 border-b border-slate-200 pb-1">
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-ink-muted mb-1 border-b border-line pb-1">
               Follow-Up Appointment Date
             </label>
             <input
               type="date"
               value={summary.followUpDate}
               onChange={e => update('followUpDate', e.target.value)}
-              className="text-sm border-0 border-b border-dashed border-slate-300 focus:border-teal-400 focus:outline-none bg-transparent py-1 text-slate-800"
+              className="text-sm border-0 border-b border-dashed border-line focus:border-accent focus:outline-none bg-transparent py-1 text-ink"
             />
           </div>
 
           {/* Signature area */}
-          <div className="grid grid-cols-2 gap-8 mt-10 pt-5 border-t-2 border-slate-300">
+          <div className="grid grid-cols-2 gap-8 mt-10 pt-5 border-t-2 border-line">
             <div className="text-center">
-              <div className="h-12 border-b-2 border-slate-400 mb-2" />
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Consultant Signature</p>
+              {/* JUDGMENT CALL: border-slate-400 -> border-ink-muted, not border-line.
+                  Not a literal table row (border-line only tables the -100/-200/-300
+                  shades). This signature blank line is deliberately heavier/darker than
+                  ordinary dividers (border-slate-400 vs. the -200/-300 used everywhere
+                  else in this file) so it reads as a "sign here" line, not a divider —
+                  border-line's value is tuned for subtle dividers and would render this
+                  signature line nearly invisible. */}
+              <div className="h-12 border-b-2 border-ink-muted mb-2" />
+              <p className="text-xs font-bold text-ink uppercase tracking-wide">Consultant Signature</p>
               {summary.attendingDoctor && (
-                <p className="text-xs text-slate-500 mt-0.5">{summary.attendingDoctor}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{summary.attendingDoctor}</p>
               )}
             </div>
             <div className="text-center">
-              <div className="h-12 border-b-2 border-slate-400 mb-2" />
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Resident Signature</p>
+              <div className="h-12 border-b-2 border-ink-muted mb-2" />
+              <p className="text-xs font-bold text-ink uppercase tracking-wide">Resident Signature</p>
               {summary.residentDoctor && (
-                <p className="text-xs text-slate-500 mt-0.5">{summary.residentDoctor}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{summary.residentDoctor}</p>
               )}
             </div>
           </div>
@@ -1086,22 +1235,22 @@ const DischargedList: React.FC<{
   return (
     <div className="space-y-4">
       {/* Search */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+      <div className="bg-surface-card rounded-lg shadow-sm border border-line p-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" />
           <input
             type="text"
             placeholder="Search by name, IP No, diagnosis..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"
+            className="w-full pl-10 pr-4 py-2 border border-line rounded-lg text-sm focus:ring-2 focus:ring-accent focus:outline-none"
           />
         </div>
       </div>
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="p-12 flex flex-col items-center justify-center text-slate-400">
+        <div className="p-12 flex flex-col items-center justify-center text-ink-muted">
           <LogOut className="w-10 h-10 mb-3 opacity-30" />
           <p className="font-medium">{patients.length === 0 ? 'No discharged patients yet.' : 'No results found.'}</p>
         </div>
@@ -1115,37 +1264,40 @@ const DischargedList: React.FC<{
                 : null;
               const hasSummary = !!patient.dischargeSummary;
               return (
-                <div key={patient.ipNo} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+                <div key={patient.ipNo} className="bg-surface-card rounded-xl border border-line shadow-sm p-4 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-900 truncate">{patient.name}</p>
-                      <p className="text-xs text-slate-500">{patient.age}y / {patient.gender} · IP: {patient.ipNo}</p>
-                      <p className="text-xs text-slate-400">{patient.ward} / Bed {patient.bed}</p>
+                      <p className="font-bold text-ink truncate">{patient.name}</p>
+                      <p className="text-xs text-ink-muted">{patient.age}y / {patient.gender} · IP: {patient.ipNo}</p>
+                      <p className="text-xs text-ink-muted">{patient.ward} / Bed {patient.bed}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
+                      {/* Length-of-stay badge: a day count, not a lab value -> accent,
+                          matching the verified "DOS badge" precedent in RoundMode.tsx
+                          (task-4-report.md: "a schedule date, not a lab value"). */}
                       {stayDays !== null && (
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-xs font-medium">{stayDays}d</span>
+                        <span className="px-2 py-0.5 bg-accent-soft text-accent-fg border border-accent rounded text-xs font-medium">{stayDays}d</span>
                       )}
                       {hasSummary
-                        ? <span className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Done</span>
-                        : <span className="text-xs text-amber-500">Pending</span>}
+                        ? <span className="text-xs text-accent-fg flex items-center gap-1"><CheckCircle className="w-3 h-3" />Done</span>
+                        : <span className="text-xs text-vital-warning-fg">Pending</span>}
                     </div>
                   </div>
-                  <p className="text-sm text-slate-700 line-clamp-2">{patient.diagnosis}</p>
-                  <div className="text-xs text-slate-400 flex gap-3">
+                  <p className="text-sm text-ink line-clamp-2">{patient.diagnosis}</p>
+                  <div className="text-xs text-ink-muted flex gap-3">
                     <span>Admitted: {patient.doa}</span>
                     <span>Discharged: {patient.dod || '—'}</span>
                   </div>
                   <div className="flex gap-2 pt-1">
                     <button
                       onClick={() => onReadmit(patient)}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] text-xs font-semibold border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] text-xs font-semibold border border-vital-warning-border text-vital-warning-fg hover:bg-vital-warning-surface rounded-lg transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5 shrink-0" /> Readmit
                     </button>
                     <button
                       onClick={() => onSelect(patient.ipNo)}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] text-xs font-semibold bg-slate-800 hover:bg-teal-700 text-white rounded-lg transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] text-xs font-semibold bg-accent hover:bg-accent-pressed text-white rounded-lg transition-colors"
                     >
                       <FileText className="w-3.5 h-3.5 shrink-0" /> {hasSummary ? 'Edit Summary' : 'Create Summary'}
                     </button>
@@ -1156,10 +1308,10 @@ const DischargedList: React.FC<{
           </div>
 
           {/* Desktop table layout */}
-          <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="hidden sm:block bg-surface-card rounded-xl shadow-sm border border-line overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left min-w-[700px]">
-                <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                <thead className="text-xs text-ink-muted uppercase bg-surface border-b border-line">
                   <tr>
                     <th className="px-5 py-3">Patient</th>
                     <th className="px-5 py-3">Diagnosis</th>
@@ -1177,42 +1329,42 @@ const DischargedList: React.FC<{
                       : null;
                     const hasSummary = !!patient.dischargeSummary;
                     return (
-                      <tr key={patient.ipNo} className="border-b last:border-0 hover:bg-slate-50 transition-colors">
+                      <tr key={patient.ipNo} className="border-b last:border-0 hover:bg-surface transition-colors">
                         <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-900">{patient.name}</div>
-                          <div className="text-xs text-slate-500">{patient.age}y / {patient.gender} • IP: {patient.ipNo}</div>
-                          <div className="text-xs text-slate-400">{patient.ward} / Bed {patient.bed}</div>
+                          <div className="font-semibold text-ink">{patient.name}</div>
+                          <div className="text-xs text-ink-muted">{patient.age}y / {patient.gender} • IP: {patient.ipNo}</div>
+                          <div className="text-xs text-ink-muted">{patient.ward} / Bed {patient.bed}</div>
                         </td>
                         <td className="px-5 py-4 max-w-xs">
-                          <p className="text-slate-700 truncate" title={patient.diagnosis}>{patient.diagnosis}</p>
-                          {patient.procedure && <p className="text-xs text-slate-400 truncate">{patient.procedure}</p>}
+                          <p className="text-ink truncate" title={patient.diagnosis}>{patient.diagnosis}</p>
+                          {patient.procedure && <p className="text-xs text-ink-muted truncate">{patient.procedure}</p>}
                         </td>
-                        <td className="px-5 py-4 text-slate-600 whitespace-nowrap">{patient.doa}</td>
-                        <td className="px-5 py-4 text-slate-600 whitespace-nowrap">{patient.dod || '—'}</td>
+                        <td className="px-5 py-4 text-ink whitespace-nowrap">{patient.doa}</td>
+                        <td className="px-5 py-4 text-ink whitespace-nowrap">{patient.dod || '—'}</td>
                         <td className="px-5 py-4">
                           {stayDays !== null ? (
-                            <span className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded text-xs font-medium">{stayDays}d</span>
+                            <span className="px-2 py-1 bg-accent-soft text-accent-fg border border-accent rounded text-xs font-medium">{stayDays}d</span>
                           ) : '—'}
                         </td>
                         <td className="px-5 py-4">
                           {hasSummary ? (
-                            <span className="flex items-center gap-1 text-xs text-teal-600"><CheckCircle className="w-3.5 h-3.5" /> Completed</span>
+                            <span className="flex items-center gap-1 text-xs text-accent-fg"><CheckCircle className="w-3.5 h-3.5" /> Completed</span>
                           ) : (
-                            <span className="text-xs text-amber-500">Pending</span>
+                            <span className="text-xs text-vital-warning-fg">Pending</span>
                           )}
                         </td>
                         <td className="px-5 py-4 text-right">
                           <div className="flex items-center justify-end gap-2 whitespace-nowrap">
                             <button
                               onClick={() => onReadmit(patient)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-vital-warning-border text-vital-warning-fg hover:bg-vital-warning-surface rounded-lg transition-colors"
                               title="Readmit to ward"
                             >
                               <RotateCcw className="w-3.5 h-3.5" /> Readmit
                             </button>
                             <button
                               onClick={() => onSelect(patient.ipNo)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-teal-700 text-white rounded-lg transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-accent hover:bg-accent-pressed text-white rounded-lg transition-colors"
                             >
                               <FileText className="w-3.5 h-3.5" /> {hasSummary ? 'Edit Summary' : 'Create Summary'}
                             </button>

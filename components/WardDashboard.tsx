@@ -329,7 +329,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       {/* Ward Selection Tabs — rendered from ward_config */}
       <div className="flex overflow-x-auto gap-2 pb-1 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0">
-        <WardTab ward="All" icon={Layers} count={counts.All} colorClass="text-ink-muted" activeClass="bg-ink border-ink text-white" />
+        <WardTab ward="All" icon={Layers} count={counts.All} colorClass="text-ink-muted" activeClass="bg-accent border-accent-pressed text-white" />
         {activeConfigWards.map((w, i) => {
           const NON_ICU_STYLES = [
             { icon: BedDouble,   colorClass: 'text-accent-fg', activeClass: 'bg-accent border-accent-pressed text-white' },
@@ -665,7 +665,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
-                        <span className={`text-white text-sm font-bold font-mono w-10 h-10 shrink-0 flex items-center justify-center rounded-lg ${item.isIcu ? 'bg-ink' : 'bg-accent'}`}>
+                        <span className={`text-white text-sm font-bold font-mono w-10 h-10 shrink-0 flex items-center justify-center rounded-lg ${item.isIcu ? 'bg-vital-critical' : 'bg-accent'}`}>
                           {shortBed(item.patient.bed)}
                         </span>
                         <div>

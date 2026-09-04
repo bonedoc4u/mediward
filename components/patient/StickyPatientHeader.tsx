@@ -24,7 +24,7 @@ const StickyPatientHeader: React.FC<Props> = ({ patient, statusLabel, statusColo
       visible ? 'py-2 opacity-100 translate-y-0' : 'py-0 h-0 opacity-0 -translate-y-full pointer-events-none overflow-hidden'
     }`}
   >
-    <div className="w-9 h-9 shrink-0 rounded-lg bg-ink text-white flex items-center justify-center text-sm font-bold font-mono">
+    <div className="w-9 h-9 shrink-0 rounded-lg bg-accent text-white flex items-center justify-center text-sm font-bold font-mono">
       {patient.bed}
     </div>
     <div className="min-w-0 flex-1">

@@ -96,17 +96,26 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
+    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+      <div className="max-w-4xl w-full bg-surface-card rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row">
 
-        {/* Left Side - Brand */}
+        {/* Left Side - Brand
+            NOTE: this panel is deliberately always-dark, independent of app theme —
+            same pattern as App.tsx's mobile header/sidebar (also left hardcoded
+            bg-slate-900). Its bg stays fixed dark in both light and dark app themes,
+            so the text/icon colors painted on it (text-blue-300, text-slate-400,
+            text-blue-400, text-slate-500 below) are intentionally left as fixed
+            light-on-dark colors too, not converted to the theme-reactive
+            ink/accent-fg tokens — those tokens are calibrated against this app's
+            *light-mode* card backgrounds and would lose contrast against a panel
+            that never lightens. See task-2-report.md for the full reasoning. */}
         <div className="hidden md:flex md:w-1/2 bg-slate-900 p-8 text-white flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-64 h-64 bg-teal-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 translate-y-1/2"></div>
+          <div className="absolute top-0 left-0 w-64 h-64 bg-accent rounded-full mix-blend-multiply filter blur-3xl opacity-20 -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-64 h-64 bg-accent rounded-full mix-blend-multiply filter blur-3xl opacity-20 translate-x-1/2 translate-y-1/2"></div>
 
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-8">
-              <div className="bg-teal-600 p-2 rounded-lg">
+              <div className="bg-accent p-2 rounded-lg">
                 <Stethoscope className="w-6 h-6" />
               </div>
               <h1 className="font-bold text-2xl tracking-tight">MediWard</h1>
@@ -135,15 +144,15 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
         <div className="w-full md:w-1/2 p-6 sm:p-8 md:p-12 flex flex-col justify-center">
           {/* Mobile-only brand header */}
           <div className="flex md:hidden items-center gap-2 mb-8">
-            <div className="bg-teal-600 p-2 rounded-lg">
+            <div className="bg-accent p-2 rounded-lg">
               <Stethoscope className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-slate-800">MediWard</span>
+            <span className="font-bold text-xl tracking-tight text-ink">MediWard</span>
           </div>
 
           <div className="mb-8">
-            <h3 className="text-2xl font-bold text-slate-800">Welcome Back</h3>
-            <p className="text-slate-500 text-sm mt-1">Enter your credentials to access the dashboard.</p>
+            <h3 className="text-2xl font-bold text-ink">Welcome Back</h3>
+            <p className="text-ink-muted text-sm mt-1">Enter your credentials to access the dashboard.</p>
           </div>
 
           {showBiometricButton && (
@@ -151,7 +160,7 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
               type="button"
               onClick={handleBiometricLogin}
               disabled={biometricLoading}
-              className="w-full mb-4 flex items-center justify-center gap-2 py-3 border-2 border-teal-600 text-teal-700 font-bold rounded-lg hover:bg-teal-50 disabled:opacity-60 transition-colors"
+              className="w-full mb-4 flex items-center justify-center gap-2 py-3 border-2 border-accent text-accent-fg font-bold rounded-lg hover:bg-accent-soft disabled:opacity-60 transition-colors"
             >
               <Fingerprint className="w-5 h-5" />
               {biometricLoading ? 'Verifying…' : 'Sign in with Fingerprint'}
@@ -160,21 +169,21 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 border border-red-100">
+              <div className="bg-vital-critical-surface text-vital-critical-fg text-sm p-3 rounded-lg flex items-center gap-2 border border-vital-critical-border">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-600 uppercase">Email Address</label>
+              <label className="text-xs font-bold text-ink uppercase">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
                 <input
                   type="email"
                   required
                   autoComplete="email"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
                   placeholder="doctor@hospital.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -183,15 +192,15 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-600 uppercase">Password</label>
+              <label className="text-xs font-bold text-ink uppercase">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   autoComplete="current-password"
                   minLength={6}
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all"
+                  className="w-full pl-10 pr-12 py-3 border border-line rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-all"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -199,7 +208,7 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-lg"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-ink-muted hover:text-ink rounded-lg"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -210,7 +219,7 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
+              className="w-full bg-accent hover:bg-accent-pressed text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-accent/30 disabled:opacity-70 disabled:cursor-not-allowed mt-4"
             >
               {isLoading ? (
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -220,12 +229,12 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             </button>
           </form>
 
-          <div className="mt-6 flex justify-center gap-6 text-xs text-slate-400">
+          <div className="mt-6 flex justify-center gap-6 text-xs text-ink-muted">
             {onPrivacy && (
-              <button onClick={onPrivacy} className="hover:text-slate-600 transition-colors font-medium">Privacy Policy</button>
+              <button onClick={onPrivacy} className="hover:text-ink transition-colors font-medium">Privacy Policy</button>
             )}
             {onTerms && (
-              <button onClick={onTerms} className="hover:text-slate-600 transition-colors font-medium">Terms of Service</button>
+              <button onClick={onTerms} className="hover:text-ink transition-colors font-medium">Terms of Service</button>
             )}
           </div>
 

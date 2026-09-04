@@ -61,18 +61,20 @@ function CategoryDropZone({ category, isEmpty, isHighlighted, children }: { cate
   return (
     <tbody
       ref={setNodeRef}
-      className={`divide-y divide-slate-100 border-b-4 border-slate-100 transition-colors ${
-        isHighlighted ? 'bg-teal-50 ring-2 ring-inset ring-teal-300' : ''
+      className={`divide-y divide-line border-b-4 border-line transition-colors ${
+        isHighlighted ? 'bg-accent-soft ring-2 ring-inset ring-accent' : ''
       }`}
     >
-      <tr className="bg-slate-100">
-        <td colSpan={13} className="p-2 px-4 font-bold text-slate-700 text-sm">
+      <tr className="bg-surface-sunken">
+        <td colSpan={13} className="p-2 px-4 font-bold text-ink text-sm">
           {category}
         </td>
       </tr>
       {isEmpty ? (
         <tr>
-          <td colSpan={13} className="p-4 text-center text-slate-400 text-xs italic">
+          {/* Empty-state hint text: structural chrome per the mapping table's own guidance
+              for this panel/state, not a disabled/placeholder input — ink-muted, not ink-faint. */}
+          <td colSpan={13} className="p-4 text-center text-ink-muted text-xs italic">
             Drag items here
           </td>
         </tr>
@@ -96,7 +98,7 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
     <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse min-w-[1200px]">
         <thead>
-          <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+          <tr className="bg-surface-sunken border-b border-line text-xs uppercase text-ink-muted font-semibold">
             <th className="p-4 w-12"></th>
             <th className="p-4 w-32">Table/Category</th>
             <th className="p-4 w-12">Seq</th>
@@ -121,9 +123,9 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
           >
               <CategoryDropZone category={category} isEmpty={(groupedItems[category]?.length ?? 0) === 0} isHighlighted={category === dragOverCategory}>
                   {groupedItems[category]?.map((patient, index) => (
-                      <SortableRow key={patient.id} id={patient.id} className="hover:bg-slate-50 group bg-white">
+                      <SortableRow key={patient.id} id={patient.id} className="hover:bg-surface-sunken group bg-surface-card">
                           <td className="p-4 cursor-grab touch-none" data-drag-handle>
-                              <GripVertical className="w-4 h-4 text-slate-400" />
+                              <GripVertical className="w-4 h-4 text-ink-muted" />
                           </td>
                           <td className="p-4">
                               <BottomSheetPicker
@@ -131,10 +133,10 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
                                   value={patient.category || ''}
                                   options={options.map(opt => ({ value: opt, label: opt }))}
                                   onChange={val => onUpdateEntry(patient.id, 'category', val)}
-                                  triggerClassName="w-full text-sm font-bold text-slate-700 flex items-center gap-1 cursor-pointer p-0"
+                                  triggerClassName="w-full text-sm font-bold text-ink flex items-center gap-1 cursor-pointer p-0"
                               />
                           </td>
-                          <td className="p-4 text-slate-500 font-mono font-bold">
+                          <td className="p-4 text-ink-muted font-mono font-bold">
                               {index + 1}
                           </td>
                           <td className="p-4">
@@ -155,7 +157,7 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
                                   placeholder="Unit"
                               />
                           </td>
-                          <td className="p-4 font-medium text-slate-900">
+                          <td className="p-4 font-medium text-ink">
                               <input
                                   type="text"
                                   value={patient.name}
@@ -164,22 +166,25 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
                                   placeholder="Name"
                               />
                           </td>
-                          <td className="p-4 text-slate-600">
+                          <td className="p-4 text-ink">
                               <div className="flex gap-1 items-center">
                                   <input
                                   type="text"
                                   value={patient.age}
                                   onChange={(e) => onUpdateEntry(patient.id, 'age', e.target.value)}
-                                  className="w-8 bg-transparent border-b border-transparent focus:border-blue-500 focus:ring-0 p-0 text-center"
+                                  /* Judgment call: focus:border-blue-500 was a decorative inline-edit
+                                     focus indicator, not a lab/clinical value — per the mapping table's
+                                     own blue carve-out, reclassified to accent (see task-5-report.md). */
+                                  className="w-8 bg-transparent border-b border-transparent focus:border-accent focus:ring-0 p-0 text-center"
                                   placeholder="Age"
                                   />
-                                  <span className="text-slate-400">/</span>
+                                  <span className="text-ink-muted">/</span>
                                   <BottomSheetPicker
                                       title="Gender"
                                       value={patient.gender}
                                       options={[{ value: 'M', label: 'M' }, { value: 'F', label: 'F' }]}
                                       onChange={val => onUpdateEntry(patient.id, 'gender', val)}
-                                      triggerClassName="w-12 text-sm font-medium text-slate-700 flex items-center gap-0.5 cursor-pointer p-0"
+                                      triggerClassName="w-12 text-sm font-medium text-ink flex items-center gap-0.5 cursor-pointer p-0"
                                   />
                               </div>
                           </td>
@@ -216,14 +221,14 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
                                   value={patient.cArm}
                                   options={[{ value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }]}
                                   onChange={val => onUpdateEntry(patient.id, 'cArm', val)}
-                                  triggerClassName="w-full text-sm font-medium text-slate-700 flex items-center gap-1 cursor-pointer p-0"
+                                  triggerClassName="w-full text-sm font-medium text-ink flex items-center gap-1 cursor-pointer p-0"
                               />
                           </td>
                           <td className="p-4">
                               <textarea
                                   value={patient.implants}
                                   onChange={(e) => onUpdateEntry(patient.id, 'implants', e.target.value)}
-                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none text-slate-500"
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-sm resize-none text-ink-muted"
                                   rows={2}
                                   placeholder="Implants..."
                               />
@@ -231,7 +236,7 @@ const OTListTable: React.FC<OTListTableProps> = ({ activeTab, groupedItems, onUp
                           <td className="p-4 text-right">
                               <button
                                   onClick={() => onRemove(patient.id)}
-                                  className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="text-ink-muted hover:text-vital-critical opacity-0 group-hover:opacity-100 transition-opacity"
                               >
                                   <Trash2 className="w-4 h-4" />
                               </button>

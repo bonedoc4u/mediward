@@ -33,10 +33,10 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl
+      <div className="relative w-full max-w-lg bg-surface-card rounded-t-2xl sm:rounded-2xl shadow-2xl
                       animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
-          <div className="w-10 h-1 bg-slate-200 rounded-full" />
+          <div className="w-10 h-1 bg-line rounded-full" />
         </div>
 
         {/* Preview — single image gets a large preview; a batch gets a thumbnail strip
@@ -71,6 +71,12 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
               return (
                 <div
                   key={`${f.name}-${i}`}
+                  // bg-slate-900 left hardcoded: this well is an image-preview
+                  // surface, same role as the single-image bg-black preview just
+                  // above and modality.ts's viewer backgrounds — deliberately
+                  // always-dark for image contrast, independent of app theme
+                  // (see task-6-report.md). The fallback filename text below,
+                  // rendered on top of this fixed-dark well, stays hardcoded too.
                   className="relative shrink-0 w-20 h-20 bg-slate-900 rounded-lg overflow-hidden"
                   onClick={canCrop ? () => onEditFile(i) : undefined}
                   onKeyDown={canCrop ? (e) => {
@@ -105,24 +111,28 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
         )}
 
         <div className="px-5 pb-8 space-y-4">
-          <h3 className="text-base font-semibold text-slate-900">
+          <h3 className="text-base font-semibold text-ink">
             Upload {files.length > 1 ? `${files.length} investigations` : 'investigation'}
           </h3>
-          <p className="text-xs text-slate-400">{patient.name} · Bed {patient.bed}</p>
+          <p className="text-xs text-ink-muted">{patient.name} · Bed {patient.bed}</p>
 
-          {/* Phase toggle — hidden for conservative patients (post-op not applicable) */}
+          {/* Phase toggle — hidden for conservative patients (post-op not applicable).
+              Pre-op(blue)/post-op(teal) is the same categorical judgment call as
+              RadiologyComparator.tsx: blue stays hardcoded (see there for why),
+              teal maps to accent. The unselected-tab text (text-slate-500/700) is
+              a neutral inactive state, not phase-colored, so it converts normally. */}
           {allowPostOp && (
             <div className="space-y-1">
-              <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+              <label className="text-[10px] font-medium tracking-widest uppercase text-ink-muted">
                 Investigation type
               </label>
-              <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+              <div className="flex bg-surface-sunken rounded-xl p-1 gap-1">
                 <button
                   onClick={() => onPhaseChange('preop')}
                   className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                     phase === 'preop'
                       ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                      : 'text-ink-muted hover:text-ink'
                   }`}
                 >
                   Pre-Op
@@ -131,8 +141,8 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
                   onClick={() => onPhaseChange('postop')}
                   className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                     phase === 'postop'
-                      ? 'bg-teal-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                      ? 'bg-accent text-white shadow-sm'
+                      : 'text-ink-muted hover:text-ink'
                   }`}
                 >
                   Post-Op
@@ -143,7 +153,7 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
 
           {/* Modality */}
           <div className="space-y-1">
-            <label className="text-[10px] font-medium tracking-widest uppercase text-slate-500">
+            <label className="text-[10px] font-medium tracking-widest uppercase text-ink-muted">
               Modality
             </label>
             <BottomSheetPicker
@@ -163,7 +173,7 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
           </div>
 
           {uploadError && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
+            <p className="text-xs text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border rounded-xl p-3">
               {uploadError}
             </p>
           )}
@@ -172,15 +182,15 @@ const UploadSheet: React.FC<UploadSheetProps> = ({
             <button
               onClick={onCancel}
               disabled={isUploading}
-              className="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-semibold
-                         text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+              className="flex-1 py-3 border border-line rounded-xl text-sm font-semibold
+                         text-ink-muted hover:bg-surface-sunken disabled:opacity-50 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={onSave}
               disabled={isUploading || files.length === 0}
-              className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-60
+              className="flex-1 py-3 bg-accent hover:bg-accent-pressed disabled:opacity-60
                          text-white font-semibold rounded-xl transition-colors
                          flex items-center justify-center gap-2"
             >

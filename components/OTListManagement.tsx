@@ -766,32 +766,38 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">OT List Management</h1>
-          <p className="text-slate-500">Plan and manage surgical lists for Major, Minor and Emergency OT</p>
+          <h1 className="text-2xl font-bold text-ink">OT List Management</h1>
+          <p className="text-ink-muted">Plan and manage surgical lists for Major, Minor and Emergency OT</p>
         </div>
-        <div className="flex items-center gap-3 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
-          <Calendar className="w-5 h-5 text-slate-400" />
+        <div className="flex items-center gap-3 bg-surface-card p-2 rounded-lg shadow-sm border border-line">
+          <Calendar className="w-5 h-5 text-ink-muted" />
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="outline-none text-slate-700 font-medium bg-transparent"
+            className="outline-none text-ink font-medium bg-transparent"
           />
         </div>
       </div>
 
       {otListError && (
-        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <div className="text-sm text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border rounded-lg px-3 py-2">
           {otListError}
         </div>
       )}
       {isLoadingOTList && (
-        <div className="text-sm text-slate-500">Loading OT list…</div>
+        <div className="text-sm text-ink-muted">Loading OT list…</div>
       )}
 
-      {/* Weekend EOT duty hint — shown on the EOT tab when this unit is on weekend duty this cycle */}
+      {/* Weekend EOT duty hint — shown on the EOT tab when this unit is on weekend duty this cycle.
+          Judgment call: original used bg-violet-50/text-violet-700/border-violet-200, a color with
+          no defined meaning in this app's ink+teal chrome or vital-* clinical palette (same class of
+          stray leftover color the mapping table flags for LoginPage.tsx's bg-purple-600). Since this
+          banner functionally IS a "heads up, the schedule is non-standard this cycle" warning (paired
+          with a ShieldAlert icon), mapped to vital-warning rather than accent so it still reads as a
+          warning at a glance, not a routine brand-teal callout. See task-5-report.md for detail. */}
       {activeTab === 'EOT' && cycle.eotWeekendDates.length > 0 && (
-        <div className="flex items-center gap-2 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 text-xs font-semibold text-vital-warning-fg bg-vital-warning-surface border border-vital-warning-border rounded-lg px-3 py-2">
           <ShieldAlert className="w-4 h-4 shrink-0" />
           {effectiveUnit} is on weekend duty this cycle — weekend EOT:{' '}
           {cycle.eotWeekendDates
@@ -802,9 +808,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       )}
 
       {/* List Meta — Surgeon / Unit / Time (editable, used in exports) */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="bg-surface-card rounded-xl border border-line shadow-sm p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">Surgeon</label>
+          <label className="text-xs font-bold text-ink-muted uppercase tracking-wide block mb-1">Surgeon</label>
           <input
             type="text"
             value={surgeon}
@@ -813,11 +819,11 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
               saveOTListMetaDebounced(activeTab, selectedDate, { surgeon: e.target.value, surgeonUnit, otTime });
             }}
             placeholder="Surgeon name…"
-            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
+            className="w-full text-sm border border-line rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent outline-none"
           />
         </div>
         <div>
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">Unit</label>
+          <label className="text-xs font-bold text-ink-muted uppercase tracking-wide block mb-1">Unit</label>
           <input
             type="text"
             value={surgeonUnit}
@@ -826,11 +832,11 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
               saveOTListMetaDebounced(activeTab, selectedDate, { surgeon, surgeonUnit: e.target.value, otTime });
             }}
             placeholder="e.g. OR 1"
-            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
+            className="w-full text-sm border border-line rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent outline-none"
           />
         </div>
         <div>
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1">Time</label>
+          <label className="text-xs font-bold text-ink-muted uppercase tracking-wide block mb-1">Time</label>
           <input
             type="text"
             value={otTime}
@@ -839,13 +845,15 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
               saveOTListMetaDebounced(activeTab, selectedDate, { surgeon, surgeonUnit, otTime: e.target.value });
             }}
             placeholder="e.g. 8.00AM"
-            className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 outline-none"
+            className="w-full text-sm border border-line rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent outline-none"
           />
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex space-x-1 bg-slate-100 p-1 rounded-xl w-fit">
+      {/* Tabs. Judgment call: EOT's active-tab text was hardcoded text-red-600 — kept as a
+          vital-critical mapping (not accent) because EOT = Emergency OT, a real urgency
+          designation this app reserves red for elsewhere, not decoration. */}
+      <div className="flex space-x-1 bg-surface-sunken p-1 rounded-xl w-fit">
         {(['Major', 'Minor', 'EOT'] as OTType[]).map((tab) => (
           <button
             key={tab}
@@ -853,9 +861,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
               activeTab === tab
                 ? tab === 'EOT'
-                  ? 'bg-white text-red-600 shadow-sm'
-                  : 'bg-white text-teal-600 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                  ? 'bg-surface-card text-vital-critical-fg shadow-sm'
+                  : 'bg-surface-card text-accent-fg shadow-sm'
+                : 'text-ink-muted hover:text-ink hover:bg-surface/50'
             }`}
           >
             {tab === 'EOT' ? 'EOT List' : `${tab} OT List`}
@@ -863,11 +871,24 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         ))}
       </div>
 
-      {/* Actions Toolbar */}
+      {/* Actions Toolbar. Judgment calls (documented in commit message + task-5-report.md):
+          - Clear List: bg-red-100/text-red-600/hover:bg-red-200 → vital-critical-surface trio with
+            hover:opacity-90, matching PatientDetail.tsx's verified destructive-button pattern
+            (opacity-based hover works in both themes without needing a second "darker critical" token).
+          - Export Excel: bg-emerald-600 text-white (solid fill) was NOT mapped to solid
+            bg-vital-normal + text-white — dark-mode --color-vital-normal (#4ade80) against white text
+            computes to ~1.7:1, failing WCAG AA (same contrast finding as Task 4's "Conservative" button).
+            Used the pale vital-normal-surface/fg/border trio instead, with hover:opacity-90 for feedback,
+            per the established precedent in DailyRounds.tsx/RoundMode.tsx of folding emerald into
+            vital-normal (index.css's own stated "kills teal+emerald split" intent).
+          - Export PDF: bg-slate-800/900 + text-white → bg-accent/accent-pressed + text-white, NOT
+            bg-ink — bg-ink flips to a near-white value in dark mode, which combined with the
+            hardcoded text-white here would go illegible-white-on-white. bg-accent/accent-pressed is
+            guaranteed dark in both themes and is the standard safe pairing with text-white. */}
       <div className="flex flex-wrap gap-3">
         <button
           onClick={handleAddManualEntry}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors border border-slate-300"
+          className="flex items-center gap-2 px-4 py-2 bg-surface-sunken text-ink rounded-lg hover:bg-surface transition-colors border border-line"
         >
           <Plus className="w-4 h-4" />
           Add Row
@@ -875,24 +896,24 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
         <button
           onClick={handleClearList}
-          className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-vital-critical-surface text-vital-critical-fg rounded-lg hover:opacity-90 transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Clear List
         </button>
 
         <div className="ml-auto flex gap-2">
-            <button 
+            <button
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-vital-normal-surface text-vital-normal-fg border border-vital-normal-border rounded-lg hover:opacity-90 transition-colors"
             >
             <FileSpreadsheet className="w-4 h-4" />
             Export Excel
             </button>
 
-            <button 
+            <button
             onClick={handleExportPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-pressed transition-colors"
             >
             <Download className="w-4 h-4" />
             Export PDF
@@ -910,7 +931,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         onDragCancel={handleDragCancel}
       >
         <div className="flex flex-col lg:flex-row gap-4 items-start">
-          <div className="flex-1 min-w-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="flex-1 min-w-0 bg-surface-card rounded-xl shadow-sm border border-line overflow-hidden">
             <OTListTable
               activeTab={activeTab}
               groupedItems={groupedItems}
@@ -928,12 +949,12 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
         <DragOverlay>
             {activePendingPatient ? (
-                <div className="p-2 bg-white rounded shadow-lg border border-slate-200 cursor-grabbing max-w-[220px] truncate">
-                    <span className="font-medium text-slate-900 text-sm">{activePendingPatient.name}</span>
+                <div className="p-2 bg-surface-card rounded shadow-lg border border-line cursor-grabbing max-w-[220px] truncate">
+                    <span className="font-medium text-ink text-sm">{activePendingPatient.name}</span>
                 </div>
             ) : activeId ? (
-                <div className="p-2 bg-white rounded shadow-lg border border-slate-200 cursor-grabbing">
-                    <GripVertical className="w-4 h-4 text-slate-600" />
+                <div className="p-2 bg-surface-card rounded shadow-lg border border-line cursor-grabbing">
+                    <GripVertical className="w-4 h-4 text-ink" />
                 </div>
             ) : null}
         </DragOverlay>
@@ -947,7 +968,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           renders after this and would otherwise paint over most of it. */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed right-6 z-40 flex items-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-full shadow-lg"
+        className="lg:hidden fixed right-6 z-40 flex items-center gap-2 px-4 py-3 bg-accent text-white rounded-full shadow-lg"
         style={{ bottom: 'var(--fab-bottom)' }}
       >
         <UserPlus className="w-5 h-5" />
@@ -956,16 +977,21 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
       {mobileOpen && (
         <div
+          // bg-black/50 kept hardcoded, not tokenized: a full-screen dimming scrim, not a
+          // surface with text on it. Its job is to darken whatever's behind it in BOTH
+          // themes; bg-ink/50 would break this since --color-ink flips to near-white in
+          // dark mode, lightening the background instead of dimming it. Same reasoning as
+          // RoundMode.tsx's session-expiry scrim (documented exception in Task 4).
           className="lg:hidden fixed inset-0 z-50 bg-black/50 flex items-end"
           onClick={() => setMobileOpen(false)}
         >
           <div
-            className="w-full bg-white rounded-t-2xl max-h-[80vh] overflow-hidden flex flex-col"
+            className="w-full bg-surface-card rounded-t-2xl max-h-[80vh] overflow-hidden flex flex-col"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
-              <h2 className="font-bold text-slate-900">Pending Surgery</h2>
-              <button onClick={() => setMobileOpen(false)} className="text-slate-400 hover:text-slate-600">
+            <div className="flex justify-between items-center p-4 border-b border-line shrink-0">
+              <h2 className="font-bold text-ink">Pending Surgery</h2>
+              <button onClick={() => setMobileOpen(false)} className="text-ink-muted hover:text-ink">
                 <X className="w-5 h-5" />
               </button>
             </div>

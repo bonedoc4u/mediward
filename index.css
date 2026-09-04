@@ -61,8 +61,111 @@
   --shadow-card: 0 1px 2px 0 rgb(30 42 46 / 0.06), 0 1px 3px 0 rgb(30 42 46 / 0.04);
 }
 
+/* ── Dark mode — system preference default (unless user explicitly chose light) ──
+ * Same custom properties as the @theme block above; Tailwind's generated
+ * utilities (bg-surface, text-ink, etc.) reference var(--color-*) rather than
+ * inlining the hex, so redefining these here repaints every existing call site
+ * with zero class changes. Vital-status "-surface" tints use a low-opacity
+ * overlay on the dark background instead of a separate pastel hex, since a
+ * pale red-50-style tint that reads on white does not read on a dark surface. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-vital-critical:         #f87171; /* red-400, graphic ~6.65:1 on surface */
+    --color-vital-critical-fg:      #fca5a5; /* red-300, text ~9.69:1 on surface */
+    --color-vital-critical-surface: rgb(248 113 113 / 0.12);
+    --color-vital-critical-border:  rgb(248 113 113 / 0.35);
+
+    --color-vital-warning:          #fbbf24; /* amber-400, graphic ~11.02:1 on surface */
+    --color-vital-warning-fg:       #fcd34d; /* amber-300, text ~12.76:1 on surface */
+    --color-vital-warning-surface:  rgb(251 191 36 / 0.12);
+    --color-vital-warning-border:   rgb(251 191 36 / 0.35);
+
+    --color-vital-normal:           #4ade80; /* green-400, graphic ~10.56:1 on surface */
+    --color-vital-normal-fg:        #86efac; /* green-300, text ~13.10:1 on surface */
+    --color-vital-normal-surface:   rgb(74 222 128 / 0.12);
+    --color-vital-normal-border:    rgb(74 222 128 / 0.35);
+
+    --color-vital-low:              #60a5fa; /* blue-400, graphic ~7.23:1 on surface */
+    --color-vital-low-fg:           #93c5fd; /* blue-300, text ~10.20:1 on surface */
+    --color-vital-low-surface:      rgb(96 165 250 / 0.12);
+    --color-vital-low-border:       rgb(96 165 250 / 0.35);
+
+    --color-chart-bp-sys: #818cf8; /* indigo-400 */
+    --color-chart-bp-dia: #a5b4fc; /* indigo-300 */
+    --color-chart-hr:     #f472b6; /* pink-400 */
+    --color-chart-spo2:   #22d3ee; /* cyan-400 */
+    --color-chart-temp:   #a78bfa; /* violet-400 */
+
+    --color-surface:         #101517; /* app background */
+    --color-surface-card:    #1b2226; /* cards, sheets, modals — lighter than surface (elevated) */
+    --color-surface-sunken:  #0a0d0f; /* chips, wells, skeletons — darker than surface (recessed) */
+    --color-ink:             #e7edee; /* primary text ~15.54:1 on surface */
+    --color-ink-muted:       #9aa8ab; /* secondary text ~7.50:1 on surface */
+    --color-ink-faint:       #62717d; /* disabled/placeholder ONLY, ~3.66:1 on surface */
+    --color-accent:          #2f6d69; /* scrub teal, graphic ~3.08:1 on surface, ~5.98:1 vs white button text */
+    --color-accent-fg:       #6cc0ba; /* teal as text ~8.66:1 on surface */
+    --color-accent-soft:     rgb(75 163 158 / 0.16); /* selection/hover tint */
+    --color-accent-pressed:  #265a56; /* pressed/active state, ~7.84:1 vs white button text */
+    --color-line:            #2a3336; /* borders and dividers */
+    color-scheme: dark; /* native form controls (date/select/checkbox) render dark-themed */
+  }
+
+  :root:not([data-theme="light"]) ::-webkit-scrollbar-track { background: var(--color-surface-sunken); }
+  :root:not([data-theme="light"]) ::-webkit-scrollbar-thumb { background: var(--color-line); }
+
+  :root:not([data-theme="light"]) .scroll-x-fade::after { background: linear-gradient(to right, transparent, var(--color-surface-card)); }
+}
+
+/* ── Dark mode — explicit user choice, wins regardless of system preference ── */
+:root[data-theme="dark"] {
+  --color-vital-critical:         #f87171; /* red-400, graphic ~6.65:1 on surface */
+  --color-vital-critical-fg:      #fca5a5; /* red-300, text ~9.69:1 on surface */
+  --color-vital-critical-surface: rgb(248 113 113 / 0.12);
+  --color-vital-critical-border:  rgb(248 113 113 / 0.35);
+
+  --color-vital-warning:          #fbbf24; /* amber-400, graphic ~11.02:1 on surface */
+  --color-vital-warning-fg:       #fcd34d; /* amber-300, text ~12.76:1 on surface */
+  --color-vital-warning-surface:  rgb(251 191 36 / 0.12);
+  --color-vital-warning-border:   rgb(251 191 36 / 0.35);
+
+  --color-vital-normal:           #4ade80; /* green-400, graphic ~10.56:1 on surface */
+  --color-vital-normal-fg:        #86efac; /* green-300, text ~13.10:1 on surface */
+  --color-vital-normal-surface:   rgb(74 222 128 / 0.12);
+  --color-vital-normal-border:    rgb(74 222 128 / 0.35);
+
+  --color-vital-low:              #60a5fa; /* blue-400, graphic ~7.23:1 on surface */
+  --color-vital-low-fg:           #93c5fd; /* blue-300, text ~10.20:1 on surface */
+  --color-vital-low-surface:      rgb(96 165 250 / 0.12);
+  --color-vital-low-border:       rgb(96 165 250 / 0.35);
+
+  --color-chart-bp-sys: #818cf8; /* indigo-400 */
+  --color-chart-bp-dia: #a5b4fc; /* indigo-300 */
+  --color-chart-hr:     #f472b6; /* pink-400 */
+  --color-chart-spo2:   #22d3ee; /* cyan-400 */
+  --color-chart-temp:   #a78bfa; /* violet-400 */
+
+  --color-surface:         #101517; /* app background */
+  --color-surface-card:    #1b2226; /* cards, sheets, modals — lighter than surface (elevated) */
+  --color-surface-sunken:  #0a0d0f; /* chips, wells, skeletons — darker than surface (recessed) */
+  --color-ink:             #e7edee; /* primary text ~15.54:1 on surface */
+  --color-ink-muted:       #9aa8ab; /* secondary text ~7.50:1 on surface */
+  --color-ink-faint:       #62717d; /* disabled/placeholder ONLY, ~3.66:1 on surface */
+  --color-accent:          #2f6d69; /* scrub teal, graphic ~3.08:1 on surface, ~5.98:1 vs white button text */
+  --color-accent-fg:       #6cc0ba; /* teal as text ~8.66:1 on surface */
+  --color-accent-soft:     rgb(75 163 158 / 0.16); /* selection/hover tint */
+  --color-accent-pressed:  #265a56; /* pressed/active state, ~7.84:1 vs white button text */
+  --color-line:            #2a3336; /* borders and dividers */
+  color-scheme: dark; /* native form controls (date/select/checkbox) render dark-themed */
+}
+
+:root[data-theme="dark"] ::-webkit-scrollbar-track { background: var(--color-surface-sunken); }
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--color-line); }
+
+:root[data-theme="dark"] .scroll-x-fade::after { background: linear-gradient(to right, transparent, var(--color-surface-card)); }
+
 /* ── Global CSS custom properties ─────────────────────────────── */
 :root {
+  color-scheme: light; /* native form controls (date/select/checkbox) render light-themed */
   --bottom-nav-height: 56px;
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -215,6 +318,7 @@ button:active, a:active { opacity: 0.85; }
   * { color: black !important; }
   .text-white { color: black !important; }
   .bg-slate-900, .bg-gradient-to-r { background: white !important; }
+  .bg-surface, .bg-surface-card, .bg-surface-sunken { background: white !important; }
 
   /* Avoid page breaks inside cards */
   .patient-card, section, article { break-inside: avoid; }
