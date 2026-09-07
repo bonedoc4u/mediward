@@ -119,7 +119,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       const matchesPending = filterPending ? (needsPac(p) && p.pacStatus === PacStatus.Pending) : true;
       const matchesSurgery = filterSurgeryToday ? (p.dos === today || p.plannedDos === today) : true;
-      const matchesPod01 = filterPod01 ? (() => { const d = calcPod(p.dos, today); return d === 1 || d === 2; })() : true;
+      const matchesPod01 = filterPod01 ? (() => { const d = calcPod(p.dos, p.dod ?? today); return d === 1 || d === 2; })() : true;
       const matchesOverdue = filterOverdueTodos ? p.todos.some(t => !t.isDone) : true;
 
       return matchesSearch && matchesPending && matchesSurgery && matchesPod01 && matchesOverdue;
@@ -523,10 +523,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     </td>
                     {viewMode !== 'pending' && (
                       <td className="px-6 py-4 text-center">
-                        {calcPod(patient.dos, today) !== undefined ? (
+                        {calcPod(patient.dos, patient.dod ?? today) !== undefined ? (
                           <div className="inline-block p-2 rounded-lg border-2 border-vital-normal bg-vital-normal-surface">
                             <span className="block text-[10px] uppercase font-bold text-vital-normal-fg leading-none mb-0.5">POD</span>
-                            <span className="font-bold font-mono text-lg text-vital-normal-fg leading-none">{calcPod(patient.dos, today)}</span>
+                            <span className="font-bold font-mono text-lg text-vital-normal-fg leading-none">{calcPod(patient.dos, patient.dod ?? today)}</span>
                           </div>
                         ) : (
                           <span className="text-ink-muted">-</span>
@@ -684,10 +684,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {showNews2 && <News2Badge vitals={item.patient.vitals} compact />}
-                        {calcPod(item.patient.dos, today) !== undefined && (
+                        {calcPod(item.patient.dos, item.patient.dod ?? today) !== undefined && (
                           <div className="text-xs font-bold uppercase text-ink-muted border-2 border-vital-normal bg-vital-normal-surface p-1.5 rounded text-center">
                             <span className="text-vital-normal-fg block text-[9px]">POD</span>
-                            <span className="text-lg font-mono text-vital-normal-fg block leading-none">{calcPod(item.patient.dos, today)}</span>
+                            <span className="text-lg font-mono text-vital-normal-fg block leading-none">{calcPod(item.patient.dos, item.patient.dod ?? today)}</span>
                           </div>
                         )}
                       </div>

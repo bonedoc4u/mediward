@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort, reconcilePlannedDos, isShortDiagnosisCode } from '../utils/calculations';
+import { calculatePOD, enrichPatientData, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort, reconcilePlannedDos, isShortDiagnosisCode } from '../utils/calculations';
 import { PacStatus } from '../types';
 import type { Patient, WardConfig } from '../types';
 
@@ -33,6 +33,38 @@ describe('calculatePOD', () => {
 
   it('returns undefined when no DOS is provided', () => {
     expect(calculatePOD(undefined)).toBeUndefined();
+  });
+
+  it('freezes at the given asOf date instead of climbing against today', () => {
+    // Surgery 3 days before an asOf date that is itself 10 days in the past —
+    // without asOf, calculatePOD would compute against the real "today" and
+    // keep growing every day after a patient is discharged (the reported bug:
+    // Master List showed a discharged patient's POD still counting up).
+    const asOf = localDate(new Date(Date.now() - 10 * 86_400_000));
+    const dos = localDate(new Date(Date.now() - 13 * 86_400_000));
+    expect(calculatePOD(dos, asOf)).toBe(4);
+    expect(calculatePOD(dos)).not.toBe(4); // live "today" gives a larger, still-climbing value
+  });
+
+  it('asOf in the future relative to dos still returns a defined POD (discharge day itself)', () => {
+    const dos = localDate(new Date(Date.now() - 20 * 86_400_000));
+    const asOf = localDate(new Date(Date.now() - 15 * 86_400_000));
+    expect(calculatePOD(dos, asOf)).toBe(6);
+  });
+});
+
+describe('enrichPatientData — POD freezes at discharge', () => {
+  it('uses dod as the POD reference date for a discharged patient, not live today', () => {
+    const dos = localDate(new Date(Date.now() - 30 * 86_400_000));
+    const dod = localDate(new Date(Date.now() - 25 * 86_400_000));
+    const [enriched] = enrichPatientData([{ dos, dod } as Patient]);
+    expect(enriched.pod).toBe(6); // POD as of discharge (dos + 5 days, 1-based), not 31 (today)
+  });
+
+  it('still computes live POD for an active patient with no dod', () => {
+    const dos = localDate(new Date(Date.now() - 3 * 86_400_000));
+    const [enriched] = enrichPatientData([{ dos } as Patient]);
+    expect(enriched.pod).toBe(4);
   });
 });
 
