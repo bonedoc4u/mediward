@@ -4,16 +4,19 @@ import { generateId } from './sanitize';
 import { localYmd } from './otSchedule';
 
 // ─── POD Calculation ───
-export const calculatePOD = (dos?: string): number | undefined => {
+// asOf lets a discharged/deceased patient's POD freeze at their dod instead of
+// climbing forever against today's real date — pass p.dod when calling this
+// for a patient who has one. Defaults to today for active (dod-less) patients.
+export const calculatePOD = (dos?: string, asOf?: string): number | undefined => {
   if (!dos) return undefined;
-  const today = new Date();
   // Append T00:00:00 so YYYY-MM-DD strings are parsed as local time, not UTC.
   // Without this, JavaScript treats bare date strings as UTC midnight,
   // causing off-by-one errors in non-UTC timezones (e.g. IST UTC+5:30).
+  const referenceDate = asOf ? new Date(asOf + 'T00:00:00') : new Date();
   const surgeryDate = new Date(dos + 'T00:00:00');
-  today.setHours(0, 0, 0, 0);
+  referenceDate.setHours(0, 0, 0, 0);
   surgeryDate.setHours(0, 0, 0, 0);
-  const diffTime = today.getTime() - surgeryDate.getTime();
+  const diffTime = referenceDate.getTime() - surgeryDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   // 1-based: day of surgery = POD 1, matching calcPod in HandoverSummary.
   // Commit 27919b2 moved the app to this convention but missed this function,
@@ -24,7 +27,7 @@ export const calculatePOD = (dos?: string): number | undefined => {
 export const enrichPatientData = (patients: Patient[]): Patient[] => {
   return patients.map(p => ({
     ...p,
-    pod:            calculatePOD(p.dos),
+    pod:            calculatePOD(p.dos, p.dod),
     // Normalise arrays — guard against null/undefined from DB or optimistic new-patient objects
     dailyRounds:   Array.isArray(p.dailyRounds)   ? p.dailyRounds   : [],
     todos:         Array.isArray(p.todos)          ? p.todos          : [],
