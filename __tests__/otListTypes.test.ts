@@ -134,4 +134,25 @@ describe('isEligibleForOTList', () => {
       patientStatus: PatientStatus.WentHome, dos: '2026-07-28', plannedDos: '2026-08-10',
     }))).toBe(true);
   });
+
+  it('excludes a conservative-management patient even though they have never had surgery', () => {
+    // Regression: hasPendingSurgery's `!p.dos` is permanently true for a
+    // conservative patient (they're never going to surgery), so without this
+    // exclusion they showed up in the OT list's pending-surgery panel forever
+    // — a gap the Ward Dashboard's own "Pending" tab already closed.
+    expect(isEligibleForOTList(makePatient({
+      management: 'conservative', dos: undefined, plannedDos: undefined,
+    }))).toBe(false);
+  });
+
+  it('excludes a conservative-management patient even with a stray plannedDos', () => {
+    expect(isEligibleForOTList(makePatient({
+      management: 'conservative', dos: undefined, plannedDos: '2026-08-10',
+    }))).toBe(false);
+  });
+
+  it('includes a surgical_fixation patient (explicit or default) the same as before', () => {
+    expect(isEligibleForOTList(makePatient({ management: 'surgical_fixation', dos: undefined }))).toBe(true);
+    expect(isEligibleForOTList(makePatient({ management: undefined, dos: undefined }))).toBe(true);
+  });
 });
