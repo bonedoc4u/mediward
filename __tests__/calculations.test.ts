@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculatePOD, enrichPatientData, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, buildSurgeryUpdate, getAdmissionDayCohort, reconcilePlannedDos, isShortDiagnosisCode } from '../utils/calculations';
+import { calculatePOD, enrichPatientData, getStatusColor, sortByBed, wardOptionsForPatient, hasPendingSurgery, isPendingSurgicalCandidate, buildSurgeryUpdate, getAdmissionDayCohort, reconcilePlannedDos, isShortDiagnosisCode } from '../utils/calculations';
 import { PacStatus } from '../types';
 import type { Patient, WardConfig } from '../types';
 
@@ -160,6 +160,38 @@ describe('hasPendingSurgery (OT pending-list / ward "Pending" view membership)',
     // Regression: this patient was previously permanently excluded from the
     // pending list because both filters hard-checked `!p.dos`.
     expect(hasPendingSurgery({ dos: '2026-06-01', plannedDos: '2026-08-01' } as Patient)).toBe(true);
+  });
+});
+
+describe('isPendingSurgicalCandidate (single source of truth for "pending surgery" membership)', () => {
+  it('is true for a never-operated surgical-fixation patient', () => {
+    expect(isPendingSurgicalCandidate({ dos: undefined, plannedDos: undefined, management: 'surgical_fixation' } as Patient)).toBe(true);
+  });
+
+  it('is true when management is unset (defaults to surgical_fixation)', () => {
+    expect(isPendingSurgicalCandidate({ dos: undefined, plannedDos: undefined, management: undefined } as Patient)).toBe(true);
+  });
+
+  it('is false for a conservative-management patient even though they have never been operated', () => {
+    // Regression: PreOpPrep.tsx and (briefly) the OT list's pending-surgery
+    // panel each independently re-derived hasPendingSurgery without this
+    // exclusion — a conservative patient never gets a dos, so `!p.dos`
+    // stayed true for them forever and they showed up as "pending" in both
+    // places. This is the shared check meant to prevent a third copy of
+    // the same gap.
+    expect(isPendingSurgicalCandidate({ dos: undefined, plannedDos: undefined, management: 'conservative' } as Patient)).toBe(false);
+  });
+
+  it('is false for a conservative-management patient even with a stray plannedDos', () => {
+    expect(isPendingSurgicalCandidate({ dos: undefined, plannedDos: '2026-08-01', management: 'conservative' } as Patient)).toBe(false);
+  });
+
+  it('is false for an already-operated surgical patient with no further surgery planned', () => {
+    expect(isPendingSurgicalCandidate({ dos: '2026-06-01', plannedDos: undefined, management: 'surgical_fixation' } as Patient)).toBe(false);
+  });
+
+  it('is true for an already-operated surgical patient with a second surgery planned', () => {
+    expect(isPendingSurgicalCandidate({ dos: '2026-06-01', plannedDos: '2026-08-01', management: 'surgical_fixation' } as Patient)).toBe(true);
   });
 });
 

@@ -77,6 +77,11 @@ describe('UIContext — full patient list loading', () => {
       renderLanding('otlist');
       expect(loadAllPatients).toHaveBeenCalled();
     });
+
+    it('loads all patients when landing directly on Pre-Op Prep', () => {
+      renderLanding('preop');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
   });
 
   describe('via navigateTo', () => {
@@ -136,6 +141,11 @@ describe('UIContext — full patient list loading', () => {
 
     it('loads all patients when navigating to OT List', () => {
       renderNav('otlist');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
+
+    it('loads all patients when navigating to Pre-Op Prep', () => {
+      renderNav('preop');
       expect(loadAllPatients).toHaveBeenCalled();
     });
   });
