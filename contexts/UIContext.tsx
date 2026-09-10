@@ -35,10 +35,15 @@ interface UIContextType {
 // ward and show accurate per-ward counts — a patient who happens to fall
 // outside the most-recently-created page would otherwise silently vanish
 // from their own ward's tab. Master/Discharge/Admissions need the same for
-// historical completeness (see the comment where this is used).
+// historical completeness (see the comment where this is used). OT List's
+// pending-surgery panel has the identical problem: it filters the same
+// `patients` array, so a patient outside the paginated first page silently
+// never appeared there either, even though they'd still turn up via search
+// once some other view's visit had already triggered the full load.
 function needsFullPatientList(view: ViewMode): boolean {
   return view === 'dashboard' || view === 'pending' || view === 'wenthome'
-    || view === 'master' || view === 'discharge' || view === 'admissions';
+    || view === 'master' || view === 'discharge' || view === 'admissions'
+    || view === 'otlist';
 }
 
 const UIContext = createContext<UIContextType | null>(null);

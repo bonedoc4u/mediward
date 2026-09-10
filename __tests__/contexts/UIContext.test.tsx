@@ -67,6 +67,16 @@ describe('UIContext — full patient list loading', () => {
       renderLanding('rounds');
       expect(loadAllPatients).not.toHaveBeenCalled();
     });
+
+    it('loads all patients when landing directly on OT List', () => {
+      // Regression: OT List's pending-surgery panel filters the same
+      // paginated `patients` array as the dashboard — a patient past the
+      // "50 most recently created" cutoff silently never appeared there,
+      // even though they'd turn up via search once some other view had
+      // already triggered the full load.
+      renderLanding('otlist');
+      expect(loadAllPatients).toHaveBeenCalled();
+    });
   });
 
   describe('via navigateTo', () => {
@@ -122,6 +132,11 @@ describe('UIContext — full patient list loading', () => {
     it('does NOT load all patients when navigating to a non-list view', () => {
       renderNav('labs');
       expect(loadAllPatients).not.toHaveBeenCalled();
+    });
+
+    it('loads all patients when navigating to OT List', () => {
+      renderNav('otlist');
+      expect(loadAllPatients).toHaveBeenCalled();
     });
   });
 });
