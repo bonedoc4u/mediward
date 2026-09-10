@@ -129,6 +129,18 @@ export const needsPac = (p: Patient): boolean =>
  *  patient into these lists. */
 export const hasPendingSurgery = (p: Patient): boolean => !p.dos || !!p.plannedDos;
 
+/** Single source of truth for "genuinely pending a surgery": combines
+ *  hasPendingSurgery with needsPac's conservative-management exclusion.
+ *  A conservative patient never gets a dos (they're not going to surgery),
+ *  so hasPendingSurgery's `!p.dos` alone stays true for them forever —
+ *  every "pending surgery" list (Ward Dashboard's Pending tab, the OT
+ *  list's pending-surgery panel, Pre-Op Prep's checklist) should use this
+ *  shared check instead of re-deriving the same two conditions separately,
+ *  which is how the conservative exclusion ended up missing from two of
+ *  those three places independently. */
+export const isPendingSurgicalCandidate = (p: Patient): boolean =>
+  hasPendingSurgery(p) && needsPac(p);
+
 /** When a surgery date is set/corrected directly (e.g. via the Edit Patient
  *  form, rather than the dedicated "Add Surgery" action), any existing
  *  plannedDos on or before that date refers to the surgery just recorded,

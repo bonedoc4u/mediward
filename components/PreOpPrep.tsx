@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Patient, PacChecklistItem } from '../types';
+import { Patient, PacChecklistItem, PatientStatus } from '../types';
 import { useConfig } from '../contexts/ConfigContext';
 import { Calendar, CheckSquare, Square, UserCheck, AlertCircle } from 'lucide-react';
 import { localYmd } from '../utils/dates';
-import { hasPendingSurgery } from '../utils/calculations';
+import { isPendingSurgicalCandidate } from '../utils/calculations';
 
 interface Props {
   patients: Patient[];
@@ -14,7 +14,7 @@ const PreOpPrep: React.FC<Props> = ({ patients, onUpdatePatient }) => {
   const { preOpChecklistTemplate } = useConfig();
 
   const preOpPatients = useMemo(
-    () => patients.filter(p => hasPendingSurgery(p) && p.patientStatus !== 'Discharged'),
+    () => patients.filter(p => isPendingSurgicalCandidate(p) && p.patientStatus !== PatientStatus.Discharged),
     [patients],
   );
 

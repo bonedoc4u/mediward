@@ -1,6 +1,6 @@
 import { UNIT_SCHEDULE } from './otSchedule';
 import { Patient, PatientStatus } from '../types';
-import { hasPendingSurgery } from './calculations';
+import { isPendingSurgicalCandidate } from './calculations';
 
 /**
  * Prefix used to build the drag id for a pending-surgery card (see
@@ -62,24 +62,15 @@ export function getDefaultCategoryForType(otType: OTType): string {
   return getTableOptionsForType(otType)[0];
 }
 
-/** Same pending-surgery rule as hasPendingSurgery, plus the status
- *  exclusions an OT list specifically needs: a Discharged patient is never
- *  relevant to any future OT list, but a patient who Went Home is still
- *  relevant if they have a genuinely scheduled second surgery (plannedDos) —
- *  unlike the Ward Dashboard's "Pending" tab, which excludes Went Home
- *  unconditionally since that view tracks who's still physically pre-op in
- *  the ward.
- *
- *  Conservative-management patients are excluded the same way the Ward
- *  Dashboard's "Pending" tab already does: they're never going to surgery,
- *  so hasPendingSurgery's `!p.dos` alone would otherwise mark them pending
- *  forever. This mirrors WardDashboard.tsx's filteredPatients check — this
- *  function was missing it, which is why the OT list's pending-surgery
- *  panel showed conservative patients that the Ward Dashboard's own
- *  Pending tab already correctly hides. */
+/** Same pending-surgery rule as isPendingSurgicalCandidate (which already
+ *  excludes conservative-management patients), plus the status exclusions
+ *  an OT list specifically needs: a Discharged patient is never relevant to
+ *  any future OT list, but a patient who Went Home is still relevant if
+ *  they have a genuinely scheduled second surgery (plannedDos) — unlike the
+ *  Ward Dashboard's "Pending" tab, which excludes Went Home unconditionally
+ *  since that view tracks who's still physically pre-op in the ward. */
 export function isEligibleForOTList(p: Patient): boolean {
   if (p.patientStatus === PatientStatus.Discharged) return false;
   if (p.patientStatus === PatientStatus.WentHome && !p.plannedDos) return false;
-  if ((p.management ?? 'surgical_fixation') === 'conservative') return false;
-  return hasPendingSurgery(p);
+  return isPendingSurgicalCandidate(p);
 }
