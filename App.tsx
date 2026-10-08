@@ -10,6 +10,7 @@ import { todayYmd } from './utils/dates';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style as StatusBarStyle } from '@capacitor/status-bar';
 import LoginPage from './components/LoginPage';
+import LandingPage from './components/LandingPage';
 import BiometricEnrollmentOffer from './components/BiometricEnrollmentOffer';
 import ResetPasswordPage from './components/ResetPasswordPage';
 import SuperAdminPanel from './components/SuperAdminPanel';
@@ -186,6 +187,21 @@ const App: React.FC = () => {
   const [showTerms, setShowTerms] = useState(
     () => window.location.hash === '#/terms',
   );
+  // ─── Public landing page (unauthenticated only) ───
+  // A device that has signed in here before skips straight to the login
+  // screen, same as today — only a genuinely first-time visit (a fresh
+  // browser/device, e.g. an external reviewer) sees the explainer first.
+  // The flag is set by AuthContext's login() on a successful password login.
+  const [showLogin, setShowLogin] = useState(
+    () => window.location.hash === '#/login' || !!localStorage.getItem('mediward_has_signed_in'),
+  );
+  // The static index.html <title> ("MediWard Manager") is fine once inside
+  // the authenticated app, but a reviewer or search engine hitting the
+  // public landing/login screens should see something more descriptive.
+  useEffect(() => {
+    if (isAuthenticated || showPrivacy || showTerms) return;
+    document.title = showLogin ? 'MediWard — Sign In' : 'MediWard — Clinical Ward Management';
+  }, [isAuthenticated, showLogin, showPrivacy, showTerms]);
   // ─── Clinical disclaimer acceptance (once per user, per doc version) ───
   // null = still determining for the current user, true = accepted, false = must show.
   // localStorage is a per-session fast-path (cleared on logout); the DB audit table
@@ -474,6 +490,15 @@ const App: React.FC = () => {
     }
     if (showTerms) {
       return <LegalPage type="terms" onBack={() => { setShowTerms(false); window.location.hash = ''; }} />;
+    }
+    if (!showLogin) {
+      return (
+        <LandingPage
+          onSignIn={() => { setShowLogin(true); window.location.hash = '#/login'; }}
+          onPrivacy={() => { setShowPrivacy(true); window.location.hash = '#/privacy'; }}
+          onTerms={() => { setShowTerms(true); window.location.hash = '#/terms'; }}
+        />
+      );
     }
     return (
       <LoginPage
