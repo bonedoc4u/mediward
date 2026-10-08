@@ -578,6 +578,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session);
       saveToStorage('session', session);
       logAuditEvent(session.id, session.name, 'LOGIN', 'session', session.id, `Login: ${email}`);
+      // Marks this device as "has signed in before" so App.tsx's public
+      // landing page is skipped on future visits — only a genuinely
+      // first-time device (no flag set yet) sees it.
+      try { localStorage.setItem('mediward_has_signed_in', '1'); } catch { /* storage unavailable — landing just shows again next time */ }
 
       // Offer fingerprint sign-in once per fresh password login, if this
       // device supports it and nothing is enrolled for it yet. The refresh
