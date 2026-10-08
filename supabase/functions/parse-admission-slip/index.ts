@@ -19,7 +19,7 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 
 const ALLOWED_ORIGINS = [
   'https://mediward.vercel.app',
-  'https://mediward.app',
+  'https://mediward.in',
   'capacitor://localhost',   // iOS Capacitor
   'https://localhost',       // Android Capacitor (Capacitor v5+)
   'http://localhost',        // Android Capacitor (older / some configs)
