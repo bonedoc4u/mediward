@@ -96,9 +96,10 @@ const LandingPage: React.FC<Props> = ({ onSignIn, onPrivacy, onTerms }) => {
           </h1>
           <p className="mt-4 text-blue-300 font-medium">Smart. Simple. Secure.</p>
           <p className="mt-6 text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-            MediWard is a multi-tenant ward management system for orthopaedic units in Indian hospitals.
-            Daily rounds, OT scheduling, labs, imaging, and discharge documentation — all in one place,
-            used on phones, during actual rounds.
+            MediWard is a multi-tenant ward management system built for surgical and clinical departments
+            in Indian hospitals — proven first in orthopaedics, with the same workflow extending to other
+            departments. Daily rounds, OT scheduling, labs, imaging, and discharge documentation — all in
+            one place, used on phones, during actual rounds.
           </p>
           <button
             onClick={onSignIn}
