@@ -26,7 +26,7 @@ const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemi
 // arbitrary domains using a stolen Bearer token.
 const ALLOWED_ORIGINS = [
   'https://mediward.vercel.app',
-  'https://mediward.app',
+  'https://mediward.in',
   // Add capacitor:// for native mobile builds
   'capacitor://localhost',
   'http://localhost:3000', // local dev only
