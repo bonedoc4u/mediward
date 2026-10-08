@@ -12,6 +12,19 @@ describe('LandingPage (public, unauthenticated marketing page)', () => {
     expect(screen.getByText('Discharge Summaries')).toBeInTheDocument();
   });
 
+  it('renders the illustrative product preview, clearly labeled as such', () => {
+    render(<LandingPage onSignIn={vi.fn()} onPrivacy={vi.fn()} onTerms={vi.fn()} />);
+    // Label must make clear this is a mockup, never mistaken for a real
+    // screenshot or real patient data.
+    expect(screen.getByText(/illustrative preview/i)).toBeInTheDocument();
+    expect(screen.getByText('Patient A')).toBeInTheDocument();
+  });
+
+  it('renders the roadmap/compliance line without overclaiming current status', () => {
+    render(<LandingPage onSignIn={vi.fn()} onPrivacy={vi.fn()} onTerms={vi.fn()} />);
+    expect(screen.getByText(/on the roadmap/i)).toBeInTheDocument();
+  });
+
   it('calls onSignIn when a Sign In button is clicked', () => {
     const onSignIn = vi.fn();
     render(<LandingPage onSignIn={onSignIn} onPrivacy={vi.fn()} onTerms={vi.fn()} />);

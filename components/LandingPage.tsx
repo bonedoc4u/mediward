@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Stethoscope, ClipboardList, CalendarClock, FileText, FlaskConical, WifiOff, ShieldCheck,
+  CheckCircle2, AlertCircle, Smartphone, Globe2,
 } from 'lucide-react';
 
 interface Props {
@@ -48,6 +49,22 @@ const FEATURES: Feature[] = [
   },
 ];
 
+// Illustrative only — fictional placeholder patients, not real data, used
+// purely to show the shape of the real Ward Dashboard layout and tokens.
+interface MockPatientRow {
+  bed: string;
+  name: string;
+  diagnosis: string;
+  pod: number | null;
+  status: 'normal' | 'warning';
+}
+
+const MOCK_PATIENTS: MockPatientRow[] = [
+  { bed: '04', name: 'Patient A', diagnosis: '# Neck of Femur (R)', pod: 2, status: 'normal' },
+  { bed: '07', name: 'Patient B', diagnosis: 'ACL Reconstruction', pod: null, status: 'warning' },
+  { bed: '11', name: 'Patient C', diagnosis: '# Both Bone Forearm (L)', pod: 5, status: 'normal' },
+];
+
 const LandingPage: React.FC<Props> = ({ onSignIn, onPrivacy, onTerms }) => {
   return (
     <div className="min-h-screen bg-surface text-ink">
@@ -92,6 +109,51 @@ const LandingPage: React.FC<Props> = ({ onSignIn, onPrivacy, onTerms }) => {
         </div>
       </section>
 
+      {/* ── Product preview ──
+          Illustrative mockup, not a real screenshot — no browser-automation
+          tooling is available to capture an actual one. Built from the same
+          tokens/layout as the real Ward Dashboard, with fictional patients
+          only, and labeled as illustrative so it's never mistaken for real
+          data or a literal screenshot. */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 -mt-10 sm:-mt-14 relative z-10">
+        <div className="bg-surface-card border border-line rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-surface-sunken border-b border-line px-4 py-2.5 flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-vital-critical/60" />
+            <span className="w-2.5 h-2.5 rounded-full bg-vital-warning/60" />
+            <span className="w-2.5 h-2.5 rounded-full bg-vital-normal/60" />
+            <span className="ml-3 text-xs text-ink-muted font-medium">Ward Dashboard — illustrative preview</span>
+          </div>
+          <div className="p-4 sm:p-5">
+            <div className="flex gap-2 mb-4">
+              <span className="px-3 py-1.5 bg-accent text-white text-xs font-semibold rounded-lg">Ward 1 (12)</span>
+              <span className="px-3 py-1.5 bg-surface-sunken text-ink-muted text-xs font-semibold rounded-lg">Ward 2 (9)</span>
+              <span className="px-3 py-1.5 bg-surface-sunken text-ink-muted text-xs font-semibold rounded-lg">ICU (4)</span>
+            </div>
+            <div className="space-y-2">
+              {MOCK_PATIENTS.map(p => (
+                <div key={p.bed} className="flex items-center gap-3 border border-line rounded-xl p-3">
+                  <span className="font-mono font-bold text-ink-muted text-sm w-8 shrink-0">{p.bed}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-ink text-sm truncate">{p.name}</p>
+                    <p className="text-xs text-ink-muted truncate">{p.diagnosis}</p>
+                  </div>
+                  {p.pod !== null && (
+                    <span className="shrink-0 px-2 py-1 bg-vital-normal-surface text-vital-normal-fg text-[11px] font-bold rounded-md">
+                      POD {p.pod}
+                    </span>
+                  )}
+                  {p.status === 'warning' ? (
+                    <AlertCircle className="w-4 h-4 text-vital-warning shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-vital-normal shrink-0" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Feature grid ── */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-16">
         <h2 className="text-2xl font-bold text-center mb-2">Everything a unit needs, in one app</h2>
@@ -123,6 +185,10 @@ const LandingPage: React.FC<Props> = ({ onSignIn, onPrivacy, onTerms }) => {
             and used daily to run real ward rounds, not as a prototype. Every feature exists because an actual
             shift needed it.
           </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-ink-muted">
+            <span className="flex items-center gap-1.5"><Globe2 className="w-3.5 h-3.5" /> FHIR R4 & ABHA/ABDM compliance — on the roadmap</span>
+            <span className="flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> Native Android + iOS — planned after PWA rollout</span>
+          </div>
         </div>
       </section>
 
