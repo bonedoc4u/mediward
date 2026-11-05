@@ -40,7 +40,7 @@ vercel list --prod
 vercel promote https://mediward-def456.vercel.app --token=$VERCEL_TOKEN
 
 # 3. Verify
-curl -s https://mediward.app/health | jq .version
+curl -s https://mediward.in/health | jq .version
 ```
 
 ### Option C — GitHub Actions re-deploy (if specific commit needed)
@@ -50,7 +50,7 @@ curl -s https://mediward.app/health | jq .version
 gh workflow run deploy-production.yml --ref v1.2.2
 ```
 
-**Verification:** open `https://mediward.app` in incognito — confirm version matches previous build.
+**Verification:** open `https://mediward.in` in incognito — confirm version matches previous build.
 
 ---
 
