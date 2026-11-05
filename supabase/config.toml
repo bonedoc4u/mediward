@@ -33,7 +33,8 @@ port     = 54323
 api_url  = "http://127.0.0.1"
 openai_api_key = "env(OPENAI_API_KEY)"
 
-[inbucket]
+# Local email testing server (was [inbucket] before Supabase CLI 3.0).
+[local_smtp]
 enabled      = true
 port         = 54324
 smtp_port    = 54325
