@@ -51,8 +51,7 @@ enabled      = true
 # Local and staging both redirect here; prod sets this in dashboard
 site_url     = "http://localhost:3000"
 additional_redirect_urls = [
-  "https://mediward.app",
-  "https://staging.mediward.app",
+  "https://mediward.in",
   "http://localhost:3000",
   "capacitor://localhost",     # Capacitor Android/iOS deep link
   "http://localhost"
@@ -72,7 +71,7 @@ host     = "inbucket"
 port     = 2500
 user     = "fake"
 pass     = "fake"
-admin_email = "admin@mediward.app"
+admin_email = "admin@mediward.in"
 sender_name = "MediWard"
 
 [auth.sms]
