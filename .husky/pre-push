@@ -23,14 +23,30 @@ echo "  ✓ No type errors"
 # NOT captured in a migration file. Create one before pushing.
 echo "  ▸ Checking for unapplied schema changes..."
 
-if ! command -v supabase &> /dev/null; then
-  echo "  ⚠ supabase CLI not found — skipping schema diff check"
-  echo "  Install: npm install -g @supabase/cli"
-else
-  DIFF=$(supabase db diff 2>&1 || true)
+SCHEMA_CHECK="skipped"
 
+if ! command -v supabase > /dev/null 2>&1; then
+  echo "  ⚠ supabase CLI not found — skipping schema diff check"
+  echo "  Install: brew install supabase/tap/supabase"
+else
+  # Keep the diff (stdout) apart from errors (stderr), and record the exit
+  # code. Previously `|| true` swallowed failures, so a diff that never ran
+  # (no Docker, bad config.toml, project not linked) printed "✓ in sync".
+  ERR_FILE=$(mktemp)
+  if DIFF=$(supabase db diff 2>"$ERR_FILE"); then
+    DIFF_OK=1
+  else
+    DIFF_OK=0
+  fi
+
+  if [ "$DIFF_OK" -eq 0 ]; then
+    echo "  ⚠ Schema diff check could NOT run — schema sync is UNVERIFIED."
+    echo "  supabase db diff failed with:"
+    sed 's/^/    /' "$ERR_FILE" | tail -5
+    echo "  Common causes: Docker not running, project not linked"
+    echo "  (supabase link), or an outdated supabase/config.toml."
   # supabase db diff outputs SQL if there are differences, empty string if clean
-  if echo "$DIFF" | grep -qE "^(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)"; then
+  elif echo "$DIFF" | grep -qE "^(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)"; then
     echo ""
     echo "  ❌ PUSH BLOCKED: unapplied database schema changes detected."
     echo ""
@@ -45,11 +61,18 @@ else
     echo "    git add supabase/migrations/ && git commit -m 'feat: add migration'"
     echo "    git push"
     echo ""
+    rm -f "$ERR_FILE"
     exit 1
+  else
+    SCHEMA_CHECK="passed"
+    echo "  ✓ Schema is in sync with migration history"
   fi
-
-  echo "  ✓ Schema is in sync with migration history"
+  rm -f "$ERR_FILE"
 fi
 
 echo ""
-echo "✅ All pre-push checks passed."
+if [ "$SCHEMA_CHECK" = "passed" ]; then
+  echo "✅ All pre-push checks passed."
+else
+  echo "✅ TypeScript passed. ⚠ Schema diff check was skipped — not verified."
+fi
