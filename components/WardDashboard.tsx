@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useLayoutEffect, memo } from 'react';
 import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
-import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac, isPendingSurgicalCandidate } from '../utils/calculations';
+import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac, isPendingSurgicalCandidate, needsUrgentReview, news2Band } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
 import { exportWardListPDF } from '../utils/exportWardList';
@@ -17,31 +17,58 @@ import { resolveEffectiveUnit } from '../utils/effectiveUnit';
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
 
 // ─── NEWS2 Badge ─────────────────────────────────────────────────────────────
-function getNews2Config(score: number): { label: string; badge: string; dot: string } {
+function getNews2BadgeClass(score: number): string {
   // Escalation stays legible without orange: pulse+bold red > bold red > amber > green
-  if (score >= 7) return { label: `N2: ${score}`, badge: 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border animate-pulse font-bold', dot: 'bg-vital-critical' };
-  if (score >= 5) return { label: `N2: ${score}`, badge: 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border font-bold', dot: 'bg-vital-critical' };
-  if (score >= 2) return { label: `N2: ${score}`, badge: 'bg-vital-warning-surface text-vital-warning-fg border-vital-warning-border', dot: 'bg-vital-warning' };
-  return { label: `N2: ${score}`, badge: 'bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border', dot: 'bg-vital-normal' };
+  if (score >= 7) return 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border animate-pulse font-bold';
+  if (score >= 5) return 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border font-bold';
+  if (score >= 2) return 'bg-vital-warning-surface text-vital-warning-fg border-vital-warning-border font-semibold';
+  return 'bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border font-semibold';
 }
 
 function News2Badge({ vitals, compact = false }: { vitals?: VitalSigns[]; compact?: boolean }) {
   const latest = vitals?.[0];
   if (!latest || latest.news2Score == null) {
     return compact ? null : (
-      <span className="px-1.5 py-0.5 rounded text-[10px] border bg-surface text-ink-faint border-line" title="No vitals recorded">
-        <Heart className="w-2.5 h-2.5 inline mr-0.5 opacity-50" />N2—
+      <span className="px-2 py-0.5 rounded text-xs border bg-surface text-ink-muted border-line whitespace-nowrap" title="No vitals recorded">
+        NEWS2 —
       </span>
     );
   }
-  const cfg = getNews2Config(latest.news2Score);
+  const score = latest.news2Score;
+  // Spelled out with its RCP band ("NEWS2 6 · Medium") at 12px, replacing the
+  // 10px "N2: 6" that was easy to misread at the bedside.
   return (
     <span
-      className={`px-1.5 py-0.5 rounded text-[10px] border ${cfg.badge}`}
-      title={`NEWS2 score ${latest.news2Score} — recorded ${new Date(latest.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border whitespace-nowrap ${getNews2BadgeClass(score)}`}
+      title={`NEWS2 score ${score} (${news2Band(score)}) — recorded ${new Date(latest.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}`}
     >
-      <Heart className="w-2.5 h-2.5 inline mr-0.5" />{cfg.label}
+      <Heart aria-hidden="true" className="w-3 h-3" />NEWS2 {score} · {news2Band(score)}
     </span>
+  );
+}
+
+// ─── Ward header ─────────────────────────────────────────────────────────────
+// Red appears only when patients here actually need urgent review (NEWS2 ≥ 5 or
+// Critical status). The old ICU header pulsed "CRITICAL" for every ICU ward
+// regardless of who was in it, which trains staff to ignore the alert.
+function WardHeader({ ward, isIcu, count, reviewCount, className = '' }: {
+  ward: string; isIcu: boolean; count: number; reviewCount: number; className?: string;
+}) {
+  return (
+    <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border border-line text-ink ${isIcu ? 'bg-accent-soft' : 'bg-surface-sunken'} ${className}`}>
+      <Layout aria-hidden="true" className="w-4 h-4" />
+      <h3 className="font-bold uppercase tracking-wide text-sm">{ward}</h3>
+      <span className="text-xs font-normal text-ink-muted">({count})</span>
+      {reviewCount > 0 && (
+        <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border px-2 py-0.5 rounded-full">
+          <span aria-hidden="true" className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vital-critical opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-vital-critical" />
+          </span>
+          {reviewCount} need{reviewCount === 1 ? 's' : ''} review
+        </span>
+      )}
+    </div>
   );
 }
 import HandoverSummary from './HandoverSummary';
@@ -50,7 +77,7 @@ import { todayYmd } from '../utils/dates';
 
 // ─── Virtual list item types ───
 type FlatItem =
-  | { kind: 'ward-header'; ward: string; isIcu: boolean; count: number }
+  | { kind: 'ward-header'; ward: string; isIcu: boolean; count: number; reviewCount: number }
   | { kind: 'patient'; patient: Patient; ward: string; isIcu: boolean };
 
 interface Props {
@@ -158,13 +185,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         // All views: primary sort is bed number so the list mirrors the physical ward layout
         return sortByBed(a, b);
       });
-      items.push({ kind: 'ward-header', ward, isIcu: isIcuWard, count: wps.length });
+      const reviewCount = wps.filter(p => needsUrgentReview(p, showNews2)).length;
+      items.push({ kind: 'ward-header', ward, isIcu: isIcuWard, count: wps.length, reviewCount });
       for (const patient of wps) {
         items.push({ kind: 'patient', patient, ward, isIcu: isIcuWard });
       }
     }
     return items;
-  }, [wardsToDisplay, patientsByWard, icuWardNames]);
+  }, [wardsToDisplay, patientsByWard, icuWardNames, showNews2]);
 
   const listRef = useRef<HTMLDivElement>(null);
   // scrollMargin must be measured after mount — listRef.current is null during render
@@ -408,23 +436,10 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           return sortByBed(a, b);
         });
         const isIcuWard = icuWardNames.has(ward);
-        const criticalCount = isIcuWard ? wardPatients.length : 0;
+        const reviewCount = wardPatients.filter(p => needsUrgentReview(p, showNews2)).length;
         return (
         <div key={ward} className="space-y-2">
-          <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border ${isIcuWard ? 'bg-accent-soft text-ink border-line' : 'bg-surface-sunken text-ink border-line'}`}>
-            <Layout className="w-4 h-4" />
-            <h3 className="font-bold uppercase tracking-wide text-sm">{ward}</h3>
-            <span className="text-xs font-normal opacity-70">({wardPatients.length})</span>
-            {isIcuWard && criticalCount > 0 && (
-              <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border px-2 py-0.5 rounded-full">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vital-critical opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-vital-critical" />
-                </span>
-                CRITICAL
-              </span>
-            )}
-          </div>
+          <WardHeader ward={ward} isIcu={isIcuWard} count={wardPatients.length} reviewCount={reviewCount} />
 
           {/* Desktop Table (md and up) */}
           <div className="hidden md:block bg-surface-card rounded-lg shadow-sm border border-line overflow-x-auto">
@@ -522,9 +537,9 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                     {viewMode !== 'pending' && (
                       <td className="px-6 py-4 text-center">
                         {calcPod(patient.dos, patient.dod ?? today) !== undefined ? (
-                          <div className="inline-block p-2 rounded-lg border-2 border-vital-normal bg-vital-normal-surface">
-                            <span className="block text-[10px] uppercase font-bold text-vital-normal-fg leading-none mb-0.5">POD</span>
-                            <span className="font-bold font-mono text-lg text-vital-normal-fg leading-none">{calcPod(patient.dos, patient.dod ?? today)}</span>
+                          <div className="inline-block p-2 rounded-lg border border-line bg-surface-sunken">
+                            <span className="block text-[10px] uppercase font-bold text-ink-muted leading-none mb-0.5">POD</span>
+                            <span className="font-bold font-mono text-lg text-ink leading-none">{calcPod(patient.dos, patient.dod ?? today)}</span>
                           </div>
                         ) : (
                           <span className="text-ink-muted">-</span>
@@ -641,20 +656,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                 }}
               >
                 {item.kind === 'ward-header' ? (
-                  <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border mb-2 ${item.isIcu ? 'bg-accent-soft text-ink border-line' : 'bg-surface-sunken text-ink border-line'}`}>
-                    <Layout className="w-4 h-4" />
-                    <h3 className="font-bold uppercase tracking-wide text-sm">{item.ward}</h3>
-                    <span className="text-xs font-normal opacity-70">({item.count})</span>
-                    {item.isIcu && (
-                      <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border px-2 py-0.5 rounded-full">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vital-critical opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-vital-critical" />
-                        </span>
-                        CRITICAL
-                      </span>
-                    )}
-                  </div>
+                  <WardHeader ward={item.ward} isIcu={item.isIcu} count={item.count} reviewCount={item.reviewCount} className="mb-2" />
                 ) : (
                   <div
                     className={`p-4 space-y-3 bg-surface-card border border-line rounded-lg mb-2 ${getTriageBorderClass(item.patient)} ${
@@ -663,12 +665,17 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
-                        <span className={`text-white text-sm font-bold font-mono w-10 h-10 shrink-0 flex items-center justify-center rounded-lg ${item.isIcu ? 'bg-vital-critical' : 'bg-accent'}`}>
+                        {/* Red bed badge = needs urgent review, not "is in ICU" (the ward header already says ICU). */}
+                        <span className={`text-sm font-bold font-mono w-11 h-11 shrink-0 flex items-center justify-center rounded-lg ${
+                          needsUrgentReview(item.patient, showNews2)
+                            ? 'bg-vital-critical-surface text-vital-critical-fg border border-vital-critical-border'
+                            : 'bg-accent text-white'
+                        }`}>
                           {shortBed(item.patient.bed)}
                         </span>
-                        <div>
-                          <h3 className="font-bold text-ink flex items-center gap-1.5 max-w-[160px] truncate" title={item.patient.name}>
-                            <span className="truncate">{item.patient.name}</span>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-ink flex items-center gap-1.5 break-words">
+                            <span>{item.patient.name}</span>
                             {item.patient.dailyRounds.some(r => r.date === today) && (
                               <span title="Rounded today">
                                 <CheckCircle2 className="w-3 h-3 text-vital-normal shrink-0" />
@@ -683,9 +690,9 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                       <div className="flex items-center gap-1.5 shrink-0">
                         {showNews2 && <News2Badge vitals={item.patient.vitals} compact />}
                         {calcPod(item.patient.dos, item.patient.dod ?? today) !== undefined && (
-                          <div className="text-xs font-bold uppercase text-ink-muted border-2 border-vital-normal bg-vital-normal-surface p-1.5 rounded text-center">
-                            <span className="text-vital-normal-fg block text-[9px]">POD</span>
-                            <span className="text-lg font-mono text-vital-normal-fg block leading-none">{calcPod(item.patient.dos, item.patient.dod ?? today)}</span>
+                          <div className="text-xs font-bold uppercase text-ink-muted border border-line bg-surface-sunken p-1.5 rounded text-center">
+                            <span className="block text-[10px]">POD</span>
+                            <span className="text-lg font-mono text-ink block leading-none">{calcPod(item.patient.dos, item.patient.dod ?? today)}</span>
                           </div>
                         )}
                       </div>

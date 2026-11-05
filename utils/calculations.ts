@@ -197,6 +197,27 @@ export const getTriageBorderClass = (p: Patient): string => {
   return 'border-l-4 border-l-slate-100';
 };
 
+/** NEWS2 aggregate-score band (RCP NEWS2): 0–4 Low, 5–6 Medium, ≥7 High. */
+export type News2Band = 'Low' | 'Medium' | 'High';
+export const news2Band = (score: number): News2Band =>
+  score >= 7 ? 'High' : score >= 5 ? 'Medium' : 'Low';
+
+/**
+ * True when a patient needs urgent review on the ward dashboard: clinician-set
+ * Critical status, or (when the hospital shows NEWS2) a latest NEWS2 of 5+ —
+ * the RCP threshold for an urgent clinical response.
+ *
+ * Drives the ward header's "needs review" count and the only red bed badges,
+ * so red means deterioration rather than "this bed is in the ICU".
+ * `vitals[0]` is the latest reading (same convention as the NEWS2 badge).
+ */
+export const needsUrgentReview = (p: Patient, includeNews2: boolean): boolean => {
+  if (p.patientStatus === PatientStatus.Critical) return true;
+  if (!includeNews2) return false;
+  const score = p.vitals?.[0]?.news2Score;
+  return score != null && score >= 5;
+};
+
 // ─── Shared Sorting ───
 /** True for Varanda Bed labels: VB, VB1, VB-2, vb 3, etc. */
 const isVaranda = (bed: string) => /^vb/i.test(bed.trim());
