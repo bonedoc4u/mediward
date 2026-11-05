@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, lazy, Suspense, useEffect, useRef } from 'react';
 import { useScrollRestoration, useReturnHighlight, setLastViewedPatient } from './hooks/useScrollRestoration';
 import { closeActiveLightbox } from './hooks/useLightboxBackHandler';
+import { usePublicScreenHashSync } from './hooks/usePublicScreenHashSync';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
@@ -195,6 +196,9 @@ const App: React.FC = () => {
   const [showLogin, setShowLogin] = useState(
     () => window.location.hash === '#/login' || !!localStorage.getItem('mediward_has_signed_in'),
   );
+  // The three states above are seeded from the hash on first render only;
+  // keep them in sync with later hash changes while signed out.
+  usePublicScreenHashSync({ isAuthenticated, setShowPrivacy, setShowTerms, setShowLogin });
   // The static index.html <title> ("MediWard Manager") is fine once inside
   // the authenticated app, but a reviewer or search engine hitting the
   // public landing/login screens should see something more descriptive.
