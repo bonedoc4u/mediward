@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { useAuth } from '../contexts/AppContext';
 import { Stethoscope, Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Fingerprint } from 'lucide-react';
 import { isBiometricAvailable, loadBiometricCredential, isBiometricCredentialValid } from '../services/biometricAuthService';
@@ -10,6 +10,10 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Stable ids so each <label> is programmatically tied to its input
+  // (screen readers announce the field name; tapping the label focuses it).
+  const emailId = useId();
+  const passwordId = useId();
   // Client-side rate limiting: exponential backoff after failed attempts
   const [failCount, setFailCount] = useState(0);
   const [lockUntil, setLockUntil] = useState(0);
@@ -176,10 +180,11 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             )}
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-ink uppercase">Email Address</label>
+              <label htmlFor={emailId} className="text-xs font-bold text-ink uppercase">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
+                <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
                 <input
+                  id={emailId}
                   type="email"
                   required
                   autoComplete="email"
@@ -192,10 +197,11 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-ink uppercase">Password</label>
+              <label htmlFor={passwordId} className="text-xs font-bold text-ink uppercase">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
+                <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
                 <input
+                  id={passwordId}
                   type={showPassword ? 'text' : 'password'}
                   required
                   autoComplete="current-password"
@@ -208,10 +214,12 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-ink-muted hover:text-ink rounded-lg"
-                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  aria-controls={passwordId}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-ink-muted hover:text-ink rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff aria-hidden="true" className="w-4 h-4" /> : <Eye aria-hidden="true" className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -229,12 +237,13 @@ const LoginPage: React.FC<{ onPrivacy?: () => void; onTerms?: () => void }> = ({
             </button>
           </form>
 
-          <div className="mt-6 flex justify-center gap-6 text-xs text-ink-muted">
+          {/* min-h-11 (44px) touch targets; px-2 keeps the visual gap the same. */}
+          <div className="mt-4 flex justify-center gap-2 text-xs text-ink-muted">
             {onPrivacy && (
-              <button onClick={onPrivacy} className="hover:text-ink transition-colors font-medium">Privacy Policy</button>
+              <button type="button" onClick={onPrivacy} className="min-h-11 px-2 hover:text-ink transition-colors font-medium">Privacy Policy</button>
             )}
             {onTerms && (
-              <button onClick={onTerms} className="hover:text-ink transition-colors font-medium">Terms of Service</button>
+              <button type="button" onClick={onTerms} className="min-h-11 px-2 hover:text-ink transition-colors font-medium">Terms of Service</button>
             )}
           </div>
 
