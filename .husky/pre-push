@@ -42,7 +42,8 @@ else
   if [ "$DIFF_OK" -eq 0 ]; then
     echo "  ⚠ Schema diff check could NOT run — schema sync is UNVERIFIED."
     echo "  supabase db diff failed with:"
-    sed 's/^/    /' "$ERR_FILE" | tail -5
+    # The CLI prints some errors to stdout (as JSON) rather than stderr.
+    { cat "$ERR_FILE"; echo "$DIFF"; } | grep -v '^[[:space:]]*$' | tail -5 | sed 's/^/    /'
     echo "  Common causes: Docker not running, project not linked"
     echo "  (supabase link), or an outdated supabase/config.toml."
   # supabase db diff outputs SQL if there are differences, empty string if clean
