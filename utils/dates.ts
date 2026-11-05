@@ -20,3 +20,27 @@ export function localYmd(d: Date): string {
 export function todayYmd(): string {
   return localYmd(new Date());
 }
+
+/** Parses YYYY-MM-DD as a LOCAL calendar date (`new Date('2026-11-03')` is UTC midnight). */
+function parseYmd(ymd: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** "3 Nov" for a YYYY-MM-DD date; returns the input unchanged if it isn't one. */
+export function shortDate(ymd: string): string {
+  const d = parseYmd(ymd);
+  return d ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ymd;
+}
+
+/** "Today", "Yesterday", otherwise shortDate() — relative to `today` (YYYY-MM-DD). */
+export function relativeDayLabel(ymd: string, today: string): string {
+  if (ymd === today) return 'Today';
+  const t = parseYmd(today);
+  if (t) {
+    t.setDate(t.getDate() - 1);
+    if (localYmd(t) === ymd) return 'Yesterday';
+  }
+  return shortDate(ymd);
+}

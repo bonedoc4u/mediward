@@ -12,6 +12,7 @@ import { calcPod } from './HandoverSummary';
 import TodaySchedule from './TodaySchedule';
 import OTDatePicker from './OTDatePicker';
 import { resolveEffectiveUnit } from '../utils/effectiveUnit';
+import PatientClinicalSummary from './ward/PatientClinicalSummary';
 
 /** Strip ward-number prefix from bed for display: "10-05" → "05", "1A" → "1A" */
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
@@ -697,20 +698,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                         )}
                       </div>
                     </div>
-                    <div className="text-sm border-t border-line pt-2">
-                      <p className="font-medium text-ink break-words">{item.patient.diagnosis}</p>
-                      {item.patient.procedure && <p className="text-xs text-ink-muted mt-0.5">{item.patient.procedure}</p>}
-                      {item.patient.comorbidities.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {item.patient.comorbidities.slice(0, 2).map(c => (
-                            <span key={c} className="px-2 py-0.5 bg-surface-sunken text-ink-muted rounded text-xs">{c}</span>
-                          ))}
-                          {item.patient.comorbidities.length > 2 && (
-                            <span className="px-2 py-0.5 text-ink-faint text-xs">+{item.patient.comorbidities.length - 2} more</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <PatientClinicalSummary patient={item.patient} today={today} />
                     {/* Planned date row — pending view only */}
                     {viewMode === 'pending' && (
                       <div className="flex items-center gap-2 border-t border-line pt-2">
