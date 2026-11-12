@@ -17,6 +17,9 @@ interface RoundsRowRead {
   date: string;
   note: string;
   todos: ToDoItem[];
+  round_note?: string | null;
+  round_note_by_name?: string | null;
+  round_note_at?: string | null;
 }
 
 interface VitalRowRead {
@@ -152,7 +155,14 @@ function rowToPatient(row: PatientRow): Patient {
 
   // Rounds: prefer normalized table; fall back to legacy JSONB for backward compat
   const dailyRounds: DailyRound[] = Array.isArray(row.rounds) && row.rounds.length > 0
-    ? row.rounds.map(r => ({ date: r.date, note: r.note, todos: Array.isArray(r.todos) ? r.todos : [] }))
+    ? row.rounds.map(r => ({
+        date: r.date,
+        note: r.note,
+        todos: Array.isArray(r.todos) ? r.todos : [],
+        roundNote:   r.round_note ?? '',
+        roundNoteBy: r.round_note_by_name ?? undefined,
+        roundNoteAt: r.round_note_at ?? undefined,
+      }))
     : Array.isArray(row.daily_rounds) ? row.daily_rounds : [];
 
   // Vitals: prefer normalized table; fall back to legacy JSONB
@@ -300,7 +310,7 @@ export const PATIENT_LIST_SELECT = [
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
   'discharge_summary', 'dama_summary', 'death_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
-  'rounds(date, note, todos)',
+  'rounds(date, note, todos, round_note, round_note_by_name, round_note_at)',
   'imaging(id, date, type, findings, image_url, phase)',
 ].join(', ');
 
@@ -314,7 +324,7 @@ export const PATIENT_SELECT = [
   'discharge_summary', 'dama_summary', 'death_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url, phase)',
-  'rounds(date, note, todos)',
+  'rounds(date, note, todos, round_note, round_note_by_name, round_note_at)',
   'patient_vitals(id, timestamp, recorded_by, bp_systolic, bp_diastolic, heart_rate, temperature, spo2, respiratory_rate, weight, pain_score, news2_score, notes)',
 ].join(', ');
 

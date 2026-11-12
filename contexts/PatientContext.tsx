@@ -37,7 +37,7 @@ import {
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
-import { upsertRound } from '../services/roundsService';
+import { upsertRound, roundToRow } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
 import { enqueue, getRetryableQueue, getQueue, getDeadLetterQueue, removeFromDeadLetterQueue, type QueuedOp } from '../services/syncQueue';
 import { drainQueue, replaySimpleOp, isSimpleOp, isAuthError } from '../services/syncReplay';
@@ -76,7 +76,8 @@ interface PatientContextType {
   loadMorePatients: () => Promise<void>;
   hasLoadedAll: boolean;
   loadAllPatients: () => Promise<void>;
-  updatePatient: (patient: Patient) => void;
+  /** `quiet` skips the "<name> updated" toast (Round Mode ticks orders many times per patient). Failures are always shown. */
+  updatePatient: (patient: Patient, opts?: { quiet?: boolean }) => void;
   /** Records a new (possibly second) surgery: archives the current procedure/dos
    *  into priorSurgeries (if one exists), sets the new ones as current, clears
    *  plannedDos. No-op if the patient isn't found. */
@@ -103,7 +104,13 @@ interface PatientContextType {
    *  this hospital. */
   fetchEmergencyPatient: (ipNo: string, reason: string) => Promise<Patient | null>;
   /** Persist a daily round note to the normalized rounds table + update local state. */
-  saveRound: (patientIpNo: string, round: DailyRound) => void;
+  /**
+   * Save one day's round. Resolves 'saved' once the server has confirmed it,
+   * or 'queued' when it is kept on the phone to be sent later. Never rejects.
+   * `quiet` suppresses the "kept on this phone" toast for screens that show
+   * the save state themselves (Round Mode).
+   */
+  saveRound: (patientIpNo: string, round: DailyRound, opts?: { quiet?: boolean }) => Promise<'saved' | 'queued'>;
   /** Insert a new vitals observation to the normalized table + update local state. */
   addVitalSign: (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => Promise<void>;
   /** Non-null when a concurrent edit conflict needs user resolution. */
@@ -764,7 +771,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [effectiveHospitalId]);
 
-  const updatePatient = useCallback((updatedPatient: Patient) => {
+  const updatePatient = useCallback((updatedPatient: Patient, opts?: { quiet?: boolean }) => {
     // Sanitize user-editable text fields (same protection as addPatient)
     const sanitized = {
       ...updatedPatient,
@@ -783,7 +790,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     upsertPatient(sanitized)
       .then(newVersion => {
         applyServerVersion(sanitized.ipNo, newVersion);
-        toast.success(`${sanitized.name} updated`);
+        if (!opts?.quiet) toast.success(`${sanitized.name} updated`);
         if (isDischarge) hapticSuccess();
       })
       .catch(err => {
@@ -1006,42 +1013,55 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, []);
 
-  const saveRound = useCallback((patientIpNo: string, round: DailyRound) => {
-    // Optimistic local update
-    setPatients(prev => {
+  const saveRound = useCallback((
+    patientIpNo: string, round: DailyRound, opts?: { quiet?: boolean },
+  ): Promise<'saved' | 'queued'> => {
+    // Merge into the same day's round instead of replacing it: a save that
+    // only carries orders must not drop the note (and its author/time) from
+    // the screen. `patch` is applied on top of whatever is there now.
+    const mergeLocal = (patch: Partial<DailyRound>) => setPatients(prev => {
       const next = prev.map(p => {
         if (p.ipNo !== patientIpNo) return p;
-        const existing = p.dailyRounds.filter(r => r.date !== round.date);
-        return { ...p, dailyRounds: [round, ...existing] };
+        const sameDay = p.dailyRounds.find(r => r.date === round.date);
+        const others = p.dailyRounds.filter(r => r.date !== round.date);
+        return { ...p, dailyRounds: [{ ...sameDay, ...round, ...patch }, ...others] };
       });
       saveActiveCache(next, effectiveHospitalId);
       return next;
     });
-    // Persist to normalized rounds table; enqueue for offline retry on failure
-    upsertRound(patientIpNo, user?.hospitalId, round).catch(err => {
-      console.error('[Patients] saveRound sync failed:', err);
-      // Queue exactly once, whatever the reason — including an expired
-      // sign-in, so the round is sent after the next login.
-      enqueue('upsert_round', {
-        patient_ip_no: patientIpNo,
-        hospital_id: user?.hospitalId ?? null,
-        date: round.date,
-        note: round.note,
-        todos: round.todos,
-      });
-      if (isAuthError(err)) {
-        setSessionExpired(true);
-        toast.error('Session expired — log in again. Your round is kept on this phone and will be sent after login.');
-        return;
-      }
-      // A warning, not an error: nothing is lost, it is waiting to be sent.
-      toast.warning('Round kept on this phone — it will be sent when the connection returns.');
-    });
+
+    // Optimistic local update. Only the keys this save actually sets.
+    const sent: Partial<DailyRound> = { ...round };
+    if (round.roundNote === undefined) delete sent.roundNote;
+    mergeLocal(sent);
+
     if (user) {
       logAuditEvent(user.id, user.name, 'CREATE', 'round', patientIpNo,
         `Round note saved for ${round.date}`);
     }
-  }, [user]);
+
+    // Persist to normalized rounds table; enqueue for offline retry on failure
+    return upsertRound(patientIpNo, user?.hospitalId, round)
+      .then((stamp): 'saved' => {
+        // Show the author and time the database recorded, not a local guess.
+        mergeLocal({ roundNote: stamp.roundNote, roundNoteBy: stamp.roundNoteBy, roundNoteAt: stamp.roundNoteAt });
+        return 'saved';
+      })
+      .catch((err): 'queued' => {
+        console.error('[Patients] saveRound sync failed:', err);
+        // Queue exactly once, whatever the reason — including an expired
+        // sign-in, so the round is sent after the next login.
+        enqueue('upsert_round', roundToRow(patientIpNo, user?.hospitalId, round));
+        if (isAuthError(err)) {
+          setSessionExpired(true);
+          toast.error('Session expired — log in again. Your round is kept on this phone and will be sent after login.');
+        } else if (!opts?.quiet) {
+          // A warning, not an error: nothing is lost, it is waiting to be sent.
+          toast.warning('Round kept on this phone — it will be sent when the connection returns.');
+        }
+        return 'queued';
+      });
+  }, [user, effectiveHospitalId]);
 
   const addVitalSign = useCallback(async (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => {
     try {

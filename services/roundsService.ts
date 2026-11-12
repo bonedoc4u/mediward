@@ -54,30 +54,66 @@ export async function fetchCurrentRound(
   return rowToRound(data as unknown as RoundRow);
 }
 
+/** The row sent to the `rounds` table for one save. Also the offline-queue payload. */
+export interface RoundRowWrite {
+  patient_ip_no: string;
+  hospital_id: string | null;
+  date: string;
+  note: string;
+  todos: ToDoItem[];
+  round_note?: string;
+}
+
 /**
- * Insert or update today's round note for a patient.
- * Uses (patient_ip_no, date) as the conflict key — safe to call repeatedly.
- * This is the simple last-write-wins version. Throws when the server did not
- * accept the write — it does NOT queue the round for retry itself.
+ * Build the row for a save. `round_note` is included ONLY when the caller
+ * set `roundNote`: an upsert changes just the columns it sends, so a save
+ * that is only about orders (Daily Rounds, an older queued change) leaves
+ * the doctor's note untouched. Author and time are never sent — the database
+ * stamps them (trigger stamp_round_note).
  */
-export async function upsertRound(
-  patientIpNo: string,
-  hospitalId: string | undefined,
-  round: DailyRound,
-): Promise<void> {
-  const payload = {
+export function roundToRow(patientIpNo: string, hospitalId: string | undefined, round: DailyRound): RoundRowWrite {
+  const row: RoundRowWrite = {
     patient_ip_no: patientIpNo,
     hospital_id:   hospitalId ?? null,
     date:          round.date,
     note:          round.note,
     todos:         round.todos,
   };
-  const { error } = await supabase
+  if (round.roundNote !== undefined) row.round_note = round.roundNote;
+  return row;
+}
+
+/** What the database recorded about the note after a save. */
+export interface RoundNoteStamp {
+  roundNote: string;
+  roundNoteBy?: string;
+  roundNoteAt?: string;
+}
+
+/**
+ * Insert or update one day's round for a patient.
+ * Uses (patient_ip_no, date) as the conflict key — safe to call repeatedly.
+ * Last-write-wins. Throws when the server did not accept the write — it does
+ * NOT queue the round for retry itself (PatientContext.saveRound does).
+ * Resolves with the note as stored, including the server-stamped author/time.
+ */
+export async function upsertRound(
+  patientIpNo: string,
+  hospitalId: string | undefined,
+  round: DailyRound,
+): Promise<RoundNoteStamp> {
+  const { data, error } = await supabase
     .from('rounds')
-    .upsert(payload, { onConflict: 'patient_ip_no,date' });
-  // Queueing for retry is the caller's job (PatientContext.saveRound). This
-  // used to enqueue here as well, so every failed save was queued twice.
+    .upsert(roundToRow(patientIpNo, hospitalId, round), { onConflict: 'patient_ip_no,date' })
+    .select('round_note, round_note_by_name, round_note_at')
+    .single();
   if (error) throw new Error(`upsertRound(${patientIpNo}): ${error.message}`);
+  const row = (data ?? {}) as { round_note?: string | null; round_note_by_name?: string | null; round_note_at?: string | null };
+  return {
+    roundNote:   row.round_note ?? '',
+    roundNoteBy: row.round_note_by_name ?? undefined,
+    roundNoteAt: row.round_note_at ?? undefined,
+  };
 }
 
 /**
