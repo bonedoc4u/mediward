@@ -42,6 +42,18 @@ export function can(user: AuthUser | null, permission: Permission): boolean {
   return (ROLE_PERMISSIONS[user.role] ?? []).includes(permission);
 }
 
+/**
+ * Roles the given user may hand out in Team Settings.
+ * Only a super-admin (platform owner, sees every hospital) may assign
+ * 'superadmin'. The database and the admin-create-user function enforce the
+ * same rule; this keeps the option off the screen for hospital admins.
+ */
+export function assignableRoles(actor: AuthUser | null): UserRole[] {
+  if (!actor || (actor.role !== 'admin' && actor.role !== 'superadmin')) return [];
+  const all = Object.keys(ROLE_PERMISSIONS) as UserRole[];
+  return actor.role === 'superadmin' ? all : all.filter(r => r !== 'superadmin');
+}
+
 // Human-readable descriptions shown in Team Management
 export const ROLE_LABELS: Record<UserRole, string> = {
   superadmin:    'Super Admin',
