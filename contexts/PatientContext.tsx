@@ -39,7 +39,8 @@ import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
 import { upsertRound } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
-import { enqueue, getRetryableQueue, getQueue, dequeue, incrementAttempts, getDeadLetterQueue, removeFromDeadLetterQueue } from '../services/syncQueue';
+import { enqueue, getRetryableQueue, getQueue, getDeadLetterQueue, removeFromDeadLetterQueue, type QueuedOp } from '../services/syncQueue';
+import { drainQueue, replaySimpleOp, isSimpleOp, isAuthError } from '../services/syncReplay';
 import {
   registerServiceWorker,
   requestNotificationPermission,
@@ -123,12 +124,6 @@ export function usePatients(): PatientContextType {
   const ctx = useContext(PatientContext);
   if (!ctx) throw new Error('usePatients must be used within PatientProvider');
   return ctx;
-}
-
-/** Returns true when the error indicates an expired/invalid JWT session. */
-function isAuthError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
-  return msg.includes('jwt') || msg.includes('expired') || msg.includes('unauthorized') || msg.includes('pgrst301');
 }
 
 // ─── Provider ───
@@ -364,90 +359,88 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       toast.info(`Syncing ${queue.length} offline change${queue.length > 1 ? 's' : ''}…`);
 
-      for (const op of queue) {
-        try {
-          if (op.type === 'upsert_patient') {
-            const qp = op.payload as Patient;
-            // Patch hospitalId in case the op was queued before this fix landed
-            // (pre-fix ops have hospitalId = undefined, causing the re-insert to fail again).
-            const withHid: Patient = qp.hospitalId
-              ? qp
-              : { ...qp, hospitalId: userRef.current?.hospitalId };
-            try {
-              await upsertPatient(withHid);
-            } catch (qErr) {
-              // CONCURRENT_EDIT in queue: another device updated the record while we were offline.
-              // Auto-resolve: if no meaningful field changed, adopt the remote timestamp and retry.
-              // This prevents 5× pointless retries → DLQ for a trivially resolvable conflict.
-              if (qErr instanceof Error && qErr.message.startsWith('CONCURRENT_EDIT:')) {
-                const remote = await fetchPatientById(withHid.ipNo, withHid.hospitalId ?? undefined);
-                if (remote) {
-                  const MKEYS = ['bed', 'ward', 'diagnosis', 'patientStatus', 'pacStatus',
-                    'procedure', 'dos', 'dod', 'pod', 'management', 'unit'] as const;
-                  const hasRealDiff = MKEYS.some(
-                    k => String((withHid as unknown as Record<string, unknown>)[k] ?? '') !==
-                         String((remote  as unknown as Record<string, unknown>)[k] ?? ''),
-                  );
-                  if (!hasRealDiff) {
-                    await upsertPatient({ ...withHid, version: remote.version, updatedAt: remote.updatedAt });
-                  } else {
-                    throw new Error(
-                      `${withHid.name || withHid.ipNo}: offline edit not applied — record was changed on another device.`,
-                    );
-                  }
+      // Sends one queued change. MUST throw unless the server confirmed it —
+      // drainQueue() removes a change from the phone only when this resolves.
+      const executeOp = async (op: QueuedOp): Promise<void> => {
+        if (op.type === 'upsert_patient') {
+          const qp = op.payload as Patient;
+          // Patch hospitalId in case the op was queued before this fix landed
+          // (pre-fix ops have hospitalId = undefined, causing the re-insert to fail again).
+          const withHid: Patient = qp.hospitalId
+            ? qp
+            : { ...qp, hospitalId: userRef.current?.hospitalId };
+          try {
+            await upsertPatient(withHid);
+          } catch (qErr) {
+            // CONCURRENT_EDIT in queue: another device updated the record while we were offline.
+            // Auto-resolve: if no meaningful field changed, adopt the remote timestamp and retry.
+            // This prevents 5× pointless retries → DLQ for a trivially resolvable conflict.
+            if (qErr instanceof Error && qErr.message.startsWith('CONCURRENT_EDIT:')) {
+              const remote = await fetchPatientById(withHid.ipNo, withHid.hospitalId ?? undefined);
+              if (remote) {
+                const MKEYS = ['bed', 'ward', 'diagnosis', 'patientStatus', 'pacStatus',
+                  'procedure', 'dos', 'dod', 'pod', 'management', 'unit'] as const;
+                const hasRealDiff = MKEYS.some(
+                  k => String((withHid as unknown as Record<string, unknown>)[k] ?? '') !==
+                       String((remote  as unknown as Record<string, unknown>)[k] ?? ''),
+                );
+                if (!hasRealDiff) {
+                  await upsertPatient({ ...withHid, version: remote.version, updatedAt: remote.updatedAt });
                 } else {
-                  throw qErr;
+                  throw new Error(
+                    `${withHid.name || withHid.ipNo}: offline edit not applied — record was changed on another device.`,
+                  );
                 }
-              } else if (
-                qErr instanceof Error &&
-                (qErr.message.includes('duplicate key') || qErr.message.includes('unique constraint')) &&
-                !withHid.updatedAt
-              ) {
-                // The first insert attempt succeeded server-side before the auth error was returned.
-                // The row already exists in the DB — silently treat as success and dequeue.
-                console.info('[SyncQueue] new-patient insert already landed for', withHid.ipNo, '— deduplicating');
               } else {
                 throw qErr;
               }
+            } else if (
+              qErr instanceof Error &&
+              (qErr.message.includes('duplicate key') || qErr.message.includes('unique constraint')) &&
+              !withHid.updatedAt
+            ) {
+              // The first insert attempt succeeded server-side before the auth error was returned.
+              // The row already exists in the DB — silently treat as success and dequeue.
+              console.info('[SyncQueue] new-patient insert already landed for', withHid.ipNo, '— deduplicating');
+            } else {
+              throw qErr;
             }
-          } else if (op.type === 'insert_lab') {
-            const { patientId, hospitalId: labHid, result } = op.payload as { patientId: string; hospitalId?: string; result: LabResult };
-            await insertLab(patientId, result, labHid);
-          } else if (op.type === 'insert_imaging') {
-            const { patientId, hospitalId: imgHid, inv } = op.payload as { patientId: string; hospitalId?: string; inv: Investigation };
-            // Patch hospitalId in case the op was queued before hospitalId was populated
-            const resolvedImgHid = imgHid ?? userRef.current?.hospitalId;
-            await insertImaging(patientId, inv, resolvedImgHid);
-          } else if (op.type === 'delete_imaging') {
-            await deleteImaging(op.payload as string);
-          } else if (op.type === 'upsert_round') {
-            const p = op.payload as { patient_ip_no: string; hospital_id: string | null; date: string; note: string; todos: unknown[] };
-            await supabase.from('rounds').upsert(p, { onConflict: 'patient_ip_no,date' });
-          } else if (op.type === 'insert_vital') {
-            await supabase.from('patient_vitals').insert(op.payload as Record<string, unknown>);
-          } else if (op.type === 'insert_nursing_note') {
-            await supabase.from('nursing_notes').insert(op.payload as Record<string, unknown>);
-          } else if (op.type === 'record_med_administration') {
-            await supabase.from('medication_administrations').insert(op.payload as Record<string, unknown>);
           }
-          dequeue(op.id);
-        } catch (err) {
-          console.error(`[SyncQueue] op ${op.type} failed:`, err);
-          // Auth errors (expired JWT, invalid token) will never succeed on retry.
-          // Surface as session-expired immediately and stop processing the queue.
-          if (isAuthError(err)) {
-            setSessionExpired(true);
-            toast.error('Session expired — please log out and log in again to save offline changes.');
-            break;
-          }
-          const { dropped, opType, label } = incrementAttempts(op.id, err);
-          if (dropped) {
-            const what = opType === 'upsert_patient'
-              ? `Patient record${label ? ` for ${label}` : ''}`
-              : 'An offline change';
-            toast.error(`${what} could not be saved after repeated attempts. Please re-enter the data.`);
-          }
+        } else if (op.type === 'insert_lab') {
+          const { patientId, hospitalId: labHid, result } = op.payload as { patientId: string; hospitalId?: string; result: LabResult };
+          await insertLab(patientId, result, labHid);
+        } else if (op.type === 'insert_imaging') {
+          const { patientId, hospitalId: imgHid, inv } = op.payload as { patientId: string; hospitalId?: string; inv: Investigation };
+          // Patch hospitalId in case the op was queued before hospitalId was populated
+          const resolvedImgHid = imgHid ?? userRef.current?.hospitalId;
+          await insertImaging(patientId, inv, resolvedImgHid);
+        } else if (op.type === 'delete_imaging') {
+          await deleteImaging(op.payload as string);
+        } else if (isSimpleOp(op.type)) {
+          // Round notes, vitals, nursing notes, medication records. These
+          // used to be awaited without checking the answer, so a refused or
+          // failed request was deleted from the queue as if it had saved.
+          await replaySimpleOp(op);
+        } else {
+          // A change type this version does not know. Never delete it
+          // silently — let it fail into the dead-letter queue where it shows.
+          throw new Error(`Unknown queued change type "${op.type}"`);
         }
+      };
+
+      const result = await drainQueue(executeOp);
+
+      if (result.stoppedBy === 'auth') {
+        // Auth errors (expired JWT, invalid token) will never succeed on retry.
+        // The remaining changes stay queued for the next sign-in.
+        setSessionExpired(true);
+        toast.error('Session expired — please log out and log in again to save offline changes.');
+      }
+      for (const { opType, label } of result.dropped) {
+        const what = opType === 'upsert_patient'
+          ? `Patient record${label ? ` for ${label}` : ''}`
+          : 'An offline change';
+        toast.error(`${what} could not be saved after repeated attempts. Please re-enter the data.`);
       }
 
       // Use getQueue() (all ops) not getRetryableQueue() (only due ops) so backoff ops are counted
