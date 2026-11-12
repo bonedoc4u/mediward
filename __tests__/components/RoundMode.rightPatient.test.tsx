@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../../contexts/AppContext', () => ({
   useApp: () => ({
-    patients: state.patients, updatePatient: state.updatePatient, saveRound: vi.fn(),
+    patients: state.patients, updatePatient: state.updatePatient, saveRound: vi.fn().mockResolvedValue('saved'),
     navigateTo: vi.fn(), sessionExpired: false, logout: vi.fn(),
   }),
   usePatients: () => ({ forceReconnect: vi.fn() }),

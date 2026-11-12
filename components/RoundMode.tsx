@@ -1,13 +1,13 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp, useConfig, usePatients } from '../contexts/AppContext';
-import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacStatus } from '../types';
+import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacStatus, DailyRound } from '../types';
 import { getStatusColor, sortByBed } from '../utils/calculations';
 import { generateId } from '../utils/sanitize';
 import { getSmartAlerts } from '../utils/smartAlerts';
 import { hapticTap } from '../utils/capacitorInit';
 import {
-  ChevronLeft, ChevronRight, X, CheckSquare, Square,
-  AlertTriangle, Calendar, ClipboardCheck, Save, Plus, Scissors, Leaf, HeartPulse,
+  X, CheckSquare, Square,
+  AlertTriangle, Calendar, ClipboardCheck, Plus, Scissors, Leaf, HeartPulse,
   LogOut, Check, Trash2
 } from 'lucide-react';
 import PacFlowChart from './PacFlowChart';
@@ -18,6 +18,12 @@ import { useNetworkQuality } from '../hooks/useNetworkQuality';
 import { localYmd, todayYmd } from '../utils/dates';
 import { resolveRoundPosition, isHorizontalSwipe } from '../utils/roundPosition';
 import { toast } from '../utils/toast';
+import RoundNoteCard from '../src/features/rounds/RoundNoteCard';
+import RoundActionBar from '../src/features/rounds/RoundActionBar';
+import AllergyLine from '../src/features/rounds/AllergyLine';
+import {
+  NoteSaveState, findTodayRound, findPreviousNote, loadDraft, saveDraft, clearDraft,
+} from '../src/features/rounds/roundNotes';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
@@ -153,14 +159,97 @@ const RoundMode: React.FC = () => {
   // patient must be declared before the useEffect hooks that reference it
   const patient: Patient | undefined = activePatients[index];
 
+  // ─── Today's round note ───
+  // noteText is what is in the box for the patient on screen. noteStates says,
+  // per patient, where that text is: only typed, being sent, on the server,
+  // or kept on this phone because the server could not be reached.
+  const [noteText, setNoteText] = useState('');
+  const [noteStates, setNoteStates] = useState<Record<string, NoteSaveState>>({});
+  const todayRound = patient ? findTodayRound(patient.dailyRounds, today) : undefined;
+  const previousNote = patient ? findPreviousNote(patient.dailyRounds, today) : undefined;
+  const serverNote = todayRound?.roundNote ?? '';
+  const noteState: NoteSaveState = patient ? (noteStates[patient.ipNo] ?? 'clean') : 'clean';
+  const noteNeedsSending = noteState === 'dirty' || noteState === 'queued';
+
+  // When the patient (or the day) changes, fill the box for that patient. A
+  // draft left on this phone wins over the server copy — it is newer.
+  // Deliberately not re-run on every server refresh: that would overwrite typing.
+  useEffect(() => {
+    if (!patient) return;
+    const draft = loadDraft(today, patient.ipNo);
+    if (draft !== null && draft !== serverNote) {
+      setNoteText(draft);
+      setNoteStates(s => (s[patient.ipNo] === 'queued' ? s : { ...s, [patient.ipNo]: 'dirty' }));
+    } else {
+      setNoteText(serverNote);
+    }
+  }, [patient?.ipNo, today]);
+
+  // If the server copy CHANGES for the patient on screen while nothing unsent
+  // is in the box (our own save came back, or a colleague wrote the note),
+  // show the server copy. It must not run on mount or on a patient change —
+  // the effect above owns those, and running here would overwrite a draft.
+  const lastServerNoteRef = useRef<{ ipNo: string | null; note: string }>({ ipNo: null, note: '' });
+  useEffect(() => {
+    const prev = lastServerNoteRef.current;
+    lastServerNoteRef.current = { ipNo: patient?.ipNo ?? null, note: serverNote };
+    if (!patient || prev.ipNo !== patient.ipNo || prev.note === serverNote) return;
+    if (!noteNeedsSending && noteState !== 'saving') setNoteText(serverNote);
+  }, [patient?.ipNo, serverNote]);
+
+  const handleNoteChange = (text: string) => {
+    if (!patient) return;
+    setNoteText(text);
+    if (text.trim() === serverNote.trim()) {
+      clearDraft(today, patient.ipNo);
+      setNoteStates(s => ({ ...s, [patient.ipNo]: 'clean' }));
+    } else {
+      saveDraft(today, patient.ipNo, text);   // survives a call, a crash, a dead battery
+      setNoteStates(s => ({ ...s, [patient.ipNo]: 'dirty' }));
+    }
+  };
+
+  /**
+   * Send one patient's round. The note is included only when it has unsent
+   * changes: an orders-only save must never blank a note that a colleague
+   * wrote a minute ago and this phone has not loaded yet.
+   */
+  // Patients whose note is on its way to the server right now. A ref, not
+  // state: "Done" saves and then navigates in the same tick, before React has
+  // applied the 'saving' state — without this the navigation's own auto-save
+  // would send the same note a second time.
+  const noteInFlightRef = useRef<Set<string>>(new Set());
+  const persistRound = (target: Patient, text: string, withNote: boolean) => {
+    const round: DailyRound = { date: today, note: target.diagnosis, todos: target.todos };
+    if (withNote) {
+      round.roundNote = text.trim();
+      noteInFlightRef.current.add(target.ipNo);
+      setNoteStates(s => ({ ...s, [target.ipNo]: 'saving' }));
+    }
+    void saveRound(target.ipNo, round, { quiet: true }).then(result => {
+      noteInFlightRef.current.delete(target.ipNo);
+      if (withNote) {
+        if (result === 'saved') clearDraft(today, target.ipNo);   // the draft stays until the server has it
+        setNoteStates(s => ({ ...s, [target.ipNo]: result }));
+      } else if (result === 'queued') {
+        toast.warning('Orders kept on this phone — they will be sent when the connection returns.');
+      }
+    });
+  };
+
 
   // ─── Navigate between patients ───
-  const goTo = useCallback((next: number) => {
+  // A plain function on purpose (not useCallback): it must always see the
+  // current list order and the current note text.
+  const goTo = (next: number) => {
+    // Leaving a patient with an unsent note sends it — never leave a typed
+    // note behind as a silent draft.
+    if (patient && noteState === 'dirty' && !noteInFlightRef.current.has(patient.ipNo)) {
+      persistRound(patient, noteText, true);
+    }
     setIndex(Math.max(0, Math.min(next, activePatients.length - 1)));
     setNewTodoText('');
-    // The whole list, not just its length: setIndex() turns a position into a
-    // patient, so it must see the current order even when the count is unchanged.
-  }, [activePatients]);
+  };
 
   const goNext = () => {
     if (navCooldownRef.current) return;
@@ -219,11 +308,7 @@ const RoundMode: React.FC = () => {
   // ─── Save round (persists todos; diagnosis used as the round note) ───
   const handleSave = useCallback((andNext = false) => {
     if (!patient) return;
-    saveRound(patient.ipNo, {
-      date:  today,
-      note:  patient.diagnosis,
-      todos: patient.todos,
-    });
+    persistRound(patient, noteText, noteNeedsSending);
     setSavedSet(prev => new Set(prev).add(patient.ipNo));
 
     if (andNext && index < activePatients.length - 1) {
@@ -232,7 +317,7 @@ const RoundMode: React.FC = () => {
       // Last patient — show discharge summary before going to dashboard
       setShowDischargeSummary(true);
     }
-  }, [patient, today, index, activePatients.length, saveRound, navigateTo, goNext]);
+  }, [patient, today, index, activePatients.length, saveRound, navigateTo, goNext, noteText, noteNeedsSending]);
 
   // ─── Toggle todo ───
   const handleToggleTodo = useCallback((todoId: string) => {
@@ -241,13 +326,13 @@ const RoundMode: React.FC = () => {
       ...patient,
       todos: patient.todos.map(t => t.id === todoId ? { ...t, isDone: !t.isDone } : t),
     };
-    updatePatient(updatedPatient);
+    updatePatient(updatedPatient, { quiet: true });
   }, [patient, updatePatient]);
 
   // ─── Delete todo ───
   const handleDeleteTodo = useCallback((todoId: string) => {
     if (!patient) return;
-    updatePatient({ ...patient, todos: patient.todos.filter(t => t.id !== todoId) });
+    updatePatient({ ...patient, todos: patient.todos.filter(t => t.id !== todoId) }, { quiet: true });
   }, [patient, updatePatient]);
 
   // ─── Add new todo ───
@@ -255,7 +340,7 @@ const RoundMode: React.FC = () => {
     if (!patient || !newTodoText.trim()) return;
     const newTodo: ToDoItem = { id: generateId(), task: newTodoText.trim(), isDone: false, addedDate: todayYmd() };
     const updatedPatient: Patient = { ...patient, todos: [...patient.todos, newTodo] };
-    updatePatient(updatedPatient);
+    updatePatient(updatedPatient, { quiet: true });
     setNewTodoText('');
     requestAnimationFrame(() => todoInputRef.current?.focus());
   }, [patient, newTodoText, updatePatient]);
@@ -265,7 +350,7 @@ const RoundMode: React.FC = () => {
     if (!patient) return;
     if (patient.todos.some(t => t.task === task)) return; // already exists
     const newTodo: ToDoItem = { id: generateId(), task, isDone: false, addedDate: todayYmd() };
-    updatePatient({ ...patient, todos: [...patient.todos, newTodo] });
+    updatePatient({ ...patient, todos: [...patient.todos, newTodo] }, { quiet: true });
   }, [patient, updatePatient]);
 
   // ─── Discharge Summary — shown after completing the last patient ───
@@ -526,7 +611,7 @@ const RoundMode: React.FC = () => {
             >
               {selectedWard === '__all__' ? 'All Wards' : selectedWard}
             </button>
-            {' · '}Swipe or use arrows
+            {' · '}<span aria-live="polite">{index + 1} of {activePatients.length}</span>
           </p>
         </div>
         <button
@@ -638,6 +723,8 @@ const RoundMode: React.FC = () => {
           </div>
         </div>
 
+        <AllergyLine allergies={patient.drugAllergies} />
+
         {/* Smart Alerts */}
         {alerts.length > 0 && (
           <div className="px-5 py-3 space-y-1.5 border-b border-line">
@@ -658,7 +745,17 @@ const RoundMode: React.FC = () => {
           </div>
         )}
 
-        <div className="p-5 space-y-5">
+        <div className="p-4 sm:p-5 space-y-5">
+          <RoundNoteCard
+            today={today}
+            previous={previousNote}
+            todayRound={todayRound}
+            value={noteText}
+            onChange={handleNoteChange}
+            saveState={noteState}
+            disabled={sessionExpired}
+          />
+
           {/* Status badges */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.pacStatus)}`}>
@@ -685,7 +782,7 @@ const RoundMode: React.FC = () => {
           {/* Management Plan — resident selects during rounds */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider shrink-0">Plan</span>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' as ManagementPlan })}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
@@ -817,7 +914,7 @@ const RoundMode: React.FC = () => {
                       key={s.label}
                       onClick={() => !done && handleQuickAdd(s.task)}
                       disabled={done}
-                      className={`px-2.5 py-1 text-xs rounded-lg border font-semibold transition-colors ${
+                      className={`px-3 min-h-11 text-sm rounded-lg border font-semibold transition-colors ${
                         // "order completed" state, per the brief's own example — vital-normal
                         done
                           ? 'bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border cursor-default'
@@ -895,78 +992,15 @@ const RoundMode: React.FC = () => {
         </div>
       </div>
 
-      {/* ─── Next patient preview ─── */}
-      {nextPatient && (
-        <div className="mt-3 px-3 py-2 bg-surface-sunken border border-line rounded-xl flex items-center gap-3">
-          <span className="text-[9px] font-bold uppercase tracking-wider text-ink-muted shrink-0">Next</span>
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-base shrink-0 border ${icuWardNames.has(nextPatient.ward ?? '') ? 'bg-vital-critical-surface border-vital-critical-border text-vital-critical-fg' : 'bg-surface-sunken border-line text-ink'}`}>
-            {nextPatient.bed}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-ink truncate">{nextPatient.name}</p>
-            <p className="text-[10px] text-ink-muted truncate">{nextPatient.diagnosis}</p>
-          </div>
-          {nextPatient.pod !== undefined && (
-            <span className="text-[10px] font-bold text-vital-normal-fg bg-vital-normal-surface border border-vital-normal-border px-2 py-0.5 rounded-full shrink-0">
-              POD {nextPatient.pod}
-            </span>
-          )}
-          {(nextPatient.comorbidities?.length ?? 0) > 0 && (
-            // same purple → neutral-chip reclassification as the Comorbidities section above
-            <span className="text-[9px] text-ink bg-surface-sunken border border-line px-1.5 py-0.5 rounded-full shrink-0 hidden sm:block truncate max-w-[80px]">
-              {nextPatient.comorbidities[0]}{(nextPatient.comorbidities?.length ?? 0) > 1 ? ` +${nextPatient.comorbidities.length - 1}` : ''}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ─── Navigation & Actions ─── */}
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          onClick={goPrev}
-          disabled={index === 0}
-          className="w-11 h-11 flex items-center justify-center shrink-0 rounded-xl border border-line hover:bg-surface-sunken disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-
-        <div className="flex-1 flex gap-2">
-          <button
-            onClick={() => handleSave(false)}
-            /* surface-sunken → hover:surface: verified precedent for a neutral secondary-
-               button hover already established in WardDashboard.tsx (e.g. its Export
-               button, ~line 800: "bg-surface-card ... hover:bg-surface"), reused here
-               since surface is reliably lighter than surface-sunken in both themes. */
-            className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 bg-surface-sunken hover:bg-surface text-ink font-semibold rounded-xl transition-colors text-sm"
-          >
-            <Save className="w-4 h-4 shrink-0" /> Save
-          </button>
-          <button
-            onClick={() => handleSave(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 bg-accent hover:bg-accent-pressed text-white font-semibold rounded-xl transition-colors text-xs sm:text-sm shadow-sm"
-          >
-            {index < activePatients.length - 1 ? (
-              <><Save className="w-3.5 h-3.5 shrink-0" /> Save & Next</>
-            ) : (
-              <><Check className="w-3.5 h-3.5 shrink-0" /> Round Complete</>
-            )}
-          </button>
-        </div>
-
-        <button
-          onClick={goNext}
-          disabled={index === activePatients.length - 1}
-          className="w-11 h-11 flex items-center justify-center shrink-0 rounded-xl border border-line hover:bg-surface-sunken disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Counter + safe-area bottom padding for iOS home indicator */}
-      <p className="text-center text-xs text-ink-muted mt-3 pb-[env(safe-area-inset-bottom)]">
-        {index + 1} of {activePatients.length} patients
-        {savedSet.size > 0 && ` · ${savedSet.size} noted`}
-      </p>
+      {/* ─── One primary action, fixed in the thumb zone ─── */}
+      {/* Keeps the last order clear of the bar, which is fixed on phones. */}
+      <div className="round-action-spacer" aria-hidden="true" />
+      <RoundActionBar
+        canGoBack={index > 0}
+        next={nextPatient}
+        onPrev={goPrev}
+        onDone={() => handleSave(true)}
+      />
     </div>
   );
 };
