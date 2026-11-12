@@ -913,21 +913,27 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deletePatient = useCallback((ipNo: string) => {
     const p = patients.find(pt => pt.ipNo === ipNo);
-    setPatients(prev => {
-      const next = prev.filter(pt => pt.ipNo !== ipNo);
-      saveActiveCache(next, effectiveHospitalId);
-      return next;
-    });
+    // Deliberately NOT optimistic. This used to take the patient off the ward
+    // list first and only show a message if the server refused — the patient
+    // then stayed hidden although still admitted. A patient leaves the list
+    // only after the server has confirmed the removal.
     removePatient(ipNo)
-      .then(() => p && toast.success(`${p.name} removed`))
+      .then(() => {
+        setPatients(prev => {
+          const next = prev.filter(pt => pt.ipNo !== ipNo);
+          saveActiveCache(next, effectiveHospitalId);
+          return next;
+        });
+        if (p) toast.success(`${p.name} removed`);
+        if (user && p) {
+          logAuditEvent(user.id, user.name, 'DELETE', 'patient', ipNo, `Removed: ${p.name}`);
+        }
+      })
       .catch(err => {
         console.error('[Patients] deletePatient failed:', err);
-        toast.error('Failed to delete patient. Check your connection.');
+        toast.error(`${p?.name ?? 'Patient'} was NOT removed. Check your connection and try again.`);
       });
-    if (user && p) {
-      logAuditEvent(user.id, user.name, 'DELETE', 'patient', ipNo, `Removed: ${p.name}`);
-    }
-  }, [user, patients]);
+  }, [user, patients, effectiveHospitalId]);
 
   const renamePatientIpNo = useCallback(async (oldIpNo: string, newIpNo: string) => {
     // Await the server result first — a duplicate/permission failure must
