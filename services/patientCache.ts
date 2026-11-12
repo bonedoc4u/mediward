@@ -17,8 +17,21 @@
 import { Patient } from '../types';
 import { saveToStorage, loadFromStorage, removeFromStorage } from './persistence';
 
-const activeKey = (hospitalId: string) => `patients_active_cache_${hospitalId}`;
-const allKey    = (hospitalId: string) => `patients_all_cache_${hospitalId}`;
+// v2: caches written before Nov 2026 hold patients that were loaded WITHOUT
+// drug allergies, DAMA/death summaries and PAC steps (those columns were
+// missing from the load). Editing such a patient offline would queue a save
+// that erases those fields. The key name changed so an old cache is never
+// read again; dropLegacyCache() deletes it so no patient data is left behind.
+const activeKey = (hospitalId: string) => `patients_active_cache_v2_${hospitalId}`;
+const allKey    = (hospitalId: string) => `patients_all_cache_v2_${hospitalId}`;
+const legacyKeys = (hospitalId: string) => [
+  `patients_active_cache_${hospitalId}`,
+  `patients_all_cache_${hospitalId}`,
+];
+
+function dropLegacyCache(hospitalId: string): void {
+  legacyKeys(hospitalId).forEach(removeFromStorage);
+}
 
 interface PatientCache {
   patients: Patient[];
@@ -35,6 +48,7 @@ export function saveActiveCache(patients: Patient[], hospitalId: string): void {
 }
 
 export function loadActiveCache(hospitalId: string): PatientCache | null {
+  dropLegacyCache(hospitalId);
   return loadFromStorage<PatientCache>(activeKey(hospitalId));
 }
 
@@ -48,6 +62,7 @@ export function saveAllCache(patients: Patient[], hospitalId: string): void {
 }
 
 export function loadAllCache(hospitalId: string): PatientCache | null {
+  dropLegacyCache(hospitalId);
   return loadFromStorage<PatientCache>(allKey(hospitalId));
 }
 
@@ -55,6 +70,7 @@ export function loadAllCache(hospitalId: string): PatientCache | null {
 export function clearPatientCache(hospitalId: string): void {
   removeFromStorage(activeKey(hospitalId));
   removeFromStorage(allKey(hospitalId));
+  dropLegacyCache(hospitalId);
 }
 
 // ─── Helpers ───
