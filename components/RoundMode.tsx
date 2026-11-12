@@ -16,6 +16,8 @@ import { useSaveRoundNote } from '../hooks/useSaveRoundNote';
 import { RoundConflictModal } from './RoundConflictModal';
 import { useNetworkQuality } from '../hooks/useNetworkQuality';
 import { localYmd, todayYmd } from '../utils/dates';
+import { resolveRoundPosition, isHorizontalSwipe } from '../utils/roundPosition';
+import { toast } from '../utils/toast';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
@@ -70,21 +72,40 @@ const RoundMode: React.FC = () => {
     [allActivePatients, selectedWard]
   );
 
+  // ─── Which patient is on screen ───
+  // Remembered by IP number, not by position: the list is live and re-sorts
+  // when a colleague admits, moves or discharges someone. A remembered
+  // position would then show a different patient without any warning.
+  // The position is kept only as a fallback for when that patient has left.
   const ROUND_IDX_KEY = 'mediward_round_index';
-  const [index, setIndexRaw] = useState<number>(() => {
+  const ROUND_PATIENT_KEY = 'mediward_round_patient';
+  const [currentIpNo, setCurrentIpNo] = useState<string | null>(
+    () => sessionStorage.getItem(ROUND_PATIENT_KEY) || null,
+  );
+  const lastIndexRef = useRef<number>((() => {
     const saved = sessionStorage.getItem(ROUND_IDX_KEY);
     const n = saved ? parseInt(saved, 10) : 0;
     return isNaN(n) || n < 0 ? 0 : n;
-  });
+  })());
+  const position = useMemo(
+    () => resolveRoundPosition(activePatients, currentIpNo, lastIndexRef.current),
+    [activePatients, currentIpNo],
+  );
+  const index = position.index;
   const setIndex = (n: number) => {
+    const ipNo = activePatients[n]?.ipNo ?? null;
+    lastIndexRef.current = n;
     sessionStorage.setItem(ROUND_IDX_KEY, String(n));
-    setIndexRaw(n);
+    if (ipNo) sessionStorage.setItem(ROUND_PATIENT_KEY, ipNo);
+    else sessionStorage.removeItem(ROUND_PATIENT_KEY);
+    setCurrentIpNo(ipNo);
   };
   const [newTodoText, setNewTodoText] = useState('');
   const [savedSet, setSavedSet] = useState<Set<string>>(new Set());
   const [showDischargeSummary, setShowDischargeSummary] = useState(false);
 
   const touchStartX  = useRef(0);
+  const touchStartY  = useRef(0);
   const swipeBlocked = useRef(false);   // true when touch started inside a no-swipe zone
   const navCooldownRef = useRef(false);
   const todoInputRef = useRef<HTMLInputElement>(null);
@@ -112,12 +133,22 @@ const RoundMode: React.FC = () => {
     } catch { /* ignore */ }
   }, []);
 
-  // Clamp index when patient list changes (e.g. after ward selection or rotation)
+  // Keep the remembered patient in step with what is on screen. If the list
+  // changed and that patient is gone (discharged, moved to another ward), say
+  // so plainly and drop any half-typed order — it was meant for them.
   React.useEffect(() => {
-    if (activePatients.length > 0 && index >= activePatients.length) {
-      setIndex(activePatients.length - 1);
+    lastIndexRef.current = position.index;
+    sessionStorage.setItem(ROUND_IDX_KEY, String(position.index));
+    if (position.ipNo === currentIpNo) return;
+    if (position.ipNo) sessionStorage.setItem(ROUND_PATIENT_KEY, position.ipNo);
+    else sessionStorage.removeItem(ROUND_PATIENT_KEY);
+    if (position.lost && position.ipNo) {
+      const now = activePatients[position.index];
+      setNewTodoText('');
+      toast.warning(`The patient you were on has left this list. Now showing Bed ${now.bed} — ${now.name}.`);
     }
-  }, [activePatients.length]);
+    setCurrentIpNo(position.ipNo);
+  }, [position, currentIpNo, activePatients]);
 
   // patient must be declared before the useEffect hooks that reference it
   const patient: Patient | undefined = activePatients[index];
@@ -127,7 +158,9 @@ const RoundMode: React.FC = () => {
   const goTo = useCallback((next: number) => {
     setIndex(Math.max(0, Math.min(next, activePatients.length - 1)));
     setNewTodoText('');
-  }, [activePatients.length]);
+    // The whole list, not just its length: setIndex() turns a position into a
+    // patient, so it must see the current order even when the count is unchanged.
+  }, [activePatients]);
 
   const goNext = () => {
     if (navCooldownRef.current) return;
@@ -149,8 +182,10 @@ const RoundMode: React.FC = () => {
     const onKey = (e: KeyboardEvent) => {
       // Don't intercept while the user is typing in an input or textarea
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goNext();
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goPrev();
+      // Left / right only. Up / down used to change the patient too, so
+      // scrolling the page with the keyboard switched patients.
+      if (e.key === 'ArrowRight') goNext();
+      else if (e.key === 'ArrowLeft') goPrev();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -159,6 +194,7 @@ const RoundMode: React.FC = () => {
   // ─── Swipe support ───
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
     // Block swipe navigation if the touch started inside a horizontally scrollable
     // child (PAC flowchart, navigation strip) — prevents gesture competition
     swipeBlocked.current = !!(e.target as HTMLElement).closest('[data-no-swipe]');
@@ -168,10 +204,13 @@ const RoundMode: React.FC = () => {
     const startX = touchStartX.current;
     const endX = e.changedTouches[0].clientX;
     const diff = startX - endX;
+    const dy = touchStartY.current - e.changedTouches[0].clientY;
     // Ignore swipes that start within 30px of the left edge — reserved for
     // iOS Safari's native back gesture (avoids competing with the system).
     if (startX < 30) return;
-    if (Math.abs(diff) > 50) {
+    // Only a deliberate sideways swipe changes the patient. Any 50px of
+    // sideways drift used to do it, including during a vertical scroll.
+    if (isHorizontalSwipe(diff, dy)) {
       if (diff > 0) goNext();
       else goPrev();
     }
