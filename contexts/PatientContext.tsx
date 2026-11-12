@@ -1014,11 +1014,8 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Persist to normalized rounds table; enqueue for offline retry on failure
     upsertRound(patientIpNo, user?.hospitalId, round).catch(err => {
       console.error('[Patients] saveRound sync failed:', err);
-      if (isAuthError(err)) {
-        setSessionExpired(true);
-        toast.error('Session expired — please log in again.');
-        return;
-      }
+      // Queue exactly once, whatever the reason — including an expired
+      // sign-in, so the round is sent after the next login.
       enqueue('upsert_round', {
         patient_ip_no: patientIpNo,
         hospital_id: user?.hospitalId ?? null,
@@ -1026,7 +1023,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         note: round.note,
         todos: round.todos,
       });
-      toast.error('Round note queued for sync when connection is restored.');
+      if (isAuthError(err)) {
+        setSessionExpired(true);
+        toast.error('Session expired — log in again. Your round is kept on this phone and will be sent after login.');
+        return;
+      }
+      // A warning, not an error: nothing is lost, it is waiting to be sent.
+      toast.warning('Round kept on this phone — it will be sent when the connection returns.');
     });
     if (user) {
       logAuditEvent(user.id, user.name, 'CREATE', 'round', patientIpNo,
