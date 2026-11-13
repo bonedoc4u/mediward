@@ -268,3 +268,26 @@ button:active, a:active { opacity: 0.85; }
   .round-action-bar { position: sticky; bottom: 0; left: auto; right: auto; padding-left: 0; padding-right: 0; }
   .round-action-spacer { height: 0; }
 }
+
+/* ── Patient identity bar on the full-page patient view ───────────
+ * Phones: the page itself scrolls, so a sticky bar scrolls away. Fix it under
+ * the app's top bar (--top-bar-bottom is measured by the component).
+ * From md up: <main> is the scroll box, so sticky holds; keep it. */
+.patient-identity-bar--page {
+  position: fixed;
+  top: var(--top-bar-bottom, 0px);
+  left: 0;
+  right: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+@media (min-width: 768px) {
+  .patient-identity-bar--page {
+    position: sticky;
+    top: 0;
+    left: auto;
+    right: auto;
+    margin-left: -2rem;
+    margin-right: -2rem;
+  }
+}
