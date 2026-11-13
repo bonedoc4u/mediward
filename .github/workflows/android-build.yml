@@ -40,6 +40,12 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's default is "tools platform-tools". Google removed the
+          # "tools" package, so the default now fails with
+          # "Failed to find package 'tools'". Gradle downloads the build tools
+          # and platform it needs by itself.
+          packages: 'platform-tools'
 
       - name: Sync Capacitor
         run: pnpm exec cap sync android
