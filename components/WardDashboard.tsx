@@ -3,7 +3,7 @@ import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac, isPendingSurgicalCandidate } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronDown, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
 import { exportWardListPDF } from '../utils/exportWardList';
 import { toast } from '../utils/toast';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
@@ -87,6 +87,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   }, [configWards, user?.role, user?.unit, selectedUnit]);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSchedule, setShowSchedule] = useState(false);   // phone only; see the schedule block below
   const [filterPending, setFilterPending] = useState(false);
   const [filterSurgeryToday, setFilterSurgeryToday] = useState(false);
   const [filterPod01, setFilterPod01] = useState(false);
@@ -188,17 +189,18 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       onClick={() => setSelectedWard(ward)}
       aria-label={`${ward} ward, ${count} patients`}
       aria-pressed={selectedWard === ward}
-      className={`shrink-0 w-[90px] md:w-auto md:flex-1 flex flex-col items-center justify-center p-2 md:p-4 rounded-xl border transition-all duration-200 ${
+      /* Phone: a compact chip (name + count, no icon, name never cut). md up: the full tile. */
+      className={`shrink-0 min-h-11 px-4 py-1.5 md:px-4 md:py-4 md:flex-1 flex flex-col items-center justify-center rounded-xl border transition-all duration-200 ${
         selectedWard === ward
           ? `${activeClass} shadow-md scale-[1.02]`
           : 'bg-surface-card border-line hover:border-accent hover:shadow-sm'
       }`}
     >
-      <div className={`p-1.5 md:p-2 rounded-full mb-1 md:mb-2 ${selectedWard === ward ? 'bg-white/20' : 'bg-surface-sunken'}`}>
+      <div className={`hidden md:block p-2 rounded-full mb-2 ${selectedWard === ward ? 'bg-white/20' : 'bg-surface-sunken'}`}>
         <Icon className={`w-4 h-4 md:w-5 md:h-5 ${selectedWard === ward ? 'text-white' : colorClass}`} />
       </div>
-      <span className={`text-xs md:text-sm font-bold truncate w-full text-center ${selectedWard === ward ? 'text-white' : 'text-ink'}`}>{ward === 'All' ? 'All' : ward}</span>
-      <span className={`text-[10px] md:text-xs ${selectedWard === ward ? 'text-white/80' : 'text-ink-muted'}`}>{count} pts</span>
+      <span className={`text-sm font-bold whitespace-nowrap md:truncate md:w-full text-center ${selectedWard === ward ? 'text-white' : 'text-ink'}`}>{ward === 'All' ? 'All' : ward}</span>
+      <span className={`text-xs ${selectedWard === ward ? 'text-white/80' : 'text-ink-muted'}`}>{count} pts</span>
     </button>
   );
 
@@ -309,12 +311,28 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
   return (
     <div className="space-y-6">
-      {/* Today's Department Schedule — home view only */}
+      {/* Today's Department Schedule — home view only.
+          On a phone it is one collapsed line: it used to fill the first screen
+          and push the patient list about 1,000px down. From md up it is always open. */}
       {viewMode === 'home' && (
-        <TodaySchedule
-          userUnit={user?.unit ?? null}
-          isAdmin={!user?.unit || user?.role === 'admin' || user?.role === 'superadmin'}
-        />
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowSchedule(v => !v)}
+            aria-expanded={showSchedule}
+            aria-controls="today-schedule"
+            className="md:hidden w-full min-h-11 flex items-center justify-between gap-2 px-4 rounded-card bg-surface-card border border-line text-sm font-semibold text-ink"
+          >
+            Today&apos;s OT schedule
+            <ChevronDown className={`w-4 h-4 text-ink-muted transition-transform ${showSchedule ? 'rotate-180' : ''}`} aria-hidden="true" />
+          </button>
+          <div id="today-schedule" className={showSchedule ? 'mt-2 md:mt-0' : 'hidden md:block'}>
+            <TodaySchedule
+              userUnit={user?.unit ?? null}
+              isAdmin={!user?.unit || user?.role === 'admin' || user?.role === 'superadmin'}
+            />
+          </div>
+        </div>
       )}
 
       {/* Ward Snapshot Strip — home view only */}
@@ -593,21 +611,9 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       })}
       </div>
 
-      {/* ─── Start Rounds CTA — mobile home view only ─── */}
-      {viewMode === 'home' && onStartRounds && filteredPatients.length > 0 && (
-        <div className="md:hidden">
-          <button
-            onClick={onStartRounds}
-            className="w-full flex items-center justify-between bg-accent text-white p-4 rounded-xl shadow-md active:scale-[0.98] transition-transform"
-          >
-            <div>
-              <p className="font-bold text-sm">Start Ward Rounds</p>
-              <p className="text-white/75 text-xs mt-0.5">{filteredPatients.length} patients · tap to begin</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-white/70" />
-          </button>
-        </div>
-      )}
+      {/* The teal "Start Ward Rounds" banner that stood here on phones is gone:
+          Rounds is in the bottom bar and "Start Rounds" is in the snapshot row
+          above, so it was a third control for one action and 90px of height. */}
 
       {/* ─── Mobile: Virtualised flat card list (all wards) ─── */}
       <div className="md:hidden" ref={listRef}>
