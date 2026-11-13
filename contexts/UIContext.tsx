@@ -10,6 +10,7 @@ import React, {
   useCallback, useMemo,
 } from 'react';
 import { ViewMode, AppNotification } from '../types';
+import { parseHashRoute } from '../utils/hashRoute';
 import { generateNotifications } from '../utils/calculations';
 import { useAuth } from './AuthContext';
 import { usePatients } from './PatientContext';
@@ -60,11 +61,15 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const { user } = useAuth();
   const { patients, loadAllPatients } = usePatients();
 
-  const [currentView, setCurrentView] = useState<ViewMode>(() => {
-    const hash = window.location.hash.replace('#/', '').replace('#', '');
-    return (hash as ViewMode) || 'dashboard';
-  });
-  const [navParams, setNavParams]             = useState<Record<string, string>>({});
+  // Screen AND id are both read from the hash at start-up. The id used to be
+  // left inside the view name here, so a reload of "#/patient/<id>" (or a link
+  // to it, or Android restarting the app) fell through to the dashboard.
+  const [currentView, setCurrentView] = useState<ViewMode>(
+    () => (parseHashRoute(window.location.hash).view as ViewMode) || 'dashboard',
+  );
+  const [navParams, setNavParams]             = useState<Record<string, string>>(
+    () => parseHashRoute(window.location.hash).params,
+  );
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notifications, setNotifications]     = useState<AppNotification[]>([]);
@@ -72,12 +77,10 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   // ─── Hash-based Routing ───
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#/', '').replace('#', '');
-      const [view, ...paramParts] = hash.split('/');
+      const { view, params } = parseHashRoute(window.location.hash);
       if (view) {
         setCurrentView(view as ViewMode);
-        if (paramParts.length > 0) setNavParams({ id: paramParts[0] });
-        else setNavParams({});
+        setNavParams(params);
       }
     };
     window.addEventListener('hashchange', handleHashChange);

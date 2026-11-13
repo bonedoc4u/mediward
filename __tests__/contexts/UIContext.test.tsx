@@ -150,3 +150,32 @@ describe('UIContext — full patient list loading', () => {
     });
   });
 });
+
+// Regression: reloading "#/patient/<id>" (or opening a link to it) showed the
+// ward dashboard, because the start-up code kept the id inside the view name.
+describe('UIContext — the screen and id are read from the URL at start-up', () => {
+  function RouteProbe() {
+    const { currentView, navParams } = useUI();
+    return <p data-testid="route">{currentView}|{navParams.id ?? ''}</p>;
+  }
+
+  afterEach(() => { window.location.hash = originalHash; });
+
+  it('opens the patient named in the URL', () => {
+    window.location.hash = '#/patient/TEST-0001';
+    render(<UIProvider><RouteProbe /></UIProvider>);
+    expect(screen.getByTestId('route')).toHaveTextContent('patient|TEST-0001');
+  });
+
+  it('opens a screen without an id', () => {
+    window.location.hash = '#/round-mode';
+    render(<UIProvider><RouteProbe /></UIProvider>);
+    expect(screen.getByTestId('route')).toHaveTextContent('round-mode|');
+  });
+
+  it('falls back to the dashboard for an empty URL', () => {
+    window.location.hash = '';
+    render(<UIProvider><RouteProbe /></UIProvider>);
+    expect(screen.getByTestId('route')).toHaveTextContent('dashboard|');
+  });
+});
