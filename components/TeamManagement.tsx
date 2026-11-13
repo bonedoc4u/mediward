@@ -5,7 +5,7 @@ import {
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { useApp, useConfig } from '../contexts/AppContext';
 import { StoredUser, UserRole } from '../types';
-import { ROLE_LABELS, ROLE_ACCESS_DESC, ROLE_COLORS } from '../utils/permissions';
+import { ROLE_LABELS, ROLE_ACCESS_DESC, ROLE_COLORS, assignableRoles } from '../utils/permissions';
 import { validatePassword } from '../utils/passwordPolicy';
 import {
   fetchAllUsers, upsertAppUser, removeAppUser, createAuthUser
@@ -279,7 +279,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
               <BottomSheetPicker
                 title="Select Access Level"
                 value={form.role}
-                options={ALL_ROLES.map(r => ({ value: r, label: ROLE_LABELS[r], description: ROLE_ACCESS_DESC[r] }))}
+                options={assignableRoles(user).map(r => ({ value: r, label: ROLE_LABELS[r], description: ROLE_ACCESS_DESC[r] }))}
                 onChange={val => setForm(v => ({ ...v, role: val as UserRole }))}
               />
             </div>
@@ -353,7 +353,7 @@ const TeamManagement: React.FC<{ onOpenSuperAdmin?: () => void }> = ({ onOpenSup
                         <BottomSheetPicker
                           title="Change Role"
                           value={editRole}
-                          options={ALL_ROLES.map(r => ({ value: r, label: ROLE_LABELS[r], description: ROLE_ACCESS_DESC[r] }))}
+                          options={assignableRoles(user).map(r => ({ value: r, label: ROLE_LABELS[r], description: ROLE_ACCESS_DESC[r] }))}
                           onChange={val => setEditRole(val as UserRole)}
                           triggerClassName="flex items-center justify-between gap-1 p-1.5 border border-blue-300 rounded-lg text-xs bg-white focus:outline-none"
                         />

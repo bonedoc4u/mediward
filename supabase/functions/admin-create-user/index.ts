@@ -6,6 +6,7 @@
 //
 // Deno runtime — excluded from the app's tsc/eslint gates (see tsconfig.json).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { checkNewUserRequest } from './validate.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -38,24 +39,15 @@ Deno.serve(async (req: Request) => {
       .eq('id', caller.id)
       .single();
 
-    if (!profile || !['admin', 'superadmin'].includes(profile.role)) {
-      return json({ error: 'Forbidden: admin role required' }, 403);
-    }
-
     const body = await req.json();
+
+    // Role, hospital and password checks live in validate.ts (unit-tested).
+    // Before Nov 2026 `role` was passed through unchecked, so a hospital
+    // admin could create a super-admin and read every hospital's patients.
+    const rejection = checkNewUserRequest(profile ?? null, body);
+    if (rejection) return json({ error: rejection.error }, rejection.status);
+
     const { email, password, name, role, ward, unit, hospitalId } = body;
-
-    if (!email || !password || !name || !role || !hospitalId) {
-      return json({ error: 'Missing required fields: email, password, name, role, hospitalId' }, 400);
-    }
-    if (password.length < 8) {
-      return json({ error: 'Password must be at least 8 characters' }, 400);
-    }
-
-    // Superadmin can create users for any hospital; admin only for their own
-    if (profile.role === 'admin' && profile.hospital_id !== hospitalId) {
-      return json({ error: 'Forbidden: cannot create users for another hospital' }, 403);
-    }
 
     // Use service role to create the user — bypasses email confirmation
     const admin = createClient(
