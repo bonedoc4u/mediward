@@ -252,7 +252,11 @@ const App: React.FC = () => {
   const mobileTabs = useMemo(() => [
     { id: 'dashboard'  as ViewMode, label: 'Ward',       icon: LayoutDashboard },
     { id: 'admissions' as ViewMode, label: 'Admits',     icon: BookOpen        },
-    { id: 'rounds'     as ViewMode, label: 'Rounds',     icon: ListChecks      },
+    // "Rounds" opens Round Mode — the screen a round is actually run from.
+    // It used to open Daily Rounds (an orders list), and Round Mode was only
+    // reachable from a button further down the ward screen. Daily Rounds is
+    // still in the menu.
+    { id: 'round-mode' as ViewMode, label: 'Rounds',     icon: ListChecks      },
     { id: 'otlist'     as ViewMode, label: procedureListName, icon: ClipboardList },
     { id: 'pac'        as ViewMode, label: preOpModuleName,   icon: HeartPulse    },
   ], [preOpModuleName, procedureListName]);
