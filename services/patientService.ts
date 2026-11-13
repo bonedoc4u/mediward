@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import type { PatientChange } from '../utils/permissions';
 import {
   Patient, DailyRound, Investigation, LabResult, ToDoItem,
   PacChecklistItem, PreOpChecklist, DischargeSummary, DamaSummary, DeathSummary, VitalSigns,
@@ -287,6 +288,32 @@ export function patientToRow(patient: Patient) {
   };
 }
 
+/** The row patientToRow() builds, i.e. what a save sends. */
+export type PatientWriteRow = ReturnType<typeof patientToRow>;
+
+/**
+ * Which stored columns would saving `after` change, compared with `before`?
+ * Null when there is nothing to compare with (record not loaded here).
+ * The role rules are decided on this, column by column (audit SEC-06).
+ */
+export function describePatientChange(before: Patient | undefined, after: Patient): PatientChange | null {
+  if (!before) return null;
+  const a = patientToRow(before) as Record<string, unknown>;
+  const b = patientToRow(after) as Record<string, unknown>;
+  return {
+    columns: Object.keys(b).filter(k => a[k] !== b[k] && JSON.stringify(a[k]) !== JSON.stringify(b[k])),
+    statusBefore: String(a.patient_status),
+    statusAfter: String(b.patient_status),
+  };
+}
+
+/** The row to send: every column, or only the named ones. */
+function rowForSave(patient: Patient, onlyColumns?: readonly string[]): Partial<PatientWriteRow> {
+  const row = patientToRow(patient);
+  if (!onlyColumns || onlyColumns.length === 0) return row;
+  return Object.fromEntries(Object.entries(row).filter(([k]) => onlyColumns.includes(k))) as Partial<PatientWriteRow>;
+}
+
 // ─── SELECT strings ───────────────────────────────────────────────────────────
 //
 // RULE: every column that patientToRow() writes MUST be in BOTH lists below.
@@ -466,14 +493,21 @@ export async function fetchPatientById(ipNo: string, hospitalId?: string): Promi
  * `data.length === 0`; the force branch must too, or a "force-save" can silently
  * write nothing while the caller reports success.
  *
+ * `onlyColumns` limits an UPDATE to those columns. A user who may only write
+ * orders must send only the orders: the database compares every column sent
+ * with what it holds, and refuses the save if any other column differs. It
+ * has no effect on the insert of a new patient.
+ *
  * Returns the row's new version so the caller can keep its cache in sync.
  */
-export async function upsertPatient(patient: Patient, forceUpdate = false): Promise<number | undefined> {
+export async function upsertPatient(
+  patient: Patient, forceUpdate = false, onlyColumns?: readonly string[],
+): Promise<number | undefined> {
   if (forceUpdate) {
     // Unconditional UPDATE — bypasses optimistic lock, but RLS can still block it
     const { data, error } = await supabase
       .from('patients')
-      .update(patientToRow(patient))
+      .update(rowForSave(patient, onlyColumns))
       .eq('ip_no', patient.ipNo)
       .select('version');
     if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
@@ -485,7 +519,7 @@ export async function upsertPatient(patient: Patient, forceUpdate = false): Prom
     // Existing patient: conditional update to detect concurrent edits
     let q = supabase
       .from('patients')
-      .update(patientToRow(patient))
+      .update(rowForSave(patient, onlyColumns))
       .eq('ip_no', patient.ipNo);
     q = patient.version != null
       ? q.eq('version', patient.version)

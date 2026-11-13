@@ -34,13 +34,16 @@ import {
   fetchActivePatients, fetchActivePatientsPage, fetchAllPatients,
   upsertPatient, removePatient, PATIENT_PAGE_SIZE,
   fetchPatientById, renamePatientIpNo as renamePatientIpNoService,
+  describePatientChange,
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
 import { saveRoundChecked, roundToRow, type RoundNoteStamp } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
 import { enqueue, getRetryableQueue, getQueue, getDeadLetterQueue, removeFromDeadLetterQueue, type QueuedOp } from '../services/syncQueue';
-import { drainQueue, replaySimpleOp, isSimpleOp, isAuthError } from '../services/syncReplay';
+import { drainQueue, replaySimpleOp, isSimpleOp, isAuthError, isRoleRefusal } from '../services/syncReplay';
+import { can, canChangePatient, isOrdersOnlyChange, ORDER_COLUMNS, PERMISSION_DENIED_MESSAGE } from '../utils/permissions';
+import { queuePatientSave, readQueuedPatientSave } from '../services/patientSaveQueue';
 import {
   registerServiceWorker,
   requestNotificationPermission,
@@ -382,14 +385,15 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // drainQueue() removes a change from the phone only when this resolves.
       const executeOp = async (op: QueuedOp): Promise<void> => {
         if (op.type === 'upsert_patient') {
-          const qp = op.payload as Patient;
+          // `onlyColumns` is set for an orders-only save: send just those columns.
+          const { patient: qp, onlyColumns } = readQueuedPatientSave(op.payload);
           // Patch hospitalId in case the op was queued before this fix landed
           // (pre-fix ops have hospitalId = undefined, causing the re-insert to fail again).
           const withHid: Patient = qp.hospitalId
             ? qp
             : { ...qp, hospitalId: userRef.current?.hospitalId };
           try {
-            await upsertPatient(withHid);
+            await upsertPatient(withHid, false, onlyColumns);
           } catch (qErr) {
             // CONCURRENT_EDIT in queue: another device updated the record while we were offline.
             // Auto-resolve: if no meaningful field changed, adopt the remote timestamp and retry.
@@ -399,12 +403,14 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               if (remote) {
                 const MKEYS = ['bed', 'ward', 'diagnosis', 'patientStatus', 'pacStatus',
                   'procedure', 'dos', 'dod', 'pod', 'management', 'unit'] as const;
-                const hasRealDiff = MKEYS.some(
+                // An orders-only save sends no other column, so a change to
+                // the other columns elsewhere is not a conflict for it.
+                const hasRealDiff = !onlyColumns && MKEYS.some(
                   k => String((withHid as unknown as Record<string, unknown>)[k] ?? '') !==
                        String((remote  as unknown as Record<string, unknown>)[k] ?? ''),
                 );
                 if (!hasRealDiff) {
-                  await upsertPatient({ ...withHid, version: remote.version, updatedAt: remote.updatedAt });
+                  await upsertPatient({ ...withHid, version: remote.version, updatedAt: remote.updatedAt }, false, onlyColumns);
                 } else {
                   throw new Error(
                     `${withHid.name || withHid.ipNo}: offline edit not applied — record was changed on another device.`,
@@ -455,11 +461,13 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSessionExpired(true);
         toast.error('Session expired — please log out and log in again to save offline changes.');
       }
-      for (const { opType, label } of result.dropped) {
+      for (const { opType, label, reason } of result.dropped) {
         const what = opType === 'upsert_patient'
           ? `Patient record${label ? ` for ${label}` : ''}`
           : 'An offline change';
-        toast.error(`${what} could not be saved after repeated attempts. Please re-enter the data.`);
+        toast.error(reason === 'role'
+          ? `${what} was not saved: ${PERMISSION_DENIED_MESSAGE} It is kept under Settings → Advanced.`
+          : `${what} could not be saved after repeated attempts. Please re-enter the data.`);
       }
 
       // Use getQueue() (all ops) not getRetryableQueue() (only due ops) so backoff ops are counted
@@ -783,7 +791,37 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [effectiveHospitalId]);
 
+  // ─── Role limits (audit SEC-06) ───
+  // Every save below first asks the role table. The database enforces the
+  // same table; these checks only spare the user a save that would be refused.
+  // They read userRef, not `user`: several of these callbacks have fixed
+  // dependency lists and would otherwise keep the user from the first render.
+  const patientsRef = useRef(patients);
+  useEffect(() => { patientsRef.current = patients; }, [patients]);
+
+  const refuse = useCallback((): false => {
+    toast.error(PERMISSION_DENIED_MESSAGE);
+    return false;
+  }, []);
+
+  /** The database refused a save because of the role: say so and show what the server really holds. */
+  const revertAfterRefusal = useCallback((ipNo: string) => {
+    toast.error(PERMISSION_DENIED_MESSAGE);
+    fetchPatientById(ipNo, user?.hospitalId)
+      .then(remote => setPatients(prev => enrichPatientData(
+        remote ? prev.map(p => (p.ipNo === ipNo ? remote : p)) : prev.filter(p => p.ipNo !== ipNo),
+      )))
+      .catch(() => { /* offline: the next refresh corrects the list */ });
+  }, [user?.hospitalId]);
+
   const updatePatient = useCallback((updatedPatient: Patient, opts?: { quiet?: boolean }) => {
+    const before = patientsRef.current.find(p => p.ipNo === updatedPatient.ipNo);
+    const change = describePatientChange(before, updatedPatient);
+    if (!canChangePatient(userRef.current, change)) { refuse(); return; }
+    // Orders are stored inside the patient record. When nothing but the orders
+    // changed, only that column is sent: a user who may write orders but not
+    // edit the patient must not send the other columns at all.
+    const only = isOrdersOnlyChange(change) ? ORDER_COLUMNS : undefined;
     // Sanitize user-editable text fields (same protection as addPatient)
     const sanitized = {
       ...updatedPatient,
@@ -799,7 +837,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return next;
     });
     const isDischarge = sanitized.patientStatus === 'Discharged';
-    upsertPatient(sanitized)
+    upsertPatient(sanitized, false, only)
       .then(newVersion => {
         applyServerVersion(sanitized.ipNo, newVersion);
         if (!opts?.quiet) toast.success(`${sanitized.name} updated`);
@@ -819,14 +857,16 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
               toast.error(`${sanitized.name} was modified by another user. Reload to see latest.`);
               return;
             }
-            const hasRealDiff = MEANINGFUL_KEYS.some(
+            // An orders-only save sends no other column, so a change to the
+            // other columns elsewhere is not a conflict for it.
+            const hasRealDiff = !only && MEANINGFUL_KEYS.some(
               k => String(sanitized[k] ?? '') !== String(remote[k] ?? ''),
             );
             if (!hasRealDiff) {
               // Only the version/timestamp diverged (e.g. our own prior save on this
               // patient bumped it and our cache was never refreshed). Re-save with the
               // server's version so the conditional check passes.
-              upsertPatient({ ...sanitized, version: remote.version, updatedAt: remote.updatedAt })
+              upsertPatient({ ...sanitized, version: remote.version, updatedAt: remote.updatedAt }, false, only)
                 .then(newVersion => {
                   applyServerVersion(sanitized.ipNo, newVersion);
                   toast.success(`${sanitized.name} updated`);
@@ -834,7 +874,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 })
                 .catch(() => {
                   // Enqueue with the remote's version so the next replay passes the conditional check
-                  enqueue('upsert_patient', { ...sanitized, version: remote.version, updatedAt: remote.updatedAt });
+                  queuePatientSave({ ...sanitized, version: remote.version, updatedAt: remote.updatedAt }, only);
                   toast.warning('Saved locally — will sync when online.');
                 });
               return;
@@ -846,22 +886,26 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           });
           return; // do NOT enqueue a stale overwrite
         }
+        if (isRoleRefusal(err)) {
+          revertAfterRefusal(sanitized.ipNo);
+          return; // do NOT enqueue: the answer would be the same every time
+        }
         if (isAuthError(err)) {
           setSessionExpired(true);
           // Enqueue so the edit is not silently lost — will replay with a fresh session
           // after the user logs back in.
-          enqueue('upsert_patient', sanitized);
+          queuePatientSave(sanitized, only);
           toast.error('Session expired — log in again. Your edit is saved locally and will sync after login.');
           return;
         }
-        enqueue('upsert_patient', sanitized);
+        queuePatientSave(sanitized, only);
         toast.warning('Saved locally — will sync when online.');
       });
     if (user) {
       logAuditEvent(user.id, user.name, 'UPDATE', 'patient', sanitized.ipNo,
         `Updated: ${sanitized.name} (Bed ${sanitized.bed})`);
     }
-  }, [user, applyServerVersion]);
+  }, [user, applyServerVersion, refuse, revertAfterRefusal]);
 
   const addSurgery = useCallback((ipNo: string, newProcedure: string, newDos: string) => {
     const patient = patients.find(p => p.ipNo === ipNo);
@@ -870,6 +914,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [patients, updatePatient]);
 
   const addPatient = useCallback((patient: Patient) => {
+    if (!can(userRef.current, 'patient:add')) { refuse(); return; }
     const p = {
       ...patient,
       // Always stamp the current user's hospitalId so the row reaches Supabase
@@ -893,6 +938,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       })
       .catch(err => {
         console.error('[Patients] addPatient failed:', err);
+        if (isRoleRefusal(err)) {
+          revertAfterRefusal(p.ipNo);
+          return;
+        }
         if (isAuthError(err)) {
           setSessionExpired(true);
           // Still enqueue so the record is not lost — the queue replay will use the
@@ -928,9 +977,10 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       logAuditEvent(user.id, user.name, 'CREATE', 'patient', p.ipNo,
         `Admitted: ${p.name} to Bed ${p.bed}`);
     }
-  }, [user, applyServerVersion]);
+  }, [user, applyServerVersion, refuse, revertAfterRefusal]);
 
   const deletePatient = useCallback((ipNo: string) => {
+    if (!can(userRef.current, 'patient:delete')) { refuse(); return; }
     const p = patients.find(pt => pt.ipNo === ipNo);
     // Deliberately NOT optimistic. This used to take the patient off the ward
     // list first and only show a message if the server refused — the patient
@@ -955,6 +1005,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user, patients, effectiveHospitalId]);
 
   const renamePatientIpNo = useCallback(async (oldIpNo: string, newIpNo: string) => {
+    if (!can(userRef.current, 'patient:edit')) throw new Error(PERMISSION_DENIED_MESSAGE);
     // Await the server result first — a duplicate/permission failure must
     // reject cleanly, not appear to have applied. The RPC logs its own audit
     // entry server-side (atomic with the rename), so no client-side
@@ -975,6 +1026,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [effectiveHospitalId]);
 
   const addLabResult = useCallback((patientId: string, result: LabResult) => {
+    if (!can(userRef.current, 'labs:write')) { refuse(); return; }
     setPatients(prev => {
       const next = prev.map(p =>
         p.ipNo !== patientId ? p : { ...p, labResults: [...p.labResults, result] },
@@ -993,6 +1045,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user]);
 
   const addInvestigation = useCallback((patientId: string, inv: Investigation) => {
+    if (!can(userRef.current, 'investigations:write')) { refuse(); return; }
     setPatients(prev => {
       const next = prev.map(p =>
         p.ipNo !== patientId ? p : { ...p, investigations: [inv, ...p.investigations] },
@@ -1011,6 +1064,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user]);
 
   const deleteInvestigation = useCallback((patientId: string, invId: string) => {
+    if (!can(userRef.current, 'investigations:write')) { refuse(); return; }
     setPatients(prev => {
       const next = prev.map(p =>
         p.ipNo !== patientId ? p
@@ -1085,6 +1139,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user, effectiveHospitalId]);
 
   const addVitalSign = useCallback(async (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => {
+    if (!can(userRef.current, 'charting:write')) { refuse(); return; }
     try {
       // Write to normalized table first so we get the server-generated UUID
       const created = await insertVital(patientIpNo, user?.hospitalId, vital);
