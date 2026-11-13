@@ -234,7 +234,7 @@ function rowToPatient(row: PatientRow): Patient {
 // ─── TypeScript Patient → DB row ───
 // NOTE: daily_rounds and vitals are now written via roundsService / vitalsService.
 //       We still write todos here (small JSONB, part of the main patient record).
-function patientToRow(patient: Patient) {
+export function patientToRow(patient: Patient) {
   return {
     ip_no:             patient.ipNo,
     hospital_id:       patient.hospitalId ?? null,
@@ -279,6 +279,13 @@ function patientToRow(patient: Patient) {
 
 // ─── SELECT strings ───────────────────────────────────────────────────────────
 //
+// RULE: every column that patientToRow() writes MUST be in BOTH lists below.
+// A save sends the whole row. A column that is saved but not loaded comes back
+// from rowToPatient() as "empty", and the next save of any kind (ticking one
+// order is enough) writes that emptiness over the real value. That is how drug
+// allergies, DAMA/death summaries and PAC clearance steps were being erased.
+// __tests__/services/patientService.test.ts fails if this rule is broken.
+//
 // PATIENT_LIST_SELECT — lightweight, used for all list/dashboard queries.
 //   Only the latest round note is fetched (limit 1) to show in list cards.
 //   No vitals JOIN — the dashboard never renders vitals history.
@@ -286,25 +293,25 @@ function patientToRow(patient: Patient) {
 // PATIENT_FULL_SELECT — full JOIN for PatientDetail and DischargeSummary views.
 //   Fetches all labs, imaging, rounds, and vitals for a single patient.
 //
-const PATIENT_LIST_SELECT = [
+export const PATIENT_LIST_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
-  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'drug_allergies', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
+  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
-  'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
+  'discharge_summary', 'dama_summary', 'death_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
   'rounds(date, note, todos)',
   'imaging(id, date, type, findings, image_url, phase)',
 ].join(', ');
 
 // Full select (all vitals) — used only when a single patient's detail is loaded
-const PATIENT_SELECT = [
+export const PATIENT_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'drug_allergies', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
-  'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
+  'discharge_summary', 'dama_summary', 'death_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url, phase)',
   'rounds(date, note, todos)',
