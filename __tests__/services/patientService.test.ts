@@ -394,7 +394,7 @@ describe('upsertPatient', () => {
 
 describe('removePatient', () => {
   it('calls supabase.from("patients")', async () => {
-    mockState.result = { data: null, error: null };
+    mockState.result = { data: [{ ip_no: 'IP001' }], error: null };
     await removePatient('IP001');
     expect(supabase.from).toHaveBeenCalledWith('patients');
   });
@@ -405,11 +405,19 @@ describe('removePatient', () => {
     await expect(removePatient('IP001')).rejects.toThrow('forbidden');
   });
 
-  it('resolves without throwing on success', async () => {
-    mockState.result = { data: null, error: null };
+  it('resolves when the server confirms it removed the record', async () => {
+    mockState.result = { data: [{ ip_no: 'IP001' }], error: null };
     await expect(removePatient('IP001')).resolves.toBeUndefined();
   });
+
+  // Regression (audit DATA-06): RLS can match zero rows without an error.
+  // That used to resolve, so the caller reported a removal that never happened.
+  it('throws when the server removed nothing', async () => {
+    mockState.result = { data: [], error: null };
+    await expect(removePatient('IP001')).rejects.toThrow('no record was removed');
+  });
 });
+
 
 // ─── renamePatientIpNo ────────────────────────────────────────────────────────
 

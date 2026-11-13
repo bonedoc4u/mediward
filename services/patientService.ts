@@ -505,12 +505,18 @@ export async function upsertPatient(patient: Patient, forceUpdate = false): Prom
  * Use anonymizePatient() for DPDP §13 Right to Erasure (immediate PII wipe).
  */
 export async function removePatient(ipNo: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('patients')
     .update({ deleted_at: new Date().toISOString() })
-    .eq('ip_no', ipNo);
+    .eq('ip_no', ipNo)
+    .select('ip_no');
 
   if (error) throw new Error(`removePatient (${ipNo}): ${error.message}`);
+  // RLS can make an UPDATE match zero rows without raising an error (stale
+  // session, wrong hospital). That must not look like a successful removal.
+  if (!data || data.length === 0) {
+    throw new Error(`removePatient (${ipNo}): no record was removed — it may already be gone, or this session cannot change it`);
+  }
 }
 
 /**
