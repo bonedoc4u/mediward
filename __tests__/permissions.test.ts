@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { can, Permission } from '../utils/permissions';
+import { can, assignableRoles, Permission } from '../utils/permissions';
 import { AuthUser, UserRole } from '../types';
 
 const ALL_PERMISSIONS: Permission[] = [
@@ -104,5 +104,29 @@ describe('can() – privilege escalation guard', () => {
   it('house_surgeon cannot discharge — guards surgical sign-off flow', () => {
     const hs = makeUser('house_surgeon');
     expect(can(hs, 'patient:discharge')).toBe(false);
+  });
+});
+
+// Regression (audit SEC-01): Team Settings offered "Super Admin" to every
+// hospital admin. A super-admin can read and change every hospital's patients.
+describe('assignableRoles() – who may hand out which role', () => {
+  const actor = (role: UserRole): AuthUser => ({
+    id: 'u1', email: 'x@test', name: 'X', role, sessionExpiry: Date.now() + 1000,
+  } as AuthUser);
+
+  it('a hospital admin can assign every role except super-admin', () => {
+    expect(assignableRoles(actor('admin')).sort()).toEqual(['admin', 'attending', 'house_surgeon', 'resident']);
+  });
+
+  it('only a super-admin can assign super-admin', () => {
+    expect(assignableRoles(actor('superadmin'))).toContain('superadmin');
+  });
+
+  it.each(['resident', 'house_surgeon', 'attending'] as UserRole[])('a %s can assign nothing', (role) => {
+    expect(assignableRoles(actor(role))).toEqual([]);
+  });
+
+  it('nobody signed in can assign nothing', () => {
+    expect(assignableRoles(null)).toEqual([]);
   });
 });
