@@ -48,6 +48,7 @@ const AdminSettings = lazy(() => import('./components/AdminSettings'));
 const StatusPage = lazy(() => import('./components/StatusPage'));
 const AdmissionList = lazy(() => import('./components/AdmissionList'));
 import OfflineBanner from './components/OfflineBanner';
+import OtherUsersPendingNotice from './src/features/sync/OtherUsersPendingNotice';
 import { NetworkBanner } from './components/NetworkBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import SwUpdateBanner from './components/SwUpdateBanner';
@@ -870,6 +871,7 @@ const App: React.FC = () => {
         style={{ height: 'calc(100svh - 56px - var(--safe-area-top, env(safe-area-inset-top, 0px)))' }}
       >
         <div className="max-w-7xl mx-auto" style={{ paddingBottom: 'var(--content-bottom-pad)' }}>
+          <OtherUsersPendingNotice />
 
           {/* ─── Superadmin: Viewing another hospital banner ─── */}
           {user?.role === 'superadmin' && viewingHospitalId && (
