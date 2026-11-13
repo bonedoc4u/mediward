@@ -14,7 +14,9 @@ import PacFlowChart from './PacFlowChart';
 import { RoundModeOfflineBanner } from './RoundModeOfflineBanner';
 import { useNetworkQuality } from '../hooks/useNetworkQuality';
 import { localYmd, todayYmd } from '../utils/dates';
-import { resolveRoundPosition, isHorizontalSwipe } from '../utils/roundPosition';
+import {
+  resolveRoundPosition, isHorizontalSwipe, ROUND_WARD_KEY, ROUND_INDEX_KEY, ROUND_PATIENT_KEY,
+} from '../utils/roundPosition';
 import { toast } from '../utils/toast';
 import RoundNoteCard from '../src/features/rounds/RoundNoteCard';
 import RoundActionBar from '../src/features/rounds/RoundActionBar';
@@ -44,7 +46,6 @@ const RoundMode: React.FC = () => {
   }, [allActivePatients]);
 
   // ─── Ward selection state — persisted so screen rotation doesn't reset it ───
-  const ROUND_WARD_KEY = 'mediward_round_ward';
   const [selectedWard, setSelectedWardRaw] = useState<string | null>(
     () => sessionStorage.getItem(ROUND_WARD_KEY) || null,
   );
@@ -78,13 +79,11 @@ const RoundMode: React.FC = () => {
   // when a colleague admits, moves or discharges someone. A remembered
   // position would then show a different patient without any warning.
   // The position is kept only as a fallback for when that patient has left.
-  const ROUND_IDX_KEY = 'mediward_round_index';
-  const ROUND_PATIENT_KEY = 'mediward_round_patient';
   const [currentIpNo, setCurrentIpNo] = useState<string | null>(
     () => sessionStorage.getItem(ROUND_PATIENT_KEY) || null,
   );
   const lastIndexRef = useRef<number>((() => {
-    const saved = sessionStorage.getItem(ROUND_IDX_KEY);
+    const saved = sessionStorage.getItem(ROUND_INDEX_KEY);
     const n = saved ? parseInt(saved, 10) : 0;
     return isNaN(n) || n < 0 ? 0 : n;
   })());
@@ -96,7 +95,7 @@ const RoundMode: React.FC = () => {
   const setIndex = (n: number) => {
     const ipNo = activePatients[n]?.ipNo ?? null;
     lastIndexRef.current = n;
-    sessionStorage.setItem(ROUND_IDX_KEY, String(n));
+    sessionStorage.setItem(ROUND_INDEX_KEY, String(n));
     if (ipNo) sessionStorage.setItem(ROUND_PATIENT_KEY, ipNo);
     else sessionStorage.removeItem(ROUND_PATIENT_KEY);
     setCurrentIpNo(ipNo);
@@ -139,7 +138,7 @@ const RoundMode: React.FC = () => {
   // so plainly and drop any half-typed order — it was meant for them.
   React.useEffect(() => {
     lastIndexRef.current = position.index;
-    sessionStorage.setItem(ROUND_IDX_KEY, String(position.index));
+    sessionStorage.setItem(ROUND_INDEX_KEY, String(position.index));
     if (position.ipNo === currentIpNo) return;
     if (position.ipNo) sessionStorage.setItem(ROUND_PATIENT_KEY, position.ipNo);
     else sessionStorage.removeItem(ROUND_PATIENT_KEY);

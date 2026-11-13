@@ -5,12 +5,17 @@ import { can } from '../utils/permissions';
 import { getLabTrend, needsPac, wardOptionsForPatient, isShortDiagnosisCode } from '../utils/calculations';
 import {
   ArrowLeft, Phone, MessageCircle, Activity, FileImage,
-  Droplet, ClipboardCheck, CheckSquare, HeartPulse,
+  Droplet, ClipboardCheck, HeartPulse,
   TrendingUp, TrendingDown, Minus, AlertCircle, LogOut, FileText, Trash2,
   Download, Pill, ClipboardList, Droplets, Bandage,
   Send, ChevronDown, ChevronLeft, ChevronRight, Home, ArrowRightLeft, Pencil, Plus, Leaf,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
+import AllergyLine from '../src/features/rounds/AllergyLine';
+import RoundNotesTimeline from '../src/features/patient/RoundNotesTimeline';
+import OrdersCard from '../src/features/patient/OrdersCard';
+import { startRoundAt } from '../utils/roundPosition';
+import { formatDayMonth, todayYmd } from '../utils/dates';
 import DateBottomSheet from './ui/DateBottomSheet';
 import ErrorBoundary from './ErrorBoundary';
 import DemographicsSection from './patient/DemographicsSection';
@@ -21,7 +26,6 @@ import RadiologyPanel from './patient/RadiologyPanel';
 import StickyPatientHeader from './patient/StickyPatientHeader';
 import MoveBedSheet from './patient/MoveBedSheet';
 import ReferralLetter from './ReferralLetter';
-import { todayYmd } from '../utils/dates';
 import { logAuditEvent } from '../services/auditLog';
 const MedicationChart  = lazy(() => import('./MedicationChart'));
 const NursingNotes     = lazy(() => import('./NursingNotes'));
@@ -136,8 +140,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
   }
 
   const activeLabTypes     = labTypes.filter(lt => patient.labResults.some(r => r.type === lt.name));
-  const pendingTodos       = patient.todos.filter(t => !t.isDone);
-  const completedTodos     = patient.todos.filter(t => t.isDone);
+  const today = todayYmd();
   const daysSinceAdmission = Math.floor((Date.now() - new Date(patient.doa).getTime()) / 86_400_000);
   const isAlreadyDischarged = patient.patientStatus === PatientStatus.Discharged;
   const statusBadge        = STATUS_BADGE[patient.patientStatus] ?? DEFAULT_STATUS;
@@ -189,6 +192,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         statusLabel={patient.patientStatus === PatientStatus.Review ? 'Needs review' : patient.patientStatus}
         statusColor={statusBadge}
         visible={showSticky}
+        pinToViewport={!inSheet}
       />
 
       {/* ─── DARK HEADER CARD ──────────────────────────────────────────── */}
@@ -292,8 +296,12 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       {/* Sentinel: once this scrolls above the top, the slim sticky header shows. */}
       <div ref={heroSentinelRef} className="h-0" aria-hidden="true" />
 
-      {/* ─── RADIOLOGY (pinned — first-class for an ortho ward) ────────── */}
-      <RadiologyPanel patient={patient} onOpenFull={() => navigateTo('radiology', { id: patient.ipNo })} />
+      {/* ─── ALLERGIES — first thing under the patient's identity ──────── */}
+      {(patient.drugAllergies ?? []).some(a => a.trim()) && (
+        <div className="mb-3 rounded-card overflow-hidden border border-vital-critical-border">
+          <AllergyLine allergies={patient.drugAllergies} />
+        </div>
+      )}
 
       {/* ─── DIAGNOSIS + PROCEDURE CARD ────────────────────────────────── */}
       <div className="bg-surface-card rounded-2xl shadow-sm border border-line overflow-hidden mb-3">
@@ -358,9 +366,28 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                 {patient.procedure || <span className="text-ink-faint italic text-base font-normal">Pending</span>}
               </p>
             )}
+            {patient.procedure && patient.dos && (
+              <p className="text-sm text-ink-muted mt-1">Operated {formatDayMonth(patient.dos)}</p>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ─── COMORBIDITIES & ALLERGIES (inline-editable) ───────────────── */}
+      <ComorbiditiesSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />
+
+      {/* ─── ROUND NOTES — a timeline of real notes, newest first ──────── */}
+      <RoundNotesTimeline
+        rounds={patient.dailyRounds}
+        today={today}
+        onWriteToday={canEdit ? () => { startRoundAt(patient); navigateTo('round-mode'); } : undefined}
+      />
+
+      {/* ─── ORDERS — open ones first, with how long each has been open ── */}
+      <OrdersCard todos={patient.todos} today={today} />
+
+      {/* ─── RADIOLOGY (first-class for an ortho ward: directly after notes and orders) ────────── */}
+      <RadiologyPanel patient={patient} onOpenFull={() => navigateTo('radiology', { id: patient.ipNo })} />
 
       {/* ─── TREATMENT + DATES ROW ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 mb-3">
@@ -470,9 +497,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       </button>
       )}
 
-      {/* ─── COMORBIDITIES & ALLERGIES (inline-editable) ───────────────── */}
-      <ComorbiditiesSection patient={patient} canEdit={canEdit} onUpdate={updatePatient} />
-
       {/* ─── SURGICAL HISTORY (second-surgery support) ─────────────────── */}
       <SurgicalHistorySection patient={patient} canEdit={canEdit} onUpdate={updatePatient} onAddSurgery={addSurgery} />
 
@@ -534,15 +558,6 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
           </>
         ) : null}
       </div>
-
-      {/* ─── DELETE RECORD ─────────────────────────────────────────────── */}
-      {canDelete && (
-        <div className="flex justify-end mb-4">
-          <button onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-vital-critical-fg border border-vital-critical-border rounded-xl hover:bg-vital-critical-surface transition-colors">
-            <Trash2 className="w-3.5 h-3.5" /> Delete Record
-          </button>
-        </div>
-      )}
 
       {/* ─── OPTIONAL TABS (Medications / Nursing / I/O etc.) ──────────── */}
       {(showMedicationChart || showNursingNotes || showIntakeOutput || showBloodTransfusion || showWoundCare) && (
@@ -656,54 +671,20 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
             </div>
           )}
 
-          {/* Active Orders */}
-          {patient.todos.length > 0 && (
-            <div className="bg-surface-card rounded-2xl shadow-sm border border-line p-4 mt-3">
-              <h3 className="font-bold text-ink flex items-center gap-2 mb-3 text-sm">
-                <CheckSquare className="w-4 h-4 text-accent-fg" /> Orders ({pendingTodos.length} pending)
-              </h3>
-              <div className="space-y-1.5">
-                {pendingTodos.map(t => (
-                  <div key={t.id} className="flex items-center gap-2 p-2 bg-vital-warning-surface rounded-xl border border-vital-warning-border">
-                    <div className="w-2 h-2 bg-vital-warning rounded-full shrink-0" />
-                    <span className="text-sm text-ink">{t.task}</span>
-                  </div>
-                ))}
-                {completedTodos.map(t => (
-                  <div key={t.id} className="flex items-center gap-2 p-2 bg-surface rounded-xl border border-line">
-                    <div className="w-2 h-2 bg-vital-normal rounded-full shrink-0" />
-                    <span className="text-sm text-ink-faint line-through">{t.task}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Recent Imaging now lives in the pinned RadiologyPanel above. */}
-
-          {/* Rounds History */}
-          {patient.dailyRounds.length > 0 && (
-            <div className="bg-surface-card rounded-2xl shadow-sm border border-line p-4 mt-3">
-              <h3 className="font-bold text-ink flex items-center gap-2 mb-3 text-sm">
-                <ClipboardCheck className="w-4 h-4 text-accent-fg" /> Rounds History
-              </h3>
-              <div className="space-y-2">
-                {patient.dailyRounds
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .slice(0, 5)
-                  .map(round => (
-                    <div key={round.date} className="bg-surface rounded-xl p-3 border border-line">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-accent-fg">{round.date}</span>
-                        <span className="text-xs text-ink-faint">{round.todos.filter(t => t.isDone).length}/{round.todos.length} done</span>
-                      </div>
-                      <p className="text-sm text-ink">{round.note || 'No note recorded'}</p>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
         </>
+      )}
+
+      {/* ─── REMOVE RECORD — last thing on the page, away from everyday controls ── */}
+      {canDelete && (
+        <div className="mt-6 pt-4 border-t border-line flex justify-start">
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="min-h-11 flex items-center gap-2 px-4 text-sm font-semibold text-vital-critical-fg border border-vital-critical-border rounded-control hover:bg-vital-critical-surface transition-colors"
+          >
+            <Trash2 className="w-4 h-4" aria-hidden="true" /> Remove record
+          </button>
+        </div>
       )}
 
       {/* ─── DIALOGS ───────────────────────────────────────────────────── */}
@@ -719,7 +700,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       <ConfirmDialog
         isOpen={showDischargeConfirm}
         title="Discharge Patient"
-        message={`Discharge ${patient.name}? Today (${new Date().toLocaleDateString()}) will be set as the discharge date.`}
+        message={`Discharge ${patient.name}? Today (${formatDayMonth(today)}) will be set as the discharge date.`}
         confirmLabel="Confirm Discharge"
         variant="warning"
         onConfirm={handleDischarge}
@@ -727,9 +708,9 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       />
       <ConfirmDialog
         isOpen={showDeleteConfirm}
-        title="Permanently Delete Record"
-        message={`This will permanently remove ${patient.name}'s entire record. This cannot be undone.`}
-        confirmLabel="Delete Permanently"
+        title="Remove patient record"
+        message={`This removes ${patient.name} (IP ${patient.ipNo}) from every list. The record is kept for 30 days and is then erased.`}
+        confirmLabel="Remove record"
         variant="danger"
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}

@@ -54,3 +54,21 @@ export function isHorizontalSwipe(dx: number, dy: number): boolean {
   const ay = Math.abs(dy);
   return ax >= SWIPE_MIN_DISTANCE && ax >= ay * 2;
 }
+
+// ─── Where Round Mode resumes ───────────────────────────────────────────────
+// Session-storage keys shared by Round Mode and the screens that open it on a
+// particular patient. One definition, so the two can never drift apart.
+export const ROUND_WARD_KEY = 'mediward_round_ward';
+export const ROUND_INDEX_KEY = 'mediward_round_index';
+export const ROUND_PATIENT_KEY = 'mediward_round_patient';
+
+/**
+ * Make the next opening of Round Mode start on this patient, in their ward.
+ * Used by "Write today's note" on the patient page.
+ */
+export function startRoundAt(patient: { ipNo: string; ward?: string | null }): void {
+  try {
+    if (patient.ward) sessionStorage.setItem(ROUND_WARD_KEY, patient.ward);
+    sessionStorage.setItem(ROUND_PATIENT_KEY, patient.ipNo);
+  } catch { /* storage blocked — Round Mode simply opens on its ward picker */ }
+}

@@ -29,6 +29,7 @@ vi.mock('../../utils/capacitorInit', () => ({ hapticTap: () => Promise.resolve()
 vi.mock('../../utils/toast', () => ({ toast: state.toast }));
 
 import RoundMode from '../../components/RoundMode';
+import { startRoundAt } from '../../utils/roundPosition';
 
 const patient = (bed: string, name: string): Patient => ({
   ipNo: `IP-${name}`, name, mobile: '', age: 50, gender: Gender.Male, ward: 'Male Ward', bed,
@@ -119,5 +120,13 @@ describe('Round Mode keeps the same patient on screen', () => {
     fireEvent.touchStart(root, { touches: [{ clientX: 300, clientY: 400 }] });
     fireEvent.touchEnd(root, { changedTouches: [{ clientX: 150, clientY: 410 }] });
     expect(onScreen()).toBe('Babu');
+  });
+
+  // "Write today's note" on the patient page.
+  it('opens on the patient another screen asked for, in that patient\'s ward', () => {
+    sessionStorage.clear();
+    startRoundAt(C);
+    render(<RoundMode />);
+    expect(onScreen()).toBe('Chitra');
   });
 });
