@@ -30,3 +30,19 @@ describe('rounds.round_note migration', () => {
     expect(Number(limit)).toBe(ROUND_NOTE_MAX_LENGTH);
   });
 });
+
+describe('save_round() migration', () => {
+  it('runs with the caller\'s own access rules, not elevated ones', () => {
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.save_round\([\s\S]*?LANGUAGE plpgsql SECURITY INVOKER/);
+  });
+
+  it('refuses a stale note write instead of overwriting', () => {
+    expect(sql).toMatch(/v_row\.round_note_at IS DISTINCT FROM p_base_note_at/);
+    expect(sql).toMatch(/RETURN QUERY SELECT true, v_row\.round_note/);
+  });
+
+  it('is not callable while signed out', () => {
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.save_round\([^)]*\) FROM PUBLIC, anon/);
+    expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.save_round\([^)]*\) TO authenticated/);
+  });
+});
