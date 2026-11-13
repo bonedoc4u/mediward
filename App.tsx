@@ -19,6 +19,7 @@ import DepartmentPicker from './components/DepartmentPicker';
 import UnitPicker from './components/UnitPicker';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationCenter from './components/NotificationCenter';
+import AssistantButton from './components/AssistantButton';
 import GlobalSearch from './components/GlobalSearch';
 import WardSkeleton from './components/WardSkeleton';
 import ToastContainer from './components/ToastContainer';
@@ -214,6 +215,11 @@ const App: React.FC = () => {
   const [disclaimerOk, setDisclaimerOk] = useState<boolean | null>(() => (hasAcceptedDisclaimer() ? true : null));
   const checkedDisclaimerFor = useRef<string | null>(null);
   const [superAdminMode, setSuperAdminMode] = useState(false);
+  // Clinical Assistant panel. `assistantUsed` stays true after the first open
+  // so the panel keeps its results; until then its code is not even loaded.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantUsed, setAssistantUsed] = useState(false);
+  const openAssistant = useCallback(() => { setAssistantUsed(true); setAssistantOpen(true); }, []);
   const {
     patients, isLoadingPatients, updatePatient, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation,
@@ -727,6 +733,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-1">
             <GlobalSearch />
+            <AssistantButton tone="dark" onClick={openAssistant} />
             <NotificationCenter />
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}>
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -902,6 +909,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <GlobalSearch />
+                <AssistantButton tone="light" onClick={openAssistant} />
                 <NotificationCenter />
               </div>
             </div>
@@ -954,11 +962,15 @@ const App: React.FC = () => {
       </Suspense>
 
       {/* ─── AI Assistant ─── */}
-      <ErrorBoundary fallbackMessage="AI Assistant encountered an error.">
-        <Suspense fallback={null}>
-          <AiClinicalAssistant patients={patients} />
-        </Suspense>
-      </ErrorBoundary>
+      {/* Opened from the header button. Its code is downloaded on first use,
+          not on every page load. */}
+      {assistantUsed && (
+        <ErrorBoundary fallbackMessage="AI Assistant encountered an error.">
+          <Suspense fallback={null}>
+            <AiClinicalAssistant patients={patients} open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
 
       {/* ─── Mobile Menu Overlay ─── */}
       {isMobileMenuOpen && (
