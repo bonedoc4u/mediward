@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   findTodayRound, findPreviousNote, appendPhrase, dayLabel, timeLabel, noteMeta,
-  draftKey, loadDraft, saveDraft, clearDraft, ROUND_NOTE_MAX_LENGTH,
+  draftKey, loadDraft, saveDraft, clearDraft, combineNotes, ROUND_NOTE_MAX_LENGTH,
 } from '../src/features/rounds/roundNotes';
 import { DailyRound } from '../types';
 
@@ -72,15 +72,36 @@ describe('labels', () => {
   });
 });
 
+describe('combineNotes — both notes kept, theirs first', () => {
+  it('joins the two notes with a blank line', () => {
+    expect(combineNotes('Wound dry.', 'Pin sites clean.')).toBe('Wound dry.\n\nPin sites clean.');
+  });
+  it('does not duplicate when one already contains the other', () => {
+    expect(combineNotes('Wound dry. Afebrile.', 'Afebrile.')).toBe('Wound dry. Afebrile.');
+    expect(combineNotes('Afebrile.', 'Afebrile. Wound dry.')).toBe('Afebrile. Wound dry.');
+  });
+  it('returns the other note when one is empty', () => {
+    expect(combineNotes('', 'Mine.')).toBe('Mine.');
+    expect(combineNotes('Theirs.', '  ')).toBe('Theirs.');
+  });
+  it('never exceeds the database limit', () => {
+    expect(combineNotes('a'.repeat(3000), 'b'.repeat(3000)).length).toBe(ROUND_NOTE_MAX_LENGTH);
+  });
+});
+
 describe('drafts', () => {
   beforeEach(() => localStorage.clear());
-  it('keeps one draft per patient per day', () => {
-    saveDraft(TODAY, 'IP-1', 'for one');
-    saveDraft(TODAY, 'IP-2', 'for two');
-    expect(loadDraft(TODAY, 'IP-1')).toBe('for one');
-    expect(loadDraft(TODAY, 'IP-2')).toBe('for two');
+  it('keeps one draft per patient per day, with the note version it was started from', () => {
+    saveDraft(TODAY, 'IP-1', { text: 'for one', baseNoteAt: null });
+    saveDraft(TODAY, 'IP-2', { text: 'for two', baseNoteAt: '2026-11-13T04:00:00.123456+00:00' });
+    expect(loadDraft(TODAY, 'IP-1')).toEqual({ text: 'for one', baseNoteAt: null });
+    expect(loadDraft(TODAY, 'IP-2')).toEqual({ text: 'for two', baseNoteAt: '2026-11-13T04:00:00.123456+00:00' });
     expect(loadDraft('2026-11-12', 'IP-1')).toBeNull();
     clearDraft(TODAY, 'IP-1');
+    expect(loadDraft(TODAY, 'IP-1')).toBeNull();
+  });
+  it('ignores a stored value it cannot read instead of crashing', () => {
+    localStorage.setItem(draftKey(TODAY, 'IP-1'), 'not json');
     expect(loadDraft(TODAY, 'IP-1')).toBeNull();
   });
   it('uses a key that starts with the date, so the 2-day clean-up in Round Mode finds it', () => {

@@ -16,19 +16,15 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../../contexts/AppContext', () => ({
   useApp: () => ({
-    patients: state.patients, updatePatient: state.updatePatient, saveRound: vi.fn().mockResolvedValue('saved'),
+    patients: state.patients, updatePatient: state.updatePatient, saveRound: vi.fn().mockResolvedValue({ status: 'saved' }),
     navigateTo: vi.fn(), sessionExpired: false, logout: vi.fn(),
   }),
   usePatients: () => ({ forceReconnect: vi.fn() }),
   useConfig: () => ({ icuWardNames: new Set<string>(), customTodoShortcuts: [] }),
 }));
-vi.mock('../../hooks/useSaveRoundNote', () => ({
-  useSaveRoundNote: () => ({ conflict: null, resolveConflict: vi.fn(), dismissConflict: vi.fn() }),
-}));
 vi.mock('../../hooks/useNetworkQuality', () => ({ useNetworkQuality: () => ({ quality: 'good' }) }));
 vi.mock('../../components/PacFlowChart', () => ({ default: () => null }));
 vi.mock('../../components/RoundModeOfflineBanner', () => ({ RoundModeOfflineBanner: () => null }));
-vi.mock('../../components/RoundConflictModal', () => ({ RoundConflictModal: () => null }));
 vi.mock('../../utils/capacitorInit', () => ({ hapticTap: () => Promise.resolve() }));
 vi.mock('../../utils/toast', () => ({ toast: state.toast }));
 

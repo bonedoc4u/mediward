@@ -5,6 +5,8 @@
 import React, { useId } from 'react';
 import { AlertTriangle, Check, Clock, Loader2, PencilLine } from 'lucide-react';
 import { DailyRound } from '../../../types';
+import type { RoundNoteStamp } from '../../../services/roundsService';
+import type { ConflictChoice } from './useRoundNote';
 import { NoteSaveState, QUICK_PHRASES, ROUND_NOTE_MAX_LENGTH, appendPhrase, noteMeta, timeLabel } from './roundNotes';
 
 interface Props {
@@ -16,6 +18,9 @@ interface Props {
   value: string;
   onChange: (text: string) => void;
   saveState: NoteSaveState;
+  /** The colleague's note that blocked this save (only while saveState is 'conflict'). */
+  conflict?: RoundNoteStamp;
+  onResolve?: (choice: ConflictChoice) => void;
   disabled?: boolean;
 }
 
@@ -32,6 +37,9 @@ const SaveLine: React.FC<{ state: NoteSaveState; todayRound?: DailyRound }> = ({
       </p>
     );
   }
+  if (state === 'conflict') {
+    return <p className={`${base} text-vital-warning-fg`} role="status"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />Not saved</p>;
+  }
   if (state === 'dirty') {
     return <p className={`${base} text-ink-muted`} role="status"><PencilLine className="w-3.5 h-3.5" aria-hidden="true" />Not saved yet</p>;
   }
@@ -47,7 +55,41 @@ const SaveLine: React.FC<{ state: NoteSaveState; todayRound?: DailyRound }> = ({
   return <p className={`${base} text-ink-muted`}>No note for today yet</p>;
 };
 
-const RoundNoteCard: React.FC<Props> = ({ today, previous, todayRound, value, onChange, saveState, disabled }) => {
+/**
+ * Shown when the save was refused because someone else wrote a note first.
+ * Nothing is lost while this is on screen: their note is on the server, ours
+ * is on the phone. Three ways out, no way to dismiss it without choosing.
+ */
+const ConflictBox: React.FC<{ theirs: RoundNoteStamp; onResolve: (choice: ConflictChoice) => void; disabled?: boolean }> = ({ theirs, onResolve, disabled }) => {
+  const who = theirs.roundNoteBy ?? 'Someone else';
+  const when = timeLabel(theirs.roundNoteAt);
+  const choice = 'min-h-11 px-3 rounded-control text-sm font-bold transition-colors disabled:opacity-40';
+  return (
+    <div role="alert" className="rounded-card border border-vital-warning-border bg-vital-warning-surface p-3 space-y-2">
+      <p className="flex items-start gap-2 text-sm font-bold text-vital-warning-fg">
+        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+        <span>Your note is not saved. {who} wrote a note first{when ? ` at ${when}` : ''}.</span>
+      </p>
+      <p className="text-sm leading-relaxed text-ink bg-surface-card border border-line rounded-control p-2 whitespace-pre-wrap select-text">
+        {theirs.roundNote}
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <button type="button" disabled={disabled} onClick={() => onResolve('both')} className={`${choice} bg-accent hover:bg-accent-pressed text-white`}>
+          Keep both
+        </button>
+        <button type="button" disabled={disabled} onClick={() => onResolve('mine')} className={`${choice} bg-surface-card border border-line text-ink hover:border-accent`}>
+          Use mine only
+        </button>
+        <button type="button" disabled={disabled} onClick={() => onResolve('theirs')} className={`${choice} bg-surface-card border border-line text-ink hover:border-accent`}>
+          Use theirs only
+        </button>
+      </div>
+      <p className="text-xs text-ink-muted">Your text below stays on this phone until you choose.</p>
+    </div>
+  );
+};
+
+const RoundNoteCard: React.FC<Props> = ({ today, previous, todayRound, value, onChange, saveState, conflict, onResolve, disabled }) => {
   const noteId = useId();
   const nearLimit = value.length > ROUND_NOTE_MAX_LENGTH - 200;
 
@@ -68,6 +110,10 @@ const RoundNoteCard: React.FC<Props> = ({ today, previous, todayRound, value, on
           </div>
           <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap select-text">{previous.roundNote}</p>
         </div>
+      )}
+
+      {saveState === 'conflict' && conflict && onResolve && (
+        <ConflictBox theirs={conflict} onResolve={onResolve} disabled={disabled} />
       )}
 
       <div className="space-y-1.5">
