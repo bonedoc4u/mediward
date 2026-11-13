@@ -24,6 +24,10 @@ vi.mock('../../contexts/AppContext', () => ({
   usePatients: () => ({ forceReconnect: vi.fn() }),
   useConfig: () => ({ icuWardNames: new Set<string>(), customTodoShortcuts: [] }),
 }));
+// Round Mode asks the role table which controls to switch on.
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'u-1', name: 'Test Resident', email: 'r@test', role: 'resident', hospitalId: 'h-1', sessionExpiry: Date.now() + 1e6 } }),
+}));
 vi.mock('../../hooks/useNetworkQuality', () => ({ useNetworkQuality: () => ({ quality: 'good' }) }));
 vi.mock('../../components/PacFlowChart', () => ({ default: () => null }));
 vi.mock('../../components/RoundModeOfflineBanner', () => ({ RoundModeOfflineBanner: () => null }));

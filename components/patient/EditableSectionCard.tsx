@@ -9,8 +9,8 @@
  *               open, or null on success (the card then closes edit mode).
  *   - `onCancel`: reset the parent's draft.
  *
- * The pencil is shown only when `canEdit` is true, so role-based access
- * (attending = view-only) is enforced at the UI. Saves go through the caller's
+ * The pencil is shown only when `canEdit` is true (the caller passes
+ * can(user, 'patient:edit')). Saves go through the caller's
  * onSave, which routes to PatientContext.updatePatient — that path already
  * sanitizes input, writes the audit entry and queues offline on failure.
  */

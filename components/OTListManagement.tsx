@@ -2,6 +2,9 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Patient } from '../types';
 import { useConfig } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useCan } from '../src/features/permissions/useCan';
+import WriteArea from '../src/features/permissions/WriteArea';
+import ViewOnlyNote from '../src/features/permissions/ViewOnlyNote';
 import { getOTCycleDates } from '../utils/otSchedule';
 import { OTPatient, OTType, OTListMeta, getTableOptionsForType, getDefaultCategoryForType, isEligibleForOTList, PENDING_ID_PREFIX } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
@@ -40,6 +43,8 @@ interface OTListManagementProps {
 const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
   const { unitChiefs, hospitalName, department, weekendDuty } = useConfig();
   const { user, selectedUnit, viewingHospitalId } = useAuth();
+  // Roles without 'otlist:write' read the list and export it; they cannot change it.
+  const canWrite = useCan('otlist:write');
   const [activeTab, setActiveTab] = useState<OTType>('Major');
 
   // Resolve the effective unit: admin's picker selection takes priority over
@@ -350,6 +355,8 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+  // No sensors = nothing can be dragged. Used for roles that may not change the list.
+  const noSensors = useSensors();
 
   // Filter pending patients for import (not yet in the current tab's list)
   const pendingPatients = patients.filter(p =>
@@ -807,6 +814,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         </div>
       )}
 
+      {!canWrite && <ViewOnlyNote />}
+
+      <WriteArea permission="otlist:write" quiet>
       {/* List Meta — Surgeon / Unit / Time (editable, used in exports) */}
       <div className="bg-surface-card rounded-xl border border-line shadow-sm p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
@@ -849,6 +859,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           />
         </div>
       </div>
+      </WriteArea>
 
       {/* Tabs. Judgment call: EOT's active-tab text was hardcoded text-red-600 — kept as a
           vital-critical mapping (not accent) because EOT = Emergency OT, a real urgency
@@ -886,6 +897,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
             hardcoded text-white here would go illegible-white-on-white. bg-accent/accent-pressed is
             guaranteed dark in both themes and is the standard safe pairing with text-white. */}
       <div className="flex flex-wrap gap-3">
+        {canWrite && (<>
         <button
           onClick={handleAddManualEntry}
           className="flex items-center gap-2 px-4 py-2 bg-surface-sunken text-ink rounded-lg hover:bg-surface transition-colors border border-line"
@@ -901,6 +913,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           <RefreshCw className="w-4 h-4" />
           Clear List
         </button>
+        </>)}
 
         <div className="ml-auto flex gap-2">
             <button
@@ -923,7 +936,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
 
       {/* OT List Table + Pending Panel with Drag and Drop */}
       <DndContext
-        sensors={sensors}
+        sensors={canWrite ? sensors : noSensors}
         collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -932,19 +945,24 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
       >
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           <div className="flex-1 min-w-0 bg-surface-card rounded-xl shadow-sm border border-line overflow-hidden">
-            <OTListTable
-              activeTab={activeTab}
-              groupedItems={groupedItems}
-              onUpdateEntry={handleUpdateEntry}
-              onRemove={handleRemove}
-              dragOverCategory={dragOverCategory}
-            />
+            {/* No blockTaps here: the table scrolls sideways and must stay readable. */}
+            <WriteArea permission="otlist:write" quiet>
+              <OTListTable
+                activeTab={activeTab}
+                groupedItems={groupedItems}
+                onUpdateEntry={handleUpdateEntry}
+                onRemove={handleRemove}
+                dragOverCategory={dragOverCategory}
+              />
+            </WriteArea>
           </div>
 
           {/* Tablet/desktop: persistent inline panel */}
-          <div className="hidden lg:block">
-            <PendingSurgeryPanel pendingPatients={pendingPatients} onAssign={handleAssignPatient} />
-          </div>
+          {canWrite && (
+            <div className="hidden lg:block">
+              <PendingSurgeryPanel pendingPatients={pendingPatients} onAssign={handleAssignPatient} />
+            </div>
+          )}
         </div>
 
         <DragOverlay>
@@ -966,6 +984,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
           bottom uses --fab-bottom (index.css) instead of a fixed Tailwind
           offset so it clears App.tsx's fixed mobile bottom-nav bar, which
           renders after this and would otherwise paint over most of it. */}
+      {canWrite && (
       <button
         onClick={() => setMobileOpen(true)}
         className="lg:hidden fixed right-6 z-40 flex items-center gap-2 px-4 py-3 bg-accent text-white rounded-full shadow-lg"
@@ -974,6 +993,7 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
         <UserPlus className="w-5 h-5" />
         Pending ({pendingPatients.length})
       </button>
+      )}
 
       {mobileOpen && (
         <div
