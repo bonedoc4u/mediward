@@ -10,11 +10,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
-import path from 'path';
+import { migrationFiles, migrationPath } from './helpers/migrations';
 
-const DIR = path.join(__dirname, '..', 'supabase', 'migrations');
-const sql = fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f)).sort()
-  .map(f => fs.readFileSync(path.join(DIR, f), 'utf-8').replace(/--.*$/gm, '')).join('\n');
+const sql = migrationFiles()
+  .map(f => fs.readFileSync(migrationPath(f), 'utf-8').replace(/--.*$/gm, '')).join('\n');
 
 describe('rounds.updated_at', () => {
   it('a migration adds the column that the rounds_updated_at trigger writes to', () => {

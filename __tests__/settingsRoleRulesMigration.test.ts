@@ -11,14 +11,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
-import path from 'path';
 import { ROLE_PERMISSIONS, type Permission } from '../utils/permissions';
 import type { UserRole } from '../types';
+import { migrationPath } from './helpers/migrations';
 
-const DIR = path.join(__dirname, '..', 'supabase', 'migrations');
 const FILE = '20261114150000_settings_tables_role_rules.sql';
 const stripComments = (text: string) => text.replace(/--.*$/gm, '');
-const sql = stripComments(fs.readFileSync(path.join(DIR, FILE), 'utf-8'));
+const sql = stripComments(fs.readFileSync(migrationPath(FILE), 'utf-8'));
 
 interface Rule { permission: string; updateAlso: string | null }
 /** table → rule, from the VALUES list in the migration. */
