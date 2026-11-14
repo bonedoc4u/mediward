@@ -69,14 +69,14 @@ supabase db dump --project-ref $PROD_PROJECT_REF -f backup-$(date +%Y%m%d-%H%M%S
 
 ### Step 1 — Write the rollback migration
 
-Copy the appropriate template from `supabase/migrations/rollback_templates.sql`
+Copy the appropriate template from `supabase/rollback_templates.sql`
 and save as a new migration file:
 
 ```bash
 # Name format: timestamp_rollback_<description>.sql
 supabase migration new rollback_add_unit_column
 # Opens: supabase/migrations/YYYYMMDDHHMMSS_rollback_add_unit_column.sql
-# Paste the rollback SQL from rollback_templates.sql
+# Paste the rollback SQL from supabase/rollback_templates.sql
 ```
 
 ### Step 2 — Test the rollback on staging FIRST

@@ -1,4 +1,4 @@
--- rollback_templates.sql
+-- supabase/rollback_templates.sql (kept outside migrations/ so it is never applied)
 -- Copy-paste templates for the 3 most common rollback scenarios.
 -- NEVER run this file directly. Copy the relevant section into a new migration
 -- named YYYYMMDDHHMMSS_rollback_<description>.sql and apply with supabase db push.
