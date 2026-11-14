@@ -20,6 +20,7 @@ import UnitPicker from './components/UnitPicker';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationCenter from './components/NotificationCenter';
 import AssistantButton from './components/AssistantButton';
+import { CLINICAL_ASSISTANT_ENABLED } from './utils/features';
 import GlobalSearch from './components/GlobalSearch';
 import WardSkeleton from './components/WardSkeleton';
 import ToastContainer from './components/ToastContainer';
@@ -740,7 +741,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-1">
             <GlobalSearch />
-            <AssistantButton tone="dark" onClick={openAssistant} />
+            {CLINICAL_ASSISTANT_ENABLED && <AssistantButton tone="dark" onClick={openAssistant} />}
             <NotificationCenter />
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}>
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -917,7 +918,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <GlobalSearch />
-                <AssistantButton tone="light" onClick={openAssistant} />
+                {CLINICAL_ASSISTANT_ENABLED && <AssistantButton tone="light" onClick={openAssistant} />}
                 <NotificationCenter />
               </div>
             </div>
@@ -971,8 +972,8 @@ const App: React.FC = () => {
 
       {/* ─── AI Assistant ─── */}
       {/* Opened from the header button. Its code is downloaded on first use,
-          not on every page load. */}
-      {assistantUsed && (
+          not on every page load. Switched off for now (utils/features.ts). */}
+      {CLINICAL_ASSISTANT_ENABLED && assistantUsed && (
         <ErrorBoundary fallbackMessage="AI Assistant encountered an error.">
           <Suspense fallback={null}>
             <AiClinicalAssistant patients={patients} open={assistantOpen} onClose={() => setAssistantOpen(false)} />
