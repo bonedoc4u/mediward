@@ -6,7 +6,6 @@
 
 import { supabase } from '../lib/supabase';
 import { DailyRound, ToDoItem } from '../types';
-import { enqueue } from './syncQueue';
 
 interface RoundRow {
   id: string;
@@ -58,7 +57,8 @@ export async function fetchCurrentRound(
 /**
  * Insert or update today's round note for a patient.
  * Uses (patient_ip_no, date) as the conflict key — safe to call repeatedly.
- * This is the simple last-write-wins version used by the offline queue replay.
+ * This is the simple last-write-wins version. Throws when the server did not
+ * accept the write — it does NOT queue the round for retry itself.
  */
 export async function upsertRound(
   patientIpNo: string,
@@ -75,10 +75,9 @@ export async function upsertRound(
   const { error } = await supabase
     .from('rounds')
     .upsert(payload, { onConflict: 'patient_ip_no,date' });
-  if (error) {
-    enqueue('upsert_round', payload);
-    throw new Error(`upsertRound(${patientIpNo}): ${error.message}`);
-  }
+  // Queueing for retry is the caller's job (PatientContext.saveRound). This
+  // used to enqueue here as well, so every failed save was queued twice.
+  if (error) throw new Error(`upsertRound(${patientIpNo}): ${error.message}`);
 }
 
 /**
