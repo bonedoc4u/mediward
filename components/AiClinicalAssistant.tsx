@@ -3,18 +3,13 @@ import { Patient, PatientStatus } from '../types';
 import { X, Loader2, AlertTriangle, CheckCircle, Brain, RefreshCw, Zap, Cpu } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useConfig } from '../contexts/AppContext';
+import { buildAiPayload, attachNames, AiAlert as BaseAiAlert } from '../utils/aiPayload';
 
 interface Props {
   patients: Patient[];
 }
 
-interface AiAlert {
-  bed: string;
-  patientName: string;
-  category: 'Diabetic Care' | 'Infection Control' | 'Pending Work' | 'Other';
-  message: string;
-  priority: 'High' | 'Medium' | 'Low';
-}
+type AiAlert = BaseAiAlert & { category: 'Diabetic Care' | 'Infection Control' | 'Pending Work' | 'Other' | string };
 
 /**
  * Rule-based clinical alert engine.
@@ -288,51 +283,11 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
   const generateInsights = useCallback(async () => {
     setLoading(true);
     setAlerts(null);
-    const today = new Date();
 
     try {
-      // Build a sanitised patient summary payload (no raw PHI beyond clinical need)
-      const summaries = patients
-        .filter(p => p.patientStatus !== PatientStatus.Discharged)
-        .map(p => {
-          const vitals = Array.isArray(p.vitals) ? p.vitals : [];
-          const latest = vitals[0];
-          const doa = new Date(p.doa);
-          const daysAdmitted = Math.max(0, Math.floor((today.getTime() - doa.getTime()) / 86_400_000));
-          const recentLabs = (Array.isArray(p.labResults) ? p.labResults : [])
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .slice(0, 8)
-            .map(l => ({ type: l.type, value: l.value, date: l.date }));
-          const lastRound = (Array.isArray(p.dailyRounds) ? p.dailyRounds : [])
-            .sort((a, b) => b.date.localeCompare(a.date))[0];
-
-          return {
-            bed: p.bed,
-            name: p.name,
-            age: p.age,
-            diagnosis: p.diagnosis,
-            comorbidities: Array.isArray(p.comorbidities) ? p.comorbidities : [],
-            procedure: p.procedure,
-            daysAdmitted,
-            pod: p.pod,
-            pacStatus: p.pacStatus,
-            patientStatus: p.patientStatus,
-            latestVitals: latest ? {
-              bp: latest.bpSystolic != null && latest.bpDiastolic != null
-                ? `${latest.bpSystolic}/${latest.bpDiastolic}`
-                : undefined,
-              hr: latest.heartRate,
-              temp: latest.temperature,
-              spo2: latest.spo2,
-              rr: latest.respiratoryRate,
-              news2Score: latest.news2Score,
-            } : undefined,
-            recentLabs,
-            pendingTodos: (Array.isArray(p.todos) ? p.todos : [])
-              .filter(t => !t.isDone).map(t => t.task),
-            lastRoundNote: lastRound?.note?.slice(0, 200),
-          };
-        });
+      // No names or IP numbers leave the phone: patients go as "Patient 1"…
+      // and the names are put back on the answer (utils/aiPayload.ts).
+      const { summaries, keys } = buildAiPayload(patients);
 
       // Try Gemini Edge Function first
       let usedGemini = false;
@@ -353,7 +308,7 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
 
         const json = await res.json();
         if (res.ok && Array.isArray(json.alerts) && !json.fallback) {
-          setAlerts(json.alerts as AiAlert[]);
+          setAlerts(attachNames(json.alerts, keys));
           usedGemini = true;
           setAiMode('gemini');
         }

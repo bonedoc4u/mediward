@@ -1,8 +1,12 @@
 // @ts-nocheck — Deno runtime; types not available in the Node/tsc toolchain
 /**
  * clinical-insights — Supabase Edge Function
- * Receives a sanitised patient context (no raw PHI beyond what's needed)
- * and calls the Google Gemini API to produce structured clinical alerts.
+ * Receives a sanitised patient context and calls the Google Gemini API to
+ * produce structured clinical alerts.
+ *
+ * Privacy (audit SEC-05): patients arrive as "Patient 1", "Patient 2"… with
+ * no name, IP number, mobile or ABHA ID (built in utils/aiPayload.ts). The
+ * prompt uses only that reference; the app puts names back on the alerts.
  *
  * Environment variables required (set via Supabase Dashboard → Settings → Edge Functions):
  *   GEMINI_API_KEY  — Google AI Studio API key (server-side only, never in client bundle)
@@ -48,7 +52,10 @@ const RATE_LIMIT_MAX       = 10;      // max requests per user per window
 
 interface PatientSummary {
   bed: string;
-  name: string;
+  /** "Patient 1"… Never a real name. */
+  ref?: string;
+  /** Older apps send the real name here; newer ones send the reference. Never used. */
+  name?: string;
   age: number;
   diagnosis: string;
   comorbidities: string[];
@@ -83,7 +90,9 @@ function sanitizePatient(p: PatientSummary): PatientSummary {
   return {
     ...p,
     bed:          sanitizeForPrompt(String(p.bed ?? '')),
-    name:         sanitizeForPrompt(String(p.name ?? '')),
+    // The reference only. A name, if an older app still sends one, is dropped.
+    ref:          /^Patient \d{1,3}$/.test(String(p.ref ?? p.name ?? '')) ? String(p.ref ?? p.name) : 'Patient ?',
+    name:         undefined,
     diagnosis:    sanitizeForPrompt(String(p.diagnosis ?? '')),
     procedure:    p.procedure  ? sanitizeForPrompt(p.procedure)  : undefined,
     comorbidities: (p.comorbidities ?? []).map(c => sanitizeForPrompt(String(c))),
@@ -110,7 +119,7 @@ function buildPrompt(patients: PatientSummary[], department: string): string {
       : 'None';
     const meds = p.medications?.length ? p.medications.join(', ') : 'Not documented';
 
-    return `Bed ${p.bed}: ${p.name}, ${p.age}y — ${p.diagnosis}${p.comorbidities.length ? ` | Comorbidities: ${p.comorbidities.join(', ')}` : ''}
+    return `${p.ref} (bed ${p.bed}), ${p.age}y — ${p.diagnosis}${p.comorbidities.length ? ` | Comorbidities: ${p.comorbidities.join(', ')}` : ''}
   Day ${p.daysAdmitted} | POD ${p.pod ?? 'N/A'} | PAC: ${p.pacStatus} | Status: ${p.patientStatus}
   Vitals: ${vitals}
   Labs: ${labs}
@@ -137,7 +146,7 @@ OUTPUT FORMAT (strict JSON array):
 [
   {
     "bed": "string",
-    "patientName": "string",
+    "patientName": "the reference exactly as given, e.g. Patient 3",
     "category": "NEWS2 Alert" | "Diabetic Care" | "Infection Control" | "Post-Op" | "Pending Work" | "Lab Alert" | "Other",
     "message": "string (max 120 chars, actionable imperative)",
     "priority": "High" | "Medium" | "Low"
