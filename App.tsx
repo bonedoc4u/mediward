@@ -49,6 +49,7 @@ const AdminSettings = lazy(() => import('./components/AdminSettings'));
 const StatusPage = lazy(() => import('./components/StatusPage'));
 const AdmissionList = lazy(() => import('./components/AdmissionList'));
 import OfflineBanner from './components/OfflineBanner';
+import WriteArea from './src/features/permissions/WriteArea';
 import { NetworkBanner } from './components/NetworkBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import SwUpdateBanner from './components/SwUpdateBanner';
@@ -631,19 +632,20 @@ const App: React.FC = () => {
         return (
           <RadiologyComparator
             patients={patients}
-            onAddInvestigation={addInvestigation}
-            onDeleteInvestigation={deleteInvestigation}
+            onAddInvestigation={can(user, 'investigations:write') ? addInvestigation : undefined}
+            onDeleteInvestigation={can(user, 'investigations:write') ? deleteInvestigation : undefined}
             initialPatientId={navParams.id || ''}
           />
         );
       case 'labs':
-        return <LabTrends patients={patients} onAddResult={addLabResult} initialPatientId={navParams.id || ''} />;
+        return <LabTrends patients={patients} onAddResult={can(user, 'labs:write') ? addLabResult : undefined} initialPatientId={navParams.id || ''} />;
       case 'rounds':
         return <DailyRounds patients={patients} onUpdatePatient={updatePatient} onSaveRound={saveRound} />;
       case 'team':
         return <TeamManagement onOpenSuperAdmin={user?.role === 'superadmin' ? () => { setViewingHospital(null); setSuperAdminMode(true); } : undefined} />;
       case 'pac':
-        return <PacManagement patients={patients} onUpdatePatient={updatePatient} />;
+        // Every control on this screen changes PAC data, so the whole screen is one write area.
+        return <WriteArea permission="pac:write" blockTaps><PacManagement patients={patients} onUpdatePatient={updatePatient} /></WriteArea>;
       case 'preop':
         return <PreOpPrep patients={patients} onUpdatePatient={updatePatient} />;
       case 'otlist':
@@ -668,17 +670,17 @@ const App: React.FC = () => {
             onViewPatient={(ipNo: string) => { setLastViewedPatient(ipNo); navigateTo(currentView, { id: ipNo }); }}
             highlightIpNo={highlightIpNo}
             onStartRounds={() => navigateTo('round-mode')}
-            onAddLab={async (ipNo, type, value, date) => {
+            onAddLab={can(user, 'labs:write') ? async (ipNo, type, value, date) => {
               addLabResult(ipNo, { id: crypto.randomUUID(), date, type, value });
-            }}
-            onAssignDate={(ipNo, plannedDos) => {
+            } : undefined}
+            onAssignDate={can(user, 'patient:edit') ? (ipNo, plannedDos) => {
               const patient = patients.find(p => p.ipNo === ipNo);
               if (patient) updatePatient({ ...patient, plannedDos });
-            }}
-            onClearDate={(ipNo) => {
+            } : undefined}
+            onClearDate={can(user, 'patient:edit') ? (ipNo) => {
               const patient = patients.find(p => p.ipNo === ipNo);
               if (patient) updatePatient({ ...patient, plannedDos: undefined });
-            }}
+            } : undefined}
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
             onLoadMore={loadMorePatients}

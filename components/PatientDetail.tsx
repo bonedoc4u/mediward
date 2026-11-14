@@ -27,6 +27,7 @@ import StickyPatientHeader from './patient/StickyPatientHeader';
 import MoveBedSheet from './patient/MoveBedSheet';
 import ReferralLetter from './ReferralLetter';
 import { logAuditEvent } from '../services/auditLog';
+import WriteArea from '../src/features/permissions/WriteArea';
 const MedicationChart  = lazy(() => import('./MedicationChart'));
 const NursingNotes     = lazy(() => import('./NursingNotes'));
 const IntakeOutput     = lazy(() => import('./IntakeOutput'));
@@ -103,6 +104,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
   const canDischarge = can(user, 'patient:discharge');
   const canDelete    = can(user, 'patient:delete');
   const canEdit      = can(user, 'patient:edit');
+  const canRound     = can(user, 'rounds:write');
 
   const patient = useMemo(() => patients.find(p => p.ipNo === effectiveId), [patients, effectiveId]);
 
@@ -380,7 +382,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       <RoundNotesTimeline
         rounds={patient.dailyRounds}
         today={today}
-        onWriteToday={canEdit ? () => { startRoundAt(patient); navigateTo('round-mode'); } : undefined}
+        onWriteToday={canRound ? () => { startRoundAt(patient); navigateTo('round-mode'); } : undefined}
       />
 
       {/* ─── ORDERS — open ones first, with how long each has been open ── */}
@@ -594,7 +596,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Medication chart failed to load.">
             <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
-              <MedicationChart patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} drugAllergies={patient.drugAllergies ?? []} />
+              <WriteArea permission="charting:write"><MedicationChart patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} drugAllergies={patient.drugAllergies ?? []} /></WriteArea>
             </Suspense>
           </ErrorBoundary>
         </div>
@@ -603,7 +605,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Nursing notes failed to load.">
             <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
-              <NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} />
+              <WriteArea permission="charting:write"><NursingNotes patientIpNo={patient.ipNo} hospitalId={user?.hospitalId ?? ''} /></WriteArea>
             </Suspense>
           </ErrorBoundary>
         </div>
@@ -612,7 +614,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Intake/Output chart failed to load.">
             <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
-              <IntakeOutput patientIpNo={patient.ipNo} />
+              <WriteArea permission="charting:write"><IntakeOutput patientIpNo={patient.ipNo} /></WriteArea>
             </Suspense>
           </ErrorBoundary>
         </div>
@@ -621,7 +623,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Blood transfusion records failed to load.">
             <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
-              <BloodTransfusion patientIpNo={patient.ipNo} />
+              <WriteArea permission="charting:write"><BloodTransfusion patientIpNo={patient.ipNo} /></WriteArea>
             </Suspense>
           </ErrorBoundary>
         </div>
@@ -630,7 +632,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <div className="bg-surface-card rounded-b-2xl shadow-sm border border-t-0 border-line p-5">
           <ErrorBoundary fallbackMessage="Wound care records failed to load.">
             <Suspense fallback={<div className="text-center py-8 text-ink-faint text-sm">Loading…</div>}>
-              <WoundCare patientIpNo={patient.ipNo} />
+              <WriteArea permission="charting:write"><WoundCare patientIpNo={patient.ipNo} /></WriteArea>
             </Suspense>
           </ErrorBoundary>
         </div>

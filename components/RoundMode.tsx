@@ -22,6 +22,7 @@ import RoundNoteCard from '../src/features/rounds/RoundNoteCard';
 import RoundActionBar from '../src/features/rounds/RoundActionBar';
 import AllergyLine from '../src/features/rounds/AllergyLine';
 import { useRoundNote } from '../src/features/rounds/useRoundNote';
+import WriteArea from '../src/features/permissions/WriteArea';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
@@ -736,6 +737,9 @@ const RoundMode: React.FC = () => {
           {/* Management Plan — resident selects during rounds */}
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-bold text-ink-muted uppercase tracking-wider shrink-0">Plan</span>
+            {/* Plan and discharge-ready change the patient record: editors only. The
+                selected choice stays readable for everyone. */}
+            <WriteArea permission="patient:edit" quiet className="[&_button:disabled]:cursor-not-allowed">
             <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => updatePatient({ ...patient, management: 'surgical_fixation' as ManagementPlan })}
@@ -787,6 +791,7 @@ const RoundMode: React.FC = () => {
                 {patient.patientStatus === PatientStatus.DischargeReady ? 'Discharge Ready ✓' : 'Discharge Ready'}
               </button>
             </div>
+            </WriteArea>
           </div>
 
           {/* Comorbidities */}
@@ -835,6 +840,7 @@ const RoundMode: React.FC = () => {
                 </p>
                 {isSaved && <span className="text-vital-normal-fg text-xs font-semibold">· Saved ✓</span>}
               </div>
+              <WriteArea permission="pac:write" quiet blockTaps>
               <PacFlowChart
                 pacFlow={patient.pacFlow}
                 patientIpNo={patient.ipNo}
@@ -849,6 +855,7 @@ const RoundMode: React.FC = () => {
                   updatePatient({ ...patient, pacFlow: updated, pacStatus: newPacStatus });
                 }}
               />
+              </WriteArea>
             </div>
           )}
 

@@ -31,7 +31,7 @@ import {
   type QueuedOp, type QueuedOpType,
 } from '../../services/syncQueue';
 import {
-  replaySimpleOp, drainQueue, isSimpleOp, isAuthError, isNetworkError,
+  replaySimpleOp, drainQueue, isSimpleOp, isAuthError, isNetworkError, isRoleRefusal,
 } from '../../services/syncReplay';
 
 const ROUND = {
@@ -271,5 +271,47 @@ describe('replaying a queued round note', () => {
     await drainQueue(replaySimpleOp);
     expect(mockState.rpcCalls).toHaveLength(0);
     expect(mockState.calls).toEqual([{ table: 'rounds', method: 'upsert', payload: ROUND }]);
+  });
+});
+
+// Audit SEC-06: a change the database refuses because of the user's role gets
+// the same answer every time. It must not use five retries, and it must not
+// vanish: it goes to the dead-letter queue at once, where it is shown.
+describe('drainQueue — refused because of the role', () => {
+  const ROLE = 'ROLE_FORBIDDEN: role attending may not write to patient_vitals';
+
+  it('recognises the database\'s role error', () => {
+    expect(isRoleRefusal(new Error(`insert_vital: ${ROLE}`))).toBe(true);
+    expect(isRoleRefusal({ code: '42501', message: ROLE })).toBe(true);
+  });
+
+  // A plain row-level-security refusal also happens with a stale session (no
+  // hospital resolved). A new sign-in cures that, so it must keep its retries.
+  it.each([
+    ['new row violates row-level security policy for table "labs"'],
+    ['Failed to fetch'], ['JWT expired'], ['duplicate key value violates unique constraint'],
+  ])('does not mistake "%s" for a role refusal', message => {
+    expect(isRoleRefusal(new Error(message))).toBe(false);
+  });
+
+  it('moves the change to the dead-letter queue on the first refusal and goes on with the rest', async () => {
+    enqueue('insert_vital', { patient_ip_no: 'TEST-001' });
+    enqueue('upsert_round', ROUND);
+    const tried: string[] = [];
+
+    const result = await drainQueue(async op => {
+      tried.push(op.type);
+      if (op.type === 'insert_vital') throw new Error(`insert_vital: ${ROLE}`);
+    });
+
+    expect(tried).toEqual(['insert_vital', 'upsert_round']);          // the refusal did not stop the queue
+    expect(result.synced).toBe(1);
+    expect(result.stoppedBy).toBeNull();
+    expect(result.dropped).toEqual([{ opType: 'insert_vital', label: undefined, reason: 'role' }]);
+    expect(getQueue()).toHaveLength(0);                               // not left to retry five times
+    const dead = getDeadLetterQueue();
+    expect(dead).toHaveLength(1);                                     // and not lost
+    expect(dead[0]).toMatchObject({ type: 'insert_vital', attempts: 0 });
+    expect(dead[0].reason).toContain('role_forbidden');
   });
 });

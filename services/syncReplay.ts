@@ -16,7 +16,7 @@
 
 import { supabase } from '../lib/supabase';
 import {
-  QueuedOp, QueuedOpType, getRetryableQueue, dequeue, incrementAttempts,
+  QueuedOp, QueuedOpType, getRetryableQueue, dequeue, incrementAttempts, moveToDeadLetter,
 } from './syncQueue';
 import { saveRoundChecked, toColumns, type RoundRowWrite } from './roundsService';
 import { combineNotes } from '../src/features/rounds/roundNotes';
@@ -39,6 +39,20 @@ export function isNetworkError(err: unknown): boolean {
     || msg.includes('load failed')
     || msg.includes('networkerror')
     || msg.includes('network request failed');
+}
+
+/**
+ * Returns true when the database refused the write because of the user's
+ * ROLE. The role rules in the database raise an error that starts with
+ * ROLE_FORBIDDEN; sending the same change again cannot succeed.
+ *
+ * A plain "row-level security" refusal is deliberately NOT counted: that one
+ * also happens for a stale session (no hospital resolved), which a new
+ * sign-in cures. Those keep the normal retry path.
+ */
+export function isRoleRefusal(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String((err as { message?: unknown } | null)?.message ?? err);
+  return msg.toLowerCase().includes('role_forbidden');
 }
 
 /** Queue op types that are a single insert/upsert into one table. */
@@ -121,8 +135,11 @@ export interface DrainResult {
    *  - 'network' — a request never reached the server; the rest would fail the same way.
    */
   stoppedBy: 'auth' | 'network' | null;
-  /** Changes the server refused more than MAX_ATTEMPTS times; now in the dead-letter queue. */
-  dropped: Array<{ opType?: QueuedOpType; label?: string }>;
+  /**
+   * Changes now in the dead-letter queue: refused more than MAX_ATTEMPTS
+   * times, or refused once because of the user's role (`reason: 'role'`).
+   */
+  dropped: Array<{ opType?: QueuedOpType; label?: string; reason?: 'role' }>;
 }
 
 /**
@@ -135,6 +152,8 @@ export interface DrainResult {
  *                           A dead connection says nothing about the change
  *                           itself, so it must never push it towards the
  *                           dead-letter queue.
+ *  - refused for the role → straight to the dead-letter queue. The answer
+ *                           will be the same every time, so no retries.
  *  - refused by server    → kept with backoff; after MAX_ATTEMPTS it moves to
  *                           the dead-letter queue (still on the phone, shown
  *                           in Settings → Advanced) and is reported in `dropped`.
@@ -156,6 +175,11 @@ export async function drainQueue(execute: (op: QueuedOp) => Promise<void>): Prom
       if (isNetworkError(err)) {
         result.stoppedBy = 'network';
         break;
+      }
+      if (isRoleRefusal(err)) {
+        const moved = moveToDeadLetter(op.id, 'role_forbidden: the signed-in role may not make this change');
+        if (moved) result.dropped.push({ ...moved, reason: 'role' });
+        continue;
       }
       const { dropped, opType, label } = incrementAttempts(op.id, err);
       if (dropped) result.dropped.push({ opType, label });
