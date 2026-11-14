@@ -2,6 +2,9 @@
 # Local dev + CI config. Production settings are set in the Supabase dashboard.
 # Run `supabase start` to boot local Postgres, Auth, Storage, and Edge Functions.
 
+# Fixes the local container names (supabase_db_mediward); CI relies on it.
+project_id = "mediward"
+
 [api]
 enabled      = true
 port         = 54321
@@ -15,7 +18,12 @@ enabled = false
 [db]
 port         = 54322
 shadow_port  = 54320
-major_version = 15
+major_version = 17
+
+# seed.sql is out of date (old roles and columns) and is switched off until
+# it is rewritten for the baseline; a local database starts empty meanwhile.
+[db.seed]
+enabled = false
 
 [db.pooler]
 enabled          = false

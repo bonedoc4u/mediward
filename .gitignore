@@ -19,3 +19,4 @@ yarn.lock
 
 # Vitest coverage report output
 coverage/
+supabase/.branches/

@@ -1,0 +1,57 @@
+# .github/workflows/db-rebuild.yml
+#
+# Builds a blank database from supabase/migrations/ (the production baseline
+# plus every later migration) and checks it is as safe as production:
+# row-level security on every table, nothing callable by signed-out users,
+# no direct audit-log writes, private hospital-scoped scan storage.
+#
+# Why (SEC-03 / OPS-01, 14 Nov 2026): the repo used to be unable to rebuild
+# production. This keeps it able to. It never touches production or dev:
+# the database lives inside the CI runner and is thrown away.
+
+name: Database rebuild
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - 'scripts/check-rebuilt-database.sql'
+      - '.github/workflows/db-rebuild.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - 'scripts/check-rebuilt-database.sql'
+      - '.github/workflows/db-rebuild.yml'
+
+concurrency:
+  group: db-rebuild-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    name: Rebuild from migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Build a blank database from the migrations
+        run: supabase db start
+
+      - name: Check it is as safe as production
+        run: docker exec -i supabase_db_mediward psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/check-rebuilt-database.sql
+
+      - name: Stop
+        if: always()
+        run: supabase stop --no-backup || true
