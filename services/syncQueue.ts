@@ -8,6 +8,9 @@
  *  - Failed ops are retried with exponential backoff (2^attempt seconds).
  *  - After MAX_ATTEMPTS, the op is dropped and incrementAttempts() returns
  *    { dropped: true } so the caller can surface a user-facing error.
+ *  - Every op belongs to the user who made it (userId). Replay, counts and
+ *    deduplication only see the signed-in user's ops. Another user's ops stay
+ *    on the phone, untouched, until that user signs in here again.
  *
  * Storage strategy (iOS WKWebView fix):
  *  - @capacitor/preferences (UserDefaults on iOS) is the durable store.
@@ -39,6 +42,15 @@ export interface QueuedOp {
   queuedAt: string;
   attempts: number;
   nextRetryAt?: string;
+  /** Who made this change. Missing only on ops queued before owners existed. */
+  userId?: string;
+  /** That user's display name, so the next person can be told whose changes wait. */
+  userName?: string;
+}
+
+export interface QueueOwner {
+  id: string;
+  name?: string;
 }
 
 const QUEUE_KEY = 'mediward_sync_queue';
@@ -58,6 +70,41 @@ let _cache: QueuedOp[] = [];
 let _dlq: DeadLetterOp[] = [];
 let _seq = 0;
 let _initialized = false;
+
+// ─── Owner (audit DATA-05) ───────────────────────────────────────────────────
+// The queue used to belong to nobody: doctor A's unsent changes were sent
+// under whoever signed in next on the same phone.
+let _owner: QueueOwner | null = null;
+// A save that fails just after sign-out (e.g. inactivity logout mid-request)
+// is still that user's change, so the last owner is remembered for stamping.
+let _lastOwner: QueueOwner | null = null;
+
+const _isMine = (op: QueuedOp): boolean => (op.userId ?? null) === (_owner?.id ?? null);
+
+/**
+ * Tell the queue who is signed in (null = nobody). Call on every sign-in and
+ * sign-out, before any replay.
+ *
+ * Ops with no owner (queued by a version before owners existed) are adopted
+ * by the first user who signs in. That is what the old code did for every op;
+ * here it happens once, so no queued change is lost by the upgrade.
+ */
+export function setQueueOwner(owner: QueueOwner | null): void {
+  _owner = owner;
+  if (!owner) return;
+  _lastOwner = owner;
+  if (_cache.some(op => !op.userId)) {
+    _persist(_cache.map(op => (op.userId ? op : { ...op, userId: owner.id, userName: owner.name })));
+  }
+}
+
+/** Unsent changes on this phone that belong to someone other than the signed-in user. */
+export function getOtherUsersPending(): { count: number; names: string[] } {
+  if (!_owner) return { count: 0, names: [] };
+  const others = _cache.filter(op => !_isMine(op));
+  const names = [...new Set(others.map(op => op.userName).filter((n): n is string => !!n))];
+  return { count: others.length, names };
+}
 
 // ─── Async initialisation — call once at app startup ─────────────────────────
 /**
@@ -131,14 +178,20 @@ function _persistDlq(dlq: DeadLetterOp[]): void {
 // ─── Public API (synchronous — uses in-memory cache) ─────────────────────────
 
 export function enqueue(type: QueuedOpType, payload: unknown): void {
+  _enqueueFor(_owner ?? _lastOwner, type, payload);
+}
+
+function _enqueueFor(owner: QueueOwner | null, type: QueuedOpType, payload: unknown): void {
   const queue = [..._cache];
+  const ownerId = owner?.id;
 
   // Deduplication: for upsert_patient, replace existing queued op for same patient
   if (type === 'upsert_patient' && payload && typeof payload === 'object') {
     const ipNo = (payload as Record<string, unknown>).ipNo as string | undefined;
     if (ipNo) {
       const idx = queue.findIndex(
-        op => op.type === 'upsert_patient' &&
+        // Only replace this user's own queued save — never another user's.
+        op => op.type === 'upsert_patient' && op.userId === ownerId &&
               (op.payload as Record<string, unknown>)?.ipNo === ipNo,
       );
       if (idx !== -1) {
@@ -154,7 +207,7 @@ export function enqueue(type: QueuedOpType, payload: unknown): void {
     const { patientId, result } = payload as { patientId?: string; result?: { type?: string; date?: string } };
     if (patientId && result?.type && result?.date) {
       const idx = queue.findIndex(op => {
-        if (op.type !== 'insert_lab') return false;
+        if (op.type !== 'insert_lab' || op.userId !== ownerId) return false;
         const p = op.payload as { patientId?: string; result?: { type?: string; date?: string } };
         return p?.patientId === patientId && p?.result?.type === result.type && p?.result?.date === result.date;
       });
@@ -184,20 +237,22 @@ export function enqueue(type: QueuedOpType, payload: unknown): void {
     payload,
     queuedAt: new Date().toISOString(),
     attempts: 0,
+    ...(owner ? { userId: owner.id, userName: owner.name } : {}),
   });
   _persist(queue);
 }
 
-/** Returns ops sorted by seq, filtered to those due for retry. */
+/** The signed-in user's ops, sorted by seq, filtered to those due for retry. */
 export function getRetryableQueue(): QueuedOp[] {
   const now = Date.now();
-  return [..._cache]
+  return _cache.filter(_isMine)
     .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
     .filter(op => !op.nextRetryAt || new Date(op.nextRetryAt).getTime() <= now);
 }
 
+/** The signed-in user's ops, including those still waiting for a retry. */
 export function getQueue(): QueuedOp[] {
-  return [..._cache].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+  return _cache.filter(_isMine).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
 }
 
 export function dequeue(id: string): void {
@@ -251,8 +306,9 @@ export function moveToDeadLetter(id: string, reason: string): { opType: QueuedOp
   return { opType: op.type, label };
 }
 
+/** How many unsent changes the signed-in user has. */
 export function getQueueSize(): number {
-  return _cache.length;
+  return _cache.filter(_isMine).length;
 }
 
 // ─── Dead-letter queue API ────────────────────────────────────────────────────
@@ -272,12 +328,12 @@ export function removeFromDeadLetterQueue(id: string): void {
   _persistDlq(_dlq.filter(o => o.id !== id));
 }
 
-/** Clears all pending ops from the main queue. */
+/** Clears all pending ops from the main queue — every user's (admin tool). */
 export function clearMainQueue(): void {
   _persist([]);
 }
 
-/** Returns the number of ops currently in the main queue. */
+/** Returns the number of ops on this phone — every user's (admin tool). */
 export function getMainQueueSize(): number {
   return _cache.length;
 }
@@ -287,5 +343,6 @@ export function retryDeadLetterOp(id: string): void {
   const op = _dlq.find(o => o.id === id);
   if (!op) return;
   _persistDlq(_dlq.filter(o => o.id !== id));
-  enqueue(op.type, op.payload);
+  // Keep the original owner: an admin pressing Retry must not become the author.
+  _enqueueFor(op.userId ? { id: op.userId, name: op.userName } : (_owner ?? _lastOwner), op.type, op.payload);
 }

@@ -40,7 +40,7 @@ import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
 import { saveRoundChecked, roundToRow, type RoundNoteStamp } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
-import { enqueue, getRetryableQueue, getQueue, getDeadLetterQueue, removeFromDeadLetterQueue, type QueuedOp } from '../services/syncQueue';
+import { enqueue, getRetryableQueue, getQueue, getDeadLetterQueue, removeFromDeadLetterQueue, setQueueOwner, type QueuedOp } from '../services/syncQueue';
 import { drainQueue, replaySimpleOp, isSimpleOp, isAuthError, isRoleRefusal } from '../services/syncReplay';
 import { can, canChangePatient, isOrdersOnlyChange, ORDER_COLUMNS, PERMISSION_DENIED_MESSAGE } from '../utils/permissions';
 import { queuePatientSave, readQueuedPatientSave } from '../services/patientSaveQueue';
@@ -311,6 +311,17 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       })
       .finally(() => setIsLoadingPatients(false));
   }, [user?.id, user?.unit, viewingHospitalId, selectedUnit]);
+
+  // ─── Offline Sync Queue — whose changes are these? (audit DATA-05) ───
+  // Unsent changes belong to the doctor who made them. This effect MUST stay
+  // above the one below that starts a replay on sign-in: effects run in the
+  // order they are written, and the replay must already see the new owner.
+  // Another user's waiting changes are shown by <OtherUsersPendingNotice />.
+  const queueOwnerId = user?.id;
+  const queueOwnerName = user?.name;
+  useEffect(() => {
+    setQueueOwner(queueOwnerId ? { id: queueOwnerId, name: queueOwnerName } : null);
+  }, [queueOwnerId, queueOwnerName]);
 
   // ─── Offline Sync Queue — replay on reconnect ───
   // Ref so the handler always reads the current user without a stale closure
