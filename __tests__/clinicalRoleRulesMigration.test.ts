@@ -19,12 +19,12 @@ import fs from 'fs';
 import path from 'path';
 import { ROLE_PERMISSIONS, type Permission } from '../utils/permissions';
 import type { UserRole } from '../types';
+import { migrationFiles, migrationPath, migrationsAfter } from './helpers/migrations';
 
 const ROOT = path.join(__dirname, '..');
-const DIR = path.join(ROOT, 'supabase', 'migrations');
 const FILE = '20261114120000_clinical_tables_role_rules.sql';
 const stripComments = (sql: string) => sql.replace(/--.*$/gm, '');
-const sql = stripComments(fs.readFileSync(path.join(DIR, FILE), 'utf-8'));
+const sql = stripComments(fs.readFileSync(migrationPath(FILE), 'utf-8'));
 
 /** table → permission, from the VALUES list in the migration. */
 const rules = new Map<string, string>(
@@ -132,8 +132,8 @@ describe('clinical tables: trigger and policies', () => {
   // replaced it with a version that takes several permissions.
   const fn = (() => {
     let body = '';
-    for (const file of fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f)).sort()) {
-      const text = stripComments(fs.readFileSync(path.join(DIR, file), 'utf-8'));
+    for (const file of migrationFiles()) {
+      const text = stripComments(fs.readFileSync(migrationPath(file), 'utf-8'));
       for (const m of text.matchAll(/CREATE OR REPLACE FUNCTION public\.enforce_role_permission\(\)[\s\S]*?AS \$\$([\s\S]*?)\$\$/g)) body = m[1];
     }
     return body;
@@ -186,9 +186,9 @@ describe('clinical tables: trigger and policies', () => {
   });
 
   it('no later migration adds a write policy without the role check to these tables', () => {
-    const later = fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f) && f > FILE);
+    const later = migrationsAfter(FILE);
     for (const file of later) {
-      const text = stripComments(fs.readFileSync(path.join(DIR, file), 'utf-8'));
+      const text = stripComments(fs.readFileSync(migrationPath(file), 'utf-8'));
       for (const st of text.split(';')) {
         const m = st.match(/CREATE POLICY\s+"?\w+"?\s+ON (?:public\.)?"?(\w+)"?/i);
         if (!m || !rules.has(m[1]) || /FOR SELECT/i.test(st)) continue;

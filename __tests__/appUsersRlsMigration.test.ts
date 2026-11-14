@@ -12,17 +12,16 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
-import path from 'path';
+import { migrationFiles, migrationPath } from './helpers/migrations';
 
-const DIR = path.join(__dirname, '..', 'supabase', 'migrations');
-const files = fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f)).sort();
+const files = migrationFiles();
 const stripComments = (sql: string) => sql.replace(/--.*$/gm, '');
 
 /** Final state of app_users policies after replaying every migration in order. */
 function finalAppUsersPolicies(): Map<string, string> {
   const policies = new Map<string, string>();
   for (const file of files) {
-    const sql = stripComments(fs.readFileSync(path.join(DIR, file), 'utf-8'));
+    const sql = stripComments(fs.readFileSync(migrationPath(file), 'utf-8'));
     const statements = sql.split(';').map(s => s.trim()).filter(Boolean);
     for (const st of statements) {
       const drop = st.match(/^DROP POLICY (?:IF EXISTS )?"?(\w+)"?\s+ON (?:public\.)?"?app_users"?/i);

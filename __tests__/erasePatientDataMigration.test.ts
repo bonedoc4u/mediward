@@ -6,19 +6,17 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import path from 'node:path';
+import { migrationPath, migrationsAfter } from './helpers/migrations';
 
-const DIR = path.resolve(__dirname, '../supabase/migrations');
 const FILE = '20261114180000_erase_patient_data.sql';
-const sql = fs.readFileSync(path.join(DIR, FILE), 'utf8');
+const sql = fs.readFileSync(migrationPath(FILE), 'utf8');
 // The function body only, without the header comment.
 const body = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.erase_patient_data'));
 
 describe('erase_patient_data migration', () => {
   it('is the last migration that defines the function', () => {
-    const later = fs.readdirSync(DIR)
-      .filter(f => f.endsWith('.sql') && f > FILE)
-      .filter(f => /FUNCTION\s+public\.erase_patient_data/i.test(fs.readFileSync(path.join(DIR, f), 'utf8')));
+    const later = migrationsAfter(FILE)
+      .filter(f => /FUNCTION\s+public\.erase_patient_data/i.test(fs.readFileSync(migrationPath(f), 'utf8')));
     expect(later, 'a later migration redefines erase_patient_data; move these checks there').toEqual([]);
   });
 

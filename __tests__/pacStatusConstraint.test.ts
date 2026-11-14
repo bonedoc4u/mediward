@@ -10,15 +10,14 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
-import path from 'path';
 import { PacStatus } from '../types';
+import { migrationFiles, migrationPath } from './helpers/migrations';
 
 // Mirrors production's chk_pac_status CHECK constraint exactly.
 const DB_ALLOWED_PAC_STATUS = ['PAC Fit', 'PAC Pending', 'PAC Unfit', 'PAC Review'];
 
-const DIR = path.join(__dirname, '..', 'supabase', 'migrations');
-const migrations = fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f)).sort()
-  .map(f => ({ file: f, sql: fs.readFileSync(path.join(DIR, f), 'utf-8').replace(/--.*$/gm, '') }));
+const migrations = migrationFiles()
+  .map(f => ({ file: f, sql: fs.readFileSync(migrationPath(f), 'utf-8').replace(/--.*$/gm, '') }));
 
 describe('patients.pac_status: app values vs database rules', () => {
   it('every PAC status the app can save is accepted by the database', () => {

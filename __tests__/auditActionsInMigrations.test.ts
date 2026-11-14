@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
-import path from 'path';
+import { migrationFiles, migrationPath } from './helpers/migrations';
 
 // Mirrors audit_log's chk_audit_action CHECK constraint exactly.
 const VALID_AUDIT_ACTIONS = new Set(['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'VIEW', 'EXPORT']);
@@ -28,16 +28,15 @@ const KNOWN_HISTORICAL_BUGS: Record<string, string> = {
   '20260728122118_safe_patient_ip_no_rename.sql': 'RENAME_IP_NO',
 };
 
-const MIGRATIONS_DIR = path.join(__dirname, '..', 'supabase', 'migrations');
 
 describe('audit actions referenced in SQL migrations', () => {
   it('every insert_audit_event(...) call uses a value chk_audit_action allows (or is a documented, already-superseded historical bug)', () => {
-    const files = fs.readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql'));
+    const files = migrationFiles();
     expect(files.length).toBeGreaterThan(0);
 
     const offenders: string[] = [];
     for (const file of files) {
-      const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf-8');
+      const sql = fs.readFileSync(migrationPath(file), 'utf-8');
       // Matches insert_audit_event('ACTION', ...) — the action is always the first arg.
       const matches = sql.matchAll(/insert_audit_event\(\s*'([^']+)'/g);
       for (const m of matches) {

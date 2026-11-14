@@ -6,13 +6,13 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { migrationPath, migrationsAfter } from './helpers/migrations';
 
-const DIR = path.resolve(__dirname, '../supabase/migrations');
 const FILE = '20261114200000_audit_log_no_direct_insert.sql';
 const strip = (sql: string) => sql.replace(/--.*$/gm, '');
 
 describe('audit_log direct-insert migration', () => {
-  const sql = strip(fs.readFileSync(path.join(DIR, FILE), 'utf8'));
+  const sql = strip(fs.readFileSync(migrationPath(FILE), 'utf8'));
 
   it('drops every insert rule on audit_log, whatever it is called', () => {
     expect(sql).toMatch(/tablename = 'audit_log' AND cmd IN \('INSERT', 'ALL'\)/);
@@ -24,9 +24,9 @@ describe('audit_log direct-insert migration', () => {
   });
 
   it('no later migration lets a signed-in user insert into audit_log again', () => {
-    const later = fs.readdirSync(DIR).filter(f => f.endsWith('.sql') && f > FILE);
+    const later = migrationsAfter(FILE);
     for (const f of later) {
-      const body = strip(fs.readFileSync(path.join(DIR, f), 'utf8'));
+      const body = strip(fs.readFileSync(migrationPath(f), 'utf8'));
       expect(body, f).not.toMatch(/CREATE POLICY[^;]*ON\s+(public\.)?"?audit_log"?[^;]*FOR\s+(INSERT|ALL)/i);
     }
   });

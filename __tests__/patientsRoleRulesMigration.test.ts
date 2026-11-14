@@ -13,14 +13,13 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
-import path from 'path';
 import { ROLE_PERMISSIONS, ORDER_COLUMNS, type Permission } from '../utils/permissions';
 import type { UserRole } from '../types';
+import { migrationFiles, migrationPath } from './helpers/migrations';
 
-const DIR = path.join(__dirname, '..', 'supabase', 'migrations');
-const files = fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f)).sort();
+const files = migrationFiles();
 const stripComments = (sql: string) => sql.replace(/--.*$/gm, '');
-const allSql = files.map(f => stripComments(fs.readFileSync(path.join(DIR, f), 'utf-8')));
+const allSql = files.map(f => stripComments(fs.readFileSync(migrationPath(f), 'utf-8')));
 
 /** Body of the LAST definition of a function across all migrations (later ones replace earlier ones). */
 function lastFunctionBody(name: string): string {

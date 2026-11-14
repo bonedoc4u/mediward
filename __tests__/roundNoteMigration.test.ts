@@ -5,12 +5,11 @@
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'fs';
-import path from 'path';
 import { ROUND_NOTE_MAX_LENGTH } from '../src/features/rounds/roundNotes';
+import { migrationFiles, migrationPath } from './helpers/migrations';
 
-const DIR = path.join(__dirname, '..', 'supabase', 'migrations');
-const sql = fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f)).sort()
-  .map(f => fs.readFileSync(path.join(DIR, f), 'utf-8').replace(/--.*$/gm, '')).join('\n');
+const sql = migrationFiles()
+  .map(f => fs.readFileSync(migrationPath(f), 'utf-8').replace(/--.*$/gm, '')).join('\n');
 
 describe('rounds.round_note migration', () => {
   it('adds the note and its author/time columns', () => {
