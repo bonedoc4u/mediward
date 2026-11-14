@@ -10,7 +10,7 @@ import { render, screen, act } from '@testing-library/react';
 import { Patient, PatientStatus, PacStatus, Gender, DailyRound } from '../../types';
 
 const mocks = vi.hoisted(() => ({
-  upsertRound: vi.fn(),
+  saveRoundChecked: vi.fn(),
   fetchActivePatientsPage: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), dismiss: vi.fn() },
 }));
@@ -36,7 +36,7 @@ vi.mock('../../services/patientService', async (importOriginal) => ({
 }));
 vi.mock('../../services/roundsService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../services/roundsService')>()),
-  upsertRound: mocks.upsertRound,
+  saveRoundChecked: mocks.saveRoundChecked,
 }));
 vi.mock('../../services/auditLog', () => ({ logAuditEvent: vi.fn() }));
 vi.mock('../../services/pushNotifications', () => ({
@@ -90,60 +90,87 @@ beforeEach(() => {
 
 describe('PatientContext.saveRound', () => {
   it("resolves 'saved' and shows the author the database recorded", async () => {
-    mocks.upsertRound.mockResolvedValue(STAMP);
+    mocks.saveRoundChecked.mockResolvedValue({ status: 'saved', stamp: STAMP });
     await renderWard();
 
-    let result: string | undefined;
+    let result: { status: string } | undefined;
     await act(async () => { result = await api.saveRound('TEST-01', { date: DATE, note: '# NOF', todos: [], roundNote: 'Wound dry.' }); });
 
-    expect(result).toBe('saved');
+    expect(result).toEqual({ status: 'saved' });
     expect(screen.getByTestId('note')).toHaveTextContent('Wound dry.');
     expect(screen.getByTestId('by')).toHaveTextContent('Test Resident');
     expect(getQueue()).toHaveLength(0);
   });
 
   it('an orders-only save keeps the note and its author on screen', async () => {
-    mocks.upsertRound.mockResolvedValue(STAMP);
+    mocks.saveRoundChecked.mockResolvedValue({ status: 'saved', stamp: STAMP });
     await renderWard([{ date: DATE, note: '# NOF', todos: [], ...STAMP }]);
 
     await act(async () => {
       await api.saveRound('TEST-01', { date: DATE, note: '# NOF', todos: [{ id: 't1', task: 'Repeat Hb', isDone: false }] });
     });
 
-    expect(mocks.upsertRound.mock.calls[0][2].roundNote).toBeUndefined();
+    expect(mocks.saveRoundChecked.mock.calls[0][2].roundNote).toBeUndefined();
     expect(screen.getByTestId('note')).toHaveTextContent('Wound dry.');
     expect(screen.getByTestId('by')).toHaveTextContent('Test Resident');
     expect(screen.getByTestId('orders')).toHaveTextContent('Repeat Hb');
   });
 
   it("resolves 'queued', queues the note exactly once, and keeps it on screen when the server cannot be reached", async () => {
-    mocks.upsertRound.mockRejectedValue(new Error('upsertRound(TEST-01): TypeError: Failed to fetch'));
+    mocks.saveRoundChecked.mockRejectedValue(new Error('upsertRound(TEST-01): TypeError: Failed to fetch'));
     await renderWard();
 
-    let result: string | undefined;
+    let result: { status: string } | undefined;
     await act(async () => { result = await api.saveRound('TEST-01', { date: DATE, note: '# NOF', todos: [], roundNote: 'Pin sites clean.' }); });
 
-    expect(result).toBe('queued');
+    expect(result).toEqual({ status: 'queued' });
     const rounds = getQueue().filter(op => op.type === 'upsert_round');
     expect(rounds).toHaveLength(1);
     expect(rounds[0].payload).toEqual({
       patient_ip_no: 'TEST-01', hospital_id: 'h-1', date: DATE, note: '# NOF', todos: [], round_note: 'Pin sites clean.',
+      base_note_at: null,   // travels with the queued note so the later send is still conflict-checked
     });
     expect(screen.getByTestId('note')).toHaveTextContent('Pin sites clean.');
     expect(mocks.toast.warning).toHaveBeenCalledTimes(1);
   });
 
   it('a queued orders-only save carries no round_note, so replaying it later cannot blank a note', async () => {
-    mocks.upsertRound.mockRejectedValue(new Error('TypeError: Failed to fetch'));
+    mocks.saveRoundChecked.mockRejectedValue(new Error('TypeError: Failed to fetch'));
     await renderWard();
     await act(async () => { await api.saveRound('TEST-01', { date: DATE, note: '# NOF', todos: [] }); });
     expect('round_note' in (getQueue()[0].payload as object)).toBe(false);
   });
 
   it('quiet mode leaves the message to the screen that asked for it', async () => {
-    mocks.upsertRound.mockRejectedValue(new Error('TypeError: Failed to fetch'));
+    mocks.saveRoundChecked.mockRejectedValue(new Error('TypeError: Failed to fetch'));
     await renderWard();
     await act(async () => { await api.saveRound('TEST-01', { date: DATE, note: '# NOF', todos: [], roundNote: 'x' }, { quiet: true }); });
     expect(mocks.toast.warning).not.toHaveBeenCalled();
+  });
+
+  // Audit DATA-04: Dr B saved a note while Dr A was typing.
+  it("resolves 'conflict' with the colleague's note, writes nothing to the queue, and shows THEIR note as the stored one", async () => {
+    const THEIRS = { roundNote: 'Dr B: drain removed.', roundNoteBy: 'Dr B', roundNoteAt: '2026-11-13T04:20:00.5+00:00' };
+    mocks.saveRoundChecked.mockResolvedValue({ status: 'conflict', server: THEIRS });
+    await renderWard();
+
+    let result: unknown;
+    await act(async () => {
+      result = await api.saveRound('TEST-01', { date: DATE, note: '# NOF', todos: [], roundNote: 'Dr A: wound dry.' }, { baseNoteAt: null });
+    });
+
+    expect(result).toEqual({ status: 'conflict', server: THEIRS });
+    expect(screen.getByTestId('note')).toHaveTextContent('Dr B: drain removed.');
+    expect(screen.getByTestId('by')).toHaveTextContent('Dr B');
+    expect(getQueue()).toHaveLength(0);
+  });
+
+  it('passes the version the writer started from to the server', async () => {
+    mocks.saveRoundChecked.mockResolvedValue({ status: 'saved', stamp: STAMP });
+    await renderWard();
+    await act(async () => {
+      await api.saveRound('TEST-01', { date: DATE, note: '# NOF', todos: [], roundNote: 'x' }, { baseNoteAt: '2026-11-13T04:11:00Z' });
+    });
+    expect(mocks.saveRoundChecked.mock.calls[0][3]).toBe('2026-11-13T04:11:00Z');
   });
 });

@@ -18,6 +18,8 @@ import { supabase } from '../lib/supabase';
 import {
   QueuedOp, QueuedOpType, getRetryableQueue, dequeue, incrementAttempts,
 } from './syncQueue';
+import { saveRoundChecked, toColumns, type RoundRowWrite } from './roundsService';
+import { combineNotes } from '../src/features/rounds/roundNotes';
 
 /** Returns true when the error indicates an expired/invalid JWT session. */
 export function isAuthError(err: unknown): boolean {
@@ -50,6 +52,38 @@ export function isSimpleOp(type: QueuedOpType): type is SimpleOpType {
 }
 
 /**
+ * Send one queued round.
+ *
+ * Orders only (no round_note): a plain upsert of the columns, as before.
+ *
+ * With a note: through the same checked save as a live save. If a colleague
+ * changed the note while this one waited on the phone, BOTH are kept — theirs
+ * first, then ours — because nobody is looking at the screen during a replay
+ * and neither text may be dropped. The combined text is saved against their
+ * version, so a third writer in between is still detected (then this throws
+ * and the change stays queued).
+ */
+async function replayRound(row: RoundRowWrite): Promise<void> {
+  if (row.round_note === undefined) {
+    const { error } = await supabase.from('rounds').upsert(toColumns(row), { onConflict: 'patient_ip_no,date' });
+    if (error) throw new Error(`upsert_round: ${error.message}`);
+    return;
+  }
+
+  const round = { date: row.date, note: row.note, todos: row.todos, roundNote: row.round_note };
+  const hospitalId = row.hospital_id ?? undefined;
+
+  const first = await saveRoundChecked(row.patient_ip_no, hospitalId, round, row.base_note_at ?? null);
+  if (first.status === 'saved') return;
+
+  const both = { ...round, roundNote: combineNotes(first.server.roundNote, row.round_note) };
+  const second = await saveRoundChecked(row.patient_ip_no, hospitalId, both, first.server.roundNoteAt ?? null);
+  if (second.status === 'conflict') {
+    throw new Error('upsert_round: the note changed again while merging — will retry');
+  }
+}
+
+/**
  * Send one queued round note / vital / nursing note / medication record.
  * Resolves only when the server accepted the write; throws otherwise, so the
  * caller keeps the change in the queue.
@@ -60,8 +94,8 @@ export async function replaySimpleOp(op: QueuedOp): Promise<void> {
 
   switch (op.type) {
     case 'upsert_round':
-      ({ error } = await supabase.from('rounds').upsert(payload, { onConflict: 'patient_ip_no,date' }));
-      break;
+      await replayRound(payload as unknown as RoundRowWrite);
+      return;
     case 'insert_vital':
       ({ error } = await supabase.from('patient_vitals').insert(payload));
       break;

@@ -9,7 +9,8 @@ export type NoteSaveState =
   | 'dirty'    // typed, not sent yet (kept as a draft on this phone)
   | 'saving'   // request in flight
   | 'saved'    // the server confirmed it
-  | 'queued';  // the server could not be reached or refused; kept on this phone, will be sent later
+  | 'queued'   // the server could not be reached or refused; kept on this phone, will be sent later
+  | 'conflict'; // not saved: someone else changed the note first; the doctor must choose
 
 /** Default quick phrases. Tapping one appends it to today's note. */
 export const QUICK_PHRASES: readonly string[] = [
@@ -46,6 +47,21 @@ export function appendPhrase(text: string, phrase: string): string {
   return `${trimmed}${needsStop ? '.' : ''} ${phrase}. `.slice(0, ROUND_NOTE_MAX_LENGTH);
 }
 
+/**
+ * Both notes in one text, theirs first (it was saved first), separated by a
+ * blank line. Used for "Keep both", and automatically when a note written
+ * offline meets a newer note on reconnect — nobody is watching the screen
+ * then, and neither text may be dropped.
+ */
+export function combineNotes(theirs: string, mine: string): string {
+  const a = theirs.trim();
+  const b = mine.trim();
+  if (a === '') return b;
+  if (b === '' || a.includes(b)) return a;
+  if (b.includes(a)) return b;
+  return `${a}\n\n${b}`.slice(0, ROUND_NOTE_MAX_LENGTH);
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** "Yesterday", or "11 Nov" for older dates. `date` and `today` are YYYY-MM-DD. */
@@ -79,12 +95,25 @@ export function noteMeta(round: DailyRound, today: string): string {
 const DRAFT_PREFIX = 'mediward_round_draft_';
 export const draftKey = (date: string, ipNo: string) => `${DRAFT_PREFIX}${date}_${ipNo}`;
 
-export function loadDraft(date: string, ipNo: string): string | null {
-  try { return localStorage.getItem(draftKey(date, ipNo)); } catch { return null; }
+/** A draft and the version of the server note it was started from. */
+export interface NoteDraft {
+  text: string;
+  /** round_note_at the doctor last saw before typing; null = there was no note. */
+  baseNoteAt: string | null;
 }
 
-export function saveDraft(date: string, ipNo: string, text: string): void {
-  try { localStorage.setItem(draftKey(date, ipNo), text); } catch { /* storage full or blocked */ }
+export function loadDraft(date: string, ipNo: string): NoteDraft | null {
+  try {
+    const raw = localStorage.getItem(draftKey(date, ipNo));
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw) as Partial<NoteDraft> | null;
+    if (!parsed || typeof parsed.text !== 'string') return null;
+    return { text: parsed.text, baseNoteAt: typeof parsed.baseNoteAt === 'string' ? parsed.baseNoteAt : null };
+  } catch { return null; }
+}
+
+export function saveDraft(date: string, ipNo: string, draft: NoteDraft): void {
+  try { localStorage.setItem(draftKey(date, ipNo), JSON.stringify(draft)); } catch { /* storage full or blocked */ }
 }
 
 export function clearDraft(date: string, ipNo: string): void {

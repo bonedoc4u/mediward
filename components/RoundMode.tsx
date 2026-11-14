@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp, useConfig, usePatients } from '../contexts/AppContext';
-import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacStatus, DailyRound } from '../types';
+import { Patient, PatientStatus, ToDoItem, ManagementPlan, PacStatus } from '../types';
 import { getStatusColor, sortByBed } from '../utils/calculations';
 import { generateId } from '../utils/sanitize';
 import { getSmartAlerts } from '../utils/smartAlerts';
@@ -12,8 +12,6 @@ import {
 } from 'lucide-react';
 import PacFlowChart from './PacFlowChart';
 import { RoundModeOfflineBanner } from './RoundModeOfflineBanner';
-import { useSaveRoundNote } from '../hooks/useSaveRoundNote';
-import { RoundConflictModal } from './RoundConflictModal';
 import { useNetworkQuality } from '../hooks/useNetworkQuality';
 import { localYmd, todayYmd } from '../utils/dates';
 import { resolveRoundPosition, isHorizontalSwipe } from '../utils/roundPosition';
@@ -21,15 +19,12 @@ import { toast } from '../utils/toast';
 import RoundNoteCard from '../src/features/rounds/RoundNoteCard';
 import RoundActionBar from '../src/features/rounds/RoundActionBar';
 import AllergyLine from '../src/features/rounds/AllergyLine';
-import {
-  NoteSaveState, findTodayRound, findPreviousNote, loadDraft, saveDraft, clearDraft,
-} from '../src/features/rounds/roundNotes';
+import { useRoundNote } from '../src/features/rounds/useRoundNote';
 
 const RoundMode: React.FC = () => {
   const { patients, updatePatient, saveRound, navigateTo, sessionExpired, logout } = useApp();
   const { forceReconnect } = usePatients();
   const { icuWardNames, customTodoShortcuts } = useConfig();
-  const { conflict: roundConflict, resolveConflict, dismissConflict } = useSaveRoundNote();
   const { quality: networkQuality } = useNetworkQuality();
 
   // ─── All active patients (unfiltered) ───
@@ -160,83 +155,16 @@ const RoundMode: React.FC = () => {
   const patient: Patient | undefined = activePatients[index];
 
   // ─── Today's round note ───
-  // noteText is what is in the box for the patient on screen. noteStates says,
-  // per patient, where that text is: only typed, being sent, on the server,
-  // or kept on this phone because the server could not be reached.
-  const [noteText, setNoteText] = useState('');
-  const [noteStates, setNoteStates] = useState<Record<string, NoteSaveState>>({});
-  const todayRound = patient ? findTodayRound(patient.dailyRounds, today) : undefined;
-  const previousNote = patient ? findPreviousNote(patient.dailyRounds, today) : undefined;
-  const serverNote = todayRound?.roundNote ?? '';
-  const noteState: NoteSaveState = patient ? (noteStates[patient.ipNo] ?? 'clean') : 'clean';
-  const noteNeedsSending = noteState === 'dirty' || noteState === 'queued';
-
-  // When the patient (or the day) changes, fill the box for that patient. A
-  // draft left on this phone wins over the server copy — it is newer.
-  // Deliberately not re-run on every server refresh: that would overwrite typing.
-  useEffect(() => {
-    if (!patient) return;
-    const draft = loadDraft(today, patient.ipNo);
-    if (draft !== null && draft !== serverNote) {
-      setNoteText(draft);
-      setNoteStates(s => (s[patient.ipNo] === 'queued' ? s : { ...s, [patient.ipNo]: 'dirty' }));
-    } else {
-      setNoteText(serverNote);
-    }
-  }, [patient?.ipNo, today]);
-
-  // If the server copy CHANGES for the patient on screen while nothing unsent
-  // is in the box (our own save came back, or a colleague wrote the note),
-  // show the server copy. It must not run on mount or on a patient change —
-  // the effect above owns those, and running here would overwrite a draft.
-  const lastServerNoteRef = useRef<{ ipNo: string | null; note: string }>({ ipNo: null, note: '' });
-  useEffect(() => {
-    const prev = lastServerNoteRef.current;
-    lastServerNoteRef.current = { ipNo: patient?.ipNo ?? null, note: serverNote };
-    if (!patient || prev.ipNo !== patient.ipNo || prev.note === serverNote) return;
-    if (!noteNeedsSending && noteState !== 'saving') setNoteText(serverNote);
-  }, [patient?.ipNo, serverNote]);
-
-  const handleNoteChange = (text: string) => {
-    if (!patient) return;
-    setNoteText(text);
-    if (text.trim() === serverNote.trim()) {
-      clearDraft(today, patient.ipNo);
-      setNoteStates(s => ({ ...s, [patient.ipNo]: 'clean' }));
-    } else {
-      saveDraft(today, patient.ipNo, text);   // survives a call, a crash, a dead battery
-      setNoteStates(s => ({ ...s, [patient.ipNo]: 'dirty' }));
-    }
-  };
-
-  /**
-   * Send one patient's round. The note is included only when it has unsent
-   * changes: an orders-only save must never blank a note that a colleague
-   * wrote a minute ago and this phone has not loaded yet.
-   */
-  // Patients whose note is on its way to the server right now. A ref, not
-  // state: "Done" saves and then navigates in the same tick, before React has
-  // applied the 'saving' state — without this the navigation's own auto-save
-  // would send the same note a second time.
-  const noteInFlightRef = useRef<Set<string>>(new Set());
-  const persistRound = (target: Patient, text: string, withNote: boolean) => {
-    const round: DailyRound = { date: today, note: target.diagnosis, todos: target.todos };
-    if (withNote) {
-      round.roundNote = text.trim();
-      noteInFlightRef.current.add(target.ipNo);
-      setNoteStates(s => ({ ...s, [target.ipNo]: 'saving' }));
-    }
-    void saveRound(target.ipNo, round, { quiet: true }).then(result => {
-      noteInFlightRef.current.delete(target.ipNo);
-      if (withNote) {
-        if (result === 'saved') clearDraft(today, target.ipNo);   // the draft stays until the server has it
-        setNoteStates(s => ({ ...s, [target.ipNo]: result }));
-      } else if (result === 'queued') {
-        toast.warning('Orders kept on this phone — they will be sent when the connection returns.');
-      }
-    });
-  };
-
+  // Text, save state and conflict handling live in useRoundNote.
+  // While the "Round complete" screen is up, no patient is on screen: a
+  // refusal that comes back then must be announced, not shown on a hidden card.
+  const note = useRoundNote(showDischargeSummary ? undefined : patient, today, saveRound, (target, theirs) => {
+    // The doctor pressed Done and moved on; the answer for the previous bed
+    // came back as "someone else wrote first". Say it where they are now.
+    toast.warning(
+      `Bed ${target.bed} — ${target.name}: your note was NOT saved. ${theirs.roundNoteBy ?? 'Someone else'} wrote a note first. Go back to that bed to choose what to keep.`,
+    );
+  });
 
   // ─── Navigate between patients ───
   // A plain function on purpose (not useCallback): it must always see the
@@ -244,9 +172,7 @@ const RoundMode: React.FC = () => {
   const goTo = (next: number) => {
     // Leaving a patient with an unsent note sends it — never leave a typed
     // note behind as a silent draft.
-    if (patient && noteState === 'dirty' && !noteInFlightRef.current.has(patient.ipNo)) {
-      persistRound(patient, noteText, true);
-    }
+    note.sendIfUnsent();
     setIndex(Math.max(0, Math.min(next, activePatients.length - 1)));
     setNewTodoText('');
   };
@@ -308,8 +234,11 @@ const RoundMode: React.FC = () => {
   // ─── Save round (persists todos; diagnosis used as the round note) ───
   const handleSave = useCallback((andNext = false) => {
     if (!patient) return;
-    persistRound(patient, noteText, noteNeedsSending);
+    note.save();
     setSavedSet(prev => new Set(prev).add(patient.ipNo));
+    if (note.state === 'conflict') {
+      toast.warning(`Bed ${patient.bed} — ${patient.name}: your note is still not saved. Go back to choose what to keep.`);
+    }
 
     if (andNext && index < activePatients.length - 1) {
       goNext();
@@ -317,7 +246,7 @@ const RoundMode: React.FC = () => {
       // Last patient — show discharge summary before going to dashboard
       setShowDischargeSummary(true);
     }
-  }, [patient, today, index, activePatients.length, saveRound, navigateTo, goNext, noteText, noteNeedsSending]);
+  }, [patient, today, index, activePatients.length, saveRound, navigateTo, goNext, note]);
 
   // ─── Toggle todo ───
   const handleToggleTodo = useCallback((todoId: string) => {
@@ -355,6 +284,9 @@ const RoundMode: React.FC = () => {
 
   // ─── Discharge Summary — shown after completing the last patient ───
   if (showDischargeSummary) {
+    const unsavedNotes = activePatients
+      .map((p, i) => ({ p, i, state: note.stateOf(p.ipNo) }))
+      .filter(x => x.state === 'conflict' || x.state === 'queued');
     const dischargeReady = allActivePatients.filter(
       p => p.patientStatus === PatientStatus.DischargeReady,
     );
@@ -379,6 +311,31 @@ const RoundMode: React.FC = () => {
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Notes that did not reach the server. A round is not complete while
+            one of these is open, so it comes before everything else. */}
+        {unsavedNotes.length > 0 && (
+          <div role="alert" className="bg-vital-warning-surface border border-vital-warning-border rounded-2xl p-4 mb-4 space-y-2">
+            <p className="flex items-center gap-2 text-sm font-bold text-vital-warning-fg">
+              <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              {unsavedNotes.length} note{unsavedNotes.length !== 1 ? 's' : ''} still need{unsavedNotes.length === 1 ? 's' : ''} you
+            </p>
+            {unsavedNotes.map(({ p, i, state }) => (
+              <button
+                key={p.ipNo}
+                type="button"
+                onClick={() => { setShowDischargeSummary(false); setIndex(i); }}
+                className="w-full min-h-11 flex items-center gap-3 px-3 rounded-control bg-surface-card border border-line text-left text-sm text-ink hover:border-accent transition-colors"
+              >
+                <span className="font-black font-mono shrink-0">{p.bed}</span>
+                <span className="flex-1 min-w-0 truncate">{p.name}</span>
+                <span className="shrink-0 text-xs font-bold text-vital-warning-fg">
+                  {state === 'conflict' ? 'Not saved — choose' : 'Kept on this phone'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Discharge-ready list */}
         <div className="bg-surface-card rounded-2xl border border-accent shadow-sm overflow-hidden mb-4">
@@ -589,15 +546,6 @@ const RoundMode: React.FC = () => {
       {/* ─── Realtime connection status (Task 6) ─── */}
       <RoundModeOfflineBanner onRetry={forceReconnect} networkQuality={networkQuality} />
 
-      {/* ─── Round note conflict modal (Task 2) ─── */}
-      {roundConflict && (
-        <RoundConflictModal
-          conflict={roundConflict}
-          onResolve={(choice) => resolveConflict(choice, undefined)}
-          onDismiss={dismissConflict}
-        />
-      )}
-
       {/* ─── Header ─── */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -659,7 +607,12 @@ const RoundMode: React.FC = () => {
                 {p.bed}
               </span>
               <span className="max-w-[80px] truncate">{p.name.split(' ')[0]}</span>
-              {isSavedP && !isActive && <span className="text-vital-normal text-xs">✓</span>}
+              {note.stateOf(p.ipNo) === 'conflict' ? (
+                // Amber, not green: this patient's note was refused and still needs a decision.
+                <span className="text-vital-warning-fg text-xs font-black" aria-label="Note not saved — needs your decision">!</span>
+              ) : (
+                isSavedP && !isActive && <span className="text-vital-normal text-xs">✓</span>
+              )}
               {isConserv && (
                 // text-green-300 (active branch) stays hardcoded — calibrated for the
                 // permanently-dark pill above, not the theme-reactive vital-normal-fg
@@ -748,11 +701,13 @@ const RoundMode: React.FC = () => {
         <div className="p-4 sm:p-5 space-y-5">
           <RoundNoteCard
             today={today}
-            previous={previousNote}
-            todayRound={todayRound}
-            value={noteText}
-            onChange={handleNoteChange}
-            saveState={noteState}
+            previous={note.previous}
+            todayRound={note.todayRound}
+            value={note.text}
+            onChange={note.change}
+            saveState={note.state}
+            conflict={note.conflict}
+            onResolve={note.resolve}
             disabled={sessionExpired}
           />
 

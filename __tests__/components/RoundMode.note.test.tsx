@@ -24,13 +24,9 @@ vi.mock('../../contexts/AppContext', () => ({
   usePatients: () => ({ forceReconnect: vi.fn() }),
   useConfig: () => ({ icuWardNames: new Set<string>(), customTodoShortcuts: [] }),
 }));
-vi.mock('../../hooks/useSaveRoundNote', () => ({
-  useSaveRoundNote: () => ({ conflict: null, resolveConflict: vi.fn(), dismissConflict: vi.fn() }),
-}));
 vi.mock('../../hooks/useNetworkQuality', () => ({ useNetworkQuality: () => ({ quality: 'good' }) }));
 vi.mock('../../components/PacFlowChart', () => ({ default: () => null }));
 vi.mock('../../components/RoundModeOfflineBanner', () => ({ RoundModeOfflineBanner: () => null }));
-vi.mock('../../components/RoundConflictModal', () => ({ RoundConflictModal: () => null }));
 vi.mock('../../utils/capacitorInit', () => ({ hapticTap: () => Promise.resolve() }));
 vi.mock('../../utils/toast', () => ({ toast: state.toast }));
 
@@ -52,13 +48,17 @@ const noteBox = () => screen.getByLabelText("Today's note") as HTMLTextAreaEleme
 const done = () => fireEvent.click(screen.getByRole('button', { name: /^Done/ }));
 const lastSave = () => state.saveRound.mock.calls[state.saveRound.mock.calls.length - 1];
 const draftKeyFor = (name: string) => `mediward_round_draft_${TODAY}_IP-${name}`;
+const draftText = (name: string): string | null => {
+  const raw = localStorage.getItem(draftKeyFor(name));
+  return raw === null ? null : (JSON.parse(raw) as { text: string }).text;
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
   localStorage.clear();
   sessionStorage.setItem('mediward_round_ward', 'Female Ward');
-  state.saveRound.mockResolvedValue('saved');
+  state.saveRound.mockResolvedValue({ status: 'saved' });
   state.patients = [
     patient('04', 'Asha', {
       drugAllergies: ['Penicillin', 'NSAIDs'],
@@ -107,7 +107,7 @@ describe('Round Mode — writing', () => {
   it('typing is kept on the phone at once and shown as not saved', () => {
     render(<RoundMode />);
     fireEvent.change(noteBox(), { target: { value: 'Wound dry. Hb 9.8.' } });
-    expect(localStorage.getItem(draftKeyFor('Asha'))).toBe('Wound dry. Hb 9.8.');
+    expect(draftText('Asha')).toBe('Wound dry. Hb 9.8.');
     expect(screen.getByText('Not saved yet')).toBeInTheDocument();
     expect(state.saveRound).not.toHaveBeenCalled();
   });
@@ -122,7 +122,7 @@ describe('Round Mode — writing', () => {
     const [ipNo, round, opts] = lastSave();
     expect(ipNo).toBe('IP-Asha');
     expect(round).toEqual({ date: TODAY, note: DIAGNOSIS, todos: [], roundNote: 'Wound dry. Hb 9.8.' });
-    expect(opts).toEqual({ quiet: true });
+    expect(opts).toEqual({ quiet: true, baseNoteAt: null });
     expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Bina');
     // The server confirmed, so the phone's draft copy is no longer needed.
     await waitFor(() => expect(localStorage.getItem(draftKeyFor('Asha'))).toBeNull());
@@ -138,7 +138,7 @@ describe('Round Mode — writing', () => {
   });
 
   it('when the server cannot be reached, says the note is kept on this phone and keeps the draft', async () => {
-    state.saveRound.mockResolvedValue('queued');
+    state.saveRound.mockResolvedValue({ status: 'queued' });
     render(<RoundMode />);
     fireEvent.change(noteBox(), { target: { value: 'Pin sites clean.' } });
     await act(async () => { done(); });
@@ -146,7 +146,7 @@ describe('Round Mode — writing', () => {
 
     expect(screen.getByText(/Kept on this phone/)).toBeInTheDocument();
     expect(noteBox().value).toBe('Pin sites clean.');
-    expect(localStorage.getItem(draftKeyFor('Asha'))).toBe('Pin sites clean.');
+    expect(draftText('Asha')).toBe('Pin sites clean.');
   });
 
   it('leaving a patient another way with an unsent note sends it instead of leaving a silent draft', async () => {
@@ -181,5 +181,107 @@ describe('Round Mode — writing', () => {
     render(<RoundMode />);
     fireEvent.click(screen.getByText('Repeat Hb'));
     expect(state.updatePatient).toHaveBeenCalledWith(expect.objectContaining({ ipNo: 'IP-Asha' }), { quiet: true });
+  });
+});
+
+// Audit DATA-04: Dr R saved a note for the same patient while this doctor was typing.
+describe('Round Mode — someone else wrote the note first', () => {
+  const THEIRS = { roundNote: 'Drain removed. Start physio.', roundNoteBy: 'Dr R', roundNoteAt: '2026-11-13T04:20:00.5+00:00' };
+  /**
+   * Type a note for Asha and press Done (which moves on to Bina); the server
+   * refuses the note because of THEIRS; then go back to Asha.
+   */
+  async function conflictOnAsha() {
+    state.saveRound.mockResolvedValueOnce({ status: 'conflict', server: THEIRS });
+    render(<RoundMode />);
+    fireEvent.change(noteBox(), { target: { value: 'Wound dry.' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Done/ })); });
+    await act(async () => { fireEvent.click(screen.getByLabelText('Jump to Asha, Bed 04')); });
+  }
+
+  it('says the note is not saved, shows their note, and keeps mine in the box and on the phone', async () => {
+    await conflictOnAsha();
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Your note is not saved. Dr R wrote a note first');
+    expect(alert).toHaveTextContent('Drain removed. Start physio.');
+    expect(noteBox().value).toBe('Wound dry.');
+    expect(draftText('Asha')).toBe('Wound dry.');
+    expect(screen.queryByText(/^Saved/)).not.toBeInTheDocument();
+  });
+
+  it('"Keep both" saves their note followed by mine, against THEIR version', async () => {
+    await conflictOnAsha();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Keep both' })); });
+
+    const [, round, opts] = lastSave();
+    expect(round.roundNote).toBe('Drain removed. Start physio.\n\nWound dry.');
+    expect(opts.baseNoteAt).toBe(THEIRS.roundNoteAt);
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(draftText('Asha')).toBeNull();
+  });
+
+  it('"Use mine only" saves my text against their version', async () => {
+    await conflictOnAsha();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Use mine only' })); });
+    const [, round, opts] = lastSave();
+    expect(round.roundNote).toBe('Wound dry.');
+    expect(opts.baseNoteAt).toBe(THEIRS.roundNoteAt);
+  });
+
+  it('"Use theirs only" drops my draft, shows their note, and sends nothing', async () => {
+    await conflictOnAsha();
+    const callsBefore = state.saveRound.mock.calls.length;
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Use theirs only' })); });
+
+    expect(state.saveRound.mock.calls.length).toBe(callsBefore);
+    expect(noteBox().value).toBe('Drain removed. Start physio.');
+    expect(draftText('Asha')).toBeNull();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('pressing Done again while unresolved saves the orders but never sends my note over theirs', async () => {
+    await conflictOnAsha();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Done/ })); });
+    const [, round] = lastSave();
+    expect('roundNote' in round).toBe(false);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('if I have already moved to the next bed, tells me which bed and marks it in the strip', async () => {
+    let answer!: (r: unknown) => void;
+    state.saveRound.mockReturnValueOnce(new Promise(resolve => { answer = resolve; }));
+    render(<RoundMode />);
+    fireEvent.change(noteBox(), { target: { value: 'Wound dry.' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Done/ })); });
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Bina');
+
+    await act(async () => { answer({ status: 'conflict', server: THEIRS }); });
+
+    expect(state.toast.warning).toHaveBeenCalledTimes(1);
+    const message = state.toast.warning.mock.calls[0][0] as string;
+    expect(message).toContain('Bed 04');
+    expect(message).toContain('NOT saved');
+    expect(message).toContain('Dr R');
+    expect(screen.getByLabelText('Note not saved — needs your decision')).toBeInTheDocument();
+    expect(draftText('Asha')).toBe('Wound dry.');
+  });
+
+  it('on the last patient, the "Round complete" screen lists the note that still needs a decision', async () => {
+    state.patients = [patient('04', 'Asha')];
+    state.saveRound.mockResolvedValueOnce({ status: 'conflict', server: THEIRS });
+    render(<RoundMode />);
+    fireEvent.change(noteBox(), { target: { value: 'Wound dry.' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Done/ })); });
+
+    expect(screen.getByText('Round Complete')).toBeInTheDocument();
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('1 note still needs you');
+    expect(alert).toHaveTextContent('Asha');
+    expect(state.toast.warning).toHaveBeenCalledTimes(1);
+
+    // Tapping it goes back to that patient, with the choice waiting.
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Asha/ })); });
+    expect(screen.getByRole('alert')).toHaveTextContent('Dr R wrote a note first');
+    expect(noteBox().value).toBe('Wound dry.');
   });
 });

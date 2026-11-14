@@ -37,7 +37,7 @@ import {
 } from '../services/patientService';
 import { insertLab } from '../services/labsService';
 import { insertImaging, deleteImaging } from '../services/imagingService';
-import { upsertRound, roundToRow } from '../services/roundsService';
+import { saveRoundChecked, roundToRow, type RoundNoteStamp } from '../services/roundsService';
 import { insertVital } from '../services/vitalsService';
 import { enqueue, getRetryableQueue, getQueue, getDeadLetterQueue, removeFromDeadLetterQueue, type QueuedOp } from '../services/syncQueue';
 import { drainQueue, replaySimpleOp, isSimpleOp, isAuthError } from '../services/syncReplay';
@@ -54,6 +54,12 @@ import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
 import { hapticSuccess } from '../utils/capacitorInit';
 import { useAuth } from './AuthContext';
+
+/** Where a round is after saveRound(). See PatientContextType.saveRound. */
+export type RoundSaveResult =
+  | { status: 'saved' }
+  | { status: 'queued' }
+  | { status: 'conflict'; server: RoundNoteStamp };
 
 // ─── Context Shape ───
 export interface ConcurrentEditConflict {
@@ -105,12 +111,18 @@ interface PatientContextType {
   fetchEmergencyPatient: (ipNo: string, reason: string) => Promise<Patient | null>;
   /** Persist a daily round note to the normalized rounds table + update local state. */
   /**
-   * Save one day's round. Resolves 'saved' once the server has confirmed it,
-   * or 'queued' when it is kept on the phone to be sent later. Never rejects.
-   * `quiet` suppresses the "kept on this phone" toast for screens that show
-   * the save state themselves (Round Mode).
+   * Save one day's round. Never rejects. Resolves with where the round is now:
+   *  - saved:    the server has confirmed it;
+   *  - queued:   kept on the phone, to be sent later;
+   *  - conflict: NOT saved — someone else changed the note after `baseNoteAt`.
+   *              `server` is their note; the caller must let the doctor choose.
+   * `baseNoteAt` is the round_note_at the writer started from (null = there
+   * was no note). `quiet` suppresses the "kept on this phone" toast for
+   * screens that show the save state themselves (Round Mode).
    */
-  saveRound: (patientIpNo: string, round: DailyRound, opts?: { quiet?: boolean }) => Promise<'saved' | 'queued'>;
+  saveRound: (
+    patientIpNo: string, round: DailyRound, opts?: { quiet?: boolean; baseNoteAt?: string | null },
+  ) => Promise<RoundSaveResult>;
   /** Insert a new vitals observation to the normalized table + update local state. */
   addVitalSign: (patientIpNo: string, vital: Omit<VitalSigns, 'id'>) => Promise<void>;
   /** Non-null when a concurrent edit conflict needs user resolution. */
@@ -1014,8 +1026,8 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const saveRound = useCallback((
-    patientIpNo: string, round: DailyRound, opts?: { quiet?: boolean },
-  ): Promise<'saved' | 'queued'> => {
+    patientIpNo: string, round: DailyRound, opts?: { quiet?: boolean; baseNoteAt?: string | null },
+  ): Promise<RoundSaveResult> => {
     // Merge into the same day's round instead of replacing it: a save that
     // only carries orders must not drop the note (and its author/time) from
     // the screen. `patch` is applied on top of whatever is there now.
@@ -1029,6 +1041,8 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
       saveActiveCache(next, effectiveHospitalId);
       return next;
     });
+    const asPatch = (stamp: RoundNoteStamp): Partial<DailyRound> =>
+      ({ roundNote: stamp.roundNote, roundNoteBy: stamp.roundNoteBy, roundNoteAt: stamp.roundNoteAt });
 
     // Optimistic local update. Only the keys this save actually sets.
     const sent: Partial<DailyRound> = { ...round };
@@ -1040,18 +1054,25 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
         `Round note saved for ${round.date}`);
     }
 
-    // Persist to normalized rounds table; enqueue for offline retry on failure
-    return upsertRound(patientIpNo, user?.hospitalId, round)
-      .then((stamp): 'saved' => {
+    const baseNoteAt = opts?.baseNoteAt ?? null;
+    return saveRoundChecked(patientIpNo, user?.hospitalId, round, baseNoteAt)
+      .then((outcome): RoundSaveResult => {
+        if (outcome.status === 'conflict') {
+          // Nothing was written. Show THEIR note as the stored one — ours is
+          // still in the caller's hands (and in its draft) until the doctor decides.
+          mergeLocal(asPatch(outcome.server));
+          return { status: 'conflict', server: outcome.server };
+        }
         // Show the author and time the database recorded, not a local guess.
-        mergeLocal({ roundNote: stamp.roundNote, roundNoteBy: stamp.roundNoteBy, roundNoteAt: stamp.roundNoteAt });
-        return 'saved';
+        mergeLocal(asPatch(outcome.stamp));
+        return { status: 'saved' };
       })
-      .catch((err): 'queued' => {
+      .catch((err): RoundSaveResult => {
         console.error('[Patients] saveRound sync failed:', err);
         // Queue exactly once, whatever the reason — including an expired
-        // sign-in, so the round is sent after the next login.
-        enqueue('upsert_round', roundToRow(patientIpNo, user?.hospitalId, round));
+        // sign-in, so the round is sent after the next login. The base stamp
+        // travels with it so the later send is still checked for a conflict.
+        enqueue('upsert_round', roundToRow(patientIpNo, user?.hospitalId, round, baseNoteAt));
         if (isAuthError(err)) {
           setSessionExpired(true);
           toast.error('Session expired — log in again. Your round is kept on this phone and will be sent after login.');
@@ -1059,7 +1080,7 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
           // A warning, not an error: nothing is lost, it is waiting to be sent.
           toast.warning('Round kept on this phone — it will be sent when the connection returns.');
         }
-        return 'queued';
+        return { status: 'queued' };
       });
   }, [user, effectiveHospitalId]);
 
