@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   saveActiveCache, loadActiveCache, saveAllCache, loadAllCache, clearPatientCache,
+  clearAllPatientCaches, PATIENT_CACHE_MAX_AGE_MS,
 } from '../../services/patientCache';
 import { Patient, PatientStatus, PacStatus, Gender } from '../../types';
 
@@ -58,5 +59,49 @@ describe('patientCache', () => {
     saveAllCache([patient], HOSPITAL);
     clearPatientCache(HOSPITAL);
     expect(Object.keys(localStorage).filter(k => k.includes('patients_'))).toEqual([]);
+  });
+});
+
+// Audit SEC-04: the last ward list stayed readable in the phone's storage
+// after a session had ended, and for as long as nobody signed out by hand.
+describe('patientCache — nothing outlives its session', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('clearAllPatientCaches removes every hospital\'s lists, in old and new formats', () => {
+    saveActiveCache([patient], 'h-1');
+    saveAllCache([patient], 'h-1');
+    saveActiveCache([patient], 'h-2');          // e.g. a super-admin viewing another hospital
+    localStorage.setItem('mediward_patients_active_cache_h-3', '{"version":1,"data":{"patients":[]}}');   // pre-v2 format
+    localStorage.setItem('mediward_session', 'keep-me');
+    localStorage.setItem('mediward_sync_queue', '[]');
+
+    clearAllPatientCaches();
+
+    expect(Object.keys(localStorage).filter(k => k.includes('patients_'))).toEqual([]);
+    // Only patient lists go: the session marker and unsent changes are not this function's business.
+    expect(localStorage.getItem('mediward_session')).toBe('keep-me');
+    expect(localStorage.getItem('mediward_sync_queue')).toBe('[]');
+  });
+
+  it('a list older than the limit is never shown and is deleted on sight', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-13T08:00:00Z'));
+    saveActiveCache([patient], HOSPITAL);
+    saveAllCache([patient], HOSPITAL);
+
+    vi.setSystemTime(new Date(Date.now() + PATIENT_CACHE_MAX_AGE_MS - 60_000));
+    expect(loadActiveCache(HOSPITAL)?.patients).toHaveLength(1);   // just inside the limit
+
+    vi.setSystemTime(new Date(Date.now() + 120_000));               // now just past it
+    expect(loadActiveCache(HOSPITAL)).toBeNull();
+    expect(loadAllCache(HOSPITAL)).toBeNull();
+    expect(Object.keys(localStorage).filter(k => k.includes('patients_'))).toEqual([]);
+  });
+
+  it('a list with an unreadable timestamp is treated as too old', () => {
+    localStorage.setItem(`mediward_patients_active_cache_v2_${HOSPITAL}`, JSON.stringify({
+      version: 1, timestamp: 'x', data: { patients: [patient], cachedAt: 'not a date' },
+    }));
+    expect(loadActiveCache(HOSPITAL)).toBeNull();
   });
 });
