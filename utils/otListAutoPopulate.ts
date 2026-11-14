@@ -1,4 +1,5 @@
-import { Patient } from '../types';
+import { AuthUser, Patient } from '../types';
+import { can } from './permissions';
 import { OTType, getOTTypeForDate, isEligibleForOTList } from './otListTypes';
 
 export interface PlannedOTAssignment {
@@ -34,4 +35,23 @@ export function findNewlyPlannedOTAssignments(
     });
   }
   return result;
+}
+
+/**
+ * May the OT list screen add planned patients to the list by itself when
+ * this user opens it? Opening a screen must never write for somebody who is
+ * not allowed to write (audit SEC-06: for a view-only role the database now
+ * refuses that write, and the screen showed the raw refusal).
+ *
+ *  - no 'otlist:write'            → no. They see the list as it is stored.
+ *  - admin looking at "all units" → no. There is no single unit to file the
+ *  - superadmin                      patient under; the screen's fallback unit
+ *                                    would collect every unit's surgeries.
+ * Adding or assigning a patient by hand is not affected.
+ */
+export function mayAutoAddPlannedPatients(user: AuthUser | null, selectedUnit: string | null | undefined): boolean {
+  if (!user || !can(user, 'otlist:write')) return false;
+  if (user.role === 'superadmin') return false;
+  if (user.role === 'admin' && (!selectedUnit || selectedUnit === 'all')) return false;
+  return true;
 }

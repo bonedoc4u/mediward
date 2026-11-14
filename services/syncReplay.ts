@@ -117,7 +117,7 @@ export async function replaySimpleOp(op: QueuedOp): Promise<void> {
       ({ error } = await supabase.from('nursing_notes').insert(payload));
       break;
     case 'record_med_administration':
-      ({ error } = await supabase.from('medication_administrations').insert(payload));
+      ({ error } = await supabase.from('med_administrations').insert(payload));
       break;
     default:
       throw new Error(`replaySimpleOp: unsupported op type "${op.type}"`);

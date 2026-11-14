@@ -59,7 +59,7 @@ describe('replaySimpleOp', () => {
     ['upsert_round',              'rounds',                     'upsert'],
     ['insert_vital',              'patient_vitals',             'insert'],
     ['insert_nursing_note',       'nursing_notes',              'insert'],
-    ['record_med_administration', 'medication_administrations', 'insert'],
+    ['record_med_administration', 'med_administrations', 'insert'],
   ];
 
   it.each(cases)('%s resolves when the server accepts the write', async (type, table, method) => {
