@@ -101,6 +101,17 @@ export function canChangePatient(user: AuthUser | null, change: PatientChange | 
 }
 
 /**
+ * Screens that are for admins only: Team, Configuration and the audit log.
+ * The menu hides them, and the app shell refuses to open them by address
+ * too. The database enforces the same for what these screens save.
+ */
+export const ADMIN_ONLY_VIEWS: readonly string[] = ['team', 'settings', 'audit'];
+
+export function canOpenView(user: AuthUser | null, view: string): boolean {
+  return !ADMIN_ONLY_VIEWS.includes(view) || can(user, 'team:manage');
+}
+
+/**
  * Roles the given user may hand out in Team Settings.
  * Only a super-admin (platform owner, sees every hospital) may assign
  * 'superadmin'. The database and the admin-create-user function enforce the
