@@ -26,6 +26,9 @@ export default defineConfig(({ mode }) => {
           project: env.SENTRY_PROJECT,
           authToken: env.SENTRY_AUTH_TOKEN,
           telemetry: false,
+          // The maps are for Sentry only: delete them before the site is
+          // published, so the app's source code is not readable on mediward.in.
+          sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
         })] : []),
         VitePWA({
           // injectManifest: use our custom sw.ts instead of generateSW so we
@@ -75,7 +78,11 @@ export default defineConfig(({ mode }) => {
         'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
       },
       build: {
-        sourcemap: true,
+        // Source maps show the app's original source code. Build them only
+        // when they go to Sentry (and are deleted after upload, above);
+        // 'hidden' also leaves no link to them in the published files.
+        // Audit SEC-05: before, every build published them.
+        sourcemap: env.SENTRY_AUTH_TOKEN ? 'hidden' : false,
         // xlsx-js-style is inherently large (~870 kB) but lazy-loaded; raise threshold to suppress noise.
         chunkSizeWarningLimit: 1000,
         rollupOptions: {
