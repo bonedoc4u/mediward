@@ -67,7 +67,8 @@ vi.mock('../../services/biometricAuthService', async () => {
 const mockFindUserByEmail = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock('../../services/userService', () => ({ findUserByEmail: mockFindUserByEmail }));
 vi.mock('../../services/auditLog', () => ({ logAuditEvent: vi.fn() }));
-vi.mock('../../services/patientCache', () => ({ clearPatientCache: vi.fn() }));
+const mockClearAllPatientCaches = vi.hoisted(() => vi.fn());
+vi.mock('../../services/patientCache', () => ({ clearAllPatientCaches: mockClearAllPatientCaches }));
 vi.mock('../../components/ClinicalDisclaimer', () => ({ clearDisclaimerAccepted: vi.fn() }));
 
 const Probe: React.FC = () => {
@@ -76,6 +77,7 @@ const Probe: React.FC = () => {
 };
 
 beforeEach(() => {
+  mockClearAllPatientCaches.mockClear();
   mockSignOut.mockClear();
   mockClearBiometric.mockClear();
   mockRefreshSession.mockReset();
@@ -535,5 +537,77 @@ describe('loginWithBiometric identity re-check', () => {
     expect(loginResult).toEqual({ success: false, error: 'Please log in again.' });
     expect(mockClearBiometric).toHaveBeenCalled();
     expect(result.current.user).toBeNull();
+  });
+});
+
+// Audit SEC-04: cached ward lists were removed only on a manual sign-out.
+// Every other way a session ended left the last patient list on the phone.
+describe('cached patient lists do not outlive the session', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  const storeSession = (role: string, sessionExpiry: number) => {
+    localStorage.setItem('mediward_session', JSON.stringify({
+      version: 1, timestamp: new Date().toISOString(),
+      data: { id: 'u1', email: 'doc@hospital.com', name: 'Dr. Test', role, hospitalId: 'h1', sessionExpiry },
+    }));
+  };
+  const boot = () => renderHook(() => useAuth(), {
+    wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+  });
+
+  it('are removed when the app starts with an expired session', async () => {
+    storeSession('resident', Date.now() - 60_000);
+    boot();
+    await waitFor(() => expect(mockClearAllPatientCaches).toHaveBeenCalled());
+  });
+
+  it('are removed when the 8-hour limit is reached', async () => {
+    vi.useFakeTimers();
+    storeSession('admin', Date.now() + 30 * 60 * 1000);
+    boot();
+    expect(mockClearAllPatientCaches).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1_000); });
+    expect(mockClearAllPatientCaches).toHaveBeenCalled();
+  });
+
+  it('are removed on inactivity when there is no fingerprint sign-in to come back with', async () => {
+    vi.useFakeTimers();
+    mockLoadBiometricCredential.mockResolvedValue(null);
+    storeSession('resident', Date.now() + 8 * 60 * 60 * 1000);
+    boot();
+    await act(async () => { await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000 + 1_000); });
+    expect(mockClearAllPatientCaches).toHaveBeenCalled();
+  });
+
+  // The one deliberate exception: the list is what makes fingerprint sign-in
+  // useful on ward Wi-Fi. It is bounded by the credential's own expiry.
+  it('are KEPT on inactivity while a fingerprint credential is stored, and removed when that credential expires', async () => {
+    vi.useFakeTimers();
+    const absoluteExpiry = Date.now() + 8 * 60 * 60 * 1000;
+    mockLoadBiometricCredential.mockResolvedValue({ refreshToken: 'tok', expiresAt: absoluteExpiry, userId: 'u1' });
+    storeSession('resident', absoluteExpiry);
+    const { result } = boot();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000 + 1_000); });
+    expect(result.current.user).toBeNull();
+    expect(mockClearAllPatientCaches).not.toHaveBeenCalled();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000); });
+    expect(mockClearAllPatientCaches).toHaveBeenCalled();
+  });
+
+  it('are removed on manual sign-out', async () => {
+    storeSession('resident', Date.now() + 8 * 60 * 60 * 1000);
+    const { result } = boot();
+    act(() => { result.current.logout(); });
+    expect(mockClearAllPatientCaches).toHaveBeenCalled();
+  });
+
+  it('are removed when the server ends the session (for example an admin force-logout)', async () => {
+    storeSession('resident', Date.now() + 8 * 60 * 60 * 1000);
+    boot();
+    const onAuthEvent = mockOnAuthStateChange.mock.calls[0][0] as (event: string, session: unknown) => void;
+    act(() => { onAuthEvent('SIGNED_OUT', null); });
+    expect(mockClearAllPatientCaches).toHaveBeenCalled();
   });
 });
