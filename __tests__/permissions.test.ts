@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  can, assignableRoles, canChangePatient, isOrdersOnlyChange, Permission, type PatientChange,
+  can, assignableRoles, canChangePatient, canOpenView, isOrdersOnlyChange, Permission, type PatientChange,
 } from '../utils/permissions';
 import { AuthUser, UserRole } from '../types';
 
@@ -198,5 +198,30 @@ describe('assignableRoles() – who may hand out which role', () => {
 
   it('nobody signed in can assign nothing', () => {
     expect(assignableRoles(null)).toEqual([]);
+  });
+});
+
+// Regression (audit SEC-06 step 4): the menu hid Configuration, Team and the
+// audit log from non-admins, but typing the address (#/settings) opened them.
+describe('canOpenView() – admin-only screens', () => {
+  const ADMIN_VIEWS = ['settings', 'team', 'audit'];
+
+  it.each(['admin', 'superadmin'] as UserRole[])('%s can open every admin screen', (role) => {
+    ADMIN_VIEWS.forEach(view => expect(canOpenView(makeUser(role), view), view).toBe(true));
+  });
+
+  it.each(['resident', 'house_surgeon', 'attending'] as UserRole[])('%s cannot open any admin screen', (role) => {
+    ADMIN_VIEWS.forEach(view => expect(canOpenView(makeUser(role), view), view).toBe(false));
+  });
+
+  it('every role can open the ordinary screens', () => {
+    (['resident', 'house_surgeon', 'attending', 'admin'] as UserRole[]).forEach(role => {
+      ['dashboard', 'rounds', 'otlist', 'patient', 'labs'].forEach(view =>
+        expect(canOpenView(makeUser(role), view), `${role} → ${view}`).toBe(true));
+    });
+  });
+
+  it('nobody signed in cannot open an admin screen', () => {
+    expect(canOpenView(null, 'settings')).toBe(false);
   });
 });

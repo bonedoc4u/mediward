@@ -62,10 +62,9 @@ const RULED_ELSEWHERE: Record<string, string> = {
   medication_config: 'admins only (medication_config_write)',
   department_templates: 'admins only (dept_templates_write)',
   compliance_acceptances: 'each user records only their own acceptance (user_id = auth.uid())',
-  // SEC-06 step 4, still open: settings tables any hospital user can write today.
-  hospital_config: 'SEC-06 step 4 (open)',
-  ward_config: 'SEC-06 step 4 (open)',
-  unit_chiefs: 'SEC-06 step 4 (open)',
+  hospital_config: 'step 4: 20261114150000_settings_tables_role_rules.sql (admins; preset list also patient:add)',
+  ward_config: 'step 4: 20261114150000_settings_tables_role_rules.sql (admins only)',
+  unit_chiefs: 'step 4: 20261114150000_settings_tables_role_rules.sql (admins only)',
 };
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
@@ -129,21 +128,30 @@ describe('no table the app writes to is left without a role rule', () => {
 });
 
 describe('clinical tables: trigger and policies', () => {
-  const fn = sql.match(/CREATE OR REPLACE FUNCTION public\.enforce_role_permission\(\)[\s\S]*?AS \$\$([\s\S]*?)\$\$/)?.[1] ?? '';
+  // The function as the database ends up with it: a later migration (step 4)
+  // replaced it with a version that takes several permissions.
+  const fn = (() => {
+    let body = '';
+    for (const file of fs.readdirSync(DIR).filter(f => /^\d{14}_.*\.sql$/.test(f)).sort()) {
+      const text = stripComments(fs.readFileSync(path.join(DIR, file), 'utf-8'));
+      for (const m of text.matchAll(/CREATE OR REPLACE FUNCTION public\.enforce_role_permission\(\)[\s\S]*?AS \$\$([\s\S]*?)\$\$/g)) body = m[1];
+    }
+    return body;
+  })();
 
-  it('the trigger function asks the role table for the permission it was given', () => {
-    expect(fn).toContain('public.current_user_can(TG_ARGV[0])');
+  it('the trigger function asks the role table for the permissions it was given', () => {
+    expect(fn).toMatch(/FOR i IN 0 \.\. TG_NARGS - 1 LOOP\s+v_allowed := v_allowed OR public\.current_user_can\(TG_ARGV\[i\]\);/);
+    expect(fn).toMatch(/v_allowed boolean := false;/);
   });
 
   it('a refusal starts with ROLE_FORBIDDEN (the app keys on that text)', () => {
-    expect(fn).toMatch(/RAISE EXCEPTION 'ROLE_FORBIDDEN: /);
+    expect(fn).toMatch(/IF NOT v_allowed THEN\s+RAISE EXCEPTION 'ROLE_FORBIDDEN: /);
     expect(fn).toMatch(/ERRCODE = '42501'/);
   });
 
   it('service-role calls and cascades are let through, nothing else', () => {
-    expect(fn).toMatch(/IF auth\.uid\(\) IS NULL THEN\s+RETURN NULL;/);
-    expect(fn).toMatch(/IF pg_trigger_depth\(\) > 1 THEN\s+RETURN NULL;/);
-    expect(fn.match(/RETURN NULL;/g)?.length).toBe(3); // the two above, and the normal end
+    expect(fn).toMatch(/IF auth\.uid\(\) IS NULL OR pg_trigger_depth\(\) > 1 THEN\s+RETURN NULL;/);
+    expect(fn.match(/RETURN NULL;/g)?.length).toBe(2); // the line above, and the normal end
   });
 
   it('the trigger fires once per statement, before every insert, update and delete', () => {

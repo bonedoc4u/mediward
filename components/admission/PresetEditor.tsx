@@ -92,7 +92,7 @@ const PresetEditor: React.FC<Props> = ({ presets, onSave, onClose, prefill = '' 
               value={shortInput}
               onChange={e => setShortInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('preset-full-input')?.focus(); } }}
-              className="flex-1 text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none font-mono"
+              className="flex-1 min-w-0 text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none font-mono"
             />
             <input
               id="preset-full-input"
@@ -101,13 +101,13 @@ const PresetEditor: React.FC<Props> = ({ presets, onSave, onClose, prefill = '' 
               value={fullInput}
               onChange={e => setFullInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addEntry(); } }}
-              className="flex-[2] text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
+              className="flex-[2] min-w-0 text-sm p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"
             />
             <button
               type="button"
               onClick={addEntry}
               disabled={!shortInput.trim() || !fullInput.trim()}
-              className="flex items-center gap-1 px-3 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg"
+              className="shrink-0 flex items-center gap-1 px-3 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg"
             >
               <Plus className="w-4 h-4" />
             </button>

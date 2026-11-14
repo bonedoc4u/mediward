@@ -5,7 +5,7 @@ import { usePublicScreenHashSync } from './hooks/usePublicScreenHashSync';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
-import { can } from './utils/permissions';
+import { can, canOpenView } from './utils/permissions';
 import { needsPac, getAdmissionDayCohort } from './utils/calculations';
 import { todayYmd } from './utils/dates';
 import { App as CapApp } from '@capacitor/app';
@@ -371,7 +371,11 @@ const App: React.FC = () => {
     setIsMobileMenuOpen(false);
   }, []);
 
-  const meta = viewMeta[currentView as keyof typeof viewMeta] ?? viewMeta.dashboard;
+  // An admin-only screen opened by address (#/settings) by another role: the
+  // ward is shown instead. Everything drawn below uses `view`, so the title,
+  // the menu highlight and the screen always agree.
+  const view = canOpenView(user, currentView) ? currentView : 'dashboard';
+  const meta = viewMeta[view as keyof typeof viewMeta] ?? viewMeta.dashboard;
 
   // Patient quick-view sheet is open when a list view carries a patient id.
   const isPatientSheetOpen = !!navParams.id && SHEET_LIST_VIEWS.includes(currentView);
@@ -461,7 +465,7 @@ const App: React.FC = () => {
   const navSections = useMemo(() => {
     const sections: Record<string, NavItem[]> = {};
     navItems
-      .filter(item => (item.id !== 'team' && item.id !== 'audit' && item.id !== 'settings') || can(user, 'team:manage'))
+      .filter(item => canOpenView(user, item.id))
       .forEach(item => {
         if (!sections[item.section]) sections[item.section] = [];
         sections[item.section].push(item);
@@ -615,7 +619,7 @@ const App: React.FC = () => {
 
   // ─── Render View ───
   const renderView = () => {
-    switch (currentView) {
+    switch (view) {
       case 'discharge':
         return <DischargeSummaryView />;
       case 'round-mode':
@@ -664,10 +668,10 @@ const App: React.FC = () => {
         return (
           <WardDashboard
             patients={patients}
-            viewMode={currentView === 'dashboard' ? 'home' : currentView as 'pending' | 'master' | 'wenthome'}
+            viewMode={view === 'dashboard' ? 'home' : view as 'pending' | 'master' | 'wenthome'}
             onAddPatient={can(user, 'patient:add') ? openAddModal : undefined}
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
-            onViewPatient={(ipNo: string) => { setLastViewedPatient(ipNo); navigateTo(currentView, { id: ipNo }); }}
+            onViewPatient={(ipNo: string) => { setLastViewedPatient(ipNo); navigateTo(view, { id: ipNo }); }}
             highlightIpNo={highlightIpNo}
             onStartRounds={() => navigateTo('round-mode')}
             onAddLab={can(user, 'labs:write') ? async (ipNo, type, value, date) => {
@@ -818,14 +822,14 @@ const App: React.FC = () => {
                   key={item.id}
                   onClick={() => { navigateTo(item.id); setIsMobileMenuOpen(false); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
-                    currentView === item.id
+                    view === item.id
                       ? 'bg-teal-600/10 border border-teal-500/20 text-teal-400 border-l-2 border-l-teal-500'
                       : 'text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent'
                   }`}
                 >
                   <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
                   <span className="font-medium text-sm">{item.label}</span>
-                  {currentView === item.id && (
+                  {view === item.id && (
                     <div className="ml-auto w-1.5 h-1.5 bg-teal-400 rounded-full"></div>
                   )}
                 </button>
@@ -990,13 +994,13 @@ const App: React.FC = () => {
           {mobileTabs.map(tab => (
             <button
               key={tab.id}
-              aria-current={currentView === tab.id ? 'page' : undefined}
+              aria-current={view === tab.id ? 'page' : undefined}
               onClick={() => { navigateTo(tab.id); setIsMobileMenuOpen(false); }}
               className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
-                currentView === tab.id ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
+                view === tab.id ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
               }`}
             >
-              {currentView === tab.id && (
+              {view === tab.id && (
                 <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-teal-600 rounded-full" />
               )}
               <tab.icon className="w-5 h-5" />
