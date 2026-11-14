@@ -28,6 +28,7 @@ function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number)
 import { Patient, LabResult, Investigation, DailyRound, VitalSigns } from '../types';
 import { enrichPatientData, buildSurgeryUpdate } from '../utils/calculations';
 import { resolveEffectiveUnit } from '../utils/effectiveUnit';
+import { applyPatientInsert, applyPatientUpdate, removePatientsFromList } from '../utils/patientRealtime';
 import { sanitizeInput } from '../utils/sanitize';
 import { logAuditEvent } from '../services/auditLog';
 import {
@@ -613,72 +614,43 @@ export const PatientProvider: React.FC<{ children: React.ReactNode }> = ({ child
             // decide what to do, then fetch the full row via SELECT which is
             // RLS-protected. This prevents PHI leakage even if the realtime
             // channel were misconfigured or Supabase Realtime auth is bypassed.
-            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-              const ipNo    = (payload.new as { ip_no?: string })?.ip_no;
-              const rowUnit = (payload.new as { unit?: string })?.unit;
-              if (!ipNo) return;
+            // Only INSERT and UPDATE arrive: deletion events are switched off in
+            // the database (they bypass access rules). See utils/patientRealtime.ts.
+            if (payload.eventType !== 'INSERT' && payload.eventType !== 'UPDATE') return;
+            const ipNo    = (payload.new as { ip_no?: string })?.ip_no;
+            const rowUnit = (payload.new as { unit?: string })?.unit;
+            if (!ipNo) return;
+            // patients.ip_no is the primary key; REPLICA IDENTITY DEFAULT means
+            // an UPDATE that changes it carries the OLD ip_no in payload.old.
+            const oldIpNo = payload.eventType === 'UPDATE'
+              ? (payload.old as { ip_no?: string } | null)?.ip_no
+              : undefined;
 
-              // Client-side unit filter (belt-and-suspenders — DB filter is primary)
-              const activeUnit = effectiveUnitRef.current;
-              if (activeUnit && rowUnit && rowUnit !== activeUnit) return;
+            const commit = (change: (prev: Patient[]) => Patient[] | null, enrich: boolean) =>
+              setPatients(prev => {
+                const changed = change(prev);
+                if (!changed) return prev;
+                const next = enrich ? enrichPatientData(changed) : changed;
+                debouncedSaveActiveCache(next, effectiveHospitalId);
+                return next;
+              });
+            // An UPDATE that leaves the patient invisible here (removed, moved
+            // to another unit, or no longer readable) takes it off this list.
+            const dropIfUpdate = () => {
+              if (payload.eventType === 'UPDATE') commit(prev => removePatientsFromList(prev, [ipNo, oldIpNo]), false);
+            };
 
-              // Fetch full row through RLS — ensures we can only see authorised data
-              const fresh = await fetchPatientById(ipNo, hospitalIdRef.current ?? undefined);
-              if (!fresh) return; // RLS blocked it (wrong hospital or unit)
+            // Client-side unit filter (belt-and-suspenders — DB filter is primary)
+            const activeUnit = effectiveUnitRef.current;
+            if (activeUnit && rowUnit && rowUnit !== activeUnit) { dropIfUpdate(); return; }
 
-              if (payload.eventType === 'INSERT') {
-                setPatients(prev => {
-                  if (prev.some(p => p.ipNo === fresh.ipNo)) return prev;
-                  const next = enrichPatientData([fresh, ...prev]);
-                  debouncedSaveActiveCache(next, effectiveHospitalId);
-                  return next;
-                });
-              } else {
-                // patients.ip_no is the primary key; REPLICA IDENTITY DEFAULT
-                // means an UPDATE that changes it carries the OLD ip_no in
-                // payload.old (needed to identify which row changed) — so we
-                // detect a rename by comparing values, not by presence alone.
-                const oldIpNo = (payload.old as { ip_no?: string } | null)?.ip_no;
-                const renamed = !!oldIpNo && oldIpNo !== fresh.ipNo;
-                setPatients(prev => {
-                  const currentEntry = prev.find(p => p.ipNo === fresh.ipNo);
-                  const oldEntry = renamed ? prev.find(p => p.ipNo === oldIpNo) : undefined;
-                  const source = currentEntry ?? oldEntry;
-                  // Neither this patient's current nor (for a rename) former key
-                  // is in this device's list at all — e.g. a colleague edited a
-                  // patient outside this device's loaded page or unit filter.
-                  // Stay a no-op, same as before a rename could ever occur here;
-                  // the INSERT branch above is what handles a genuinely new
-                  // patient entering this device's scope.
-                  if (!source) return prev;
-                  // Merge: keep locally-loaded sub-records (labs, imaging, rounds)
-                  const merged = {
-                    ...fresh,
-                    labResults:     source.labResults,
-                    investigations: source.investigations,
-                    dailyRounds:    source.dailyRounds,
-                    vitals:         source.vitals,
-                  };
-                  const withoutStaleEntry = oldEntry ? prev.filter(p => p.ipNo !== oldIpNo) : prev;
-                  const next = enrichPatientData(
-                    currentEntry
-                      ? withoutStaleEntry.map(p => p.ipNo === fresh.ipNo ? merged : p)
-                      : [merged, ...withoutStaleEntry],
-                  );
-                  debouncedSaveActiveCache(next, effectiveHospitalId);
-                  return next;
-                });
-              }
-            } else if (payload.eventType === 'DELETE') {
-              const deletedIpNo = (payload.old as { ip_no?: string })?.ip_no;
-              if (deletedIpNo) {
-                setPatients(prev => {
-                  const next = prev.filter(p => p.ipNo !== deletedIpNo);
-                  debouncedSaveActiveCache(next, effectiveHospitalId);
-                  return next;
-                });
-              }
-            }
+            // Fetch full row through RLS — ensures we can only see authorised data.
+            // null: soft-deleted, or RLS hides it (wrong hospital or unit).
+            const fresh = await fetchPatientById(ipNo, hospitalIdRef.current ?? undefined);
+            if (!fresh) { dropIfUpdate(); return; }
+
+            if (payload.eventType === 'INSERT') commit(prev => applyPatientInsert(prev, fresh), true);
+            else commit(prev => applyPatientUpdate(prev, fresh, oldIpNo), true);
           },
         )
         .subscribe((status) => {

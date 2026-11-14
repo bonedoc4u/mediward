@@ -273,7 +273,7 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .on('postgres_changes', { event: '*', schema: 'public', table: 'ward_config' }, loadAll)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'lab_type_config' }, loadAll)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'hospital_config' }, loadAll)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'medications' }, loadAll)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'medication_config' }, loadAll)
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             retryDelay = 2000;

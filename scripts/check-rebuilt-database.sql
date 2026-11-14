@@ -62,6 +62,22 @@ BEGIN
     RAISE EXCEPTION 'radiology storage rules are not the four hospital-scoped ones';
   END IF;
 
+  -- 6. Live updates never send deletion events: Supabase cannot apply
+  --    access rules to them (OPS-03; on dev they leaked other hospitals'
+  --    IP numbers). Every table sent live has row-level security.
+  IF EXISTS (SELECT 1 FROM pg_publication
+             WHERE pubname = 'supabase_realtime' AND (pubdelete OR pubtruncate)) THEN
+    RAISE EXCEPTION 'supabase_realtime sends delete or truncate events';
+  END IF;
+  SELECT string_agg(pt.tablename, ', ') INTO bad
+  FROM pg_publication_tables pt
+  JOIN pg_class c ON c.relname = pt.tablename
+  JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = pt.schemaname
+  WHERE pt.pubname = 'supabase_realtime' AND NOT c.relrowsecurity;
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Live-update tables without row-level security: %', bad;
+  END IF;
+
   RAISE NOTICE 'Rebuilt database checks passed.';
 END
 $check$;

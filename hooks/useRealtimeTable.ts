@@ -29,6 +29,9 @@ export interface UseRealtimeTableOptions<T extends Record<string, unknown>> {
   event?: PgEvent;
   onInsert?: (row: T) => void;
   onUpdate?: (row: T) => void;
+  /** Never fires: deletion events are switched off in the database because
+   *  they bypass access rules (migration 20261115100000). Kept for type
+   *  compatibility; use soft-delete UPDATEs instead. */
   onDelete?: (row: Partial<T>) => void;
   /** Set to false while required values (hospitalId, userId) are not yet known.
    *  Prevents opening an unscoped channel that leaks cross-tenant events. */
