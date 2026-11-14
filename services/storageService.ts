@@ -198,3 +198,74 @@ export async function deleteInvestigationImage(imageUrl: string): Promise<void> 
     // URL parsing failed — ignore
   }
 }
+
+// ─── Removing all of one patient's files (erase request) ─────────────────────
+
+const parentOf = (path: string): string => path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+
+/** Every file directly inside a folder of the radiology bucket, as full paths. */
+async function listFolder(folder: string): Promise<string[]> {
+  const PAGE = 1000;
+  const found: string[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase.storage.from('radiology').list(folder, { limit: PAGE, offset });
+    if (error) throw new Error(`The stored image files could not be listed: ${error.message}`);
+    // Entries without an id are sub-folders, not files.
+    found.push(...(data ?? []).filter(f => f.id).map(f => (folder ? `${folder}/${f.name}` : f.name)));
+    if (!data || data.length < PAGE) return found;
+  }
+}
+
+export interface RemovedPatientFiles {
+  /** Files that existed and are now gone. */
+  removed: number;
+  /** Recorded links that are not in this hospital's storage and were left alone. */
+  skipped: number;
+}
+
+/**
+ * Remove every stored image that belongs to a patient: everything in the
+ * patient's own folder, plus the paths recorded on the patient's imaging rows
+ * (a corrected IP number leaves older files under the old folder).
+ *
+ * Throws if any of those files is still there afterwards. Storage reports a
+ * refused delete as "nothing removed", not as an error, so the only proof is
+ * to look again.
+ */
+export async function removePatientFiles(
+  hospitalId: string,
+  patientIpNo: string,
+  recordedPaths: string[],
+): Promise<RemovedPatientFiles> {
+  if (!hospitalId || !patientIpNo) throw new Error('removePatientFiles: hospital and IP number are required');
+
+  const recorded = recordedPaths.filter(p => p && !p.startsWith('data:')).map(extractStoragePath);
+  // Only this hospital's own storage. A link elsewhere is not ours to delete.
+  const ours = recorded.filter(p => p.startsWith(`${hospitalId}/`));
+  const candidates = [...new Set([...ours.map(parentOf), `${hospitalId}/${patientIpNo}`])];
+
+  const existing = async (): Promise<Set<string>> => {
+    const all = new Set<string>();
+    for (const folder of candidates) (await listFolder(folder)).forEach(p => all.add(p));
+    return all;
+  };
+
+  const before = await existing();
+  const ownFolder = `${hospitalId}/${patientIpNo}/`;
+  const targets = [...before].filter(p => p.startsWith(ownFolder) || ours.includes(p));
+
+  for (let i = 0; i < targets.length; i += 100) {
+    const { error } = await supabase.storage.from('radiology').remove(targets.slice(i, i + 100));
+    if (error) throw new Error(`The image files could not be removed: ${error.message}`);
+  }
+  targets.forEach(p => _urlCache.delete(p));
+
+  if (targets.length > 0) {
+    const after = await existing();
+    const left = targets.filter(p => after.has(p));
+    if (left.length > 0) {
+      throw new Error(`${left.length} of ${targets.length} image file(s) could not be removed.`);
+    }
+  }
+  return { removed: targets.length, skipped: recorded.length - ours.length };
+}
