@@ -3,13 +3,14 @@ import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac, isPendingSurgicalCandidate } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, FlaskConical, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
+import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronRight, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
 import { exportWardListPDF } from '../utils/exportWardList';
 import { toast } from '../utils/toast';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { calcPod } from './HandoverSummary';
 import TodaySchedule from './TodaySchedule';
+import PatientCard from '../src/features/ward/PatientCard';
 import OTDatePicker from './OTDatePicker';
 import { resolveEffectiveUnit } from '../utils/effectiveUnit';
 
@@ -50,7 +51,7 @@ import { todayYmd } from '../utils/dates';
 
 // ─── Virtual list item types ───
 type FlatItem =
-  | { kind: 'ward-header'; ward: string; isIcu: boolean; count: number }
+  | { kind: 'ward-header'; ward: string; isIcu: boolean; count: number; rounded: number }
   | { kind: 'patient'; patient: Patient; ward: string; isIcu: boolean };
 
 interface Props {
@@ -158,13 +159,16 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         // All views: primary sort is bed number so the list mirrors the physical ward layout
         return sortByBed(a, b);
       });
-      items.push({ kind: 'ward-header', ward, isIcu: isIcuWard, count: wps.length });
+      items.push({
+        kind: 'ward-header', ward, isIcu: isIcuWard, count: wps.length,
+        rounded: wps.filter(p => p.dailyRounds.some(r => r.date === today)).length,
+      });
       for (const patient of wps) {
         items.push({ kind: 'patient', patient, ward, isIcu: isIcuWard });
       }
     }
     return items;
-  }, [wardsToDisplay, patientsByWard, icuWardNames]);
+  }, [wardsToDisplay, patientsByWard, icuWardNames, today]);
 
   const listRef = useRef<HTMLDivElement>(null);
   // scrollMargin must be measured after mount — listRef.current is null during render
@@ -408,22 +412,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           return sortByBed(a, b);
         });
         const isIcuWard = icuWardNames.has(ward);
-        const criticalCount = isIcuWard ? wardPatients.length : 0;
         return (
         <div key={ward} className="space-y-2">
           <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border ${isIcuWard ? 'bg-accent-soft text-ink border-line' : 'bg-surface-sunken text-ink border-line'}`}>
             <Layout className="w-4 h-4" />
             <h3 className="font-bold uppercase tracking-wide text-sm">{ward}</h3>
-            <span className="text-xs font-normal opacity-70">({wardPatients.length})</span>
-            {isIcuWard && criticalCount > 0 && (
-              <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border px-2 py-0.5 rounded-full">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vital-critical opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-vital-critical" />
-                </span>
-                CRITICAL
-              </span>
-            )}
+            <span className="text-xs text-ink-muted">
+              {wardPatients.length} patient{wardPatients.length !== 1 ? 's' : ''} · {wardPatients.filter(p => p.dailyRounds.some(r => r.date === today)).length} rounded
+            </span>
           </div>
 
           {/* Desktop Table (md and up) */}
@@ -644,68 +640,23 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                   <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border mb-2 ${item.isIcu ? 'bg-accent-soft text-ink border-line' : 'bg-surface-sunken text-ink border-line'}`}>
                     <Layout className="w-4 h-4" />
                     <h3 className="font-bold uppercase tracking-wide text-sm">{item.ward}</h3>
-                    <span className="text-xs font-normal opacity-70">({item.count})</span>
-                    {item.isIcu && (
-                      <span className="ml-auto flex items-center gap-1.5 text-xs font-bold text-vital-critical-fg bg-vital-critical-surface border border-vital-critical-border px-2 py-0.5 rounded-full">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-vital-critical opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-vital-critical" />
-                        </span>
-                        CRITICAL
-                      </span>
-                    )}
+                    {/* A ward is a place, not an alarm: the same neutral header for every
+                        ward, ICU included. It used to pulse a red "CRITICAL" for any ICU. */}
+                    <span className="text-xs text-ink-muted">
+                      {item.count} patient{item.count !== 1 ? 's' : ''} · {item.rounded} rounded
+                    </span>
                   </div>
                 ) : (
-                  <div
-                    className={`p-4 space-y-3 bg-surface-card border border-line rounded-lg mb-2 ${getTriageBorderClass(item.patient)} ${
-                      !item.patient.dos && needsPac(item.patient) && item.patient.pacStatus === PacStatus.Pending ? 'bg-vital-critical-surface/20' : ''
-                    } ${highlightIpNo === item.patient.ipNo ? 'row-highlight' : ''}`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-white text-sm font-bold font-mono w-10 h-10 shrink-0 flex items-center justify-center rounded-lg ${item.isIcu ? 'bg-vital-critical' : 'bg-accent'}`}>
-                          {shortBed(item.patient.bed)}
-                        </span>
-                        <div>
-                          <h3 className="font-bold text-ink flex items-center gap-1.5 max-w-[160px] truncate" title={item.patient.name}>
-                            <span className="truncate">{item.patient.name}</span>
-                            {item.patient.dailyRounds.some(r => r.date === today) && (
-                              <span title="Rounded today">
-                                <CheckCircle2 className="w-3 h-3 text-vital-normal shrink-0" />
-                              </span>
-                            )}
-                          </h3>
-                          <div className="text-xs text-ink-muted">
-                            {item.patient.age}y • {item.patient.gender} • {item.patient.ipNo}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {showNews2 && <News2Badge vitals={item.patient.vitals} compact />}
-                        {calcPod(item.patient.dos, item.patient.dod ?? today) !== undefined && (
-                          <div className="text-xs font-bold uppercase text-ink-muted border-2 border-vital-normal bg-vital-normal-surface p-1.5 rounded text-center">
-                            <span className="text-vital-normal-fg block text-[9px]">POD</span>
-                            <span className="text-lg font-mono text-vital-normal-fg block leading-none">{calcPod(item.patient.dos, item.patient.dod ?? today)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-sm border-t border-line pt-2">
-                      <p className="font-medium text-ink break-words">{item.patient.diagnosis}</p>
-                      {item.patient.procedure && <p className="text-xs text-ink-muted mt-0.5">{item.patient.procedure}</p>}
-                      {item.patient.comorbidities.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {item.patient.comorbidities.slice(0, 2).map(c => (
-                            <span key={c} className="px-2 py-0.5 bg-surface-sunken text-ink-muted rounded text-xs">{c}</span>
-                          ))}
-                          {item.patient.comorbidities.length > 2 && (
-                            <span className="px-2 py-0.5 text-ink-faint text-xs">+{item.patient.comorbidities.length - 2} more</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    {/* Planned date row — pending view only */}
-                    {viewMode === 'pending' && (
+                  <PatientCard
+                    patient={item.patient}
+                    today={today}
+                    highlighted={highlightIpNo === item.patient.ipNo}
+                    onOpen={onViewPatient ? () => onViewPatient(item.patient.ipNo) : undefined}
+                    onEdit={onEditPatient ? () => onEditPatient(item.patient) : undefined}
+                    onAddLab={onAddLab ? () => { setQuickLabIp(item.patient.ipNo); setQuickLabType(''); setQuickLabValue(''); } : undefined}
+                    /* Planned date row — pending view only */
+                    footer={viewMode === 'pending' ? (
+
                       <div className="flex items-center gap-2 border-t border-line pt-2">
                         {item.patient.plannedDos ? (
                           <button
@@ -725,63 +676,8 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
                           </button>
                         ) : null}
                       </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-wrap gap-1.5">
-                        {!item.patient.dos && (
-                          needsPac(item.patient) ? (
-                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.pacStatus)}`}>
-                              {item.patient.pacStatus === 'PAC Pending' && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
-                              {item.patient.pacStatus === 'PAC Fit' && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
-                              {item.patient.pacStatus}
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border">
-                              <Leaf className="w-3 h-3" aria-hidden="true" /> Conservative
-                            </span>
-                          )
-                        )}
-                        {item.patient.patientStatus !== PatientStatus.Fit && (
-                          <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(item.patient.patientStatus)}`}>
-                            {item.patient.patientStatus === PatientStatus.Critical && <AlertCircle className="w-3 h-3" aria-hidden="true" />}
-                            {item.patient.patientStatus === PatientStatus.DischargeReady && <CheckCircle2 className="w-3 h-3" aria-hidden="true" />}
-                            {item.patient.patientStatus === PatientStatus.Review ? 'Needs Review' : item.patient.patientStatus}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-2 shrink-0">
-                        {onAddLab && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setQuickLabIp(item.patient.ipNo); setQuickLabType(''); setQuickLabValue(''); }}
-                            className="w-11 h-11 flex items-center justify-center bg-accent-soft hover:bg-accent-soft rounded-lg text-accent-fg transition-colors"
-                            title="Quick Lab Entry"
-                            aria-label={`Add lab result for ${item.patient.name}`}
-                          >
-                            <FlaskConical className="w-4 h-4" />
-                          </button>
-                        )}
-                        {onEditPatient && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onEditPatient(item.patient); }}
-                            className="w-11 h-11 flex items-center justify-center bg-surface-sunken hover:bg-accent-soft rounded-lg text-ink-muted transition-colors"
-                            title="Edit"
-                            aria-label={`Edit ${item.patient.name}`}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                        )}
-                        {onViewPatient && (
-                          <button
-                            onClick={() => onViewPatient(item.patient.ipNo)}
-                            className="px-3 py-1.5 bg-accent hover:bg-accent-pressed text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors"
-                            aria-label={`View details for ${item.patient.name}`}
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" /> View
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    ) : undefined}
+                  />
                 )}
               </div>
             );

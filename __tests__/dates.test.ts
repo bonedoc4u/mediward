@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { localYmd, todayYmd } from '../utils/dates';
+import { localYmd, todayYmd, formatDayMonth } from '../utils/dates';
 
 describe('localYmd', () => {
   // The property toISOString() violates: a Date built from local components
@@ -21,5 +21,22 @@ describe('localYmd', () => {
 describe('todayYmd', () => {
   it('matches localYmd of now', () => {
     expect(todayYmd()).toBe(localYmd(new Date()));
+  });
+});
+
+describe('formatDayMonth — the one short date format', () => {
+  it('formats a calendar date without a time zone shift', () => {
+    expect(formatDayMonth('2026-11-10')).toBe('10 Nov');
+    expect(formatDayMonth('2026-01-01')).toBe('1 Jan');
+    expect(formatDayMonth('2026-12-31')).toBe('31 Dec');
+  });
+  it('accepts a full timestamp and uses its date part', () => {
+    expect(formatDayMonth('2026-11-10T23:59:00+05:30')).toBe('10 Nov');
+  });
+  it('returns an empty string for anything it cannot read', () => {
+    expect(formatDayMonth(undefined)).toBe('');
+    expect(formatDayMonth(null)).toBe('');
+    expect(formatDayMonth('10/11/2026')).toBe('');
+    expect(formatDayMonth('2026-13-40')).toBe('');
   });
 });
