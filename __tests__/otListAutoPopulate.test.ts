@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { findNewlyPlannedOTAssignments } from '../utils/otListAutoPopulate';
-import { Patient, Gender, PacStatus, PatientStatus } from '../types';
+import { findNewlyPlannedOTAssignments, mayAutoAddPlannedPatients } from '../utils/otListAutoPopulate';
+import { AuthUser, Patient, Gender, PacStatus, PatientStatus, UserRole } from '../types';
 
 const makePatient = (overrides: Partial<Patient> = {}): Patient => ({
   ipNo: 'IP001', name: 'Ravi Kumar', mobile: '9876543210', age: 52,
@@ -62,5 +62,36 @@ describe('findNewlyPlannedOTAssignments', () => {
     const patients = [makePatient({ ipNo: 'IP001', unit: 'OR1', plannedDos: '2026-08-05' })];
     const result = findNewlyPlannedOTAssignments(patients, new Set(), tabDates);
     expect(result[0].otType).toBe('Minor'); // OR1's real Wednesday type, matching the fallback here too
+  });
+});
+
+// Regression (audit SEC-06 step 3): opening the OT list as an attending tried
+// to create the list and add planned patients. The database now refuses that
+// write for the role, and the screen showed the raw refusal.
+describe('mayAutoAddPlannedPatients', () => {
+  const user = (role: UserRole): AuthUser => ({
+    id: 'u1', email: 'x@test', name: 'X', role, hospitalId: 'h-1', sessionExpiry: Date.now() + 1000,
+  } as AuthUser);
+
+  it('a role that cannot change the OT list never auto-adds (opening a screen must not write)', () => {
+    expect(mayAutoAddPlannedPatients(user('attending'), 'OR1')).toBe(false);
+  });
+
+  it.each(['resident', 'house_surgeon'] as UserRole[])('%s in a unit auto-adds', (role) => {
+    expect(mayAutoAddPlannedPatients(user(role), 'OR1')).toBe(true);
+  });
+
+  it('an admin auto-adds only when one unit is selected', () => {
+    expect(mayAutoAddPlannedPatients(user('admin'), 'OR1')).toBe(true);
+    expect(mayAutoAddPlannedPatients(user('admin'), 'all')).toBe(false);
+    expect(mayAutoAddPlannedPatients(user('admin'), null)).toBe(false);
+  });
+
+  it('a superadmin never auto-adds', () => {
+    expect(mayAutoAddPlannedPatients(user('superadmin'), 'OR1')).toBe(false);
+  });
+
+  it('nobody signed in: no', () => {
+    expect(mayAutoAddPlannedPatients(null, 'OR1')).toBe(false);
   });
 });

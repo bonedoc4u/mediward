@@ -40,6 +40,10 @@ import {
   upsertPatient,
   removePatient,
   renamePatientIpNo,
+  fetchPatientById,
+  patientToRow,
+  PATIENT_LIST_SELECT,
+  PATIENT_SELECT,
 } from '../../services/patientService';
 import { Patient, PatientStatus, PacStatus, Gender } from '../../types';
 
@@ -390,7 +394,7 @@ describe('upsertPatient', () => {
 
 describe('removePatient', () => {
   it('calls supabase.from("patients")', async () => {
-    mockState.result = { data: null, error: null };
+    mockState.result = { data: [{ ip_no: 'IP001' }], error: null };
     await removePatient('IP001');
     expect(supabase.from).toHaveBeenCalledWith('patients');
   });
@@ -401,11 +405,19 @@ describe('removePatient', () => {
     await expect(removePatient('IP001')).rejects.toThrow('forbidden');
   });
 
-  it('resolves without throwing on success', async () => {
-    mockState.result = { data: null, error: null };
+  it('resolves when the server confirms it removed the record', async () => {
+    mockState.result = { data: [{ ip_no: 'IP001' }], error: null };
     await expect(removePatient('IP001')).resolves.toBeUndefined();
   });
+
+  // Regression (audit DATA-06): RLS can match zero rows without an error.
+  // That used to resolve, so the caller reported a removal that never happened.
+  it('throws when the server removed nothing', async () => {
+    mockState.result = { data: [], error: null };
+    await expect(removePatient('IP001')).rejects.toThrow('no record was removed');
+  });
 });
+
 
 // ─── renamePatientIpNo ────────────────────────────────────────────────────────
 
@@ -430,5 +442,88 @@ describe('renamePatientIpNo', () => {
   it('surfaces the server error message (e.g. duplicate IP, permission denied)', async () => {
     mockState.rpcResult = { data: null, error: { message: 'IP number IP999 is already in use' } };
     await expect(renamePatientIpNo('IP001', 'IP999')).rejects.toThrow('IP number IP999 is already in use');
+  });
+});
+
+// ─── Saved columns must be loaded columns ────────────────────────────────────
+//
+// Regression (audit DATA-01): every save writes the whole row, but the loads
+// did not ask for drug_allergies, dama_summary, death_summary (and the list
+// load skipped pac_flow). Those came back "empty", and the next save of any
+// kind — ticking one order in Round Mode was enough — erased them in the DB.
+
+/** Top-level column names of a PostgREST select string (ignores joined tables). */
+const topLevelColumns = (select: string): string[] =>
+  select.replace(/\w+\([^)]*\)/g, '').split(',').map(c => c.trim()).filter(Boolean);
+
+const FULL_PATIENT = makePatient({
+  version: 3,
+  drugAllergies: ['Penicillin', 'NSAIDs'],
+  pacFlow: {
+    seenByAnaesthesia: true,
+    seenDate: '2026-11-11',
+    branches: [{ id: 'b1', label: 'Cardiology fitness', isDone: false, items: [] }],
+  },
+  damaSummary:  { reason: 'left against advice' } as unknown as Patient['damaSummary'],
+  deathSummary: { cause: 'test' } as unknown as Patient['deathSummary'],
+});
+
+describe('every column a save writes is also loaded', () => {
+  const savedColumns = Object.keys(patientToRow(FULL_PATIENT));
+
+  it.each([
+    ['ward-list load (PATIENT_LIST_SELECT)', PATIENT_LIST_SELECT],
+    ['single-patient load (PATIENT_SELECT)',  PATIENT_SELECT],
+  ])('%s asks for every saved column', (_label, select) => {
+    const loaded = new Set(topLevelColumns(select));
+    const savedButNotLoaded = savedColumns.filter(c => !loaded.has(c));
+    expect(savedButNotLoaded).toEqual([]);
+  });
+
+  it('names the four columns that were being erased', () => {
+    for (const select of [PATIENT_LIST_SELECT, PATIENT_SELECT]) {
+      const loaded = topLevelColumns(select);
+      expect(loaded).toEqual(expect.arrayContaining(['drug_allergies', 'pac_flow', 'dama_summary', 'death_summary']));
+    }
+  });
+});
+
+describe('load → save round trip keeps clinical fields', () => {
+  const DB_ROW = makeRow({
+    version: 3,
+    drug_allergies: ['Penicillin', 'NSAIDs'],
+    pac_flow: FULL_PATIENT.pacFlow,
+    dama_summary: { reason: 'left against advice' },
+    death_summary: { cause: 'test' },
+  });
+
+  /** The row payload of the most recent .update() call. */
+  const lastUpdatePayload = (): Record<string, unknown> => {
+    const builders = vi.mocked(supabase.from).mock.results.map(r => r.value);
+    const calls = builders.flatMap(b => b.update.mock.calls);
+    return calls[calls.length - 1][0];
+  };
+
+  it.each([
+    ['the ward list',     async () => (await fetchActivePatients())[0]],
+    ['the patient page',  async () => (await fetchPatientById('IP001'))!],
+  ])('a patient loaded from %s is saved back with allergies, PAC steps and summaries intact', async (_label, load) => {
+    // maybeSingle() resolves with one row; list queries with an array.
+    mockState.result = { data: _label === 'the patient page' ? (DB_ROW as any) : [DB_ROW], error: null };
+    const loaded = await load();
+
+    expect(loaded.drugAllergies).toEqual(['Penicillin', 'NSAIDs']);
+    expect(loaded.pacFlow).toEqual(FULL_PATIENT.pacFlow);
+
+    // The smallest possible edit: tick one order.
+    const edited: Patient = { ...loaded, todos: [{ id: 't1', task: 'Repeat Hb', isDone: true }] };
+    mockState.result = { data: [{ version: 4 }], error: null };
+    await upsertPatient(edited);
+
+    const sent = lastUpdatePayload();
+    expect(sent.drug_allergies).toEqual(['Penicillin', 'NSAIDs']);
+    expect(sent.pac_flow).toEqual(FULL_PATIENT.pacFlow);
+    expect(sent.dama_summary).toEqual({ reason: 'left against advice' });
+    expect(sent.death_summary).toEqual({ cause: 'test' });
   });
 });

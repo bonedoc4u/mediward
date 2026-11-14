@@ -15,7 +15,7 @@ import {
   fetchWards, createWard, updateWard, deleteWard,
   fetchLabTypes, createLabType, updateLabType, deleteLabType,
   fetchUnitChiefs, upsertUnitChief,
-  fetchHospitalConfig, upsertHospitalConfig,
+  fetchHospitalConfig, upsertHospitalConfig, updateComorbidityMap,
   fetchMedications, createMedication, updateMedication, deleteMedication,
   seedDefaultMedications,
   fetchDepartmentTemplate, saveDepartmentTemplate, deleteDepartmentTemplate,
@@ -28,6 +28,8 @@ import {
 import { saveToStorage, loadFromStorage } from '../services/persistence';
 import { supabase } from '../lib/supabase';
 import { toast } from '../utils/toast';
+import { isRoleRefusal } from '../services/syncReplay';
+import { PERMISSION_DENIED_MESSAGE } from '../utils/permissions';
 import { useAuth } from './AuthContext';
 
 // ─── localStorage cache keys ───
@@ -337,15 +339,27 @@ export const ConfigProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toast.success('Hospital settings saved');
   }, []);
 
+  // The preset list is the one setting every doctor who admits patients may
+  // change (from the Add patient form). It is saved on its own, never with the
+  // rest of the settings row, and "saved" is shown only after the server said so.
   const saveComorbidityMap = useCallback(async (map: ComorbidityEntry[]) => {
-    setHospitalConfigState(prev => {
-      const next = { ...prev, comorbidityMap: map };
-      upsertHospitalConfig(next).catch(err => console.error('[Config] saveComorbidityMap failed:', err));
+    const before = hospitalConfig.comorbidityMap;
+    const next = { ...hospitalConfig, comorbidityMap: map };
+    setHospitalConfigState(prev => ({ ...prev, comorbidityMap: map }));
+    try {
+      const saved = await updateComorbidityMap(map);
+      // No settings row yet: first set-up. Only an admin can create it.
+      if (!saved) await upsertHospitalConfig(next);
       saveToStorage(HOSPITAL_CONFIG_CACHE_KEY, next);
-      return next;
-    });
-    toast.success('Comorbidity list saved');
-  }, []);
+      toast.success('Comorbidity list saved');
+    } catch (err) {
+      console.error('[Config] saveComorbidityMap failed:', err);
+      setHospitalConfigState(prev => ({ ...prev, comorbidityMap: before }));
+      toast.error(isRoleRefusal(err)
+        ? PERMISSION_DENIED_MESSAGE
+        : 'The comorbidity list was NOT saved. Check the connection and try again.');
+    }
+  }, [hospitalConfig]);
 
   const saveWeekendDuty = useCallback(async (map: Record<string, string>) => {
     setHospitalConfigState(prev => {

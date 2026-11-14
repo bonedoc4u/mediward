@@ -23,7 +23,8 @@ type RadPhase = 'preop' | 'postop';
 
 interface Props {
   patients: Patient[];
-  onAddInvestigation: (patientId: string, investigation: Investigation) => void;
+  /** Omit for a user who may not add images: camera and upload controls are then not shown. */
+  onAddInvestigation?: (patientId: string, investigation: Investigation) => void;
   onDeleteInvestigation?: (patientId: string, investigationId: string) => void;
   initialPatientId?: string;
 }
@@ -429,7 +430,7 @@ const RadiologyComparator: React.FC<Props> = ({
           // Conservative patients can't file post-op — guard against stale phase state
           phase: showPostOp ? uploadPhase : 'preop',
         };
-        onAddInvestigation(selectedPatientId, newInv);
+        onAddInvestigation?.(selectedPatientId, newInv);
       } catch (err) {
         failed.push({ file, message: err instanceof Error ? err.message : 'Upload failed' });
       }
@@ -582,7 +583,7 @@ const RadiologyComparator: React.FC<Props> = ({
                 </p>
               </div>
             )}
-            {isNativePlatform && (
+            {isNativePlatform && onAddInvestigation && (
               <button
                 onClick={handleCameraClick}
                 className="shrink-0 flex items-center gap-1.5 bg-accent hover:bg-accent-pressed
@@ -606,7 +607,7 @@ const RadiologyComparator: React.FC<Props> = ({
                   onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                 />
               ))}
-              <UploadCard phase="preop" onClick={() => openUpload('preop')} />
+              {onAddInvestigation && <UploadCard phase="preop" onClick={() => openUpload('preop')} />}
             </div>
           </div>
 
@@ -623,7 +624,7 @@ const RadiologyComparator: React.FC<Props> = ({
                     onDelete={onDeleteInvestigation ? () => handleDelete(inv.id, inv.imageUrl) : undefined}
                   />
                 ))}
-                <UploadCard phase="postop" onClick={() => openUpload('postop')} />
+                {onAddInvestigation && <UploadCard phase="postop" onClick={() => openUpload('postop')} />}
               </div>
             </div>
           ) : (

@@ -10,7 +10,8 @@ import { todayYmd } from '../utils/dates';
 
 interface Props {
   patients: Patient[];
-  onAddResult: (patientId: string, result: LabResult) => void;
+  /** Omit for a user who may not add lab results: the "Add entry" buttons are then not shown. */
+  onAddResult?: (patientId: string, result: LabResult) => void;
   initialPatientId?: string;
 }
 
@@ -126,7 +127,7 @@ const AddEntrySheet: React.FC<{
 const LabChartCard: React.FC<{
   param: LabTypeConfig;
   entries: LabEntry[];
-  onAddEntry: (paramId: string) => void;
+  onAddEntry?: (paramId: string) => void;
 }> = ({ param, entries, onAddEntry }) => {
   const latest = entries[entries.length - 1];
   const prev   = entries[entries.length - 2];
@@ -232,13 +233,15 @@ const LabChartCard: React.FC<{
         <span className="text-[9px] text-ink-faint font-mono">
           {param.alertHigh !== null ? `Alert: >${param.alertHigh} ${param.unit}` : 'No alert threshold'}
         </span>
-        <button
-          onClick={() => onAddEntry(param.id)}
-          className="flex items-center gap-1 text-[10px] font-semibold text-accent-fg
-                     hover:text-accent-pressed transition-colors"
-        >
-          <Plus className="w-3 h-3" /> Add entry
-        </button>
+        {onAddEntry && (
+          <button
+            onClick={() => onAddEntry(param.id)}
+            className="flex items-center gap-1 text-[10px] font-semibold text-accent-fg
+                       hover:text-accent-pressed transition-colors"
+          >
+            <Plus className="w-3 h-3" /> Add entry
+          </button>
+        )}
       </div>
     </div>
   );
@@ -358,7 +361,7 @@ const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = 
   }, [selectedPatient, allLabTypes]);
 
   const handleSaveEntry = (paramId: string, entry: LabEntry) => {
-    if (!selectedPatient) return;
+    if (!selectedPatient || !onAddResult) return;
     const param = allLabTypes.find(p => p.id === paramId);
     if (!param) return;
     onAddResult(selectedPatient.ipNo, {
@@ -424,7 +427,7 @@ const LabTrends: React.FC<Props> = ({ patients, onAddResult, initialPatientId = 
                       key={param.id}
                       param={param}
                       entries={entriesByParam[param.id] ?? []}
-                      onAddEntry={id => setSheetParam(allLabTypes.find(p => p.id === id) ?? null)}
+                      onAddEntry={onAddResult ? id => setSheetParam(allLabTypes.find(p => p.id === id) ?? null) : undefined}
                     />
                   ))}
                 </div>

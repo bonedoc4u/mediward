@@ -1,17 +1,19 @@
 /**
- * sw.ts — Custom Workbox service worker (Task 3)
+ * sw.ts — Custom Workbox service worker
  *
  * Bundled by vite-plugin-pwa in injectManifest mode.
  * Responsibilities:
  *   1. Precache all app assets (manifest injected by workbox-build).
- *   2. NetworkFirst strategy for Supabase REST + Realtime calls.
- *   3. BackgroundSync queue for round note POST/PATCH mutations.
- *      Flush is sequential (FIFO) to preserve causality.
- *      On completion, posts a ROUNDS_SYNCED message to all open windows.
+ *   2. NetworkFirst strategy for Supabase REST calls.
+ *   3. Hand round saves left in the OLD BackgroundSync queue to the page
+ *      (transition only — see "Legacy rounds queue" below).
  *
- * iOS note: the Background Sync API is Chrome/Android only. On iOS Safari
- * the queue will not replay via BackgroundSync, but the app-layer syncQueue
- * (syncQueue.ts) handles the same offline replay so rounds are never lost.
+ * What this worker deliberately does NOT do any more: queue or resend failed
+ * round saves. It used to intercept them, answer "202 Accepted" so the app
+ * believed the save had worked, and resend later counting any server reply
+ * (including "sign-in expired") as success. Offline saves now have exactly
+ * one owner: the app's queue (services/syncQueue.ts + services/syncReplay.ts),
+ * which checks the server's answer and can refresh the sign-in first.
  */
 
 /// <reference lib="webworker" />
@@ -23,6 +25,10 @@ import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { Queue } from 'workbox-background-sync';
+import {
+  LEGACY_ROUNDS_QUEUE_NAME, MSG_GET_LEGACY_ROUNDS, MSG_LEGACY_ROUNDS_TAKEN,
+  readLegacyEntries, dropTakenEntries,
+} from './utils/legacyRoundQueue';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -66,70 +72,40 @@ registerRoute(
   }),
 );
 
-// ─── Offline round note queue (BackgroundSync) ───
+// ─── Legacy rounds queue (transition only) ───
 //
-// When a POST/PATCH to /rest/v1/rounds fails because the device is offline,
-// we push the request to a persistent queue (stored in IndexedDB by Workbox).
-// On reconnect, the Background Sync API triggers `onSync`, which replays the
-// queue SEQUENTIALLY (not in parallel) to preserve the order of round updates.
-const roundsQueue = new Queue('mediward-rounds-bgsync', {
-  maxRetentionTime: 60 * 24, // discard after 24 h — stale round notes are misleading
-  onSync: async ({ queue: q }) => {
-    let entry;
-    let synced = 0;
-
-    // Shift-and-retry loop: sequential flush, stop on first network failure
-    // so we don't skip entries or create out-of-order writes.
-    while ((entry = await q.shiftRequest())) {
-      try {
-        await fetch(entry.request.clone());
-        synced++;
-      } catch {
-        // Network still unavailable — put the entry back at the front and abort.
-        await q.unshiftRequest(entry);
-        throw new Error('BackgroundSync: network still unavailable');
-      }
-    }
-
-    if (synced > 0) {
-      // Notify all open tabs so they can show a "X notes synced" toast.
-      const clients = await self.clients.matchAll({ type: 'window' });
-      clients.forEach(c => c.postMessage({ type: 'ROUNDS_SYNCED', count: synced }));
-    }
-  },
+// Earlier versions stored failed round saves in a Workbox BackgroundSync queue
+// with this name. This worker no longer adds to it and never resends from it.
+// It only lets the page read what is left and then deletes what the page has
+// confirmed it moved into the app queue.
+//
+// The Queue object is needed just to reach that IndexedDB store:
+//   - onSync does nothing, so a pending browser "sync" event cannot resend
+//     anything with the old, unchecked logic;
+//   - maxRetentionTime is long because getAll() silently deletes anything
+//     older than it — an old note must reach the app queue, not vanish.
+//
+// Remove this block (and the workbox-background-sync dependency) once every
+// installed copy has updated past this version.
+const legacyRoundsQueue = new Queue(LEGACY_ROUNDS_QUEUE_NAME, {
+  maxRetentionTime: 60 * 24 * 90, // minutes — 90 days
+  onSync: async () => { /* intentionally empty — the page drives the handover */ },
 });
 
-// Intercept POST and PATCH requests to the rounds table.
-// On network failure → push to BackgroundSync queue and return 202.
-const roundsPattern = ({ url, request }: { url: URL; request: Request }) =>
-  url.href.includes('/rest/v1/rounds') &&
-  (request.method === 'POST' || request.method === 'PATCH');
+self.addEventListener('message', (event) => {
+  const type = (event.data as { type?: string } | null)?.type;
 
-registerRoute(roundsPattern, async ({ event }) => {
-  const req = (event as FetchEvent).request;
-  try {
-    const response = await fetch(req.clone());
-    return response;
-  } catch {
-    await roundsQueue.pushRequest({ request: req });
-    // Return 202 Accepted so the app layer knows it was queued, not failed.
-    return new Response(
-      JSON.stringify({ queued: true, message: 'Offline — queued for sync' }),
-      { status: 202, headers: { 'Content-Type': 'application/json' } },
+  if (type === MSG_GET_LEGACY_ROUNDS) {
+    const port = event.ports[0];
+    if (!port) return;
+    event.waitUntil(
+      readLegacyEntries(legacyRoundsQueue)
+        .then(entries => port.postMessage({ entries }))
+        .catch(() => port.postMessage({ entries: [] })),
     );
+  } else if (type === MSG_LEGACY_ROUNDS_TAKEN) {
+    const ids = (event.data as { ids?: unknown }).ids;
+    if (!Array.isArray(ids)) return;
+    event.waitUntil(dropTakenEntries(legacyRoundsQueue, ids as string[]));
   }
-}, 'POST');
-
-// Also register for PATCH (Workbox registerRoute only registers one method per call)
-registerRoute(roundsPattern, async ({ event }) => {
-  const req = (event as FetchEvent).request;
-  try {
-    return await fetch(req.clone());
-  } catch {
-    await roundsQueue.pushRequest({ request: req });
-    return new Response(
-      JSON.stringify({ queued: true, message: 'Offline — queued for sync' }),
-      { status: 202, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
-}, 'PATCH');
+});

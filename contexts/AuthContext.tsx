@@ -14,7 +14,12 @@ import { supabase } from '../lib/supabase';
 import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { toast } from '../utils/toast';
 import { clearDisclaimerAccepted } from '../components/ClinicalDisclaimer';
-import { clearPatientCache } from '../services/patientCache';
+// Cached patient lists are removed together with the fingerprint credential:
+// both are things that must not outlive a session on this phone. The one
+// place they are deliberately KEPT is the soft inactivity logout with a
+// fingerprint credential stored (the list is what makes fingerprint sign-in
+// useful on ward Wi-Fi); that state is bounded by the credential's own expiry.
+import { clearAllPatientCaches } from '../services/patientCache';
 import { isSessionValid } from '../utils/sessionValidity';
 import {
   clearBiometricCredential,
@@ -175,6 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isRecoveryMode) {
         supabase.auth.signOut().catch(() => {});
         clearBiometricCredential().catch(() => {});
+        clearAllPatientCaches();
       }
     }
     removeFromStorage('session');
@@ -199,6 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const sweep = () => {
       supabase.auth.signOut().catch(() => {});
       clearBiometricCredential().catch(() => {});
+      clearAllPatientCaches();
       orphanedCredentialTimerRef.current = null;
     };
     if (msRemaining <= 0) {
@@ -303,6 +310,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isRecoveryMode) {
         supabase.auth.signOut().catch(() => {});
         clearBiometricCredential().catch(() => {});
+        clearAllPatientCaches();
       }
       setUser(null);
       removeFromStorage('session');
@@ -323,6 +331,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       disarmOrphanedCredentialDeadline();
       supabase.auth.signOut().catch(() => {});
       clearBiometricCredential().catch(() => {});
+      clearAllPatientCaches();
       pendingBiometricEnrollmentRef.current = null;
       setOfferBiometricEnrollment(false);
       setUser(null);
@@ -387,10 +396,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             supabase.auth.signOut().catch(() => {});
             clearBiometricCredential().catch(() => {});
+            clearAllPatientCaches();
           }
         }).catch(() => {
           supabase.auth.signOut().catch(() => {});
           clearBiometricCredential().catch(() => {});
+          clearAllPatientCaches();
         });
       }, limit);
     };
@@ -532,6 +543,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         pendingBiometricEnrollmentRef.current = null;
         setOfferBiometricEnrollment(false);
         clearBiometricCredential().catch(() => {});
+        clearAllPatientCaches();
         // If Supabase revokes the session externally (e.g. admin force-logout, token expiry),
         // clear our local session too so the user is redirected to login.
         setUser(prev => {
@@ -620,6 +632,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const credential = await loadBiometricCredential();
     if (!isBiometricCredentialValid(credential, Date.now())) {
       await clearBiometricCredential();
+      clearAllPatientCaches();
       return { success: false, error: 'expired' };
     }
 
@@ -640,6 +653,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // credential is dead, clear it so the fingerprint button stops
           // being offered.
           await clearBiometricCredential();
+          clearAllPatientCaches();
         }
         return { success: false, error: isNetworkBlip ? 'network' : 'Please log in again.' };
       }
@@ -650,6 +664,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // credential, never a different account on the same device.
       if (!email || data.session.user.id !== credential.userId) {
         await clearBiometricCredential();
+        clearAllPatientCaches();
         return { success: false, error: 'Please log in again.' };
       }
 
@@ -699,11 +714,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(() => {
     if (user) {
       logAuditEvent(user.id, user.name, 'LOGOUT', 'session', user.id, 'User logged out');
-      clearPatientCache(user.hospitalId); // clear hospital-scoped cache so next user can't read it
     }
     disarmOrphanedCredentialDeadline(); // this path signs out for real itself
     supabase.auth.signOut().catch(() => {});
     clearBiometricCredential().catch(() => {});
+    clearAllPatientCaches();
     pendingBiometricEnrollmentRef.current = null;
     setOfferBiometricEnrollment(false);
     setUser(null);

@@ -289,6 +289,23 @@ export function incrementAttempts(id: string, error?: unknown): { dropped: boole
   return { dropped: false };
 }
 
+/**
+ * Move one op to the dead-letter queue now, without using up its retries.
+ * For refusals that can never succeed on a retry (e.g. the user's role).
+ */
+export function moveToDeadLetter(id: string, reason: string): { opType: QueuedOpType; label?: string } | null {
+  const op = _cache.find(o => o.id === id);
+  if (!op) return null;
+  let label: string | undefined;
+  if (op.type === 'upsert_patient') {
+    const p = op.payload as Record<string, unknown> | undefined;
+    label = (p?.name as string) ?? (p?.ipNo as string);
+  }
+  _persistDlq([..._dlq, { ...op, failedAt: new Date().toISOString(), reason }]);
+  _persist(_cache.filter(o => o.id !== id));
+  return { opType: op.type, label };
+}
+
 /** How many unsent changes the signed-in user has. */
 export function getQueueSize(): number {
   return _cache.filter(_isMine).length;

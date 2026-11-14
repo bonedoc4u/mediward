@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import type { PatientChange } from '../utils/permissions';
 import {
   Patient, DailyRound, Investigation, LabResult, ToDoItem,
   PacChecklistItem, PreOpChecklist, DischargeSummary, DamaSummary, DeathSummary, VitalSigns,
@@ -17,6 +18,9 @@ interface RoundsRowRead {
   date: string;
   note: string;
   todos: ToDoItem[];
+  round_note?: string | null;
+  round_note_by_name?: string | null;
+  round_note_at?: string | null;
 }
 
 interface VitalRowRead {
@@ -152,7 +156,14 @@ function rowToPatient(row: PatientRow): Patient {
 
   // Rounds: prefer normalized table; fall back to legacy JSONB for backward compat
   const dailyRounds: DailyRound[] = Array.isArray(row.rounds) && row.rounds.length > 0
-    ? row.rounds.map(r => ({ date: r.date, note: r.note, todos: Array.isArray(r.todos) ? r.todos : [] }))
+    ? row.rounds.map(r => ({
+        date: r.date,
+        note: r.note,
+        todos: Array.isArray(r.todos) ? r.todos : [],
+        roundNote:   r.round_note ?? '',
+        roundNoteBy: r.round_note_by_name ?? undefined,
+        roundNoteAt: r.round_note_at ?? undefined,
+      }))
     : Array.isArray(row.daily_rounds) ? row.daily_rounds : [];
 
   // Vitals: prefer normalized table; fall back to legacy JSONB
@@ -234,7 +245,7 @@ function rowToPatient(row: PatientRow): Patient {
 // ─── TypeScript Patient → DB row ───
 // NOTE: daily_rounds and vitals are now written via roundsService / vitalsService.
 //       We still write todos here (small JSONB, part of the main patient record).
-function patientToRow(patient: Patient) {
+export function patientToRow(patient: Patient) {
   return {
     ip_no:             patient.ipNo,
     hospital_id:       patient.hospitalId ?? null,
@@ -277,7 +288,40 @@ function patientToRow(patient: Patient) {
   };
 }
 
+/** The row patientToRow() builds, i.e. what a save sends. */
+export type PatientWriteRow = ReturnType<typeof patientToRow>;
+
+/**
+ * Which stored columns would saving `after` change, compared with `before`?
+ * Null when there is nothing to compare with (record not loaded here).
+ * The role rules are decided on this, column by column (audit SEC-06).
+ */
+export function describePatientChange(before: Patient | undefined, after: Patient): PatientChange | null {
+  if (!before) return null;
+  const a = patientToRow(before) as Record<string, unknown>;
+  const b = patientToRow(after) as Record<string, unknown>;
+  return {
+    columns: Object.keys(b).filter(k => a[k] !== b[k] && JSON.stringify(a[k]) !== JSON.stringify(b[k])),
+    statusBefore: String(a.patient_status),
+    statusAfter: String(b.patient_status),
+  };
+}
+
+/** The row to send: every column, or only the named ones. */
+function rowForSave(patient: Patient, onlyColumns?: readonly string[]): Partial<PatientWriteRow> {
+  const row = patientToRow(patient);
+  if (!onlyColumns || onlyColumns.length === 0) return row;
+  return Object.fromEntries(Object.entries(row).filter(([k]) => onlyColumns.includes(k))) as Partial<PatientWriteRow>;
+}
+
 // ─── SELECT strings ───────────────────────────────────────────────────────────
+//
+// RULE: every column that patientToRow() writes MUST be in BOTH lists below.
+// A save sends the whole row. A column that is saved but not loaded comes back
+// from rowToPatient() as "empty", and the next save of any kind (ticking one
+// order is enough) writes that emptiness over the real value. That is how drug
+// allergies, DAMA/death summaries and PAC clearance steps were being erased.
+// __tests__/services/patientService.test.ts fails if this rule is broken.
 //
 // PATIENT_LIST_SELECT — lightweight, used for all list/dashboard queries.
 //   Only the latest round note is fetched (limit 1) to show in list cards.
@@ -286,28 +330,28 @@ function patientToRow(patient: Patient) {
 // PATIENT_FULL_SELECT — full JOIN for PatientDetail and DischargeSummary views.
 //   Fetches all labs, imaging, rounds, and vitals for a single patient.
 //
-const PATIENT_LIST_SELECT = [
+export const PATIENT_LIST_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
-  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pre_op_checklist',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'drug_allergies', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
+  'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
-  'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
-  'rounds(date, note, todos)',
+  'discharge_summary', 'dama_summary', 'death_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
+  'rounds(date, note, todos, round_note, round_note_by_name, round_note_at)',
   'imaging(id, date, type, findings, image_url, phase)',
 ].join(', ');
 
 // Full select (all vitals) — used only when a single patient's detail is loaded
-const PATIENT_SELECT = [
+export const PATIENT_SELECT = [
   'ip_no', 'hospital_id', 'abha_id', 'name', 'mobile', 'age', 'gender', 'ward', 'bed', 'unit',
   'specialty', 'specialty_data',
-  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
+  'diagnosis', 'mode_of_injury', 'procedure', 'comorbidities', 'drug_allergies', 'doa', 'dos', 'planned_dos', 'dod', 'pod', 'prior_surgeries', 'fractures', 'admission_source',
   'pac_status', 'patient_status', 'todos', 'pac_checklist', 'pac_flow', 'pre_op_checklist',
   'management',
-  'discharge_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
+  'discharge_summary', 'dama_summary', 'death_summary', 'created_at', 'updated_at', 'version', 'consent_given_at', 'consent_version',
   'labs(id, date, type, value)',
   'imaging(id, date, type, findings, image_url, phase)',
-  'rounds(date, note, todos)',
+  'rounds(date, note, todos, round_note, round_note_by_name, round_note_at)',
   'patient_vitals(id, timestamp, recorded_by, bp_systolic, bp_diastolic, heart_rate, temperature, spo2, respiratory_rate, weight, pain_score, news2_score, notes)',
 ].join(', ');
 
@@ -449,14 +493,21 @@ export async function fetchPatientById(ipNo: string, hospitalId?: string): Promi
  * `data.length === 0`; the force branch must too, or a "force-save" can silently
  * write nothing while the caller reports success.
  *
+ * `onlyColumns` limits an UPDATE to those columns. A user who may only write
+ * orders must send only the orders: the database compares every column sent
+ * with what it holds, and refuses the save if any other column differs. It
+ * has no effect on the insert of a new patient.
+ *
  * Returns the row's new version so the caller can keep its cache in sync.
  */
-export async function upsertPatient(patient: Patient, forceUpdate = false): Promise<number | undefined> {
+export async function upsertPatient(
+  patient: Patient, forceUpdate = false, onlyColumns?: readonly string[],
+): Promise<number | undefined> {
   if (forceUpdate) {
     // Unconditional UPDATE — bypasses optimistic lock, but RLS can still block it
     const { data, error } = await supabase
       .from('patients')
-      .update(patientToRow(patient))
+      .update(rowForSave(patient, onlyColumns))
       .eq('ip_no', patient.ipNo)
       .select('version');
     if (error) throw new Error(`upsertPatient (${patient.ipNo}): ${error.message}`);
@@ -468,7 +519,7 @@ export async function upsertPatient(patient: Patient, forceUpdate = false): Prom
     // Existing patient: conditional update to detect concurrent edits
     let q = supabase
       .from('patients')
-      .update(patientToRow(patient))
+      .update(rowForSave(patient, onlyColumns))
       .eq('ip_no', patient.ipNo);
     q = patient.version != null
       ? q.eq('version', patient.version)
@@ -498,12 +549,18 @@ export async function upsertPatient(patient: Patient, forceUpdate = false): Prom
  * Use anonymizePatient() for DPDP §13 Right to Erasure (immediate PII wipe).
  */
 export async function removePatient(ipNo: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('patients')
     .update({ deleted_at: new Date().toISOString() })
-    .eq('ip_no', ipNo);
+    .eq('ip_no', ipNo)
+    .select('ip_no');
 
   if (error) throw new Error(`removePatient (${ipNo}): ${error.message}`);
+  // RLS can make an UPDATE match zero rows without raising an error (stale
+  // session, wrong hospital). That must not look like a successful removal.
+  if (!data || data.length === 0) {
+    throw new Error(`removePatient (${ipNo}): no record was removed — it may already be gone, or this session cannot change it`);
+  }
 }
 
 /**

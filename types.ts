@@ -407,8 +407,20 @@ export interface PacChecklistItem {
 
 export interface DailyRound {
   date: string;
+  /** Legacy field: older app versions store a copy of the diagnosis here. Not the doctor's note. */
   note: string;
   todos: ToDoItem[];
+  /**
+   * The doctor's round note for this day (rounds.round_note).
+   * `undefined` on a save means "this save does not touch the note" — the
+   * column is then left out of the request, so an orders-only save can never
+   * blank a note written elsewhere. '' means "no note".
+   */
+  roundNote?: string;
+  /** Who last changed the note. Stamped by the database; the app only reads it. */
+  roundNoteBy?: string;
+  /** When the note was last changed (ISO). Stamped by the database; the app only reads it. */
+  roundNoteAt?: string;
 }
 
 /** Pre-op checklist — dynamic list, same structure as PacChecklistItem.

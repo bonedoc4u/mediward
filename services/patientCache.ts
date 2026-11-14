@@ -17,8 +17,21 @@
 import { Patient } from '../types';
 import { saveToStorage, loadFromStorage, removeFromStorage } from './persistence';
 
-const activeKey = (hospitalId: string) => `patients_active_cache_${hospitalId}`;
-const allKey    = (hospitalId: string) => `patients_all_cache_${hospitalId}`;
+// v2: caches written before Nov 2026 hold patients that were loaded WITHOUT
+// drug allergies, DAMA/death summaries and PAC steps (those columns were
+// missing from the load). Editing such a patient offline would queue a save
+// that erases those fields. The key name changed so an old cache is never
+// read again; dropLegacyCache() deletes it so no patient data is left behind.
+const activeKey = (hospitalId: string) => `patients_active_cache_v2_${hospitalId}`;
+const allKey    = (hospitalId: string) => `patients_all_cache_v2_${hospitalId}`;
+const legacyKeys = (hospitalId: string) => [
+  `patients_active_cache_${hospitalId}`,
+  `patients_all_cache_${hospitalId}`,
+];
+
+function dropLegacyCache(hospitalId: string): void {
+  legacyKeys(hospitalId).forEach(removeFromStorage);
+}
 
 interface PatientCache {
   patients: Patient[];
@@ -34,8 +47,28 @@ export function saveActiveCache(patients: Patient[], hospitalId: string): void {
   });
 }
 
+/**
+ * A cached list older than this is never shown and is deleted on sight.
+ * A session lasts at most 8 hours, so a list older than 12 hours cannot
+ * belong to a session that is still valid — it is only patient data left
+ * behind on the phone.
+ */
+export const PATIENT_CACHE_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+function loadFresh(key: string): PatientCache | null {
+  const cache = loadFromStorage<PatientCache>(key);
+  if (!cache) return null;
+  const age = Date.now() - new Date(cache.cachedAt).getTime();
+  if (isNaN(age) || age > PATIENT_CACHE_MAX_AGE_MS) {
+    removeFromStorage(key);
+    return null;
+  }
+  return cache;
+}
+
 export function loadActiveCache(hospitalId: string): PatientCache | null {
-  return loadFromStorage<PatientCache>(activeKey(hospitalId));
+  dropLegacyCache(hospitalId);
+  return loadFresh(activeKey(hospitalId));
 }
 
 // ─── All patients cache (loaded on Master/Discharge views) ───
@@ -48,13 +81,33 @@ export function saveAllCache(patients: Patient[], hospitalId: string): void {
 }
 
 export function loadAllCache(hospitalId: string): PatientCache | null {
-  return loadFromStorage<PatientCache>(allKey(hospitalId));
+  dropLegacyCache(hospitalId);
+  return loadFresh(allKey(hospitalId));
 }
 
 /** Clear all patient caches for a specific hospital (call on logout). */
 export function clearPatientCache(hospitalId: string): void {
   removeFromStorage(activeKey(hospitalId));
   removeFromStorage(allKey(hospitalId));
+  dropLegacyCache(hospitalId);
+}
+
+/**
+ * Remove every cached patient list from this phone: every hospital, current
+ * and old key formats. Called whenever a session really ends (sign-out,
+ * 8-hour limit, token revoked, inactivity without fingerprint sign-in), so a
+ * lost or shared phone does not keep the last ward list in readable storage.
+ *
+ * Deliberately not tied to one hospital id: a super-admin viewing another
+ * hospital caches under THAT hospital's id, which the old per-hospital clear
+ * on sign-out never touched.
+ */
+export function clearAllPatientCaches(): void {
+  try {
+    Object.keys(localStorage)
+      .filter(k => /^mediward_patients_(active|all)_cache_/.test(k))
+      .forEach(k => localStorage.removeItem(k));
+  } catch { /* storage unavailable — nothing cached either */ }
 }
 
 // ─── Helpers ───

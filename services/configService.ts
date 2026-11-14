@@ -222,6 +222,38 @@ export async function fetchHospitalConfig(hospitalId?: string): Promise<Hospital
   };
 }
 
+/**
+ * Save ONLY the shared comorbidity preset list.
+ *
+ * The "Add patient" form lets every doctor who admits patients edit this
+ * list. It lives in the hospital settings row, but such a user may change
+ * nothing else in that row (the database refuses it), and their phone may
+ * hold an outdated copy of the other settings. So this sends the one column,
+ * never the whole row.
+ *
+ * Returns false when the hospital has no settings row yet (first set-up, an
+ * admin's job); the caller decides what to do then. Throws when the server
+ * refuses or the row was not changed.
+ */
+export async function updateComorbidityMap(map: ComorbidityEntry[]): Promise<boolean> {
+  const { data: existing, error: readError } = await supabase
+    .from('hospital_config')
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+  if (readError) throw new Error(`updateComorbidityMap: ${readError.message}`);
+  if (!existing?.id) return false;
+
+  const { data, error } = await supabase
+    .from('hospital_config')
+    .update({ comorbidity_map: map, updated_at: new Date().toISOString() })
+    .eq('id', existing.id)
+    .select('id');
+  if (error) throw new Error(`updateComorbidityMap: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('updateComorbidityMap: the preset list was not saved');
+  return true;
+}
+
 export async function upsertHospitalConfig(config: HospitalConfig): Promise<void> {
   // Fetch existing row id so we can UPDATE; INSERT if none exists.
   const { data: existing } = await supabase

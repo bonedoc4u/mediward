@@ -20,3 +20,19 @@ export function localYmd(d: Date): string {
 export function todayYmd(): string {
   return localYmd(new Date());
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "10 Nov" from a YYYY-MM-DD string — the one short date format for cards and
+ * headers. Reads the parts directly (no Date parsing), so a time zone can
+ * never move it to the previous day. Returns '' for anything it cannot read.
+ */
+export function formatDayMonth(ymd: string | undefined | null): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd ?? '');
+  if (!m) return '';
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+  return `${day} ${MONTH_NAMES[month - 1]}`;
+}

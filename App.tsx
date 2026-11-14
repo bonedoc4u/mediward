@@ -5,7 +5,7 @@ import { usePublicScreenHashSync } from './hooks/usePublicScreenHashSync';
 import { useAuth, usePatients, useUI, useConfig } from './contexts/AppContext';
 import { Patient, ViewMode, PacStatus, PatientStatus, AdmissionSource } from './types';
 import type { UnitStat } from './components/UnitPicker';
-import { can } from './utils/permissions';
+import { can, canOpenView } from './utils/permissions';
 import { needsPac, getAdmissionDayCohort } from './utils/calculations';
 import { todayYmd } from './utils/dates';
 import { App as CapApp } from '@capacitor/app';
@@ -19,6 +19,7 @@ import DepartmentPicker from './components/DepartmentPicker';
 import UnitPicker from './components/UnitPicker';
 import ErrorBoundary from './components/ErrorBoundary';
 import NotificationCenter from './components/NotificationCenter';
+import AssistantButton from './components/AssistantButton';
 import GlobalSearch from './components/GlobalSearch';
 import WardSkeleton from './components/WardSkeleton';
 import ToastContainer from './components/ToastContainer';
@@ -49,6 +50,7 @@ const StatusPage = lazy(() => import('./components/StatusPage'));
 const AdmissionList = lazy(() => import('./components/AdmissionList'));
 import OfflineBanner from './components/OfflineBanner';
 import OtherUsersPendingNotice from './src/features/sync/OtherUsersPendingNotice';
+import WriteArea from './src/features/permissions/WriteArea';
 import { NetworkBanner } from './components/NetworkBanner';
 import PwaInstallBanner from './components/PwaInstallBanner';
 import SwUpdateBanner from './components/SwUpdateBanner';
@@ -215,6 +217,11 @@ const App: React.FC = () => {
   const [disclaimerOk, setDisclaimerOk] = useState<boolean | null>(() => (hasAcceptedDisclaimer() ? true : null));
   const checkedDisclaimerFor = useRef<string | null>(null);
   const [superAdminMode, setSuperAdminMode] = useState(false);
+  // Clinical Assistant panel. `assistantUsed` stays true after the first open
+  // so the panel keeps its results; until then its code is not even loaded.
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantUsed, setAssistantUsed] = useState(false);
+  const openAssistant = useCallback(() => { setAssistantUsed(true); setAssistantOpen(true); }, []);
   const {
     patients, isLoadingPatients, updatePatient, addPatient, deletePatient,
     addLabResult, addInvestigation, deleteInvestigation,
@@ -253,7 +260,11 @@ const App: React.FC = () => {
   const mobileTabs = useMemo(() => [
     { id: 'dashboard'  as ViewMode, label: 'Ward',       icon: LayoutDashboard },
     { id: 'admissions' as ViewMode, label: 'Admits',     icon: BookOpen        },
-    { id: 'rounds'     as ViewMode, label: 'Rounds',     icon: ListChecks      },
+    // "Rounds" opens Round Mode — the screen a round is actually run from.
+    // It used to open Daily Rounds (an orders list), and Round Mode was only
+    // reachable from a button further down the ward screen. Daily Rounds is
+    // still in the menu.
+    { id: 'round-mode' as ViewMode, label: 'Rounds',     icon: ListChecks      },
     { id: 'otlist'     as ViewMode, label: procedureListName, icon: ClipboardList },
     { id: 'pac'        as ViewMode, label: preOpModuleName,   icon: HeartPulse    },
   ], [preOpModuleName, procedureListName]);
@@ -361,7 +372,11 @@ const App: React.FC = () => {
     setIsMobileMenuOpen(false);
   }, []);
 
-  const meta = viewMeta[currentView as keyof typeof viewMeta] ?? viewMeta.dashboard;
+  // An admin-only screen opened by address (#/settings) by another role: the
+  // ward is shown instead. Everything drawn below uses `view`, so the title,
+  // the menu highlight and the screen always agree.
+  const view = canOpenView(user, currentView) ? currentView : 'dashboard';
+  const meta = viewMeta[view as keyof typeof viewMeta] ?? viewMeta.dashboard;
 
   // Patient quick-view sheet is open when a list view carries a patient id.
   const isPatientSheetOpen = !!navParams.id && SHEET_LIST_VIEWS.includes(currentView);
@@ -451,7 +466,7 @@ const App: React.FC = () => {
   const navSections = useMemo(() => {
     const sections: Record<string, NavItem[]> = {};
     navItems
-      .filter(item => (item.id !== 'team' && item.id !== 'audit' && item.id !== 'settings') || can(user, 'team:manage'))
+      .filter(item => canOpenView(user, item.id))
       .forEach(item => {
         if (!sections[item.section]) sections[item.section] = [];
         sections[item.section].push(item);
@@ -605,7 +620,7 @@ const App: React.FC = () => {
 
   // ─── Render View ───
   const renderView = () => {
-    switch (currentView) {
+    switch (view) {
       case 'discharge':
         return <DischargeSummaryView />;
       case 'round-mode':
@@ -622,19 +637,20 @@ const App: React.FC = () => {
         return (
           <RadiologyComparator
             patients={patients}
-            onAddInvestigation={addInvestigation}
-            onDeleteInvestigation={deleteInvestigation}
+            onAddInvestigation={can(user, 'investigations:write') ? addInvestigation : undefined}
+            onDeleteInvestigation={can(user, 'investigations:write') ? deleteInvestigation : undefined}
             initialPatientId={navParams.id || ''}
           />
         );
       case 'labs':
-        return <LabTrends patients={patients} onAddResult={addLabResult} initialPatientId={navParams.id || ''} />;
+        return <LabTrends patients={patients} onAddResult={can(user, 'labs:write') ? addLabResult : undefined} initialPatientId={navParams.id || ''} />;
       case 'rounds':
         return <DailyRounds patients={patients} onUpdatePatient={updatePatient} onSaveRound={saveRound} />;
       case 'team':
         return <TeamManagement onOpenSuperAdmin={user?.role === 'superadmin' ? () => { setViewingHospital(null); setSuperAdminMode(true); } : undefined} />;
       case 'pac':
-        return <PacManagement patients={patients} onUpdatePatient={updatePatient} />;
+        // Every control on this screen changes PAC data, so the whole screen is one write area.
+        return <WriteArea permission="pac:write" blockTaps><PacManagement patients={patients} onUpdatePatient={updatePatient} /></WriteArea>;
       case 'preop':
         return <PreOpPrep patients={patients} onUpdatePatient={updatePatient} />;
       case 'otlist':
@@ -653,23 +669,23 @@ const App: React.FC = () => {
         return (
           <WardDashboard
             patients={patients}
-            viewMode={currentView === 'dashboard' ? 'home' : currentView as 'pending' | 'master' | 'wenthome'}
+            viewMode={view === 'dashboard' ? 'home' : view as 'pending' | 'master' | 'wenthome'}
             onAddPatient={can(user, 'patient:add') ? openAddModal : undefined}
             onEditPatient={can(user, 'patient:edit') ? openEditModal : undefined}
-            onViewPatient={(ipNo: string) => { setLastViewedPatient(ipNo); navigateTo(currentView, { id: ipNo }); }}
+            onViewPatient={(ipNo: string) => { setLastViewedPatient(ipNo); navigateTo(view, { id: ipNo }); }}
             highlightIpNo={highlightIpNo}
             onStartRounds={() => navigateTo('round-mode')}
-            onAddLab={async (ipNo, type, value, date) => {
+            onAddLab={can(user, 'labs:write') ? async (ipNo, type, value, date) => {
               addLabResult(ipNo, { id: crypto.randomUUID(), date, type, value });
-            }}
-            onAssignDate={(ipNo, plannedDos) => {
+            } : undefined}
+            onAssignDate={can(user, 'patient:edit') ? (ipNo, plannedDos) => {
               const patient = patients.find(p => p.ipNo === ipNo);
               if (patient) updatePatient({ ...patient, plannedDos });
-            }}
-            onClearDate={(ipNo) => {
+            } : undefined}
+            onClearDate={can(user, 'patient:edit') ? (ipNo) => {
               const patient = patients.find(p => p.ipNo === ipNo);
               if (patient) updatePatient({ ...patient, plannedDos: undefined });
-            }}
+            } : undefined}
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
             onLoadMore={loadMorePatients}
@@ -724,6 +740,7 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center gap-1">
             <GlobalSearch />
+            <AssistantButton tone="dark" onClick={openAssistant} />
             <NotificationCenter />
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg" aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}>
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -806,14 +823,14 @@ const App: React.FC = () => {
                   key={item.id}
                   onClick={() => { navigateTo(item.id); setIsMobileMenuOpen(false); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
-                    currentView === item.id
+                    view === item.id
                       ? 'bg-teal-600/10 border border-teal-500/20 text-teal-400 border-l-2 border-l-teal-500'
                       : 'text-slate-400 hover:bg-slate-800/50 hover:text-white border border-transparent'
                   }`}
                 >
                   <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
                   <span className="font-medium text-sm">{item.label}</span>
-                  {currentView === item.id && (
+                  {view === item.id && (
                     <div className="ml-auto w-1.5 h-1.5 bg-teal-400 rounded-full"></div>
                   )}
                 </button>
@@ -900,6 +917,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <GlobalSearch />
+                <AssistantButton tone="light" onClick={openAssistant} />
                 <NotificationCenter />
               </div>
             </div>
@@ -952,11 +970,15 @@ const App: React.FC = () => {
       </Suspense>
 
       {/* ─── AI Assistant ─── */}
-      <ErrorBoundary fallbackMessage="AI Assistant encountered an error.">
-        <Suspense fallback={null}>
-          <AiClinicalAssistant patients={patients} />
-        </Suspense>
-      </ErrorBoundary>
+      {/* Opened from the header button. Its code is downloaded on first use,
+          not on every page load. */}
+      {assistantUsed && (
+        <ErrorBoundary fallbackMessage="AI Assistant encountered an error.">
+          <Suspense fallback={null}>
+            <AiClinicalAssistant patients={patients} open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
 
       {/* ─── Mobile Menu Overlay ─── */}
       {isMobileMenuOpen && (
@@ -974,13 +996,13 @@ const App: React.FC = () => {
           {mobileTabs.map(tab => (
             <button
               key={tab.id}
-              aria-current={currentView === tab.id ? 'page' : undefined}
+              aria-current={view === tab.id ? 'page' : undefined}
               onClick={() => { navigateTo(tab.id); setIsMobileMenuOpen(false); }}
               className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
-                currentView === tab.id ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
+                view === tab.id ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
               }`}
             >
-              {currentView === tab.id && (
+              {view === tab.id && (
                 <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-teal-600 rounded-full" />
               )}
               <tab.icon className="w-5 h-5" />

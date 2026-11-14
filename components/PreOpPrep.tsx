@@ -4,6 +4,7 @@ import { useConfig } from '../contexts/ConfigContext';
 import { Calendar, CheckSquare, Square, UserCheck, AlertCircle } from 'lucide-react';
 import { localYmd } from '../utils/dates';
 import { isPendingSurgicalCandidate } from '../utils/calculations';
+import WriteArea from '../src/features/permissions/WriteArea';
 
 interface Props {
   patients: Patient[];
@@ -91,6 +92,8 @@ const PreOpPrep: React.FC<Props> = ({ patients, onUpdatePatient }) => {
         </div>
       </div>
 
+      {/* The date filter above stays usable for everyone; the lists below change pre-op data. */}
+      <WriteArea permission="preop:write" blockTaps className="space-y-6">
       {/* Unscheduled pool */}
       <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-3">
@@ -201,6 +204,7 @@ const PreOpPrep: React.FC<Props> = ({ patients, onUpdatePatient }) => {
           </div>
         )}
       </div>
+      </WriteArea>
     </div>
   );
 };

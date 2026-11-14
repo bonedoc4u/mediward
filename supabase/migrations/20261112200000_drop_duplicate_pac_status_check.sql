@@ -1,0 +1,21 @@
+-- 20261112200000_drop_duplicate_pac_status_check.sql
+--
+-- FIX (audit 2026-11-12, finding DATA-08).
+--
+-- patients.pac_status carries two CHECK constraints in production:
+--   chk_pac_status            allows 'PAC Fit', 'PAC Pending', 'PAC Unfit', 'PAC Review'
+--   patients_pac_status_check allows 'PAC Fit', 'PAC Pending', 'PAC Unfit'
+-- The second is the auto-named inline check from the original CREATE TABLE.
+-- It was never removed when 'PAC Review' was added, so both apply and the
+-- narrower one wins: every save with pac_status = 'PAC Review' is rejected
+-- (error 23514). The app offers that status in Pre-op Clearance, so the save
+-- fails, sits in the offline queue, and ends in the "could not be saved" list.
+--
+-- This only removes the stale duplicate. chk_pac_status stays and still
+-- rejects anything outside the four known values. No data changes.
+--
+-- Rollback (re-introduces the bug):
+--   ALTER TABLE public.patients ADD CONSTRAINT patients_pac_status_check
+--     CHECK (pac_status = ANY (ARRAY['PAC Fit','PAC Pending','PAC Unfit']));
+
+ALTER TABLE public.patients DROP CONSTRAINT IF EXISTS patients_pac_status_check;
