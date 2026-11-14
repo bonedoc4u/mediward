@@ -546,7 +546,7 @@ export async function upsertPatient(
 /**
  * Soft-delete a patient by setting deleted_at to now.
  * Hard-purge happens automatically after 30 days via purge_old_soft_deletes().
- * Use anonymizePatient() for DPDP §13 Right to Erasure (immediate PII wipe).
+ * For an erasure request (DPDP §13) use erasePatientData() in patientDataRights.ts.
  */
 export async function removePatient(ipNo: string): Promise<void> {
   const { data, error } = await supabase
@@ -595,101 +595,4 @@ export async function renamePatientIpNo(oldIpNo: string, newIpNo: string): Promi
   });
   if (error) throw new Error(error.message);
   return data as number | undefined;
-}
-
-/**
- * DPDP Act 2023 — Right to Erasure (§13)
- * Anonymises all PII fields for a patient record and deletes linked
- * labs, imaging, rounds and nursing_notes rows.
- * The anonymised patient row is retained for billing / audit continuity.
- */
-export async function anonymizePatient(ipNo: string, hospitalId: string): Promise<void> {
-  const redacted = '[REDACTED]';
-  const redactedDate = '1900-01-01';
-
-  // 1. Anonymise PII in patients table
-  const { error: patErr } = await supabase
-    .from('patients')
-    .update({
-      name:            redacted,
-      mobile:          null,
-      abha_id:         null,
-      age:             0,
-      comorbidities:   null,
-      rounds:          null,
-      pre_op_checklist: null,
-      pac_checklist:   null,
-      notes:           null,
-      todos:           null,
-      drug_allergies:  null,
-      date_of_admission: redactedDate,
-      date_of_surgery:   null,
-    })
-    .eq('ip_no', ipNo)
-    .eq('hospital_id', hospitalId);
-  if (patErr) throw new Error(`anonymizePatient PII wipe: ${patErr.message}`);
-
-  // 2. Delete linked normalized tables
-  const tables = ['labs', 'imaging', 'rounds', 'nursing_notes'] as const;
-  for (const table of tables) {
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq('patient_ip_no', ipNo);
-    if (error) console.warn(`anonymizePatient ${table} delete: ${error.message}`);
-  }
-
-  // 3. Delete clinical administration tables (DPDP §13 complete erasure)
-  const clinicalTables = ['med_administrations', 'medications_prescribed', 'patient_vitals'] as const;
-  for (const table of clinicalTables) {
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq('patient_ip_no', ipNo);
-    if (error) console.warn(`anonymizePatient ${table} delete: ${error.message}`);
-  }
-}
-
-/**
- * DPDP Act 2023 — Right to Data Portability (§16)
- * Returns a structured JSON export of all data held for a single patient.
- * Triggers a browser download of the JSON file.
- */
-export async function exportPatientData(ipNo: string, hospitalId: string): Promise<void> {
-  // 1. Core patient record
-  const { data: patient, error: patErr } = await supabase
-    .from('patients')
-    .select('*')
-    .eq('ip_no', ipNo)
-    .eq('hospital_id', hospitalId)
-    .maybeSingle();
-  if (patErr) throw new Error(`exportPatientData: ${patErr.message}`);
-  if (!patient) throw new Error(`Patient ${ipNo} not found.`);
-
-  // 2. Linked tables — hospital_id filter prevents cross-tenant data leakage (DPDP §16)
-  const [labsRes, imagingRes, roundsRes, notesRes] = await Promise.all([
-    supabase.from('labs').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
-    supabase.from('imaging').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
-    supabase.from('rounds').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
-    supabase.from('nursing_notes').select('*').eq('patient_ip_no', ipNo).eq('hospital_id', hospitalId),
-  ]);
-
-  const exportBundle = {
-    exportedAt: new Date().toISOString(),
-    exportedBy: 'MediWard — DPDP §16 Data Portability',
-    patient,
-    labs:          labsRes.data    ?? [],
-    imaging:       imagingRes.data ?? [],
-    rounds:        roundsRes.data  ?? [],
-    nursingNotes:  notesRes.data   ?? [],
-  };
-
-  // Trigger browser download
-  const blob = new Blob([JSON.stringify(exportBundle, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `mediward_patient_${ipNo.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
 }

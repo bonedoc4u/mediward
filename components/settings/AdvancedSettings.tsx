@@ -1,111 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useConfig, useAuth } from '../../contexts/AppContext';
 import { SpecialtyFieldGroup, SpecialtyField } from '../../types';
-import { anonymizePatient, exportPatientData } from '../../services/patientService';
+import { DpdpErasurePanel, DpdpPortabilityPanel } from './DataProtectionPanels';
 import { SPECIALTY_DISPLAY_NAMES } from '../../services/specialtyTemplates';
 import { createIncident, updateIncidentStatus, deleteIncident, fetchIncidents, StatusIncident, IncidentSeverity, IncidentStatus } from '../../services/statusService';
 import { getDeadLetterQueue, clearDeadLetterQueue, retryDeadLetterOp, clearMainQueue, getMainQueueSize, DeadLetterOp } from '../../services/syncQueue';
 import {
-  Link2, Server, Globe, Radio, ShieldAlert, LayoutTemplate, UserX, Download,
+  Link2, Server, Globe, Radio, ShieldAlert, LayoutTemplate,
   Plus, Pencil, Trash2, Save, X, ChevronDown, ChevronUp, RotateCcw,
   CheckCircle2, AlertTriangle, XCircle, RefreshCw,
 } from 'lucide-react';
-
-// ─── DPDP Right-to-Erasure Panel ───
-const DpdpErasurePanel: React.FC<{ hospitalId: string }> = ({ hospitalId }) => {
-  const [ipNo, setIpNo] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const handleErase = async () => {
-    if (!ipNo.trim()) return;
-    if (!window.confirm(`Permanently anonymise ALL personal data for patient ${ipNo}? This cannot be undone.`)) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await anonymizePatient(ipNo.trim(), hospitalId);
-      setMsg({ ok: true, text: `Patient ${ipNo} — personal data anonymised per DPDP §13.` });
-      setIpNo('');
-    } catch (err: unknown) {
-      setMsg({ ok: false, text: err instanceof Error ? err.message : 'Anonymisation failed.' });
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <UserX className="w-4 h-4 text-red-600" />
-        <h2 className="font-bold text-slate-800">Patient Data Erasure (DPDP §13)</h2>
-      </div>
-      <div className="p-4 space-y-3 text-sm text-slate-700">
-        <p className="text-xs text-slate-500">Right to erasure under the Digital Personal Data Protection Act, 2023. Anonymises name, mobile, ABHA ID, and all clinical notes for the specified patient. The anonymised record is retained for audit/billing continuity.</p>
-        <div className="flex gap-2">
-          <input type="text" value={ipNo} onChange={e => setIpNo(e.target.value)}
-            placeholder="IP Number (e.g. IP/2024/1234)"
-            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 outline-none" />
-          <button onClick={handleErase} disabled={busy || !ipNo.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
-            {busy ? 'Processing…' : 'Anonymise'}
-          </button>
-        </div>
-        {msg && (
-          <div className={`flex items-center gap-2 p-3 rounded-lg text-xs font-medium ${msg.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-            {msg.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
-            {msg.text}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ─── DPDP Data Portability Panel ───
-const DpdpPortabilityPanel: React.FC<{ hospitalId: string }> = ({ hospitalId }) => {
-  const [ipNo, setIpNo] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const handleExport = async () => {
-    if (!ipNo.trim()) return;
-    setBusy(true);
-    setMsg(null);
-    try {
-      await exportPatientData(ipNo.trim(), hospitalId);
-      setMsg({ ok: true, text: `Patient ${ipNo} data exported as JSON.` });
-    } catch (err: unknown) {
-      setMsg({ ok: false, text: err instanceof Error ? err.message : 'Export failed.' });
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <Download className="w-4 h-4 text-teal-600" />
-        <h2 className="font-bold text-slate-800">Patient Data Export (DPDP §16)</h2>
-      </div>
-      <div className="p-4 space-y-3 text-sm text-slate-700">
-        <p className="text-xs text-slate-500">Right to data portability under the Digital Personal Data Protection Act, 2023. Downloads a complete JSON file of all data held for the specified patient.</p>
-        <div className="flex gap-2">
-          <input type="text" value={ipNo} onChange={e => setIpNo(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleExport()}
-            placeholder="IP Number (e.g. IP/2024/1234)"
-            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-400 outline-none" />
-          <button onClick={handleExport} disabled={busy || !ipNo.trim()}
-            className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
-            <Download className="w-4 h-4" />
-            {busy ? 'Exporting…' : 'Export JSON'}
-          </button>
-        </div>
-        {msg && (
-          <div className={`flex items-center gap-2 p-3 rounded-lg text-xs font-medium ${msg.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-            {msg.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
-            {msg.text}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // ─── Advanced Settings panel ───
 const AdvancedSettings: React.FC = () => {
@@ -429,7 +333,7 @@ const AdvancedSettings: React.FC = () => {
 
       {/* DPDP Data Rights */}
       <DpdpPortabilityPanel hospitalId={hospitalId} />
-      <DpdpErasurePanel hospitalId={hospitalId} />
+      <DpdpErasurePanel />
 
       {/* Incident Management */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
