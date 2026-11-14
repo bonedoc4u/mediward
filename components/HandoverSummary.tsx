@@ -175,11 +175,11 @@ const HandoverSummary: React.FC<Props> = ({
   });
 
   return (
-    <div className="mb-6">
+    <div className="md:mb-6">
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Ward Snapshot</h3>
-          <p className="text-xs text-slate-400">{dateLabel} · Click a card to filter</p>
+          <p className="text-xs text-slate-400">{dateLabel}<span className="hidden md:inline"> · Click a card to filter</span></p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -199,32 +199,35 @@ const HandoverSummary: React.FC<Props> = ({
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Phone: four compact tiles in one row (number + label). The icon and the
+          patient names appear from md up. As a 2x2 grid of full tiles this block
+          was about 450px tall and stood between the doctor and the patient list. */}
+      <div className="grid grid-cols-4 gap-2 md:gap-3">
         {cards.map(card => (
           <button
             key={card.label}
             onClick={card.onClick}
             className={`
-              flex flex-col items-start p-4 rounded-xl border transition-all duration-200
+              flex flex-col items-start min-h-16 p-2 md:p-4 rounded-xl border transition-all duration-200
               hover:shadow-md hover:scale-[1.02] active:scale-[0.98] text-left
               ${card.bg} ${card.borderColor}
             `}
           >
-            <div className={`p-2 rounded-lg mb-3 ${card.iconBg}`}>
+            <div className={`hidden md:block p-2 rounded-lg mb-3 ${card.iconBg}`}>
               <card.icon className={`w-4 h-4 ${card.textColor}`} />
             </div>
-            <div className={`text-2xl font-bold leading-none mb-1 ${card.textColor}`}>
+            <div className={`text-xl md:text-2xl font-bold leading-none mb-1 ${card.textColor}`}>
               {card.count}
             </div>
-            <div className={`text-xs font-semibold mb-1 ${card.textColor}`}>
+            <div className={`text-xs font-semibold leading-tight md:mb-1 ${card.textColor}`}>
               {card.label}
             </div>
             {card.names.length > 0 ? (
-              <div className="text-[10px] text-slate-500 leading-relaxed">
+              <div className="hidden md:block text-[10px] text-slate-500 leading-relaxed">
                 {card.names.join(', ')}{card.count > 3 ? ` +${card.count - 3}` : ''}
               </div>
             ) : (
-              <div className="text-[10px] text-slate-400">None today</div>
+              <div className="hidden md:block text-[10px] text-slate-400">None today</div>
             )}
           </button>
         ))}

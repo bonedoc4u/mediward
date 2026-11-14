@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Patient, PatientStatus } from '../types';
 import { X, Loader2, AlertTriangle, CheckCircle, Brain, RefreshCw, Zap, Cpu } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -6,6 +6,9 @@ import { useConfig } from '../contexts/AppContext';
 
 interface Props {
   patients: Patient[];
+  /** Whether the panel is shown. The button that opens it lives in the app header. */
+  open: boolean;
+  onClose: () => void;
 }
 
 interface AiAlert {
@@ -152,138 +155,12 @@ function generateRuleBasedAlerts(patients: Patient[]): AiAlert[] {
   return alerts.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 }
 
-// ─── Draggable FAB position (AssistiveTouch-style) ───────────────────────────
-const BTN_SIZE = 56;   // px
-const EDGE_MARGIN = 8; // px from screen edge when snapped
-
-function snappedLeft(side: 'left' | 'right') {
-  return side === 'right'
-    ? window.innerWidth - BTN_SIZE - EDGE_MARGIN
-    : EDGE_MARGIN;
-}
-
-function loadFabPos(): { side: 'left' | 'right'; yPx: number } {
-  try {
-    const raw = localStorage.getItem('mediward_fab_pos');
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return { side: 'right', yPx: 120 };
-}
-
-function saveFabPos(pos: { side: 'left' | 'right'; yPx: number }) {
-  try { localStorage.setItem('mediward_fab_pos', JSON.stringify(pos)); } catch { /* ignore */ }
-}
-
-const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
+const AiClinicalAssistant: React.FC<Props> = ({ patients, open: isOpen, onClose }) => {
   const { department } = useConfig();
-  const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alerts, setAlerts] = useState<AiAlert[] | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [aiMode, setAiMode] = useState<'gemini' | 'rules'>('rules');
-
-  // ── Draggable FAB state ──
-  const [fabPos, setFabPos] = useState<{ side: 'left' | 'right'; yPx: number }>(loadFabPos);
-  // liveDrag: free x/y while finger is down; null = snapped position
-  const [liveDrag, setLiveDrag] = useState<{ x: number; y: number } | null>(null);
-  const dragging = useRef(false);
-  const dragMoved = useRef(false);
-  const startTouchX = useRef(0);
-  const startTouchY = useRef(0);
-  const startFabX = useRef(0);
-  const startFabY = useRef(0);
-
-  const clampY = (y: number) => Math.max(EDGE_MARGIN, Math.min(y, window.innerHeight - BTN_SIZE - EDGE_MARGIN));
-  const clampX = (x: number) => Math.max(EDGE_MARGIN, Math.min(x, window.innerWidth - BTN_SIZE - EDGE_MARGIN));
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    const t = e.touches[0];
-    dragging.current = true;
-    dragMoved.current = false;
-    startTouchX.current = t.clientX;
-    startTouchY.current = t.clientY;
-    startFabX.current = snappedLeft(fabPos.side);
-    startFabY.current = fabPos.yPx;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!dragging.current || e.touches.length !== 1) return;
-    const t = e.touches[0];
-    const dx = t.clientX - startTouchX.current;
-    const dy = t.clientY - startTouchY.current;
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-      dragMoved.current = true;
-      e.preventDefault();
-    }
-    if (dragMoved.current) {
-      setLiveDrag({
-        x: clampX(startFabX.current + dx),
-        y: clampY(startFabY.current + dy),
-      });
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!dragging.current) return;
-    dragging.current = false;
-
-    if (!dragMoved.current) {
-      setLiveDrag(null);
-      setIsOpen(true);
-      if (!alerts) generateInsights();
-      return;
-    }
-
-    const touch = e.changedTouches[0];
-    const newSide: 'left' | 'right' = touch.clientX < window.innerWidth / 2 ? 'left' : 'right';
-    const newPos = { side: newSide, yPx: clampY(liveDrag?.y ?? fabPos.yPx) };
-    setLiveDrag(null); // triggers transition to snapped position
-    setFabPos(newPos);
-    saveFabPos(newPos);
-  };
-
-  // Mouse drag (desktop)
-  const handleMouseDown = (e: React.MouseEvent) => {
-    dragging.current = true;
-    dragMoved.current = false;
-    startTouchX.current = e.clientX;
-    startTouchY.current = e.clientY;
-    startFabX.current = snappedLeft(fabPos.side);
-    startFabY.current = fabPos.yPx;
-  };
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!dragging.current) return;
-      const dx = e.clientX - startTouchX.current;
-      const dy = e.clientY - startTouchY.current;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved.current = true;
-      if (dragMoved.current) {
-        setLiveDrag({
-          x: clampX(startFabX.current + dx),
-          y: clampY(startFabY.current + dy),
-        });
-      }
-    };
-    const onMouseUp = (e: MouseEvent) => {
-      if (!dragging.current) return;
-      dragging.current = false;
-      if (!dragMoved.current) { setLiveDrag(null); return; }
-      const newSide: 'left' | 'right' = e.clientX < window.innerWidth / 2 ? 'left' : 'right';
-      const newPos = { side: newSide, yPx: clampY(liveDrag?.y ?? fabPos.yPx) };
-      setLiveDrag(null);
-      setFabPos(newPos);
-      saveFabPos(newPos);
-    };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-   
-  }, [fabPos, liveDrag]);
 
   const generateInsights = useCallback(async () => {
     setLoading(true);
@@ -377,6 +254,12 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
     }
   }, [patients, department]);
 
+  // Opening the panel runs the analysis if there is none yet. (The floating
+  // button used to do this in its own tap handler.)
+  useEffect(() => {
+    if (isOpen && !alerts && !loading) void generateInsights();
+  }, [isOpen]);
+
   const getPriorityColor = (p: string) => {
     switch (p) {
       case 'High': return 'bg-red-50 text-red-700 border-red-200';
@@ -397,45 +280,9 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
 
   return (
     <>
-      {/* ─── Draggable AssistiveTouch-style FAB ─── */}
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onMouseDown={handleMouseDown}
-        onClick={() => {
-          if (dragMoved.current) return; // suppress click after drag
-          setIsOpen(true);
-          if (!alerts) generateInsights();
-        }}
-        aria-label="Clinical Assistant"
-        title="Clinical Assistant (drag to move)"
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { setIsOpen(true); if (!alerts) generateInsights(); } }}
-        className="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-full shadow-lg shadow-indigo-900/30 flex items-center justify-center select-none"
-        style={{
-          position: 'fixed',
-          top: liveDrag ? liveDrag.y : fabPos.yPx,
-          left: liveDrag ? liveDrag.x : snappedLeft(fabPos.side),
-          width: BTN_SIZE,
-          height: BTN_SIZE,
-          zIndex: 40,
-          touchAction: 'none',
-          cursor: liveDrag ? 'grabbing' : 'grab',
-          transition: liveDrag
-            ? 'none'
-            : 'top 0.35s cubic-bezier(0.34,1.56,0.64,1), left 0.35s cubic-bezier(0.34,1.56,0.64,1)',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
-        }}
-      >
-        <Zap className="w-6 h-6 pointer-events-none" />
-      </div>
-
       {isOpen && (
         <div className="fixed inset-0 z-[70] flex justify-end">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => onClose()} />
 
           <div className="relative w-full max-w-md bg-white flex flex-col shadow-2xl" style={{ height: '100dvh', paddingTop: 'var(--safe-area-top, env(safe-area-inset-top, 0px))', paddingBottom: 'var(--safe-area-bottom, env(safe-area-inset-bottom, 0px))' }}>
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-indigo-50/50">
@@ -452,7 +299,7 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients }) => {
                   </p>
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-slate-600 p-1">
+              <button onClick={() => onClose()} className="text-slate-400 hover:text-slate-600 p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
