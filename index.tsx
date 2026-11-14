@@ -7,7 +7,7 @@ import { initCapacitor } from './utils/capacitorInit';
 import { recoverDurableStorage } from './services/persistence';
 import { initSyncQueue } from './services/syncQueue';
 import { startConnectivityPolling } from './utils/connectivity';
-import { toast } from './utils/toast';
+import { startLegacyRoundHandover } from './services/legacyRoundQueue';
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 if (sentryDsn) {
@@ -26,17 +26,6 @@ initCapacitor();
 // Start real connectivity probing (replaces unreliable navigator.onLine)
 startConnectivityPolling();
 
-// Listen for the BackgroundSync service worker notifying us that queued round
-// notes have been replayed. Chrome/Android only — iOS falls back to syncQueue.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', (e: MessageEvent) => {
-    if (e.data?.type === 'ROUNDS_SYNCED') {
-      const n = e.data.count as number;
-      toast.success(`${n} round note${n > 1 ? 's' : ''} synced`);
-    }
-  });
-}
-
 // Recover any localStorage keys purged by iOS and initialise the offline sync
 // queue from Capacitor Preferences (UserDefaults — survives iOS memory pressure).
 // Both must complete before the React tree mounts so enqueue() sees a warm cache.
@@ -44,6 +33,10 @@ Promise.all([
   recoverDurableStorage(),
   initSyncQueue(),
 ]).catch(() => {}).finally(() => {
+  // Move round saves left in the service worker's old queue into the app
+  // queue (now warm). Background task — does not delay the first paint.
+  startLegacyRoundHandover();
+
   const root = ReactDOM.createRoot(document.getElementById('root')!);
   root.render(
     <React.StrictMode>
