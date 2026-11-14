@@ -9,7 +9,7 @@ import { getOTCycleDates } from '../utils/otSchedule';
 import { OTPatient, OTType, OTListMeta, getTableOptionsForType, getDefaultCategoryForType, isEligibleForOTList, PENDING_ID_PREFIX } from '../utils/otListTypes';
 import { buildOTPatientEntry } from '../utils/otListAssign';
 import { preferRowCollision } from '../utils/otListCollision';
-import { findNewlyPlannedOTAssignments } from '../utils/otListAutoPopulate';
+import { findNewlyPlannedOTAssignments, mayAutoAddPlannedPatients } from '../utils/otListAutoPopulate';
 import { resolveEffectiveUnit } from '../utils/effectiveUnit';
 import { fetchOTList, upsertOTListMeta, insertOTListEntry, updateOTListEntry, deleteOTListEntry, reorderOTListEntries } from '../services/otListService';
 import { exportOTListToExcel, exportOTListToPDF } from '../utils/otListExport';
@@ -290,8 +290,9 @@ const OTListManagement: React.FC<OTListManagementProps> = ({ patients }) => {
     // above), which would write every unit's planned surgeries into that
     // one default unit's OT list. Skip the automatic path entirely in both
     // cases; manual add/assign is unaffected.
-    if (user.role === 'admin' && (!selectedUnit || selectedUnit === 'all')) return;
-    if (user.role === 'superadmin') return;
+    // Nor does a role that may not change the OT list: opening the screen
+    // must not write. All three cases live in mayAutoAddPlannedPatients().
+    if (!mayAutoAddPlannedPatients(user, selectedUnit)) return;
     const tabDates: Array<{ date: string; fallbackType: OTType }> = [
       { date: majorDate, fallbackType: 'Major' },
       { date: minorDate, fallbackType: 'Minor' },
