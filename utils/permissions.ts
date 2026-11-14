@@ -21,7 +21,7 @@ export type Permission =
  *
  * 'rounds:write' covers the round note and the patient's orders (to-dos).
  */
-const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   superadmin: [
     'patient:add', 'patient:edit', 'patient:delete', 'patient:discharge',
     'rounds:write', 'labs:write', 'investigations:write',
