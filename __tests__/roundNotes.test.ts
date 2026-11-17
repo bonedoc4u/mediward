@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   findTodayRound, findPreviousNote, appendPhrase, dayLabel, timeLabel, noteMeta,
-  draftKey, loadDraft, saveDraft, clearDraft, combineNotes, ROUND_NOTE_MAX_LENGTH,
+  draftKey, loadDraft, saveDraft, clearDraft, combineNotes, ROUND_NOTE_MAX_LENGTH, countRoundedToday,
 } from '../src/features/rounds/roundNotes';
 import { DailyRound } from '../types';
 
@@ -106,5 +106,22 @@ describe('drafts', () => {
   });
   it('uses a key that starts with the date, so the 2-day clean-up in Round Mode finds it', () => {
     expect(draftKey(TODAY, 'IP-1')).toBe('mediward_round_draft_2026-11-13_IP-1');
+  });
+});
+
+describe('countRoundedToday — the "x of y rounded" count', () => {
+  it('counts patients with a round dated today, and nothing else', () => {
+    const patients = [
+      { dailyRounds: [round(TODAY, 'seen')] },
+      { dailyRounds: [round('2026-11-12', 'yesterday only')] },
+      { dailyRounds: [] },
+      { dailyRounds: undefined },
+      { dailyRounds: [round('2026-11-12'), round(TODAY)] },
+    ];
+    expect(countRoundedToday(patients, TODAY)).toBe(2);
+  });
+
+  it('is zero for an empty ward', () => {
+    expect(countRoundedToday([], TODAY)).toBe(0);
   });
 });

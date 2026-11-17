@@ -15,6 +15,8 @@ import AllergyLine from '../src/features/rounds/AllergyLine';
 import RoundNotesTimeline from '../src/features/patient/RoundNotesTimeline';
 import OrdersCard from '../src/features/patient/OrdersCard';
 import { startRoundAt } from '../utils/roundPosition';
+import PatientActionBar from '../src/features/patient/PatientActionBar';
+import { findTodayRound } from '../src/features/rounds/roundNotes';
 import { formatDayMonth, todayYmd } from '../utils/dates';
 import DateBottomSheet from './ui/DateBottomSheet';
 import ErrorBoundary from './ErrorBoundary';
@@ -197,17 +199,17 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         pinToViewport={!inSheet}
       />
 
-      {/* ─── DARK HEADER CARD ──────────────────────────────────────────── */}
-      <div className="bg-accent rounded-b-3xl overflow-hidden mb-4 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-2 pb-6">
+      {/* ─── HEADER ─────────────────────────────────────────────────────
+          White, not a solid teal block: colour on this screen is kept for
+          clinical status. The IP number has its own line and never wraps. */}
+      <div className="bg-surface-card border-b border-line mb-4 -mx-4 sm:-mx-8 px-4 sm:px-8 pt-2 pb-4">
 
-        {/* Back / close — sits top-left, clear of the status badges top-right.
-            Prev/Next (only when opened from a page-able list, e.g. Admission
-            List) sit top-right of this row so a chief walkthrough can page
-            through the day's patients without returning to the list each time. */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Back / close. Prev/Next (only when opened from a page-able list,
+            e.g. Admission List) sit on the right of this row. */}
+        <div className="flex items-center justify-between mb-2">
           <button
             onClick={dismiss}
-            className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
+            className="min-h-11 -ml-2 px-2 flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink rounded-control transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <ArrowLeft className="w-4 h-4" /> {inSheet ? 'Close' : 'Dashboard'}
           </button>
@@ -217,7 +219,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                 onClick={onPrevPatient}
                 disabled={!onPrevPatient}
                 aria-label="Previous patient"
-                className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-surface-sunken disabled:opacity-30 disabled:hover:bg-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -225,7 +227,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
                 onClick={onNextPatient}
                 disabled={!onNextPatient}
                 aria-label="Next patient"
-                className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                className="min-w-11 min-h-11 flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-surface-sunken disabled:opacity-30 disabled:hover:bg-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -233,64 +235,65 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
           )}
         </div>
 
-        {/* Name row + Status badges */}
-        <div className="flex items-start justify-between gap-3 mb-1.5">
-          <div className="flex items-center gap-3 min-w-0">
-            {canEdit ? (
-              <button
-                onClick={() => setShowMoveBed(true)}
-                aria-label={patient.bed ? `Change bed (currently ${patient.bed})` : 'Assign bed'}
-                title="Tap to assign / change bed"
-                className="relative bg-white/10 hover:bg-white/20 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold font-mono text-white border border-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-              >
-                {patient.bed || <Plus className="w-5 h-5 text-white/70" />}
-                <span className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 border-2 border-accent">
-                  <Pencil className="w-2.5 h-2.5 text-accent" />
-                </span>
-              </button>
-            ) : (
-              <div className="bg-white/10 w-12 h-12 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold font-mono text-white border border-white/20">
-                {patient.bed || '—'}
-              </div>
-            )}
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-white tracking-tight truncate">{patient.name}</h1>
-              <p className="text-white/70 text-xs mt-0.5">
-                {patient.age}y · {patient.gender} · IP {patient.ipNo} · {patient.ward}
-              </p>
+        {/* Bed + name + identifiers */}
+        <div className="flex items-start gap-3">
+          {canEdit ? (
+            <button
+              onClick={() => setShowMoveBed(true)}
+              aria-label={patient.bed ? `Change bed (currently ${patient.bed})` : 'Assign bed'}
+              title="Tap to assign / change bed"
+              className="relative bg-accent hover:bg-accent-pressed w-12 h-12 shrink-0 rounded-control flex items-center justify-center text-lg font-medium font-mono text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+            >
+              {patient.bed || <Plus className="w-5 h-5 text-white/80" />}
+              <span className="absolute -bottom-1 -right-1 bg-surface-card rounded-full p-0.5 border-2 border-accent">
+                <Pencil className="w-2.5 h-2.5 text-accent-fg" />
+              </span>
+            </button>
+          ) : (
+            <div className="bg-accent w-12 h-12 shrink-0 rounded-control flex items-center justify-center text-lg font-medium font-mono text-white">
+              {patient.bed || '—'}
             </div>
-          </div>
-          {/* Patient status + PAC status stacked */}
-          <div className="shrink-0 flex flex-col items-end gap-1.5 mt-1">
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold ${statusBadge.bg} ${statusBadge.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
-              {patient.patientStatus === PatientStatus.Review ? 'Needs Review' : patient.patientStatus}
-            </span>
-            {needsPac(patient) ? (
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border ${pacBadge.bg} ${pacBadge.text} ${pacBadge.border}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${pacBadge.dot}`} />
-                {patient.pacStatus}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold border bg-vital-normal/20 text-white border-vital-normal/40">
-                <Leaf className="w-3 h-3" aria-hidden="true" /> Conservative
-              </span>
-            )}
+          )}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-ink tracking-tight leading-tight break-words">{patient.name}</h1>
+            <p className="text-sm text-ink-muted mt-0.5">
+              {patient.age}y · {patient.gender}{patient.ward ? ` · ${patient.ward}` : ''}
+            </p>
+            <p className="text-sm text-ink-muted">
+              IP <span className="font-mono text-ink whitespace-nowrap">{patient.ipNo}</span>
+            </p>
           </div>
         </div>
 
-        {/* POD + Admitted metric chips — same white/10 treatment for both: a saturated
-            green POD chip didn't read well against the new solid accent header. */}
+        {/* Patient status + PAC status */}
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${statusBadge.bg} ${statusBadge.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
+            {patient.patientStatus === PatientStatus.Review ? 'Needs Review' : patient.patientStatus}
+          </span>
+          {needsPac(patient) ? (
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${pacBadge.bg} ${pacBadge.text} ${pacBadge.border}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${pacBadge.dot}`} />
+              {patient.pacStatus}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border">
+              <Leaf className="w-3 h-3" aria-hidden="true" /> Conservative
+            </span>
+          )}
+        </div>
+
+        {/* POD + days admitted */}
         <div className="flex gap-3 mt-4">
           {patient.pod !== undefined && (
-            <div className="flex-1 bg-white/10 border border-white/15 rounded-2xl px-4 py-3 text-center">
-              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Post-Op Day</p>
-              <p className="text-3xl font-black font-mono text-white leading-tight mt-0.5">{patient.pod}</p>
+            <div className="flex-1 bg-surface-sunken border border-line rounded-card px-4 py-2.5 text-center">
+              <p className="text-ink-muted text-[11px] font-bold uppercase tracking-wider">Post-Op Day</p>
+              <p className="text-2xl font-medium font-mono text-ink leading-tight mt-0.5">{patient.pod}</p>
             </div>
           )}
-          <div className={`${patient.pod !== undefined ? 'flex-1' : 'flex-1'} bg-white/10 border border-white/15 rounded-2xl px-4 py-3 text-center`}>
-            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Admitted</p>
-            <p className="text-3xl font-black font-mono text-white leading-tight mt-0.5">{daysSinceAdmission}d</p>
+          <div className="flex-1 bg-surface-sunken border border-line rounded-card px-4 py-2.5 text-center">
+            <p className="text-ink-muted text-[11px] font-bold uppercase tracking-wider">Admitted</p>
+            <p className="text-2xl font-medium font-mono text-ink leading-tight mt-0.5">{daysSinceAdmission}d</p>
           </div>
         </div>
       </div>
@@ -307,7 +310,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── DIAGNOSIS + PROCEDURE CARD ────────────────────────────────── */}
       <div className="bg-surface-card rounded-2xl shadow-sm border border-line overflow-hidden mb-3">
-        <div className="border-l-4 border-accent px-4 py-4 space-y-3.5">
+        <div className="px-4 py-4 space-y-3.5">
 
           {/* Diagnosis */}
           <div>
@@ -382,7 +385,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
       <RoundNotesTimeline
         rounds={patient.dailyRounds}
         today={today}
-        onWriteToday={canRound ? () => { startRoundAt(patient); navigateTo('round-mode'); } : undefined}
+        /* Writing today's note is in the bottom action bar (below). */
       />
 
       {/* ─── ORDERS — open ones first, with how long each has been open ── */}
@@ -507,9 +510,12 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
 
       {/* ─── QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-4 -mx-1 px-1 scrollbar-hide">
-        <button onClick={() => setShowReferral(true)} className="flex items-center gap-1.5 px-3 py-2.5 bg-accent hover:bg-accent-pressed text-white text-xs font-bold rounded-xl transition-colors shrink-0 min-h-[44px]">
-          <Send className="w-4 h-4" /><span>Refer</span>
-        </button>
+        {/* Refer and Move bed live in the action bar's "⋯" menu when it shows. */}
+        {!canRound && (
+          <button onClick={() => setShowReferral(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
+            <Send className="w-4 h-4 text-accent-fg" /> Refer
+          </button>
+        )}
         <button onClick={() => navigateTo('rounds')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
           <ClipboardCheck className="w-4 h-4 text-accent-fg" /> Daily Rounds
         </button>
@@ -522,7 +528,7 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         <button onClick={() => navigateTo('pac')} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
           <HeartPulse className="w-4 h-4 text-accent-fg" /> PAC Status
         </button>
-        {canEdit && (
+        {canEdit && !canRound && (
           <button onClick={() => setShowMoveBed(true)} className="flex items-center gap-2 px-3 py-2.5 min-h-[44px] shrink-0 bg-surface-card rounded-xl shadow-sm border border-line hover:border-accent hover:bg-accent-soft transition-colors text-xs font-bold text-ink whitespace-nowrap">
             <ArrowRightLeft className="w-4 h-4 text-accent-fg" /> Move bed
           </button>
@@ -717,6 +723,17 @@ const PatientDetail: React.FC<PatientDetailProps> = ({ patientId, onClose, inShe
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
       />
+
+      {/* ─── Main action in thumb reach (users who can write round notes) ── */}
+      {canRound && (
+        <PatientActionBar
+          inSheet={inSheet}
+          hasTodayNote={(findTodayRound(patient.dailyRounds, today)?.roundNote ?? '').trim() !== ''}
+          onWriteToday={() => { startRoundAt(patient); navigateTo('round-mode'); }}
+          onReferral={() => setShowReferral(true)}
+          onMoveBed={canEdit ? () => setShowMoveBed(true) : undefined}
+        />
+      )}
 
       {showReferral   && (
         <ReferralLetter

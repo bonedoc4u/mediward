@@ -27,6 +27,17 @@ export function findTodayRound(rounds: readonly DailyRound[] | undefined, today:
 }
 
 /**
+ * How many of `patients` have a round for `today`. The one rule behind every
+ * "x of y rounded" line (ward headers, the Round Mode ward picker and progress).
+ */
+export function countRoundedToday(
+  patients: readonly { dailyRounds?: readonly DailyRound[] }[],
+  today: string,
+): number {
+  return patients.filter(p => findTodayRound(p.dailyRounds, today) !== undefined).length;
+}
+
+/**
  * The most recent real note written BEFORE `today` — what the doctor reads
  * first on a round. Days whose round has no note text are skipped, so a
  * weekend gap still shows Friday's note. The legacy `note` field (a copy of

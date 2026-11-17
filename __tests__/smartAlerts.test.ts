@@ -53,6 +53,20 @@ describe('getSmartAlerts', () => {
     expect(alerts.some(a => a.type === 'warning' && a.message.includes('extended stay'))).toBe(true);
   });
 
+  it('shows a single length-of-stay alert from POD 7, not two', () => {
+    const patient = makePatient({ pod: 11, dischargeSummary: undefined });
+    const stay = getSmartAlerts(patient).filter(a => a.message.startsWith('POD 11'));
+    expect(stay).toHaveLength(1);
+    expect(stay[0].type).toBe('warning');
+    expect(stay[0].message).toContain('plan discharge');
+  });
+
+  it('keeps the plain extended-stay wording once a discharge summary exists', () => {
+    const patient = makePatient({ pod: 9, dischargeSummary: { summary: 'x' } as unknown as Patient['dischargeSummary'] });
+    const alerts = getSmartAlerts(patient);
+    expect(alerts.map(a => a.message)).toEqual(['POD 9 — extended stay, review needed']);
+  });
+
   it('returns no alerts for a routine fit patient', () => {
     const patient = makePatient({ pacStatus: PacStatus.Fit, pod: 2 });
     const alerts = getSmartAlerts(patient);

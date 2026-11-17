@@ -62,7 +62,7 @@ const PatientCard: React.FC<Props> = ({ patient, today, highlighted, onOpen, onE
         <span className="flex-1 min-w-0">
           <span className="block text-base font-bold text-ink leading-snug break-words">{patient.name}</span>
           <span className="block text-sm text-ink-muted">
-            {patient.age} {genderInitial(patient.gender)} · {patient.ipNo}
+            {patient.age} {genderInitial(patient.gender)} · <span className="font-mono whitespace-nowrap">{patient.ipNo}</span>
           </span>
         </span>
         {pod !== undefined && (
@@ -127,13 +127,15 @@ const PatientCard: React.FC<Props> = ({ patient, today, highlighted, onOpen, onE
 
       <div className="flex items-center justify-between gap-2 px-3 pb-3">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 min-w-0">
+          {/* The one fact scanned for mid-round, so it is a clear label, not
+              faint grey text: teal "Round due", or green "Rounded 09:40". */}
           {todayRound ? (
-            <span className="flex items-center gap-1 text-sm font-semibold text-vital-normal-fg">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-vital-normal-border bg-vital-normal-surface text-sm font-semibold text-vital-normal-fg">
               <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
-              Rounded today{roundedAt ? ` · ${roundedAt}` : ''}
+              {roundedAt ? <>Rounded <span className="font-mono">{roundedAt}</span></> : 'Rounded today'}
             </span>
           ) : (
-            <span className="text-sm text-ink-muted">Not rounded today</span>
+            <span className="px-2 py-0.5 rounded-full border border-accent text-sm font-semibold text-accent-fg">Round due</span>
           )}
           {showPac && (
             needsPac(patient) ? (
@@ -162,10 +164,11 @@ const PatientCard: React.FC<Props> = ({ patient, today, highlighted, onOpen, onE
               <button
                 type="button"
                 onClick={onAddLab}
-                aria-label={`Add lab result for ${patient.name}`}
-                className="w-11 h-11 flex items-center justify-center rounded-control bg-surface-sunken text-ink-muted hover:bg-accent-soft hover:text-accent-fg transition-colors"
+                aria-label={`Labs for ${patient.name}`}
+                className="h-11 px-3 flex items-center gap-1.5 rounded-control bg-surface-sunken text-sm font-semibold text-ink hover:bg-accent-soft hover:text-accent-fg transition-colors"
               >
-                <FlaskConical className="w-4 h-4" aria-hidden="true" />
+                <FlaskConical className="w-4 h-4 text-ink-muted" aria-hidden="true" />
+                Labs
               </button>
             )}
             {onEdit && (
@@ -173,9 +176,10 @@ const PatientCard: React.FC<Props> = ({ patient, today, highlighted, onOpen, onE
                 type="button"
                 onClick={onEdit}
                 aria-label={`Edit ${patient.name}`}
-                className="w-11 h-11 flex items-center justify-center rounded-control bg-surface-sunken text-ink-muted hover:bg-accent-soft hover:text-accent-fg transition-colors"
+                className="h-11 px-3 flex items-center gap-1.5 rounded-control bg-surface-sunken text-sm font-semibold text-ink hover:bg-accent-soft hover:text-accent-fg transition-colors"
               >
-                <Pencil className="w-4 h-4" aria-hidden="true" />
+                <Pencil className="w-4 h-4 text-ink-muted" aria-hidden="true" />
+                Edit
               </button>
             )}
           </div>

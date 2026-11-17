@@ -377,6 +377,7 @@ const App: React.FC = () => {
   // ward is shown instead. Everything drawn below uses `view`, so the title,
   // the menu highlight and the screen always agree.
   const view = canOpenView(user, currentView) ? currentView : 'dashboard';
+  const inRoundMode = view === 'round-mode';
   const meta = viewMeta[view as keyof typeof viewMeta] ?? viewMeta.dashboard;
 
   // Patient quick-view sheet is open when a list view carries a patient id.
@@ -696,7 +697,12 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
+    <div
+      className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row"
+      /* Round Mode has no tab bar (see below), so everything placed above the
+         tab bar (the Done bar, content padding) drops to the bottom edge. */
+      style={inRoundMode ? ({ '--bottom-nav-height': '0px' } as React.CSSProperties) : undefined}
+    >
       <style>{`
         :root {
           --bottom-nav-height: 60px;
@@ -705,7 +711,6 @@ const App: React.FC = () => {
           --content-bottom-pad: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 24px);
           --fab-bottom: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 16px);
         }
-        * { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
         .glass-effect { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
@@ -992,40 +997,47 @@ const App: React.FC = () => {
       {/* ─── Mobile Bottom Tab Bar ─── */}
       <PwaInstallBanner />
 
-      <nav aria-label="Main navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      {/* Hidden in Round Mode: the round has its own bottom bar (Done · next),
+          and a stray tap on a tab used to leave the round mid-note. The ✕ at
+          the top of Round Mode still exits. */}
+      {!inRoundMode && (
+      <nav aria-label="Main navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface-card border-t border-line shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="grid grid-cols-6">
           {mobileTabs.map(tab => (
             <button
               key={tab.id}
               aria-current={view === tab.id ? 'page' : undefined}
               onClick={() => { navigateTo(tab.id); setIsMobileMenuOpen(false); }}
-              className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
-                view === tab.id ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
+              className={`relative min-h-[60px] flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors ${
+                view === tab.id ? 'text-accent-fg' : 'text-ink-muted active:text-ink'
               }`}
             >
               {view === tab.id && (
-                <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-teal-600 rounded-full" />
+                <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-accent rounded-full" />
               )}
               <tab.icon className="w-5 h-5" />
-              <span className="text-[10px] font-semibold leading-none truncate max-w-full px-0.5">{tab.label}</span>
+              {/* Hospitals name some modules themselves ("Procedure List",
+                  "Pre-op Clearance"): wrap onto two lines before cutting. */}
+              <span className="text-[10px] font-semibold leading-3 text-center line-clamp-2 break-words max-w-full px-0.5">{tab.label}</span>
             </button>
           ))}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             aria-expanded={isMobileMenuOpen}
             aria-haspopup="menu"
-            className={`relative flex flex-col items-center justify-center gap-0.5 py-3 transition-colors ${
-              isMobileMenuOpen ? 'text-teal-600' : 'text-slate-400 active:text-slate-600'
+            className={`relative min-h-[60px] flex flex-col items-center justify-center gap-0.5 py-1.5 transition-colors ${
+              isMobileMenuOpen ? 'text-accent-fg' : 'text-ink-muted active:text-ink'
             }`}
           >
             {isMobileMenuOpen && (
-              <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-teal-600 rounded-full" />
+              <span className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-accent rounded-full" />
             )}
             <Menu className="w-5 h-5" />
-            <span className="text-[10px] font-semibold leading-none">More</span>
+            <span className="text-[10px] font-semibold leading-3">More</span>
           </button>
         </div>
       </nav>
+      )}
 
       {/* ─── Concurrent Edit Conflict Modal ─── */}
       {concurrentEditConflict && (

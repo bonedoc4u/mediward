@@ -3,16 +3,22 @@ import { Patient, PacStatus, PatientStatus, VitalSigns } from '../types';
 import { useConfig, useAuth } from '../contexts/AppContext';
 import { getStatusColor, sortByBed, groupByWard, getTriageBorderClass, needsPac, isPendingSurgicalCandidate } from '../utils/calculations';
 import { getSmartAlerts } from '../utils/smartAlerts';
-import { Search, Filter, UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronDown, X, CalendarClock, CalendarCheck, Heart, Home, FileDown, Leaf } from 'lucide-react';
+import { UserPlus, Pencil, Layout, Activity, BedDouble, Stethoscope, Layers, ExternalLink, CheckCircle2, AlertCircle, Loader2, ChevronDown, X, CalendarClock, CalendarCheck, Heart, Home, Leaf } from 'lucide-react';
 import { exportWardListPDF } from '../utils/exportWardList';
 import { toast } from '../utils/toast';
 import { NoPatients, NoSearchResults } from './ui/EmptyState';
 import BottomSheetPicker from './ui/BottomSheetPicker';
 import { calcPod } from './HandoverSummary';
+import type { SnapshotFilter } from './HandoverSummary';
+import WardControls, { type WardFilters } from '../src/features/ward/WardControls';
+import { buildShiftSnapshot, exportShiftHandoverPDF } from '../utils/shiftHandover';
+import { countRoundedToday } from '../src/features/rounds/roundNotes';
 import TodaySchedule from './TodaySchedule';
 import PatientCard from '../src/features/ward/PatientCard';
 import OTDatePicker from './OTDatePicker';
 import { resolveEffectiveUnit } from '../utils/effectiveUnit';
+
+const NO_FILTERS: WardFilters = { surgeryToday: false, pod01: false, pending: false, overdueTodos: false };
 
 /** Strip ward-number prefix from bed for display: "10-05" → "05", "1A" → "1A" */
 const shortBed = (bed: string) => bed.includes('-') ? bed.split('-').pop()! : bed;
@@ -88,10 +94,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showSchedule, setShowSchedule] = useState(false);   // phone only; see the schedule block below
-  const [filterPending, setFilterPending] = useState(false);
-  const [filterSurgeryToday, setFilterSurgeryToday] = useState(false);
-  const [filterPod01, setFilterPod01] = useState(false);
-  const [filterOverdueTodos, setFilterOverdueTodos] = useState(false);
+  const [filters, setFilters] = useState<WardFilters>(NO_FILTERS);
   const [selectedWard, setSelectedWard] = useState<string>('All');
 
   const today = todayYmd();
@@ -117,14 +120,14 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
         (p.bed || '').includes(searchTerm) ||
         (p.ipNo || '').includes(searchTerm);
 
-      const matchesPending = filterPending ? (needsPac(p) && p.pacStatus === PacStatus.Pending) : true;
-      const matchesSurgery = filterSurgeryToday ? (p.dos === today || p.plannedDos === today) : true;
-      const matchesPod01 = filterPod01 ? (() => { const d = calcPod(p.dos, p.dod ?? today); return d === 1 || d === 2; })() : true;
-      const matchesOverdue = filterOverdueTodos ? p.todos.some(t => !t.isDone) : true;
+      const matchesPending = filters.pending ? (needsPac(p) && p.pacStatus === PacStatus.Pending) : true;
+      const matchesSurgery = filters.surgeryToday ? (p.dos === today || p.plannedDos === today) : true;
+      const matchesPod01 = filters.pod01 ? (() => { const d = calcPod(p.dos, p.dod ?? today); return d === 1 || d === 2; })() : true;
+      const matchesOverdue = filters.overdueTodos ? p.todos.some(t => !t.isDone) : true;
 
       return matchesSearch && matchesPending && matchesSurgery && matchesPod01 && matchesOverdue;
     });
-  }, [patients, searchTerm, filterPending, filterSurgeryToday, filterPod01, filterOverdueTodos, viewMode, today]);
+  }, [patients, searchTerm, filters, viewMode, today]);
 
   const patientsByWard = useMemo(() => groupByWard(filteredPatients), [filteredPatients]);
 
@@ -162,7 +165,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       });
       items.push({
         kind: 'ward-header', ward, isIcu: isIcuWard, count: wps.length,
-        rounded: wps.filter(p => p.dailyRounds.some(r => r.date === today)).length,
+        rounded: countRoundedToday(wps, today),
       });
       for (const patient of wps) {
         items.push({ kind: 'patient', patient, ward, isIcu: isIcuWard });
@@ -205,14 +208,29 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   );
 
   const clearFilters = () => {
-    setFilterPending(false);
-    setFilterSurgeryToday(false);
-    setFilterPod01(false);
-    setFilterOverdueTodos(false);
+    setFilters(NO_FILTERS);
     setSearchTerm('');
   };
+  /** A snapshot tile shows only its own patients. */
+  const showOnly = (key: SnapshotFilter) => { setSearchTerm(''); setFilters({ ...NO_FILTERS, [key]: true }); };
+  const toggleFilter = (key: SnapshotFilter) => setFilters(f => ({ ...f, [key]: !f[key] }));
+  const activeFilterSet = useMemo(
+    () => new Set((Object.keys(filters) as SnapshotFilter[]).filter(k => filters[k])),
+    [filters],
+  );
 
-  const hasActiveFilters = filterPending || filterSurgeryToday || filterPod01 || filterOverdueTodos || searchTerm;
+  const hasActiveFilters = activeFilterSet.size > 0 || searchTerm;
+  const activeWardPatients = useMemo(
+    () => patients.filter(p => p.patientStatus !== PatientStatus.Discharged),
+    [patients],
+  );
+  const handleExportShiftHandover = () => {
+    exportShiftHandoverPDF(buildShiftSnapshot(activeWardPatients, today), today).catch(err => {
+      console.error('[export] shift handover PDF failed:', err);
+      toast.error('Could not generate the PDF. Please try again.');
+    });
+  };
+  const showAddFab = (viewMode === 'home' || viewMode === 'master') && !!onAddPatient;
 
   // ─── Export ward list PDF (follows the active ward tab) ───
   const [exporting, setExporting] = useState(false);
@@ -280,7 +298,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           filteredPatients.map(p => (
             <div
               key={p.ipNo}
-              className="bg-surface-card rounded-xl border border-line border-l-4 border-l-accent p-4 flex items-center gap-4 cursor-pointer hover:shadow-sm hover:border-accent transition-all active:scale-[0.99]"
+              className="bg-surface-card rounded-xl border border-line p-4 flex items-center gap-4 cursor-pointer hover:shadow-sm hover:border-accent transition-all active:scale-[0.99]"
               onClick={() => onViewPatient?.(p.ipNo)}
             >
               <div className="w-10 h-10 rounded-lg bg-surface-sunken flex items-center justify-center text-sm font-bold font-mono text-ink shrink-0">
@@ -310,12 +328,15 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
   }
 
   return (
-    <div className="space-y-6">
+    /* Phone order (max-md:order-*): search, snapshot counts, ward chips, OT
+       line, then patients — so the first patient is on the first screen.
+       md up keeps the source order. */
+    <div className="flex flex-col gap-3 md:gap-6">
       {/* Today's Department Schedule — home view only.
           On a phone it is one collapsed line: it used to fill the first screen
           and push the patient list about 1,000px down. From md up it is always open. */}
       {viewMode === 'home' && (
-        <div>
+        <div className="max-md:order-4">
           <button
             type="button"
             onClick={() => setShowSchedule(v => !v)}
@@ -337,18 +358,21 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       {/* Ward Snapshot Strip — home view only */}
       {viewMode === 'home' && (
-        <HandoverSummary
-          patients={patients.filter(p => p.patientStatus !== PatientStatus.Discharged)}
-          onFilterSurgeryToday={() => { clearFilters(); setFilterSurgeryToday(true); }}
-          onFilterPod01={() => { clearFilters(); setFilterPod01(true); }}
-          onFilterPacPending={() => { clearFilters(); setFilterPending(true); }}
-          onFilterOverdueTodos={() => { clearFilters(); setFilterOverdueTodos(true); }}
-          onStartRounds={onStartRounds ?? (() => {})}
-        />
+        <div className="max-md:order-2">
+          <HandoverSummary
+            patients={activeWardPatients}
+            onFilterSurgeryToday={() => showOnly('surgeryToday')}
+            onFilterPod01={() => showOnly('pod01')}
+            onFilterPacPending={() => showOnly('pending')}
+            onFilterOverdueTodos={() => showOnly('overdueTodos')}
+            onStartRounds={onStartRounds ?? (() => {})}
+            activeFilters={activeFilterSet}
+          />
+        </div>
       )}
 
       {/* Ward Selection Tabs — rendered from ward_config */}
-      <div className="flex overflow-x-auto gap-2 pb-1 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0">
+      <div className="max-md:order-3 flex overflow-x-auto gap-2 pb-1 md:grid md:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0">
         <WardTab ward="All" icon={Layers} count={counts.All} colorClass="text-ink-muted" activeClass="bg-accent border-accent-pressed text-white" />
         {activeConfigWards.map((w, i) => {
           const NON_ICU_STYLES = [
@@ -369,51 +393,19 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       </div>
 
       {/* Controls */}
-      <div className="bg-surface-card p-3 md:p-4 rounded-lg shadow-sm border border-line sticky top-0 z-10">
-        <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
-          <div className="relative w-full xl:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-            <input
-              type="text"
-              placeholder="Search Name, Bed, IP No, Diagnosis..."
-              className="w-full pl-10 pr-4 py-2 border border-line rounded-md focus:ring-2 focus:ring-accent focus:outline-none"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-            {(viewMode === 'home' || viewMode === 'master') && onAddPatient && (
-              <button onClick={onAddPatient} className="flex items-center gap-2 bg-accent hover:bg-accent-pressed text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors">
-                <UserPlus className="w-4 h-4" /> Add Patient
-              </button>
-            )}
-            {viewMode === 'home' && (
-              <button
-                onClick={handleExportPdf}
-                disabled={exporting}
-                aria-label="Export ward list as PDF"
-                className="flex items-center gap-2 bg-surface-card border border-line hover:border-accent hover:text-accent-fg text-ink px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
-              >
-                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                {exporting ? 'Exporting…' : 'Export PDF'}
-              </button>
-            )}
-            <button
-              onClick={() => setFilterPending(!filterPending)}
-              className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-lg font-medium text-sm border transition-colors ${filterPending ? 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border' : 'border-line text-ink-muted hover:bg-surface'}`}
-            >
-              <Filter className="w-4 h-4" /> PAC Pending
-            </button>
-            {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg font-medium text-xs border border-line text-ink-muted hover:bg-surface-sunken transition-colors"
-              >
-                ✕ Clear
-              </button>
-            )}
-          </div>
-        </div>
+      <div className="max-md:order-1 sticky top-0 z-10">
+        <WardControls
+          viewMode={viewMode}
+          searchTerm={searchTerm}
+          onSearch={setSearchTerm}
+          filters={filters}
+          onToggleFilter={toggleFilter}
+          onClear={clearFilters}
+          onAddPatient={onAddPatient}
+          onExportWardList={handleExportPdf}
+          exportingWardList={exporting}
+          onExportShiftHandover={handleExportShiftHandover}
+        />
       </div>
 
       {/* Patient Tables by Ward — Desktop only; mobile uses virtual list below */}
@@ -436,7 +428,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
             <Layout className="w-4 h-4" />
             <h3 className="font-bold uppercase tracking-wide text-sm">{ward}</h3>
             <span className="text-xs text-ink-muted">
-              {wardPatients.length} patient{wardPatients.length !== 1 ? 's' : ''} · {wardPatients.filter(p => p.dailyRounds.some(r => r.date === today)).length} rounded
+              {wardPatients.length} patient{wardPatients.length !== 1 ? 's' : ''} · {countRoundedToday(wardPatients, today)} rounded
             </span>
           </div>
 
@@ -616,7 +608,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           above, so it was a third control for one action and 90px of height. */}
 
       {/* ─── Mobile: Virtualised flat card list (all wards) ─── */}
-      <div className="md:hidden" ref={listRef}>
+      <div className={`md:hidden max-md:order-5 ${showAddFab ? 'pb-20' : ''}`} ref={listRef}>
         <div
           role="list"
           aria-label="Patient list"
@@ -693,7 +685,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
 
       {/* Load More — shown when more pages exist on the server */}
       {hasMore && onLoadMore && (
-        <div className="flex justify-center pt-2 pb-4">
+        <div className="max-md:order-6 flex justify-center pt-2 pb-4">
           <button
             onClick={onLoadMore}
             disabled={isLoadingMore}
@@ -707,13 +699,25 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
       )}
 
       {wardsToDisplay.length === 0 && (
-        <div className="bg-surface-card rounded-xl border border-line">
+        <div className="max-md:order-7 bg-surface-card rounded-xl border border-line">
           {hasActiveFilters ? (
             <NoSearchResults query={searchTerm || 'current filters'} />
           ) : (
             <NoPatients onAdd={onAddPatient} />
           )}
         </div>
+      )}
+
+      {/* ─── Phone: Add patient in thumb reach, above the tab bar ─── */}
+      {showAddFab && !quickLabIp && (
+        <button
+          type="button"
+          onClick={onAddPatient}
+          className="md:hidden fixed right-4 z-30 min-h-14 px-5 flex items-center gap-2 rounded-full bg-accent hover:bg-accent-pressed active:bg-accent-pressed text-white font-semibold shadow-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+          style={{ bottom: 'var(--fab-bottom)' }}
+        >
+          <UserPlus className="w-5 h-5" aria-hidden="true" /> Add patient
+        </button>
       )}
 
       {/* ─── OT Date Picker modal ─── */}

@@ -1,14 +1,6 @@
 import React from 'react';
 import { ChevronRight, LayoutGrid, Users, AlertTriangle } from 'lucide-react';
 
-const UNIT_GRADIENTS = [
-  'from-teal-500 to-teal-700',
-  'from-emerald-500 to-emerald-700',
-  'from-purple-500 to-purple-700',
-  'from-orange-500 to-orange-700',
-  'from-rose-500 to-rose-700',
-];
-
 export interface UnitStat {
   total: number;
   pacPending: number;
@@ -38,7 +30,7 @@ const UnitPicker: React.FC<Props> = ({
     <div className="min-h-[100dvh] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 overflow-y-auto">
       {/* Logo */}
       <div className="mb-8 flex flex-col items-center gap-3">
-        <div className="bg-gradient-to-br from-teal-500 to-teal-700 p-4 rounded-2xl shadow-xl shadow-teal-900/40">
+        <div className="bg-accent p-4 rounded-2xl shadow-xl shadow-black/30">
           <LayoutGrid className="w-10 h-10 text-white" />
         </div>
         <div className="text-center">
@@ -61,7 +53,7 @@ const UnitPicker: React.FC<Props> = ({
           onClick={() => onSelect('all')}
           className="w-full bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-2xl p-5 flex items-center gap-4 transition-all duration-200 text-left group"
         >
-          <div className="bg-gradient-to-br from-slate-500 to-slate-700 p-3 rounded-xl shrink-0">
+          <div className="bg-slate-600 p-3 rounded-xl shrink-0">
             <LayoutGrid className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1 min-w-0">
@@ -77,7 +69,7 @@ const UnitPicker: React.FC<Props> = ({
         </button>
 
         {/* Individual units */}
-        {units.map((unit, i) => {
+        {units.map((unit) => {
           const stat = unitStats?.[unit];
           return (
             <button
@@ -85,7 +77,9 @@ const UnitPicker: React.FC<Props> = ({
               onClick={() => onSelect(unit)}
               className="w-full bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-2xl p-5 flex items-center gap-4 transition-all duration-200 text-left group"
             >
-              <div className={`bg-gradient-to-br ${UNIT_GRADIENTS[i % UNIT_GRADIENTS.length]} p-3 rounded-xl shrink-0 min-w-[3rem] flex items-center justify-center`}>
+              {/* One colour for every unit: a unit is not a status. (Units used
+                  to cycle through teal / green / purple / orange / rose.) */}
+              <div className="bg-accent p-3 rounded-xl shrink-0 min-w-[3rem] flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{unit}</span>
               </div>
               <div className="flex-1 min-w-0">

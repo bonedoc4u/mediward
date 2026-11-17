@@ -55,6 +55,9 @@
   --color-accent-pressed:  #28615e; /* pressed/hover fill        */
   --color-line:            #dce4e4; /* all borders & dividers    */
 
+  /* @fontsource-variable registers the face as "DM Sans Variable"; plain
+     "DM Sans" matched nothing, so the app fell back to the system font. */
+  --font-sans: 'DM Sans Variable', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'DM Mono', ui-monospace, 'Cascadia Mono', monospace;
   --radius-card: 12px;
   --radius-control: 8px;
@@ -267,6 +270,20 @@ button:active, a:active { opacity: 0.85; }
 @media (min-width: 768px) {
   .round-action-bar { position: sticky; bottom: 0; left: auto; right: auto; padding-left: 0; padding-right: 0; }
   .round-action-spacer { height: 0; }
+}
+
+/* ── Patient record action bar (Write today's note) ───────────────
+ * Same placement rules as the Round Mode bar above. */
+.patient-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--bottom-nav-height) + var(--safe-area-bottom));
+  padding-left: calc(1rem + var(--safe-area-left));
+  padding-right: calc(1rem + var(--safe-area-right));
+}
+@media (min-width: 768px) {
+  .patient-action-bar { position: sticky; bottom: 0; left: auto; right: auto; padding-left: 0; padding-right: 0; }
 }
 
 /* ── Patient identity bar on the full-page patient view ───────────
