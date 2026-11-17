@@ -21,10 +21,11 @@ describe('font tokens match the self-hosted faces', () => {
     expect(appCss).toMatch(new RegExp(`--font-sans:\\s*'${family}'`));
   });
 
-  it('--font-mono starts with the family @fontsource/dm-mono registers', () => {
-    const family = registeredFamily(read('node_modules/@fontsource/dm-mono/400.css'));
-    expect(family).toBeTruthy();
-    expect(appCss).toMatch(new RegExp(`--font-mono:\\s*'${family}'`));
+  // Clinical numbers use DM Sans: DM Mono's zero has a line through it,
+  // which the user did not want. font-mono must point at the sans face.
+  it('--font-mono (clinical numbers) uses the sans face, not DM Mono', () => {
+    expect(appCss).toMatch(/--font-mono:\s*var\(--font-sans\)/);
+    expect(appCss).not.toMatch(/dm-mono|'DM Mono'/i);
   });
 
   it('App.tsx sets no global font-family that would override font-mono', () => {
