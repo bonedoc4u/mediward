@@ -298,9 +298,9 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients, open: isOpen, onClose 
                   )}
 
                   {alerts.map((alert, idx) => (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex flex-col gap-2 relative overflow-hidden">
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${alert.priority === 'High' ? 'bg-red-500' : alert.priority === 'Medium' ? 'bg-orange-400' : 'bg-blue-400'}`} />
-                      <div className="flex justify-between items-start pl-2">
+                    <div key={idx} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex flex-col gap-2">
+                      {/* Priority is the badge on the right; no coloured side stripe. */}
+                      <div className="flex justify-between items-start">
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="bg-slate-900 text-white text-xs font-bold px-1.5 py-0.5 rounded">Bed {alert.bed}</span>
@@ -311,7 +311,7 @@ const AiClinicalAssistant: React.FC<Props> = ({ patients, open: isOpen, onClose 
                           {alert.priority}
                         </span>
                       </div>
-                      <div className="pl-2">
+                      <div>
                         <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1">
                           {getCategoryIcon(alert.category)} {alert.category}
                         </div>

@@ -18,10 +18,11 @@ const NotificationCenter: React.FC = () => {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'border-l-red-500 bg-red-50/50';
-      case 'medium': return 'border-l-orange-400 bg-orange-50/30';
-      case 'low': return 'border-l-blue-400 bg-blue-50/30';
-      default: return 'border-l-slate-300 bg-slate-50/30';
+      // Priority shows in the icon colour and a light tint; no thick side stripe.
+      case 'high': return 'bg-red-50/50';
+      case 'medium': return 'bg-orange-50/30';
+      case 'low': return 'bg-blue-50/30';
+      default: return 'bg-slate-50/30';
     }
   };
 
@@ -86,7 +87,7 @@ const NotificationCenter: React.FC = () => {
                   <button
                     key={n.id}
                     onClick={() => handleNotificationClick(n)}
-                    className={`w-full text-left p-3 border-b border-slate-50 border-l-4 hover:bg-slate-50 transition-colors ${getPriorityColor(n.priority)} ${n.read ? 'opacity-60' : ''}`}
+                    className={`w-full text-left p-3 border-b border-slate-100 hover:bg-slate-50 transition-colors ${getPriorityColor(n.priority)} ${n.read ? 'opacity-60' : ''}`}
                   >
                     <div className="flex items-start gap-2.5">
                       <div className={`mt-0.5 ${n.priority === 'high' ? 'text-red-500' : n.priority === 'medium' ? 'text-orange-500' : 'text-blue-500'}`}>

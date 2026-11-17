@@ -298,7 +298,7 @@ const WardDashboard: React.FC<Props> = memo(({ patients, viewMode = 'home', onAd
           filteredPatients.map(p => (
             <div
               key={p.ipNo}
-              className="bg-surface-card rounded-xl border border-line border-l-4 border-l-accent p-4 flex items-center gap-4 cursor-pointer hover:shadow-sm hover:border-accent transition-all active:scale-[0.99]"
+              className="bg-surface-card rounded-xl border border-line p-4 flex items-center gap-4 cursor-pointer hover:shadow-sm hover:border-accent transition-all active:scale-[0.99]"
               onClick={() => onViewPatient?.(p.ipNo)}
             >
               <div className="w-10 h-10 rounded-lg bg-surface-sunken flex items-center justify-center text-sm font-bold font-mono text-ink shrink-0">
