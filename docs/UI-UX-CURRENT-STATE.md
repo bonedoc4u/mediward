@@ -48,7 +48,7 @@ This is the actual "brand feel" of the app: a muted, clinical teal-on-off-white 
 ### 2.3 Typography
 
 - **DM Sans** (variable font, self-hosted — not loaded from Google's CDN, deliberately, for data-privacy reasons) — all UI text.
-- **DM Mono** — reserved specifically for clinical *numbers*: vitals, drug doses, bed numbers, IP numbers. Using a monospace face for these is intentional, so digits are easy to scan and compare at a glance (e.g. telling "112" from "121" at speed).
+- **Clinical numbers** (vitals, drug doses, bed numbers, IP numbers) keep the `font-mono` class, but since 2026-11-17 it renders in **DM Sans**, not DM Mono: DM Mono's zero has a line through it and no plain alternate. The class still marks which text is a clinical number, so the face can be changed in one place (`--font-mono` in `index.css`).
 
 ### 2.4 Shape and elevation
 
