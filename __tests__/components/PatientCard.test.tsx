@@ -64,7 +64,7 @@ describe('PatientCard — the last round note', () => {
   it("shows yesterday's note with who wrote it when not yet rounded today", () => {
     const rounds = [round('2026-11-12', { roundNote: 'Pin sites clean. Continue IV antibiotics.', roundNoteBy: 'Dr R' })];
     render(<PatientCard patient={patient({ dailyRounds: rounds })} today={TODAY} />);
-    expect(screen.getByText('Not rounded today')).toBeInTheDocument();
+    expect(screen.getByText('Round due')).toBeInTheDocument();
     expect(screen.getByText(/Yesterday · Dr R/)).toBeInTheDocument();
     expect(screen.getByText(/Pin sites clean\. Continue IV antibiotics\./)).toBeInTheDocument();
   });
@@ -75,7 +75,8 @@ describe('PatientCard — the last round note', () => {
       round(TODAY, { roundNote: 'Wrist swelling settling.', roundNoteAt: new Date(2026, 10, 13, 9, 40).toISOString() }),
     ];
     render(<PatientCard patient={patient({ dailyRounds: rounds })} today={TODAY} />);
-    expect(screen.getByText('Rounded today · 09:40')).toBeInTheDocument();
+    expect(screen.getByText('09:40').parentElement).toHaveTextContent('Rounded 09:40');
+    expect(screen.queryByText('Round due')).not.toBeInTheDocument();
     expect(screen.getByText('Wrist swelling settling.')).toBeInTheDocument();
     expect(screen.queryByText(/Old note/)).not.toBeInTheDocument();
   });
@@ -85,6 +86,11 @@ describe('PatientCard — the last round note', () => {
     render(<PatientCard patient={patient({ dailyRounds: [round('2026-11-12')] })} today={TODAY} />);
     expect(screen.getAllByText(DIAGNOSIS)).toHaveLength(1);   // the diagnosis line only
     expect(screen.queryByText(/Yesterday/)).not.toBeInTheDocument();
+  });
+
+  it('says "Rounded today" when today\'s round has no time', () => {
+    render(<PatientCard patient={patient({ dailyRounds: [round(TODAY)] })} today={TODAY} />);
+    expect(screen.getByText('Rounded today')).toBeInTheDocument();
   });
 });
 
@@ -103,7 +109,7 @@ describe('PatientCard — red means the patient, not the ward', () => {
 });
 
 describe('PatientCard — actions', () => {
-  it('tapping the card opens the patient; lab and edit are separate 44px buttons', () => {
+  it('tapping the card opens the patient; Labs and Edit are separate, labelled 44px buttons', () => {
     const onOpen = vi.fn(); const onEdit = vi.fn(); const onAddLab = vi.fn();
     render(<PatientCard patient={patient({ name: 'Patient E' })} today={TODAY} onOpen={onOpen} onEdit={onEdit} onAddLab={onAddLab} />);
 
@@ -111,11 +117,14 @@ describe('PatientCard — actions', () => {
     expect(onOpen).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByLabelText('Edit Patient E'));
-    fireEvent.click(screen.getByLabelText('Add lab result for Patient E'));
+    fireEvent.click(screen.getByLabelText('Labs for Patient E'));
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onAddLab).toHaveBeenCalledTimes(1);
     expect(onOpen).toHaveBeenCalledTimes(1);   // the icon buttons do not also open the patient
-    expect(screen.getByLabelText('Edit Patient E').className).toMatch(/w-11 h-11/);
+    // Visible words, and accessible names that contain them (WCAG 2.5.3).
+    expect(screen.getByLabelText('Edit Patient E')).toHaveTextContent('Edit');
+    expect(screen.getByLabelText('Labs for Patient E')).toHaveTextContent('Labs');
+    expect(screen.getByLabelText('Edit Patient E').className).toMatch(/h-11/);
   });
 
   it('shows PAC Pending before surgery and no PAC label after it', () => {
