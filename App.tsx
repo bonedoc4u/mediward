@@ -711,7 +711,6 @@ const App: React.FC = () => {
           --content-bottom-pad: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 24px);
           --fab-bottom: calc(var(--bottom-nav-height) + var(--safe-area-bottom) + 16px);
         }
-        * { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
         .glass-effect { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }

@@ -55,6 +55,9 @@
   --color-accent-pressed:  #28615e; /* pressed/hover fill        */
   --color-line:            #dce4e4; /* all borders & dividers    */
 
+  /* @fontsource-variable registers the face as "DM Sans Variable"; plain
+     "DM Sans" matched nothing, so the app fell back to the system font. */
+  --font-sans: 'DM Sans Variable', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'DM Mono', ui-monospace, 'Cascadia Mono', monospace;
   --radius-card: 12px;
   --radius-control: 8px;
