@@ -377,6 +377,7 @@ const App: React.FC = () => {
   // ward is shown instead. Everything drawn below uses `view`, so the title,
   // the menu highlight and the screen always agree.
   const view = canOpenView(user, currentView) ? currentView : 'dashboard';
+  const inRoundMode = view === 'round-mode';
   const meta = viewMeta[view as keyof typeof viewMeta] ?? viewMeta.dashboard;
 
   // Patient quick-view sheet is open when a list view carries a patient id.
@@ -696,7 +697,12 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row">
+    <div
+      className="min-h-[100dvh] bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex flex-col md:flex-row"
+      /* Round Mode has no tab bar (see below), so everything placed above the
+         tab bar (the Done bar, content padding) drops to the bottom edge. */
+      style={inRoundMode ? ({ '--bottom-nav-height': '0px' } as React.CSSProperties) : undefined}
+    >
       <style>{`
         :root {
           --bottom-nav-height: 60px;
@@ -992,6 +998,10 @@ const App: React.FC = () => {
       {/* ─── Mobile Bottom Tab Bar ─── */}
       <PwaInstallBanner />
 
+      {/* Hidden in Round Mode: the round has its own bottom bar (Done · next),
+          and a stray tap on a tab used to leave the round mid-note. The ✕ at
+          the top of Round Mode still exits. */}
+      {!inRoundMode && (
       <nav aria-label="Main navigation" className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="grid grid-cols-6">
           {mobileTabs.map(tab => (
@@ -1026,6 +1036,7 @@ const App: React.FC = () => {
           </button>
         </div>
       </nav>
+      )}
 
       {/* ─── Concurrent Edit Conflict Modal ─── */}
       {concurrentEditConflict && (

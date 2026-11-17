@@ -140,14 +140,15 @@ const RoundNoteCard: React.FC<Props> = ({ today, previous, todayRound, value, on
         )}
       </div>
 
-      <div data-no-swipe className="flex gap-2 overflow-x-auto pb-1" aria-label="Quick phrases">
+      {/* Wraps onto more rows so every phrase is visible (it used to scroll sideways). */}
+      <div data-no-swipe className="flex flex-wrap gap-2" aria-label="Quick phrases">
         {QUICK_PHRASES.map(phrase => (
           <button
             key={phrase}
             type="button"
             disabled={disabled}
             onClick={() => onChange(appendPhrase(value, phrase))}
-            className="shrink-0 min-h-11 px-3 rounded-full border border-line bg-surface-card text-sm font-semibold text-ink hover:border-accent active:bg-accent-soft disabled:opacity-40 transition-colors"
+            className="min-h-11 px-3 rounded-full border border-line bg-surface-card text-sm font-semibold text-ink hover:border-accent active:bg-accent-soft disabled:opacity-40 transition-colors"
           >
             + {phrase}
           </button>

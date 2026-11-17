@@ -24,6 +24,7 @@ import AllergyLine from '../src/features/rounds/AllergyLine';
 import { useRoundNote } from '../src/features/rounds/useRoundNote';
 import { countRoundedToday } from '../src/features/rounds/roundNotes';
 import RoundWardCard from '../src/features/rounds/RoundWardCard';
+import RoundProgress from '../src/features/rounds/RoundProgress';
 import WriteArea from '../src/features/permissions/WriteArea';
 
 const RoundMode: React.FC = () => {
@@ -308,6 +309,7 @@ const RoundMode: React.FC = () => {
           </div>
           <button
             onClick={() => navigateTo('dashboard')}
+            aria-label="Close round"
             className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-sunken rounded-xl text-ink-muted transition-colors"
           >
             <X className="w-5 h-5" />
@@ -403,6 +405,7 @@ const RoundMode: React.FC = () => {
           </div>
           <button
             onClick={() => navigateTo('dashboard')}
+            aria-label="Exit ward rounds"
             className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-sunken rounded-xl text-ink-muted hover:text-ink transition-colors"
           >
             <X className="w-5 h-5" />
@@ -531,7 +534,7 @@ const RoundMode: React.FC = () => {
       <RoundModeOfflineBanner onRetry={forceReconnect} networkQuality={networkQuality} />
 
       {/* ─── Header ─── */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-2">
         <div>
           <h2 className="text-xl font-bold text-ink">Ward Rounds</h2>
           <p className="text-xs text-ink-muted">
@@ -548,11 +551,15 @@ const RoundMode: React.FC = () => {
         </div>
         <button
           onClick={() => navigateTo('dashboard')}
+          aria-label="Exit ward rounds"
           className="min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-surface-sunken rounded-xl text-ink-muted hover:text-ink transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
       </div>
+
+      {/* ─── Progress through this ward: patients with a round today ─── */}
+      <RoundProgress rounded={countRoundedToday(activePatients, today)} total={activePatients.length} />
 
       {/* ─── Patient Navigation Strip ─── */}
       {/* Scrollable chip list — tap any patient to jump directly to them */}
