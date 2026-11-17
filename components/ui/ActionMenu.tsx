@@ -27,6 +27,7 @@ interface Props {
   /** Open the list above the button (for bars at the bottom of the screen). */
   placement?: 'below' | 'above';
   align?: 'start' | 'end';
+  /** Replaces the default size and rounding (44px square, control radius). */
   triggerClassName?: string;
   /** Marks the button as "on", e.g. while a filter from the menu is active. */
   active?: boolean;
@@ -54,14 +55,20 @@ const ActionMenu: React.FC<Props> = ({
     const onPointer = (e: PointerEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) close(false);
     };
+    // Escape closes only this menu. Listening on window in the capture phase
+    // runs before Radix's own Escape handler, so a menu inside the patient
+    // sheet does not also close the sheet.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); close(); }
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
     };
     document.addEventListener('pointerdown', onPointer);
-    document.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     return () => {
       document.removeEventListener('pointerdown', onPointer);
-      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, true);
     };
   }, [open, close]);
 
@@ -84,11 +91,11 @@ const ActionMenu: React.FC<Props> = ({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen(v => !v)}
-        className={`min-w-11 min-h-11 flex items-center justify-center rounded-control border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        className={`${triggerClassName || 'min-w-11 min-h-11 rounded-control'} flex items-center justify-center border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           active || open
             ? 'bg-accent-soft border-accent text-accent-fg'
             : 'bg-surface-card border-line text-ink-muted hover:text-ink hover:border-accent'
-        } ${triggerClassName}`}
+        }`}
       >
         {children}
       </button>
