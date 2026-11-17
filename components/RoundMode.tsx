@@ -22,6 +22,8 @@ import RoundNoteCard from '../src/features/rounds/RoundNoteCard';
 import RoundActionBar from '../src/features/rounds/RoundActionBar';
 import AllergyLine from '../src/features/rounds/AllergyLine';
 import { useRoundNote } from '../src/features/rounds/useRoundNote';
+import { countRoundedToday } from '../src/features/rounds/roundNotes';
+import RoundWardCard from '../src/features/rounds/RoundWardCard';
 import WriteArea from '../src/features/permissions/WriteArea';
 
 const RoundMode: React.FC = () => {
@@ -417,44 +419,26 @@ const RoundMode: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Neutral cards: an ICU is a place, not an alarm (it used to be a red
+                card). Each card shows where the round stands in that ward. */}
             {[...wardCounts.entries()].map(([ward, count]) => (
-              <button
+              <RoundWardCard
                 key={ward}
-                onClick={() => setSelectedWard(ward)}
-                className={`p-6 rounded-2xl border-2 text-left transition-all hover:shadow-md ${
-                  icuWardNames.has(ward)
-                    ? 'border-vital-critical-border bg-vital-critical-surface hover:border-vital-critical'
-                    /* blue here was decorative (ward-picker hover/count), not a lab value —
-                       reclassified to accent so blue stays reserved for its clinical
-                       ("abnormal-low") meaning per docs/UI-UX-CURRENT-STATE.md 2.1 */
-                    : 'border-line bg-surface-card hover:border-accent'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-lg font-bold ${icuWardNames.has(ward) ? 'text-vital-critical-fg' : 'text-ink'}`}>
-                    {ward}
-                  </span>
-                  <span className={`text-3xl font-black ${icuWardNames.has(ward) ? 'text-vital-critical' : 'text-accent-fg'}`}>
-                    {count}
-                  </span>
-                </div>
-                <p className="text-xs text-ink-muted">{count} patient{count !== 1 ? 's' : ''}</p>
-                {icuWardNames.has(ward) && (
-                  <span className="mt-2 inline-block text-xs font-bold text-vital-critical uppercase tracking-widest">ICU</span>
-                )}
-              </button>
+                name={ward}
+                count={count}
+                rounded={countRoundedToday(allActivePatients.filter(p => (p.ward ?? 'Unknown') === ward), today)}
+                isIcu={icuWardNames.has(ward)}
+                onSelect={() => setSelectedWard(ward)}
+              />
             ))}
             {wardCounts.size > 1 && (
-              <button
-                onClick={() => setSelectedWard('__all__')}
-                className="p-6 rounded-2xl border-2 border-dashed border-line bg-surface-sunken hover:border-accent hover:bg-accent-soft text-left transition-all"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-lg font-bold text-ink">All Wards</span>
-                  <span className="text-3xl font-black text-ink-muted">{allActivePatients.length}</span>
-                </div>
-                <p className="text-xs text-ink-muted">Round on all {allActivePatients.length} patients</p>
-              </button>
+              <RoundWardCard
+                name="All wards"
+                count={allActivePatients.length}
+                rounded={countRoundedToday(allActivePatients, today)}
+                allWards
+                onSelect={() => setSelectedWard('__all__')}
+              />
             )}
           </div>
         )}
@@ -576,7 +560,6 @@ const RoundMode: React.FC = () => {
         {activePatients.map((p, i) => {
           const isActive  = i === index;
           const isSavedP  = savedSet.has(p.ipNo);
-          const isIcu     = icuWardNames.has(p.ward ?? '');
           const isConserv = (p.management ?? 'surgical_fixation') === 'conservative';
           return (
             <button
@@ -585,18 +568,10 @@ const RoundMode: React.FC = () => {
               aria-label={`Jump to ${p.name}, Bed ${p.bed}`}
               className={`snap-start shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all min-h-[40px] ${
                 isActive
-                  ? /* isActive pill: left hardcoded (judgment call, not a mechanical
-                       lookup) — this is the same "always-dark identity chrome" idiom
-                       as the Patient Header below (which uses the darker bg-red-900/
-                       bg-slate-900 shades for the same ICU/default split), so both
-                       stay in sync. Converting only this chip to bg-accent/bg-ink
-                       would (a) desync it from the header's
-                       still-hardcoded look and (b) bg-ink risks the near-white-in-
-                       dark-mode bug this task warns against. See Patient Header
-                       comment below and task-4-report.md for full reasoning. */
-                    isIcu
-                    ? 'bg-red-800 text-white border-red-900 shadow-sm'
-                    : 'bg-slate-800 text-white border-slate-900 shadow-sm'
+                  ? /* isActive pill: hardcoded always-dark chip, the same idiom as the
+                       Patient Header below (bg-ink would turn near-white in dark mode).
+                       No red for ICU beds: an ICU is a location, not a warning. */
+                    'bg-slate-800 text-white border-slate-900 shadow-sm'
                   : isSavedP
                   ? 'bg-vital-normal-surface text-vital-normal-fg border-vital-normal-border'
                   /* blue hover border here is decorative (chip hover), not a lab value */
@@ -628,7 +603,7 @@ const RoundMode: React.FC = () => {
       {/* ─── Main Card ─── */}
       <div className="flex-1 bg-surface-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/*
-          Patient Header — JUDGMENT CALL, left hardcoded (bg-red-900 / bg-slate-900 +
+          Patient Header — JUDGMENT CALL, left hardcoded (bg-slate-900 +
           text-white, and every light-on-dark color within it below), not tokenized.
           Not a mechanical mapping-table lookup; documented here + commit message +
           task-4-report.md.
@@ -652,14 +627,20 @@ const RoundMode: React.FC = () => {
           hardcoded raw color never flips, so it can never become white-on-white the
           way bg-ink + text-white would.
         */}
-        <div className={`p-4 sm:p-5 ${icuWardNames.has(patient.ward ?? '') ? 'bg-red-900' : 'bg-slate-900'} text-white`}>
+        <div className="p-4 sm:p-5 bg-slate-900 text-white">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className={`w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-xl flex items-center justify-center font-black text-lg sm:text-2xl border-2 border-white/20 ${icuWardNames.has(patient.ward ?? '') ? 'bg-red-700' : 'bg-white/10'}`}>
+              <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-xl flex items-center justify-center font-bold font-mono text-lg sm:text-2xl border-2 border-white/20 bg-white/10">
                 {patient.bed}
               </div>
               <div className="min-w-0">
-                <h3 className="text-lg sm:text-xl font-bold truncate">{patient.name}</h3>
+                <h3 className="text-lg sm:text-xl font-bold truncate flex items-center gap-2">
+                  <span className="truncate">{patient.name}</span>
+                  {/* ICU is said in words, not in red (red is for critical only). */}
+                  {icuWardNames.has(patient.ward ?? '') && (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded border border-white/30 text-[11px] font-bold tracking-wide text-white">ICU</span>
+                  )}
+                </h3>
                 <p className="text-slate-400 text-xs sm:text-sm truncate">{patient.age}y / {patient.gender} · {patient.ward} · IP: {patient.ipNo}</p>
               </div>
             </div>

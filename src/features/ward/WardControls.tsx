@@ -131,7 +131,7 @@ const WardControls: React.FC<Props> = ({
           <button
             onClick={() => onToggleFilter('pending')}
             aria-pressed={filters.pending}
-            className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-control font-medium text-sm border transition-colors ${filters.pending ? 'bg-vital-critical-surface text-vital-critical-fg border-vital-critical-border' : 'border-line text-ink-muted hover:bg-surface'}`}
+            className={`flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-control font-medium text-sm border transition-colors ${filters.pending ? 'bg-accent-soft text-accent-fg border-accent' : 'border-line text-ink-muted hover:bg-surface'}`}
           >
             <Filter className="w-4 h-4" /> PAC Pending
           </button>
