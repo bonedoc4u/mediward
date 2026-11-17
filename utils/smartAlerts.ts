@@ -21,11 +21,18 @@ export function getSmartAlerts(patient: Patient): SmartAlert[] {
   if ((patient.pod === 1 || patient.pod === 2) && patient.todos.some(t => !t.isDone))
     alerts.push({ type: 'warning', message: `POD ${patient.pod} — overdue orders` });
 
-  if (patient.pod !== undefined && patient.pod >= 5 && !patient.dischargeSummary)
-    alerts.push({ type: 'info', message: `POD ${patient.pod} — consider discharge planning` });
-
+  // One length-of-stay alert per patient. From POD 7 the amber "extended stay"
+  // alert replaces the POD 5 discharge-planning nudge: both used to show at
+  // once, saying the same thing in two colours.
   if (patient.pod !== undefined && patient.pod >= 7)
-    alerts.push({ type: 'warning', message: `POD ${patient.pod} — extended stay, review needed` });
+    alerts.push({
+      type: 'warning',
+      message: patient.dischargeSummary
+        ? `POD ${patient.pod} — extended stay, review needed`
+        : `POD ${patient.pod} — extended stay. Review and plan discharge`,
+    });
+  else if (patient.pod !== undefined && patient.pod >= 5 && !patient.dischargeSummary)
+    alerts.push({ type: 'info', message: `POD ${patient.pod} — consider discharge planning` });
 
   return alerts;
 }
